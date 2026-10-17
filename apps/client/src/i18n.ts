@@ -57,7 +57,7 @@ const ES: Record<string, string> = {
   'Create room': 'Crear sala',
   'or join friends': 'o únete a tus amigos',
   Join: 'Unirse',
-  'Online sim racing for friends · Nürburgring GP': 'Simulador de carreras online con amigos · Nürburgring GP',
+  'Online sim racing for friends · Nürburgring · Zandvoort': 'Simulador de carreras online con amigos · Nürburgring · Zandvoort',
   Settings: 'Ajustes',
   'Keyboard: W/S throttle & brake · A/D steer · Space handbrake · Esc menu':
     'Teclado: W/S acelerador y freno · A/D dirección · Espacio freno de mano · Esc menú',
@@ -80,6 +80,7 @@ const ES: Record<string, string> = {
   // lobby: session setup
   'Nürburgring GP': 'Nürburgring GP',
   'Nürburgring GP · Short (no Müllenbachschleife)': 'Nürburgring GP · Corto (sin Müllenbachschleife)',
+  'Circuit Zandvoort': 'Circuito de Zandvoort',
   '{weather} from about minute {min}': '{weather} desde el minuto {min} aprox.',
   'Stable conditions': 'Condiciones estables',
   '{name}: grip {dry} % dry / {wet} % wet, wear ×{wear}': '{name}: agarre {dry} % seco / {wet} % mojado, desgaste ×{wear}',
@@ -254,7 +255,7 @@ const ES: Record<string, string> = {
   'Enter: skip': 'Enter: saltar',
 
   // race messages
-  '15 turns': '15 curvas',
+  '{n} turns': '{n} curvas',
   'Wet track': 'Pista mojada',
   'Damp track': 'Pista húmeda',
   'Dry track': 'Pista seca',

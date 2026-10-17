@@ -24,6 +24,8 @@ export interface RacingLine {
   ds: Float32Array;
   /** Signed curvature (1/m, + = turning left). */
   curvature: Float32Array;
+  /** Banking (rad, + = left side higher) per point, from the track data; zeros when it has none. */
+  bank: Float32Array;
 }
 
 export function buildRacingLine(track: TrackData, margin = 2.0, iterations = 3000): RacingLine {
@@ -93,7 +95,8 @@ export function buildRacingLine(track: TrackData, margin = 2.0, iterations = 300
   // light smoothing of the curvature (the 5 m resampled line still has small kinks)
   const tmp = Float32Array.from(curvature);
   for (let i = 0; i < n; i++) curvature[i] = (tmp[(i - 1 + n) % n] + 2 * tmp[i] + tmp[(i + 1) % n]) / 4;
-  return { x, z, offset: off, ds, curvature };
+  const bank = track.bank && track.bank.length === n ? Float32Array.from(track.bank) : new Float32Array(n);
+  return { x, z, offset: off, ds, curvature, bank };
 }
 
 /** What the speed profile needs to know about the car. */
@@ -124,7 +127,8 @@ export function carLimits(specs: CarSpecs, skill = 1): CarLimits {
 
 /**
  * Quasi-steady-state speed profile along the racing line:
- *  - cornering limit with downforce: v²·κ = μ·(g + k·v²), k = ½ρ·ClA / m;
+ *  - cornering limit with downforce: v²·κ = μ·(g + k·v²), k = ½ρ·ClA / m; on a banked corner (angle θ towards
+ *    the inside) gravity helps: v²·(κ(cos θ − μ sin θ) − μk) = g(sin θ + μ cos θ);
  *  - a backward pass for braking that shares grip with cornering (friction ellipse) and adds drag;
  *  - optionally a forward pass for power-limited acceleration (for lap-time estimates).
  */
@@ -135,14 +139,20 @@ export function speedProfile(line: RacingLine, car: CarLimits, weatherGrip = 1, 
   const kd = (0.5 * RHO * car.dragArea) / car.massKg;
   const mu = car.mu * weatherGrip;
   const muB = car.muBrake * weatherGrip;
+  // banking towards the inside of the turn (+), against it (−)
+  const theta = (i: number) => (line.curvature[i] > 0 ? -line.bank[i] : line.curvature[i] < 0 ? line.bank[i] : 0);
   for (let i = 0; i < n; i++) {
     const kap = Math.abs(line.curvature[i]);
-    const den = kap - mu * k;
-    v[i] = den <= 1e-6 ? car.vMax : Math.min(car.vMax, Math.sqrt((mu * G) / den));
+    const th = theta(i);
+    const den = kap * (Math.cos(th) - mu * Math.sin(th)) - mu * k;
+    const num = G * (Math.sin(th) + mu * Math.cos(th));
+    v[i] = den <= 1e-6 ? car.vMax : Math.min(car.vMax, Math.sqrt(Math.max(0, num) / den));
   }
   const avail = (i: number, vv: number, m: number) => {
-    const grip = m * (G + k * vv * vv);
-    const lat = vv * vv * Math.abs(line.curvature[i]);
+    const th = theta(i);
+    const kap = Math.abs(line.curvature[i]);
+    const grip = m * (G * Math.cos(th) + k * vv * vv + vv * vv * kap * Math.sin(th));
+    const lat = vv * vv * kap * Math.cos(th) - G * Math.sin(th);
     return Math.sqrt(Math.max(0, grip * grip - lat * lat));
   };
   for (let pass = 0; pass < 2; pass++) {

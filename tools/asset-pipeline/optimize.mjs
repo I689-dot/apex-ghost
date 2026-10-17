@@ -2,7 +2,8 @@
 /**
  * Optimisation stage (gltf-transform + meshoptimizer + toktx):
  *   cars → apps/client/public/assets/cars/<id>/lod{0,1,2}.glb + thumb.webp, cars.json
- *   map  → apps/client/public/assets/track/*.glb, collision.bin, track.json
+ *   map  → apps/client/public/assets/<map assets dir>/*.glb, collision.apxc, the layout JSONs (one map per run:
+ *          --map <id>, configured in maps/<id>.json; default the Nürburgring)
  *   shared → packages/shared/src/generated/{track-race,car-ids}.json (server validation data)
  *
  * Budgets: car LOD0 ≤ 100k triangles, textures ≤ 2048 px (colour) / 1024 px (data); LOD1 ≈ 28k; LOD2 ≈ 7k.
@@ -35,6 +36,14 @@ const HAVE_KTX = existsSync(TOKTX);
 const args = process.argv.slice(2);
 const carFilter = args.includes('--car') ? args[args.indexOf('--car') + 1] : null;
 const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
+const MAP = loadMapConfig(args.includes('--map') ? args[args.indexOf('--map') + 1] : 'nurburgring');
+
+/** maps/<id>.json: source model, output and asset folders, layouts (turns, file names), map-specific fixes. */
+function loadMapConfig(id) {
+  const f = path.join(here, 'maps', `${id}.json`);
+  if (!existsSync(f)) throw new Error(`unknown map ${id} (no ${f})`);
+  return JSON.parse(readFileSync(f, 'utf8'));
+}
 
 await MeshoptDecoder.ready;
 await MeshoptEncoder.ready;
@@ -462,8 +471,8 @@ const HEAVY_RE =
 const CUTOUT_RE = /^(tree|pines|trees_new|fence|fences_b|grille|box_fence|galvanized|net|glass_railing|spons_panels)/i;
 
 async function map() {
-  const mapOut = path.join(out, 'map');
-  const dstDir = path.join(pub, 'track');
+  const mapOut = path.join(out, MAP.out);
+  const dstDir = path.join(pub, MAP.assets);
   mkdirSync(dstDir, { recursive: true });
   const chunks = JSON.parse(readFileSync(path.join(mapOut, 'chunks.json'), 'utf8'));
   const files = {};
@@ -498,17 +507,22 @@ async function map() {
   }
   await collision(mapOut, dstDir);
 
+  const base = `assets/${MAP.assets}`;
   writeTracks(mapOut, {
-    chunks: chunks.map((c) => ({ file: `assets/track/${files[c.kind]}${V}`, node: c.name, center: c.center, radius: c.radius, kind: c.kind })),
-    files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, `assets/track/${f}${V}`])),
-    collision: { file: `assets/track/collision.apxc${V}`, surfaces: ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'] },
+    chunks: chunks.map((c) => ({ file: `${base}/${files[c.kind]}${V}`, node: c.name, center: c.center, radius: c.radius, kind: c.kind })),
+    files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, `${base}/${f}${V}`])),
+    collision: { file: `${base}/collision.apxc${V}`, surfaces: ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'] },
   });
 }
 
+/** Where a layout's JSON lives (public/assets/<file>): the map config can name it (the Nürburgring GP keeps track.json). */
+const layoutFile = (id) => MAP.tracks?.[id]?.file ?? `tracks/${id}.json`;
+
 /**
  * One JSON per layout (the GP and the alternatives traced on the same map), sharing the render chunks and the
- * collision mesh: public/assets/track.json (GP), public/assets/tracks/<id>.json, an index (tracks.json) and the
- * server's validation data (shared/generated/tracks-race.json).
+ * collision mesh: public/assets/track.json (Nürburgring GP), public/assets/tracks/<id>.json, an index (tracks.json)
+ * and the server's validation data (shared/generated/tracks-race.json). The index and the validation data hold
+ * every map: this run replaces the entries of its own map and keeps the others.
  */
 function writeTracks(mapOut, render) {
   const bases = [JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'))];
@@ -517,15 +531,16 @@ function writeTracks(mapOut, render) {
     .sort())
     bases.push(JSON.parse(readFileSync(path.join(mapOut, f), 'utf8')));
   const surf = roadSurface(mapOut);
-  fixPitEntry(bases);
+  if (MAP.fixPitEntry) fixPitEntry(bases);
   for (const b of bases) fixHeights(b, surf);
+  if (MAP.bank) for (const b of bases) b.bank = measureBank(b, surf);
   mkdirSync(path.join(pub, 'tracks'), { recursive: true });
   const index = [];
   const races = {};
   // the hole fill (fill_holes.mjs) is one more always-visible track chunk
   const fillInfo = existsSync(path.join(mapOut, 'fill.json')) ? JSON.parse(readFileSync(path.join(mapOut, 'fill.json'), 'utf8')) : null;
   if (fillInfo) {
-    const url = `assets/track/${fillInfo.file}${V}`;
+    const url = `assets/${MAP.assets}/${fillInfo.file}${V}`;
     render = {
       ...render,
       chunks: [
@@ -537,9 +552,17 @@ function writeTracks(mapOut, render) {
   }
   bases.forEach((base, i) => {
     const track = { ...base, ...render };
-    const file = i === 0 ? 'track.json' : `tracks/${base.id}.json`;
+    const file = layoutFile(base.id);
     writeFileSync(path.join(pub, file), JSON.stringify(track));
-    index.push({ id: base.id, name: base.name, length: base.length, turns: i === 0 ? 15 : null, file: `assets/${file}${V}`, default: i === 0 });
+    index.push({
+      id: base.id,
+      name: base.name,
+      length: base.length,
+      turns: MAP.tracks?.[base.id]?.turns ?? null,
+      file: `assets/${file}${V}`,
+      default: !!MAP.default && i === 0,
+      map: MAP.id,
+    });
     races[base.id] = {
       id: base.id,
       name: base.name,
@@ -553,11 +576,25 @@ function writeTracks(mapOut, render) {
       pitExitS: base.pitLane ? base.pitLane.exitS : null,
     };
   });
-  writeFileSync(path.join(pub, 'tracks.json'), JSON.stringify({ tracks: index }));
+  // merge with the other maps' layouts (entries without a map field are the Nürburgring's, from before maps/)
+  const indexFile = path.join(pub, 'tracks.json');
+  const prev = existsSync(indexFile) ? JSON.parse(readFileSync(indexFile, 'utf8')).tracks : [];
+  const mapOf = (e) => e.map ?? 'nurburgring';
+  const others = prev.filter((e) => mapOf(e) !== MAP.id && !index.some((n) => n.id === e.id));
+  const merged = [...others, ...index].sort(
+    (a, b) => Number(b.default) - Number(a.default) || Number(mapOf(a) !== 'nurburgring') - Number(mapOf(b) !== 'nurburgring'),
+  );
+  // keep each map's layouts together, in the order they were listed
+  const order = [...new Set(merged.map(mapOf))];
+  const all = order.flatMap((m) => merged.filter((e) => mapOf(e) === m));
+  writeFileSync(indexFile, JSON.stringify({ tracks: all }));
   mkdirSync(sharedGen, { recursive: true });
-  writeFileSync(path.join(sharedGen, 'track-race.json'), JSON.stringify(races[bases[0].id]));
-  writeFileSync(path.join(sharedGen, 'tracks-race.json'), JSON.stringify(races));
-  log(`tracks written: ${index.map((t) => `${t.id} (${Math.round(t.length)} m)`).join(', ')}`);
+  const racesFile = path.join(sharedGen, 'tracks-race.json');
+  const prevRaces = existsSync(racesFile) ? JSON.parse(readFileSync(racesFile, 'utf8')) : {};
+  const keep = Object.fromEntries(Object.entries(prevRaces).filter(([id]) => others.some((e) => e.id === id)));
+  if (MAP.default) writeFileSync(path.join(sharedGen, 'track-race.json'), JSON.stringify(races[bases[0].id]));
+  writeFileSync(racesFile, JSON.stringify({ ...keep, ...races }));
+  log(`tracks written: ${index.map((t) => `${t.id} (${Math.round(t.length)} m)`).join(', ')}; index: ${all.map((t) => t.id).join(', ')}`);
 }
 
 /**
@@ -760,10 +797,44 @@ function fixHeights(base, surf) {
   if (fixed) log(`${base.id}: ${fixed} lap-line heights corrected from the road surface (>1.5 m off)`);
 }
 
+/**
+ * Banking at every lap-line point from the road surface 3.5 m either side (rad, + = left side higher), lightly
+ * smoothed. Zandvoort's Hugenholtz and Arie Luyendyk corners are banked ~11° and ~14° in the model; the AI's speed
+ * profile takes it into account.
+ */
+function measureBank(base, surf) {
+  const cl = base.centerline;
+  const n = cl.length / 3;
+  const W = 3.5;
+  const near = (x, z, y) => {
+    const ys = surf(x, z);
+    return ys.length ? ys.reduce((b, v) => (Math.abs(v - y) < Math.abs(b - y) ? v : b), ys[0]) : NaN;
+  };
+  const raw = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a = (i - 1 + n) % n;
+    let tx = cl[j * 3] - cl[a * 3];
+    let tz = cl[j * 3 + 2] - cl[a * 3 + 2];
+    const tl = Math.hypot(tx, tz) || 1;
+    tx /= tl;
+    tz /= tl;
+    const y = cl[i * 3 + 1];
+    const yl = near(cl[i * 3] + tz * W, cl[i * 3 + 2] - tx * W, y);
+    const yr = near(cl[i * 3] - tz * W, cl[i * 3 + 2] + tx * W, y);
+    raw[i] = Number.isFinite(yl) && Number.isFinite(yr) ? Math.atan2(yl - yr, 2 * W) : 0;
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(Math.round(((raw[(i - 1 + n) % n] + 2 * raw[i] + raw[(i + 1) % n]) / 4) * 1000) / 1000);
+  log(`${base.id}: banking up to ${((Math.max(...out.map(Math.abs)) * 180) / Math.PI).toFixed(1)}°`);
+  return out;
+}
+
 /** Re-write the layout JSONs only (after a new track analysis), keeping the optimized meshes. */
 function tracksOnly() {
-  const cur = JSON.parse(readFileSync(path.join(pub, 'track.json'), 'utf8'));
-  writeTracks(path.join(out, 'map'), { chunks: cur.chunks, files: cur.files, collision: cur.collision });
+  const first = JSON.parse(readFileSync(path.join(out, MAP.out, 'track_base.json'), 'utf8')).id;
+  const cur = JSON.parse(readFileSync(path.join(pub, layoutFile(first)), 'utf8'));
+  writeTracks(path.join(out, MAP.out), { chunks: cur.chunks, files: cur.files, collision: cur.collision });
 }
 
 /* ---------------------------------------------------------- collision --- */
@@ -879,11 +950,12 @@ async function collision(mapOut, dstDir) {
 /* --------------------------------------------------------------- main --- */
 
 try {
-  if (!only || only === 'cars') await cars();
+  // a run for one map (--map) leaves the cars alone
+  if ((!only && !args.includes('--map')) || only === 'cars') await cars();
   if (!only || only === 'map') await map();
   if (only === 'tracks') tracksOnly();
   if (only === 'collision') {
-    await collision(path.join(out, 'map'), path.join(pub, 'track'));
+    await collision(path.join(out, MAP.out), path.join(pub, MAP.assets));
     tracksOnly();
   }
 } finally {

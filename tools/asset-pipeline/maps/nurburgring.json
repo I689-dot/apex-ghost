@@ -1,0 +1,14 @@
+{
+  "id": "nurburgring",
+  "name": "Nürburgring",
+  "source": "MAP/Nürburgring_GP_2022_layout/scene.usdc",
+  "out": "map",
+  "assets": "track",
+  "default": true,
+  "tracks": {
+    "nurburgring_gp_2022": { "turns": 15, "file": "track.json" },
+    "nurburgring_short": { "turns": null }
+  },
+  "fixPitEntry": true,
+  "analysis": null
+}

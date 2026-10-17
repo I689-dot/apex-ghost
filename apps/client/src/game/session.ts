@@ -375,7 +375,7 @@ export class RaceSession {
       trackName: this.trackData.name,
       facts: [
         `${(this.trackData.length / 1000).toFixed(3)} km`,
-        ...(this.trackData.id.includes('gp') ? [t('15 turns')] : []),
+        ...(this.trackData.turns ? [t('{n} turns', { n: this.trackData.turns })] : []),
         `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
         t(WEATHER_LABEL[this.race.weather.kind]),
         w0.wetness > 0.3 ? t('Wet track') : w0.wetness > 0.05 ? t('Damp track') : t('Dry track'),

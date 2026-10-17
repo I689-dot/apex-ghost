@@ -185,7 +185,7 @@ export class App {
           'div.brand',
           {},
           h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-          h('p', { text: t('Online sim racing for friends · Nürburgring GP') }),
+          h('p', { text: t('Online sim racing for friends · Nürburgring · Zandvoort') }),
         ),
         form,
         h(

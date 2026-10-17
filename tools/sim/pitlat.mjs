@@ -3,12 +3,12 @@
  * W wall) every 10 m of the lap, with the traced pit lane marked P, so the trace can be compared with the real
  * lane. Run from the repo root.
  *
- *   node tools/sim/pitlat.mjs [fromS] [toS]
+ *   node tools/sim/pitlat.mjs [fromS] [toS] [--track <layout id>]
  */
-import { readFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
+import { loadTrack, trackArg } from './trackfile.mjs';
 const S = ['#', 'c', '.', 'g', 's', 'W'];
-const buf = gunzipSync(readFileSync('apps/client/public/assets/track/collision.apxc'));
+const loaded = loadTrack(trackArg(process.argv));
+const buf = loaded.collision;
 const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
 let o = 12;
 const grid = new Map();
@@ -53,12 +53,13 @@ const surf = (x, z) => {
   }
   return best;
 };
-const t = JSON.parse(readFileSync('apps/client/public/assets/track.json', 'utf8'));
+const t = loaded.track;
 const cl = t.centerline;
 const cs = t.cumS;
 const N = cl.length / 3;
 const pit = t.pitLane.points;
-const [from, to] = [Number(process.argv[2] ?? 4950), Number(process.argv[3] ?? 5200)];
+const pos = process.argv.slice(2).filter((a, i, all) => a !== '--track' && all[i - 1] !== '--track');
+const [from, to] = [Number(pos[0] ?? 4950), Number(pos[1] ?? 5200)];
 for (let s = from; s <= to; s += 10) {
   const sm = s % t.length;
   let i = 0;
