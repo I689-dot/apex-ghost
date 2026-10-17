@@ -120,6 +120,19 @@ const ES: Record<string, string> = {
   Hard: 'Duro',
   Wet: 'Lluvia',
   '{name} tyres': 'Neumáticos {name}',
+  'Which tyre?': '¿Qué neumático?',
+  'Dry grip': 'Agarre en seco',
+  'Wet grip': 'Agarre en mojado',
+  Life: 'Duración',
+  'Warm-up': 'Calentamiento',
+  'Fastest over one lap and warms up quickly, but wears about twice as fast as the Medium.':
+    'El más rápido a una vuelta y se calienta enseguida, pero se gasta casi el doble que el Medio.',
+  'The all-rounder: good grip that lasts a long run.': 'El polivalente: buen agarre que aguanta una tanda larga.',
+  'Lasts the longest, but has the least grip and needs more time to warm up.': 'El que más dura, pero tiene menos agarre y tarda más en calentarse.',
+  'For a wet track: the grooves clear the water. On a drying track it overheats and wears fast.':
+    'Para pista mojada: los surcos evacuan el agua. Si la pista se seca, se sobrecalienta y se gasta rápido.',
+  'Rain or a drying track can change the best choice during the session: you can change tyres in the pit box (pit lane next to the start).':
+    'La lluvia o una pista que se seca pueden cambiar la mejor elección durante la sesión: puedes cambiar de neumáticos en el box (pit lane junto a la salida).',
   // weather and time of day
   Clear: 'Despejado',
   Cloudy: 'Nublado',
@@ -269,7 +282,9 @@ const ES: Record<string, string> = {
   'Everyone is loading the race…': 'Todos están cargando la carrera…',
   GO: 'YA',
   'Track limits: this lap no longer counts': 'Límites de pista: esta vuelta ya no cuenta',
-  'SESSION {clock}': 'SESIÓN {clock}',
+  'TIME LEFT {clock}': 'TIEMPO RESTANTE {clock}',
+  'Qualifying: {min} minutes to set your best lap (clock at the top). Out lap first: warm the tyres, timing starts at the line.':
+    'Clasificación: {min} minutos para marcar tu mejor vuelta (reloj arriba). Primero la vuelta de salida: calienta los neumáticos, el cronómetro empieza en la línea.',
   'CHEQUERED FLAG · LAST LAP': 'BANDERA A CUADROS · ÚLTIMA VUELTA',
   'Pit lane · limiter {n} km/h · stop in the yellow box for service': 'Pit lane · limitador {n} km/h · para en el box amarillo para el servicio',
   'Session over': 'Sesión terminada',

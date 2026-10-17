@@ -210,8 +210,9 @@ export class AiDriver {
   /**
    * @param checkpointS lap distance of the last gate this bot passed (resets go there, like a player's reset,
    *   so the race tracker keeps counting its gates); without it the bot resets 10 m behind where it is.
+   * @param speedCap highest speed allowed now (m/s): a car directly ahead.
    */
-  update(dt: number, raceStarted: boolean, weatherGrip: number, checkpointS?: number): Controls {
+  update(dt: number, raceStarted: boolean, weatherGrip: number, checkpointS?: number, speedCap = Infinity): Controls {
     const c = this.controls;
     const v = this.vehicle;
     const t = this.track;
@@ -270,7 +271,7 @@ export class AiDriver {
       this.profileGrip = weatherGrip;
       this.profile = speedProfile(this.line, this.limits, weatherGrip);
     }
-    const vt = this.profile[indexAt(t, s + 2 + speed * 0.12)];
+    const vt = Math.min(this.profile[indexAt(t, s + 2 + speed * 0.12)], speedCap);
     this.dbgVt = vt;
     const err = vt - speed;
     if (err > 0) {

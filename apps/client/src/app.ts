@@ -1,6 +1,6 @@
 import { GameAudio } from './audio/audio';
 import { heroUrl, uiAsset } from './ui/images';
-import { COMPOUNDS } from './physics/tyres';
+import { COMPOUNDS, type CompoundId } from './physics/tyres';
 import { WING, recommendSetup } from './game/carSetup';
 import {
   SESSION_MINUTES,
@@ -425,6 +425,7 @@ export class App {
       ),
       h('h3', { text: t('Your car') }),
       row(t('Tyres'), tyreBtns),
+      tyreGuide(),
       row(t('Rear wing'), wingSel),
       row(t('Brake balance'), h('div.range', {}, bias, biasOut)),
       h(
@@ -859,4 +860,45 @@ export class App {
 
 function fact(k: string, v: string): HTMLElement {
   return h('div.fact', {}, h('label', { text: k }), h('span', { text: v }));
+}
+
+/** What each compound is for, from the same numbers the physics uses (lobby, before choosing). */
+function tyreGuide(): HTMLElement {
+  const NOTE: Record<CompoundId, string> = {
+    soft: 'Fastest over one lap and warms up quickly, but wears about twice as fast as the Medium.',
+    medium: 'The all-rounder: good grip that lasts a long run.',
+    hard: 'Lasts the longest, but has the least grip and needs more time to warm up.',
+    wet: 'For a wet track: the grooves clear the water. On a drying track it overheats and wears fast.',
+  };
+  const ids: CompoundId[] = ['soft', 'medium', 'hard', 'wet'];
+  const maxLife = Math.max(...ids.map((i) => 1 / COMPOUNDS[i].wear));
+  const maxWarm = Math.max(...ids.map((i) => 1 / COMPOUNDS[i].heatCap));
+  const bar = (label: string, v: number) =>
+    h('div.tg-bar', {}, h('span', { text: label }), h('i', {}, h('b', { style: `width:${Math.round(Math.max(0.06, Math.min(1, v)) * 100)}%` })));
+  return h(
+    'details.tyre-guide',
+    { open: true },
+    h('summary', { text: t('Which tyre?') }),
+    h(
+      'div.tg-grid',
+      {},
+      ...ids.map((id) => {
+        const c = COMPOUNDS[id];
+        return h(
+          'div.tg-card',
+          { style: `--tc:${c.colour}` },
+          h('img', { src: uiAsset(`tyre_${id}.webp`), alt: '' }),
+          h('b', { text: t(c.name) }),
+          bar(t('Dry grip'), (c.grip - 0.8) / 0.25),
+          bar(t('Wet grip'), c.wetGrip / 0.8),
+          bar(t('Life'), 1 / c.wear / maxLife),
+          bar(t('Warm-up'), 1 / c.heatCap / maxWarm),
+          h('p', { text: t(NOTE[id]) }),
+        );
+      }),
+    ),
+    h('p.tg-foot', {
+      text: t('Rain or a drying track can change the best choice during the session: you can change tyres in the pit box (pit lane next to the start).'),
+    }),
+  );
 }

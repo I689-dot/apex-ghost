@@ -19,6 +19,7 @@ import { homedir, tmpdir, cpus } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { fillHoles, fillTerrain, writeFillGlb } from './fill_holes.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -516,10 +517,24 @@ function writeTracks(mapOut, render) {
     .sort())
     bases.push(JSON.parse(readFileSync(path.join(mapOut, f), 'utf8')));
   const surf = roadSurface(mapOut);
+  fixPitEntry(bases);
   for (const b of bases) fixHeights(b, surf);
   mkdirSync(path.join(pub, 'tracks'), { recursive: true });
   const index = [];
   const races = {};
+  // the hole fill (fill_holes.mjs) is one more always-visible track chunk
+  const fillInfo = existsSync(path.join(mapOut, 'fill.json')) ? JSON.parse(readFileSync(path.join(mapOut, 'fill.json'), 'utf8')) : null;
+  if (fillInfo) {
+    const url = `assets/track/${fillInfo.file}${V}`;
+    render = {
+      ...render,
+      chunks: [
+        ...render.chunks.filter((c) => c.node !== 'chunk_fill'),
+        { file: url, node: 'chunk_fill', center: fillInfo.center, radius: fillInfo.radius, kind: 'track' },
+      ],
+      files: { ...render.files, fill: url },
+    };
+  }
   bases.forEach((base, i) => {
     const track = { ...base, ...render };
     const file = i === 0 ? 'track.json' : `tracks/${base.id}.json`;
@@ -544,6 +559,107 @@ function writeTracks(mapOut, render) {
   writeFileSync(path.join(sharedGen, 'tracks-race.json'), JSON.stringify(races));
   log(`tracks written: ${index.map((t) => `${t.id} (${Math.round(t.length)} m)`).join(', ')}`);
 }
+
+/**
+ * The traced pit entry wandered off into the paddock (up to 89 m from the lane, so the minimap and the pit-lane
+ * markings were wrong there). The real lane, measured from the collision surfaces (tools/sim/pitlat.mjs):
+ * it leaves the track at ~4975 m of the GP lap, runs 10–16 m left of the centreline behind the pit wall, crosses
+ * the apron and reaches the garages ~20 m left by ~5190 m, where the trace was right again. Rebuilt as
+ * (lap s, lateral) pairs on the GP centreline; the service box is moved in front of the garages
+ * (5190 m … 60 m, across the start line). Other layouts sharing the lane get the same points.
+ */
+const PIT_ENTRY = [
+  [4975, -3],
+  [4990, -12],
+  [5000, -13],
+  [5060, -13],
+  [5100, -14],
+  [5150, -16],
+  [5190, -19.5],
+];
+const PIT_BOX = [5190, 60];
+
+function fixPitEntry(bases) {
+  const gp = bases[0];
+  const pl = gp.pitLane;
+  if (!pl) return;
+  const cl = gp.centerline;
+  const cs = gp.cumS;
+  const n = cl.length / 3;
+  const L = gp.length;
+  const frame = (sLap) => {
+    const sm = ((sLap % L) + L) % L;
+    let i = 0;
+    while (i < n - 1 && cs[i + 1] <= sm) i++;
+    const j = (i + 1) % n;
+    const seg = (j === 0 ? L : cs[j]) - cs[i] || 1;
+    const f = Math.min(1, Math.max(0, (sm - cs[i]) / seg));
+    let tx = cl[j * 3] - cl[i * 3];
+    let tz = cl[j * 3 + 2] - cl[i * 3 + 2];
+    const tl = Math.hypot(tx, tz) || 1;
+    tx /= tl;
+    tz /= tl;
+    return { x: cl[i * 3] + (cl[j * 3] - cl[i * 3]) * f, y: cl[i * 3 + 1], z: cl[i * 3 + 2] + (cl[j * 3 + 2] - cl[i * 3 + 2]) * f, tx, tz };
+  };
+  const project = (p) => {
+    let best = 0;
+    let bd = Infinity;
+    for (let i = 0; i < n; i++) {
+      const d = (cl[i * 3] - p[0]) ** 2 + (cl[i * 3 + 2] - p[2]) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    }
+    const j = (best + 1) % n;
+    let tx = cl[j * 3] - cl[best * 3];
+    let tz = cl[j * 3 + 2] - cl[best * 3 + 2];
+    const tl = Math.hypot(tx, tz) || 1;
+    tx /= tl;
+    tz /= tl;
+    return { s: cs[best], lat: (p[0] - cl[best * 3]) * tz - (p[2] - cl[best * 3 + 2]) * tx };
+  };
+  const old = pl.points;
+  // first old point back on the real lane (in front of the garages)
+  const join = old.findIndex((p) => {
+    const q = project(p);
+    return q.s >= PIT_ENTRY[PIT_ENTRY.length - 1][0] && q.s < L - 2 && q.lat < -17 && q.lat > -25;
+  });
+  if (join < 0) return;
+  const sJoin = project(old[join]).s;
+  const latAt = (sl) => {
+    const P = [...PIT_ENTRY, [sJoin, project(old[join]).lat]];
+    for (let k = 0; k < P.length - 1; k++) if (sl <= P[k + 1][0]) return P[k][1] + ((P[k + 1][1] - P[k][1]) * (sl - P[k][0])) / (P[k + 1][0] - P[k][0] || 1);
+    return P[P.length - 1][1];
+  };
+  const pts = [];
+  for (let sl = PIT_ENTRY[0][0]; sl < sJoin - 1; sl += 2.5) {
+    const f = frame(sl);
+    const lat = latAt(sl);
+    // + lateral = left of travel: left of (tx, tz) is (tz, -tx)
+    pts.push([round3(f.x + f.tz * lat), f.y, round3(f.z - f.tx * lat)]);
+  }
+  const points = [...pts, ...old.slice(join)];
+  let len = 0;
+  for (let k = 1; k < points.length; k++) len += Math.hypot(points[k][0] - points[k - 1][0], points[k][2] - points[k - 1][2]);
+  const lapS = points.map((p) => project(p).s);
+  const inBox = (sl) => (PIT_BOX[0] > PIT_BOX[1] ? sl >= PIT_BOX[0] || sl <= PIT_BOX[1] : sl >= PIT_BOX[0] && sl <= PIT_BOX[1]);
+  const boxFrom = lapS.findIndex((sl, k) => k > pts.length / 2 && inBox(sl));
+  let boxTo = boxFrom;
+  while (boxTo + 1 < points.length && inBox(lapS[boxTo + 1])) boxTo++;
+  const before = old.length;
+  const fixed = { ...pl, points, length: Math.round(len * 10) / 10, entryS: PIT_ENTRY[0][0], boxFrom, boxTo };
+  for (const b of bases) {
+    if (!b.pitLane) continue;
+    const mid = b.pitLane.points[Math.floor(b.pitLane.points.length / 2)];
+    const same = old.some((p) => Math.hypot(p[0] - mid[0], p[2] - mid[2]) < 5);
+    if (!same) continue;
+    b.pitLane = b === gp ? fixed : { ...b.pitLane, points: points.map((p) => p.slice()), length: fixed.length, boxFrom, boxTo };
+  }
+  log(`pit entry rebuilt: ${before} → ${points.length} points, ${Math.round(len)} m, service box ${boxFrom}–${boxTo}`);
+}
+
+const round3 = (v) => Math.round(v * 1000) / 1000;
 
 /**
  * Road surface lookup from the collision meshes (asphalt + kerbs): every height under a point (x, z).
@@ -720,6 +836,19 @@ async function collision(mapOut, dstDir) {
     parts.push({ si, pos: new Float32Array(cp), idx: ci });
     total += ci.length / 3;
     log(`collision ${s}: ${before} → ${ci.length / 3} tris`);
+  }
+  // ground holes in the source model (sky showing through, cars falling out of the world): fill them with grass
+  const base = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
+  const fill = fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : []);
+  if (fill.cells) {
+    const gi = SURF.indexOf('grass');
+    parts.push({ si: gi, pos: fill.pos, idx: fill.idx });
+    total += fill.idx.length / 3;
+    const terrain = await fillTerrain(io, path.join(mapOut, 'map_terrain.glb'), parts, SURF);
+    log(`terrain holes filled: ${terrain.cells} cells of 20 m`);
+    const bounds = await writeFillGlb(io, fill, path.join(mapOut, 'map_track.glb'), path.join(dstDir, 'map_fill.glb'), terrain);
+    writeFileSync(path.join(mapOut, 'fill.json'), JSON.stringify({ file: 'map_fill.glb', cells: fill.cells, ...bounds }));
+    log(`ground holes filled: ${fill.cells} cells of 2 m (${((fill.cells * 4) / 1e4).toFixed(2)} ha)`);
   }
   let size = 12;
   for (const p of parts) size += 12 + p.pos.byteLength + p.idx.byteLength;

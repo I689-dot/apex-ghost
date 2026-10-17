@@ -251,7 +251,7 @@ export class Hud {
       this.lapTag.classList.toggle('invalid', s.lapInvalid);
       this.cur.el.classList.toggle('invalid', s.lapInvalid);
     }
-    this.pos.set(`${s.position}/${s.total}`);
+    this.pos.set(`${s.bestLapMs === null ? '–' : s.position}/${s.total}`);
     this.cur.set(fmtTime(s.currentLapMs));
     this.best.set(fmtTime(s.bestLapMs));
     this.last.set(fmtTime(s.lastLapMs));
@@ -267,7 +267,7 @@ export class Hud {
     this.draft.classList.toggle('show', s.slipstream > 0.25);
     this.msg.set(s.message);
     this.fin.set(s.sessionText);
-    this.fin.el.classList.toggle('flag', s.sessionText.startsWith('CHEQUERED'));
+    this.fin.el.classList.toggle('flag', s.sessionText === t('CHEQUERED FLAG · LAST LAP'));
     this.pitBanner.set(s.pitText);
     this.resetEl.classList.toggle('show', s.resetHint);
   }
@@ -277,7 +277,7 @@ export class Hud {
     const i = list.findIndex((x) => x.id === me);
     const from = Math.max(0, Math.min(i - 2, list.length - 5));
     const rows = list.slice(from, from + 5);
-    const key = rows.map((r) => `${r.id}${r.position}${r.bestLapMs ?? ''}${r.finishedMs ?? ''}${r.dnf}${r.inPit}`).join('|');
+    const key = rows.map((r) => `${r.id}${r.position}${r.bestLapMs ?? ''}${r.finishedMs ?? ''}${r.dnf}${r.inPit}${r.outLap}${r.lapInvalid}`).join('|');
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.board.replaceChildren(
@@ -285,7 +285,7 @@ export class Hud {
         h(
           `div.row${r.id === me ? '.me' : ''}`,
           {},
-          h('b', { text: String(r.position) }),
+          h('b', { text: r.bestLapMs === null ? '–' : String(r.position) }),
           h('span', {}, names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: t('PIT') }) : null),
           h(`em${r.position === 1 && r.bestLapMs !== null ? '.p1' : ''}`, {
             text:
@@ -296,7 +296,9 @@ export class Hud {
                     ? t('PIT')
                     : r.outLap
                       ? t('OUT LAP')
-                      : t('ON LAP')
+                      : r.lapInvalid
+                        ? t('INVALID LAP')
+                        : t('ON LAP')
                 : r.position === 1
                   ? fmtTime(r.bestLapMs)
                   : `+${((r.gapMs ?? 0) / 1000).toFixed(3)}`,

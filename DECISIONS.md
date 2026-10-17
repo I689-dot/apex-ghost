@@ -412,6 +412,44 @@ One lumped temperature per tyre (`TYRE_TEMP` in `vehicle.ts`):
 - **Air temperature:** follows the time of day, cloud and rain.
 - **HUD:** four small indicators: blue cold, green in the window, red overheating.
 
+## Interface language
+
+- English or Spanish (Settings → "Language / Idioma"; first run follows the browser). `src/i18n.ts`: `t()` looks the English text up in the Spanish table and falls back to English, so a missing entry never breaks anything; `{name}` placeholders.
+- Data labels (weather, tyre compounds, time of day, controls, engineer notes, wing settings) stay English in the data and are translated where they are shown, so switching applies at once: the menu and lobby are redrawn, race messages follow on their own.
+- The strings were found with the TypeScript compiler (every string literal in the UI and game code), wrapped automatically where they had a dictionary entry, and the rest converted by hand. Code that compared display text (the HUD checked `startsWith('CHEQUERED')`) now compares the translated text.
+- `node tools/e2e/spanish.mjs` plays in Spanish and lists any text without a Spanish entry.
+
+## Ground holes in the map
+
+- **Report:** "some things are not textured, and if you stay on them you fall below the map". The white areas were not untextured objects but holes: the 2022-layout source model has no ground where the old track was cut out, so the sky showed through, and there was no collision (`tools/sim/holes.ts`: 4627–4653 m and 4678–4848 m of the lap, 4–9 m left of the centreline). The satellite terrain also had a channel cut along the (unmodelled) Nordschleife, the "empty places" of the aerial cinematic.
+- **Fix** (`tools/asset-pipeline/fill_holes.mjs`, run by the optimizer's collision step):
+  - every drivable collision surface is rasterised onto a 2 m lattice up to 450 m from the centreline and the pit lane (cell centres and edge midpoints too, which catches cracks narrower than a cell); uncovered nodes are holes, their heights relaxed in from the ground around them;
+  - each cell with a hole becomes a grass quad 12 cm below any surface it overlaps (never on top of road), in the collision and in `map_fill.glb` (the track's own grass texture): 23 ha;
+  - the terrain's own holes are filled on a 20 m lattice with heights and satellite-photo coordinates relaxed in from the surrounding terrain, so the patch continues the photo seamlessly.
+- Hole scan: from about 40 stretches to one sub-millimetre seam.
+
+## Pit lane trace
+
+- The traced pit entry wandered into the paddock (up to 89 m from the lane), so the minimap and the pit-lane markings were wrong there. The real lane was measured from the collision surfaces (`node tools/sim/pitlat.mjs`: surface types across the track with the trace overlaid): it leaves the track at ~4975 m, runs behind the pit wall 10–16 m left of the centreline, crosses the apron and reaches the garages. The optimizer rebuilds that part (`fixPitEntry`) and moves the service box in front of the garages (5190 m … 60 m, across the start line).
+
+## Start and AI traffic
+
+- At the green light every AI car launched side by side onto the same racing line; cars pass through each other here, so they visibly drove into each other ("the cars start bumping"). As in a real qualifying session, AI cars now leave the grid one at a time, 2.5 s apart in grid order, and keep about 12 m behind a car directly ahead in their lane. The grid itself was checked (`pnpm tsx tools/sim/gridsettle.ts`): slots are 11.4 m apart and cars settle within a few centimetres without bouncing.
+
+## Timing board and session clock
+
+- Checked in a 6-minute session with AI cars (`spanish.mjs`): the board shows each lap within seconds. Laps the AI lost to track limits were all in heavy rain; in the dry, `ailap.ts` and the browser run showed none.
+- Drivers without a time show "–" instead of a position, in a stable order (they used to swap places as they passed each other on the out lap); the board also refreshes on status changes (out lap, invalid lap, pits).
+- The clock reads "TIME LEFT 9:53", and at the green light a message explains the format: 10 minutes to set your best lap, out lap first.
+
+## Tyre guide
+
+- The lobby shows what each compound is for, with bars for dry grip, wet grip, life and warm-up computed from the same numbers the physics uses, and a note that tyres can be changed in the pit box.
+
+## Map look
+
+- Grass, terrain, sand and gravel get world-space macro variation (two octaves of smooth noise, tens of metres across, plus a dry/lush hue drift); asphalt and concrete a weaker version. It breaks the visible repetition of the small texture tiles, at the cost of a few shader instructions.
+
 ## Speed-sensitive keyboard steering
 
 - **Report:** "the steering is way too brutal, turns are so pronounced at high speed", worse on some cars.

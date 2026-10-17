@@ -69,6 +69,8 @@ import { t } from '../i18n';
 const FIXED_DT = 1 / PHYSICS_HZ;
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
 const MAX_FRAME_DT = 0.1;
+/** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). */
+const BOT_RELEASE_MS = 2500;
 
 interface Remote {
   id: string;
@@ -729,7 +731,13 @@ export class RaceSession {
     } else if (serverNow >= this.freezeUntil && this.vehicle.frozen && raceT >= 0 && !this.pitHold) {
       this.vehicle.frozen = false;
       this.updateCountdown(-1);
-      if (this.myLaps === 0 && raceT < 2000) this.flash(t('Out lap: bring the tyres up to temperature. Timing starts at the line.'), 5000);
+      if (this.myLaps === 0 && raceT < 2000)
+        this.flash(
+          t('Qualifying: {min} minutes to set your best lap (clock at the top). Out lap first: warm the tyres, timing starts at the line.', {
+            min: Math.round(this.race.sessionMs / 60000),
+          }),
+          7000,
+        );
     } else if (raceT < 1500) this.updateCountdown(-1);
     else this.clearCountdown();
 
@@ -754,7 +762,7 @@ export class RaceSession {
       this.prevPos.copy(this.currPos);
       this.prevRot.copy(this.currRot);
       this.vehicle.step(FIXED_DT, controls);
-      this.stepBots(raceT >= 0);
+      this.stepBots(raceT);
       this.world.step(this.events);
       this.drainContacts();
       this.snapshotPose();
@@ -963,23 +971,51 @@ export class RaceSession {
     this.track.applyWetness(w.wetness, this.env.envIntensity);
   }
 
-  private stepBots(started: boolean): void {
-    for (const r of this.remotes.values()) {
+  /**
+   * AI cars, simulated on the host. As in a real qualifying session they leave one at a time (BOT_RELEASE_MS
+   * apart, in grid order) instead of all launching side by side onto the same line, and they keep their distance
+   * behind a car directly ahead (cars pass through each other here, so without this they drove through it).
+   */
+  private stepBots(raceT: number): void {
+    const bots = [...this.remotes.values()].filter((r) => r.bot).sort((a, b) => a.slot - b.slot);
+    bots.forEach((r, order) => {
       const b = r.bot;
-      if (!b) continue;
+      if (!b) return;
+      const started = raceT >= order * BOT_RELEASE_MS;
       b.vehicle.frozen = !started;
       const tr = this.localTracker?.players.get(r.id);
       const gates = this.trackData.gates;
       const cp = tr && tr.passed >= 0 ? gates[(tr.nextGate - 1 + gates.length) % gates.length].s : undefined;
-      const c = b.ai.update(FIXED_DT, started, b.vehicle.weatherGrip * b.vehicle.wearGripAvg, cp);
-      if (b.ai.resetRequested) {
-        b.ai.resetRequested = false;
-        b.resetFlagSamples = 2;
-        const t = b.vehicle.body.translation();
-        b.currPos.set(t.x, t.y, t.z);
-      }
+      const c = b.ai.update(FIXED_DT, started, b.vehicle.weatherGrip * b.vehicle.wearGripAvg, cp, started ? this.followCap(r) : Infinity);
       b.vehicle.step(FIXED_DT, c);
+    });
+  }
+
+  /** Speed cap for a bot with a car directly ahead in its lane: hold about 12 m, never drive into it. */
+  private followCap(r: Remote): number {
+    const v = r.bot?.vehicle;
+    if (!v) return Infinity;
+    const p = v.body.translation();
+    const q = v.body.rotation();
+    const fx = 2 * (q.x * q.z + q.y * q.w);
+    const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+    let cap = Infinity;
+    const check = (ox: number, oz: number, speed: number) => {
+      const dx = ox - p.x;
+      const dz = oz - p.z;
+      const along = dx * fx + dz * fz;
+      if (along < 2 || along > 30) return;
+      if (Math.abs(dx * fz - dz * fx) > 2.4) return;
+      cap = Math.min(cap, Math.max(0, speed + (along - 12) * 0.6));
+    };
+    for (const o of this.remotes.values()) {
+      if (o === r) continue;
+      const op = o.bot ? o.bot.vehicle.body.translation() : o.visual.object.position;
+      check(op.x, op.z, o.vel.length());
     }
+    const me = this.vehicle.body.translation();
+    check(me.x, me.z, this.vehicle.telemetry.speed);
+    return cap;
   }
 
   private snapshotBots(): void {
@@ -1008,7 +1044,15 @@ export class RaceSession {
       // track limits, judged here like a player's (the server only sees the flag)
       b.hint = nearestCenterlineIndex(this.trackData, s.px, s.py, s.pz, b.hint, 30);
       const lat = lateralAt(this.trackData, b.hint, s.px, s.pz);
+      const wasOff = b.limits.offTrack;
       if (b.limits.update(1 / STATE_HZ, beyondLimitsNow(b.vehicle, this.trackData, b.hint, lat))) f |= FLAG_OFF_TRACK;
+      if (import.meta.env.DEV && b.limits.offTrack && !wasOff) {
+        const edge = lat >= 0 ? this.trackData.widthL[b.hint] : this.trackData.widthR[b.hint];
+        const surf = b.vehicle.wheels.map((w) => (w.contact ? w.surface : '-')).join(',');
+        console.debug(
+          `[limits] ${this.names.get(r.id)} at ${this.trackData.cumS[b.hint].toFixed(0)} m (index ${b.hint}) lateral ${lat.toFixed(1)} edge ${edge.toFixed(1)} wheels ${surf}`,
+        );
+      }
       s.flags = f;
       this.localTracker?.ingest(r.id, s.t, s.px, s.py, s.pz, (f & FLAG_RESET) !== 0, undefined, (f & FLAG_OFF_TRACK) !== 0);
       if (++b.pendingCount >= STATES_PER_PACKET) {
@@ -1165,9 +1209,9 @@ export class RaceSession {
   /** Session clock: time left until the chequered flag (the flag falls at start + session length). */
   private sessionText(serverNow: number): string {
     if (this.finishedMs !== null) return t('SESSION COMPLETE');
-    if (this.startAt === null) return t('SESSION {clock}', { clock: fmtClock(this.race.sessionMs) });
+    if (this.startAt === null) return t('TIME LEFT {clock}', { clock: fmtClock(this.race.sessionMs) });
     const left = this.startAt + this.race.sessionMs - Math.max(serverNow, this.startAt);
-    return this.flagged || left <= 0 ? t('CHEQUERED FLAG · LAST LAP') : t('SESSION {clock}', { clock: fmtClock(left) });
+    return this.flagged || left <= 0 ? t('CHEQUERED FLAG · LAST LAP') : t('TIME LEFT {clock}', { clock: fmtClock(left) });
   }
 
   /** Pit lane: limiter, pit-in/out for the lap logic, the service box. */

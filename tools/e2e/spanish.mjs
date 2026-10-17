@@ -19,13 +19,15 @@ const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1
 const URL = opt('url', 'http://127.0.0.1:5173');
 const BOTS = Number(opt('bots', '3'));
 const MINUTES = Number(opt('minutes', '4'));
+const WEATHER = opt('weather', '');
 
 const browser = await chromium.launch({ args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const missing = new Set();
 page.on('console', (m) => {
   const t = m.text();
-  if (t.startsWith('[i18n]')) missing.add(t.slice(25));
+  if (t.startsWith('[i18n]')) missing.add(t.slice(23));
+  else if (t.startsWith('[limits]')) console.log('  ' + t);
   else if (m.type() === 'error' && !/WebSocket|ERR_CONNECTION/.test(t)) console.log('  [console.error]', t.slice(0, 200));
 });
 page.on('pageerror', (e) => console.log('  pageerror', String(e)));
@@ -40,6 +42,7 @@ await shot('1-menu');
 await page.click('button.primary:has-text("Crear sala")');
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.waitForTimeout(1500);
+if (WEATHER) await page.selectOption('.prep .prep-row:nth-of-type(2) select', WEATHER);
 await page.click('.car-card >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');

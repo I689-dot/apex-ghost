@@ -362,8 +362,10 @@ export class RaceTracker {
   }
 
   /**
-   * Official order, as in qualifying: by best valid lap. Drivers without a time follow, by distance
-   * covered (drivers who left last). Equal times: whoever set it first stays ahead (stable sort on join order).
+   * Official order, as in qualifying: by best valid lap. Drivers without a time follow; in a timed session in
+   * join order (they have no position yet, so they don't shuffle around as they pass each other on the out
+   * lap), in a fixed-lap race by distance covered. Equal times:
+   * whoever set it first stays ahead (stable sort on join order).
    */
   standings(): Standing[] {
     const list = [...this.players.values()];
@@ -373,7 +375,8 @@ export class RaceTracker {
       if (at && bt) return (a.bestLapMs as number) - (b.bestLapMs as number);
       if (at !== bt) return at ? -1 : 1;
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
-      return b.raceDist - a.raceDist;
+      // fixed-lap race: by distance covered; timed session: untimed drivers keep join order
+      return this.flagAt === null ? b.raceDist - a.raceDist : 0;
     });
     const leader = list[0];
     return list.map((p, i) => ({

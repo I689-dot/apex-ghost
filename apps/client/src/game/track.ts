@@ -7,6 +7,45 @@ import type { QualityConfig } from '../settings';
 
 type R = typeof RAPIER;
 
+/** Large areas whose small texture tile repeats visibly: they get world-space macro variation. */
+const GROUND_MAT_RE = /^(grass|top2|terrain_fill|astroturf|sand|gravel)/i;
+const PAVED_MAT_RE = /^(asph|conc_|pavement|pits)/i;
+
+/**
+ * Macro variation (as racing games break texture tiling): the colour is modulated by two octaves of smooth
+ * value noise in world space, metres to tens of metres across, plus a slight dry/lush hue drift on grass. Paved
+ * surfaces get a weaker, greyer version (patches of newer and older asphalt).
+ */
+function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean): void {
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('void main() {', 'varying vec3 vApxW;\nvoid main() {')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvApxW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        'void main() {',
+        `varying vec3 vApxW;
+float apxHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float apxNoise(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(apxHash(i), apxHash(i + vec2(1.0, 0.0)), f.x), mix(apxHash(i + vec2(0.0, 1.0)), apxHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void main() {`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+{
+  vec2 wp = vApxW.xz;
+  float n = apxNoise(wp / 37.0) * 0.65 + apxNoise(wp / 9.0) * 0.35;
+  diffuseColor.rgb *= 1.0 + (n - 0.5) * ${(strength * 2).toFixed(2)};
+  ${hue ? 'float d = apxNoise(wp / 61.0 + 7.3); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.04, 0.78), smoothstep(0.55, 0.9, d) * 0.6);' : ''}
+}`,
+      );
+  };
+  m.customProgramCacheKey = () => `macro-${strength}-${hue}`;
+}
+
 const ROAD_MAT_RE = /^(asph|curb|lines|redline|pits|conc_|travert_0|box_decal|pavement)/i;
 const LIGHT_MAT_RE = /^(lights_emissive|lights_0)/i;
 /** Small, dense trackside detail: invisible far away, so culled per mesh by distance. */
@@ -69,6 +108,8 @@ export class Track {
         if (/^red_lights/i.test(sm.name)) t.startLights.red.push(sm);
         if (/^green_lights/i.test(sm.name)) t.startLights.green.push(sm);
         sm.side = sm.alphaTest > 0 || sm.transparent ? THREE.DoubleSide : THREE.FrontSide;
+        if (GROUND_MAT_RE.test(sm.name) || sm.name === 'grass_fill') addMacroVariation(sm, 0.22, /grass|top2|fill|turf/i.test(sm.name));
+        else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false);
       }
       const first = mats[0] as THREE.MeshStandardMaterial | undefined;
       if (first && DETAIL_MAT_RE.test(first.name)) {
