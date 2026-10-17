@@ -1,0 +1,2845 @@
+{
+ "version": 1,
+ "forward": "+Z",
+ "up": "+Y",
+ "units": "m",
+ "cars": [
+  {
+   "id": "vantage_gt3_evo_heart_of_racing",
+   "name": "Aston Martin Vantage GT3 Evo",
+   "manufacturer": "Aston Martin",
+   "year": 2024,
+   "category": "GT3 Evo",
+   "color": "#1d2f55",
+   "thumbnail": "assets/cars/vantage_gt3_evo_heart_of_racing/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/vantage_gt3_evo_heart_of_racing/lod0.glb?v=mvck5wjy",
+    "assets/cars/vantage_gt3_evo_heart_of_racing/lod1.glb?v=mvck5wjy",
+    "assets/cars/vantage_gt3_evo_heart_of_racing/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 5049140,
+   "cockpit": "assets/cars/vantage_gt3_evo_heart_of_racing/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 8299868,
+   "dims": {
+    "length": 4.835,
+    "width": 2.301,
+    "height": 1.224
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8847,
+      0.3535,
+      1.43
+     ],
+     "radius": 0.3526,
+     "width": 0.3505
+    },
+    "FR": {
+     "position": [
+      -0.8847,
+      0.3535,
+      1.4299
+     ],
+     "radius": 0.3525,
+     "width": 0.3505
+    },
+    "RL": {
+     "position": [
+      0.8787,
+      0.3632,
+      -1.4299
+     ],
+     "radius": 0.3632,
+     "width": 0.3616
+    },
+    "RR": {
+     "position": [
+      -0.8787,
+      0.3632,
+      -1.4299
+     ],
+     "radius": 0.3632,
+     "width": 0.3616
+    }
+   },
+   "wheelbase": 2.8599,
+   "trackFront": 1.7694,
+   "trackRear": 1.7573,
+   "steering": null,
+   "cockpitCamera": {
+    "position": [
+     0.3326,
+     0.9839,
+     -0.2011
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1290,
+    "powerKw": 380,
+    "idleRpm": 1100,
+    "redlineRpm": 7200,
+    "limiterRpm": 7400,
+    "torqueCurve": [
+     [
+      1000,
+      400
+     ],
+     [
+      2500,
+      600
+     ],
+     [
+      4000,
+      660
+     ],
+     [
+      5500,
+      650
+     ],
+     [
+      6500,
+      600
+     ],
+     [
+      7200,
+      520
+     ],
+     [
+      7500,
+      300
+     ]
+    ],
+    "gears": [
+     2.95,
+     2.2,
+     1.77,
+     1.47,
+     1.25,
+     1.08
+    ],
+    "reverseRatio": 3.1,
+    "finalDrive": 3.15,
+    "shiftTimeMs": 65,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.48,
+    "comHeightM": 0.42,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8400,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.05,
+    "downforceArea": 2.23,
+    "aeroBalanceFront": 0.44,
+    "diffLock": 0.5,
+    "maxSteerDeg": 25,
+    "springRateFront": 140000,
+    "springRateRear": 140000,
+    "antiRollFront": 45000,
+    "antiRollRear": 28000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "2020_audi_r8_lms_evo",
+   "name": "Audi R8 LMS Evo",
+   "manufacturer": "Audi",
+   "year": 2020,
+   "category": "GT3 Evo",
+   "color": "#c8332b",
+   "thumbnail": "assets/cars/2020_audi_r8_lms_evo/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2020_audi_r8_lms_evo/lod0.glb?v=mvck5wjy",
+    "assets/cars/2020_audi_r8_lms_evo/lod1.glb?v=mvck5wjy",
+    "assets/cars/2020_audi_r8_lms_evo/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 3943296,
+   "cockpit": "assets/cars/2020_audi_r8_lms_evo/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 2959044,
+   "dims": {
+    "length": 4.718,
+    "width": 2.062,
+    "height": 1.641
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.86,
+      0.3485,
+      1.3931
+     ],
+     "radius": 0.3485,
+     "width": 0.3284
+    },
+    "FR": {
+     "position": [
+      -0.8599,
+      0.3485,
+      1.3931
+     ],
+     "radius": 0.3485,
+     "width": 0.3284
+    },
+    "RL": {
+     "position": [
+      0.8497,
+      0.3636,
+      -1.3931
+     ],
+     "radius": 0.3634,
+     "width": 0.3446
+    },
+    "RR": {
+     "position": [
+      -0.8496,
+      0.3636,
+      -1.3931
+     ],
+     "radius": 0.3634,
+     "width": 0.3446
+    }
+   },
+   "wheelbase": 2.7862,
+   "trackFront": 1.72,
+   "trackRear": 1.6993,
+   "steering": {
+    "position": [
+     0.3353,
+     0.6808,
+     0.4699
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.21
+   },
+   "cockpitCamera": {
+    "position": [
+     0.4153,
+     0.9881,
+     0.0063
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1235,
+    "powerKw": 375,
+    "idleRpm": 1300,
+    "redlineRpm": 8400,
+    "limiterRpm": 8600,
+    "torqueCurve": [
+     [
+      1000,
+      250
+     ],
+     [
+      3000,
+      400
+     ],
+     [
+      5000,
+      480
+     ],
+     [
+      6500,
+      530
+     ],
+     [
+      7500,
+      510
+     ],
+     [
+      8400,
+      450
+     ],
+     [
+      8700,
+      250
+     ]
+    ],
+    "gears": [
+     3.2,
+     2.37,
+     1.89,
+     1.55,
+     1.3,
+     1.11
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.36,
+    "shiftTimeMs": 55,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.42,
+    "comHeightM": 0.39,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8000,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1.07,
+    "downforceArea": 2.29,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 130000,
+    "springRateRear": 145000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "bmw_m4_touring_nh_24h",
+   "name": "BMW M3 Touring 24h",
+   "manufacturer": "BMW",
+   "year": 2024,
+   "category": "Touring",
+   "color": "#d23a2a",
+   "thumbnail": "assets/cars/bmw_m4_touring_nh_24h/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/bmw_m4_touring_nh_24h/lod0.glb?v=mvck5wjy",
+    "assets/cars/bmw_m4_touring_nh_24h/lod1.glb?v=mvck5wjy",
+    "assets/cars/bmw_m4_touring_nh_24h/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 3099880,
+   "cockpit": "assets/cars/bmw_m4_touring_nh_24h/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 4065392,
+   "dims": {
+    "length": 5.158,
+    "width": 2.116,
+    "height": 1.44
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8548,
+      0.3536,
+      1.4536
+     ],
+     "radius": 0.3533,
+     "width": 0.3561
+    },
+    "FR": {
+     "position": [
+      -0.8487,
+      0.3532,
+      1.4518
+     ],
+     "radius": 0.3532,
+     "width": 0.3606
+    },
+    "RL": {
+     "position": [
+      0.848,
+      0.3586,
+      -1.4523
+     ],
+     "radius": 0.355,
+     "width": 0.3483
+    },
+    "RR": {
+     "position": [
+      -0.8694,
+      0.3588,
+      -1.4531
+     ],
+     "radius": 0.3548,
+     "width": 0.3615
+    }
+   },
+   "wheelbase": 2.9058,
+   "trackFront": 1.7035,
+   "trackRear": 1.7174,
+   "steering": {
+    "position": [
+     0.3109,
+     0.7726,
+     0.0982
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.311
+   },
+   "cockpitCamera": {
+    "position": [
+     0.2909,
+     1.0199,
+     0.0346
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_EXT_Glass_Emissive_Front",
+     "LIGHT_HEAD_SpecialPatternDRL"
+    ],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1420,
+    "powerKw": 405,
+    "idleRpm": 1000,
+    "redlineRpm": 7100,
+    "limiterRpm": 7300,
+    "torqueCurve": [
+     [
+      1000,
+      420
+     ],
+     [
+      2200,
+      640
+     ],
+     [
+      3500,
+      700
+     ],
+     [
+      5000,
+      690
+     ],
+     [
+      6200,
+      620
+     ],
+     [
+      7100,
+      520
+     ],
+     [
+      7400,
+      300
+     ]
+    ],
+    "gears": [
+     2.9,
+     2.17,
+     1.74,
+     1.44,
+     1.22,
+     1.06
+    ],
+    "reverseRatio": 3.1,
+    "finalDrive": 3.08,
+    "shiftTimeMs": 65,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.5,
+    "comHeightM": 0.46,
+    "tyreGrip": 1.77,
+    "brakeTorqueNm": 8600,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.18,
+    "downforceArea": 1.56,
+    "aeroBalanceFront": 0.44,
+    "diffLock": 0.5,
+    "maxSteerDeg": 25,
+    "springRateFront": 145000,
+    "springRateRear": 145000,
+    "antiRollFront": 46000,
+    "antiRollRear": 28000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 272
+   }
+  },
+  {
+   "id": "2025_bmw_m4_gt3_evo_g82",
+   "name": "BMW M4 GT3 EVO",
+   "manufacturer": "BMW",
+   "year": 2025,
+   "category": "GT3 Evo",
+   "color": "#141414",
+   "thumbnail": "assets/cars/2025_bmw_m4_gt3_evo_g82/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod0.glb?v=mvck5wjy",
+    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod1.glb?v=mvck5wjy",
+    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 3179940,
+   "cockpit": "assets/cars/2025_bmw_m4_gt3_evo_g82/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 1892888,
+   "dims": {
+    "length": 5.124,
+    "width": 2.102,
+    "height": 1.387
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8642,
+      0.3496,
+      1.4876
+     ],
+     "radius": 0.3496,
+     "width": 0.3352
+    },
+    "FR": {
+     "position": [
+      -0.8642,
+      0.3496,
+      1.4876
+     ],
+     "radius": 0.3496,
+     "width": 0.3352
+    },
+    "RL": {
+     "position": [
+      0.8514,
+      0.368,
+      -1.4876
+     ],
+     "radius": 0.3655,
+     "width": 0.3564
+    },
+    "RR": {
+     "position": [
+      -0.8514,
+      0.368,
+      -1.4876
+     ],
+     "radius": 0.3655,
+     "width": 0.3564
+    }
+   },
+   "wheelbase": 2.9752,
+   "trackFront": 1.7284,
+   "trackRear": 1.7028,
+   "steering": {
+    "position": [
+     0.3179,
+     0.7615,
+     -0.0624
+    ],
+    "axis": [
+     0.0018,
+     0.0903,
+     -0.9959
+    ],
+    "diameter": 0.315
+   },
+   "cockpitCamera": {
+    "position": [
+     0.3988,
+     0.9267,
+     -0.4603
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_BMWMAT_Lights1"
+    ],
+    "tail": [
+     "LIGHT_TAIL_BMWMAT_Lights1"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1310,
+    "powerKw": 395,
+    "idleRpm": 1000,
+    "redlineRpm": 7100,
+    "limiterRpm": 7300,
+    "torqueCurve": [
+     [
+      1000,
+      420
+     ],
+     [
+      2200,
+      640
+     ],
+     [
+      3500,
+      700
+     ],
+     [
+      5000,
+      690
+     ],
+     [
+      6200,
+      620
+     ],
+     [
+      7100,
+      520
+     ],
+     [
+      7400,
+      300
+     ]
+    ],
+    "gears": [
+     2.9,
+     2.17,
+     1.74,
+     1.44,
+     1.22,
+     1.06
+    ],
+    "reverseRatio": 3.1,
+    "finalDrive": 3.08,
+    "shiftTimeMs": 65,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.5,
+    "comHeightM": 0.43,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8600,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.07,
+    "downforceArea": 2.23,
+    "aeroBalanceFront": 0.44,
+    "diffLock": 0.5,
+    "maxSteerDeg": 25,
+    "springRateFront": 145000,
+    "springRateRear": 145000,
+    "antiRollFront": 46000,
+    "antiRollRear": 28000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 278
+   }
+  },
+  {
+   "id": "ferrari_296_challenge_2024",
+   "name": "Ferrari 296 Challenge",
+   "manufacturer": "Ferrari",
+   "year": 2024,
+   "category": "Cup",
+   "color": "#c8102e",
+   "thumbnail": "assets/cars/ferrari_296_challenge_2024/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/ferrari_296_challenge_2024/lod0.glb?v=mvck5wjy",
+    "assets/cars/ferrari_296_challenge_2024/lod1.glb?v=mvck5wjy",
+    "assets/cars/ferrari_296_challenge_2024/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 4593124,
+   "cockpit": "assets/cars/ferrari_296_challenge_2024/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 5815544,
+   "dims": {
+    "length": 4.751,
+    "width": 2.136,
+    "height": 1.226
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.7911,
+      0.3219,
+      1.249
+     ],
+     "radius": 0.3219,
+     "width": 0.2801
+    },
+    "FR": {
+     "position": [
+      -0.791,
+      0.3219,
+      1.249
+     ],
+     "radius": 0.3219,
+     "width": 0.2801
+    },
+    "RL": {
+     "position": [
+      0.7783,
+      0.3521,
+      -1.249
+     ],
+     "radius": 0.352,
+     "width": 0.3063
+    },
+    "RR": {
+     "position": [
+      -0.7783,
+      0.3521,
+      -1.249
+     ],
+     "radius": 0.352,
+     "width": 0.3063
+    }
+   },
+   "wheelbase": 2.4981,
+   "trackFront": 1.5821,
+   "trackRear": 1.5565,
+   "steering": {
+    "position": [
+     0.3019,
+     0.6707,
+     0.3998
+    ],
+    "axis": [
+     -0.0015,
+     0.2107,
+     -0.9776
+    ],
+    "diameter": 0.305
+   },
+   "cockpitCamera": {
+    "position": [
+     0.2211,
+     0.896,
+     0.0111
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_HGLOW2"
+    ],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1300,
+    "powerKw": 515,
+    "idleRpm": 1200,
+    "redlineRpm": 8000,
+    "limiterRpm": 8200,
+    "torqueCurve": [
+     [
+      1000,
+      300
+     ],
+     [
+      2500,
+      560
+     ],
+     [
+      3500,
+      680
+     ],
+     [
+      5500,
+      690
+     ],
+     [
+      7000,
+      610
+     ],
+     [
+      8000,
+      520
+     ],
+     [
+      8300,
+      280
+     ]
+    ],
+    "gears": [
+     3.1,
+     2.3,
+     1.84,
+     1.52,
+     1.29,
+     1.1
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.3,
+    "shiftTimeMs": 55,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.42,
+    "comHeightM": 0.39,
+    "tyreGrip": 1.71,
+    "brakeTorqueNm": 8200,
+    "brakeBiasFront": 0.6,
+    "dragArea": 0.9,
+    "downforceArea": 1.38,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 132000,
+    "springRateRear": 150000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 296
+   }
+  },
+  {
+   "id": "lamborghini_huracan_gt3_evo",
+   "name": "Lamborghini Huracán GT3 EVO",
+   "manufacturer": "Lamborghini",
+   "year": 2019,
+   "category": "GT3 Evo",
+   "color": "#f0f0f0",
+   "thumbnail": "assets/cars/lamborghini_huracan_gt3_evo/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/lamborghini_huracan_gt3_evo/lod0.glb?v=mvck5wjy",
+    "assets/cars/lamborghini_huracan_gt3_evo/lod1.glb?v=mvck5wjy",
+    "assets/cars/lamborghini_huracan_gt3_evo/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 1153528,
+   "cockpit": "assets/cars/lamborghini_huracan_gt3_evo/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 2167396,
+   "dims": {
+    "length": 4.782,
+    "width": 2.25,
+    "height": 1.592
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8527,
+      0.345,
+      1.3002
+     ],
+     "radius": 0.345,
+     "width": 0.34
+    },
+    "FR": {
+     "position": [
+      -0.8527,
+      0.345,
+      1.3002
+     ],
+     "radius": 0.345,
+     "width": 0.34
+    },
+    "RL": {
+     "position": [
+      1,
+      0.4014,
+      -1.3002
+     ],
+     "radius": 0.3529,
+     "width": 0.0922
+    },
+    "RR": {
+     "position": [
+      -1,
+      0.4014,
+      -1.3002
+     ],
+     "radius": 0.3529,
+     "width": 0.0922
+    }
+   },
+   "wheelbase": 2.6005,
+   "trackFront": 1.7054,
+   "trackRear": 2,
+   "steering": null,
+   "cockpitCamera": {
+    "position": [
+     0.44,
+     0.9057,
+     -0.1012
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_EXT_Lights"
+    ],
+    "tail": [
+     "LIGHT_TAIL_EXT_Lights"
+    ]
+   },
+   "genericWheels": [
+    "RL",
+    "RR"
+   ],
+   "specs": {
+    "massKg": 1235,
+    "powerKw": 370,
+    "idleRpm": 1300,
+    "redlineRpm": 8400,
+    "limiterRpm": 8600,
+    "torqueCurve": [
+     [
+      1000,
+      250
+     ],
+     [
+      3000,
+      400
+     ],
+     [
+      5000,
+      480
+     ],
+     [
+      6500,
+      530
+     ],
+     [
+      7500,
+      510
+     ],
+     [
+      8400,
+      450
+     ],
+     [
+      8700,
+      250
+     ]
+    ],
+    "gears": [
+     3.2,
+     2.37,
+     1.89,
+     1.55,
+     1.3,
+     1.11
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.36,
+    "shiftTimeMs": 55,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.42,
+    "comHeightM": 0.39,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8000,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1.11,
+    "downforceArea": 2.29,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 130000,
+    "springRateRear": 145000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "2023_lamborghini_huracan_gt3_evo2",
+   "name": "Lamborghini Huracán GT3 EVO2",
+   "manufacturer": "Lamborghini",
+   "year": 2023,
+   "category": "GT3 Evo",
+   "color": "#1b1b1b",
+   "thumbnail": "assets/cars/2023_lamborghini_huracan_gt3_evo2/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod0.glb?v=mvck5wjy",
+    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod1.glb?v=mvck5wjy",
+    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 3792824,
+   "cockpit": "assets/cars/2023_lamborghini_huracan_gt3_evo2/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 3973136,
+   "dims": {
+    "length": 4.76,
+    "width": 2.249,
+    "height": 1.513
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8368,
+      0.3449,
+      1.3365
+     ],
+     "radius": 0.344,
+     "width": 0.3375
+    },
+    "FR": {
+     "position": [
+      -0.8379,
+      0.3449,
+      1.3365
+     ],
+     "radius": 0.344,
+     "width": 0.3375
+    },
+    "RL": {
+     "position": [
+      0.8209,
+      0.3559,
+      -1.3365
+     ],
+     "radius": 0.3559,
+     "width": 0.3579
+    },
+    "RR": {
+     "position": [
+      -0.8217,
+      0.3559,
+      -1.3365
+     ],
+     "radius": 0.3559,
+     "width": 0.3579
+    }
+   },
+   "wheelbase": 2.6729,
+   "trackFront": 1.6747,
+   "trackRear": 1.6426,
+   "steering": {
+    "position": [
+     0.3267,
+     0.6869,
+     0.4699
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.303
+   },
+   "cockpitCamera": {
+    "position": [
+     0.4067,
+     0.9942,
+     -0.0937
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_AUX_LIGHT_005",
+     "LIGHT_HEAD_EXT_Emissive_Light_Front_005",
+     "LIGHT_HEAD_EXT_Glass_Emissive_Front_005"
+    ],
+    "tail": [
+     "LIGHT_TAIL_EXT_Emissive_Light_Rear_005",
+     "LIGHT_TAIL_EXT_Glass_Emissive_Rear_005"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1235,
+    "powerKw": 380,
+    "idleRpm": 1300,
+    "redlineRpm": 8400,
+    "limiterRpm": 8600,
+    "torqueCurve": [
+     [
+      1000,
+      250
+     ],
+     [
+      3000,
+      400
+     ],
+     [
+      5000,
+      480
+     ],
+     [
+      6500,
+      530
+     ],
+     [
+      7500,
+      510
+     ],
+     [
+      8400,
+      450
+     ],
+     [
+      8700,
+      250
+     ]
+    ],
+    "gears": [
+     3.2,
+     2.37,
+     1.89,
+     1.55,
+     1.3,
+     1.11
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.36,
+    "shiftTimeMs": 55,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.42,
+    "comHeightM": 0.39,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8000,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1.06,
+    "downforceArea": 2.29,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 130000,
+    "springRateRear": 145000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "lamborghini_huracan_gt3_evo2",
+   "name": "Lamborghini Huracán GT3 EVO2 (Iron Lynx)",
+   "manufacturer": "Lamborghini",
+   "year": 2023,
+   "category": "GT3 Evo",
+   "color": "#c7c22c",
+   "thumbnail": "assets/cars/lamborghini_huracan_gt3_evo2/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/lamborghini_huracan_gt3_evo2/lod0.glb?v=mvck5wjy",
+    "assets/cars/lamborghini_huracan_gt3_evo2/lod1.glb?v=mvck5wjy",
+    "assets/cars/lamborghini_huracan_gt3_evo2/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 6601124,
+   "cockpit": "assets/cars/lamborghini_huracan_gt3_evo2/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 7188980,
+   "dims": {
+    "length": 4.799,
+    "width": 2.254,
+    "height": 1.509
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8448,
+      0.3993,
+      1.3405
+     ],
+     "radius": 0.3425,
+     "width": 0.3502
+    },
+    "FR": {
+     "position": [
+      -0.8421,
+      0.4439,
+      1.3401
+     ],
+     "radius": 0.3483,
+     "width": 0.3737
+    },
+    "RL": {
+     "position": [
+      0.8291,
+      0.3562,
+      -1.3398
+     ],
+     "radius": 0.3562,
+     "width": 0.3574
+    },
+    "RR": {
+     "position": [
+      -0.8251,
+      0.4132,
+      -1.3408
+     ],
+     "radius": 0.3594,
+     "width": 0.3779
+    }
+   },
+   "wheelbase": 2.6803,
+   "trackFront": 1.687,
+   "trackRear": 1.6542,
+   "steering": null,
+   "cockpitCamera": {
+    "position": [
+     0.44,
+     1.0145,
+     -0.0894
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": false,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_AR3DMat_PBR_Light_Cool_White",
+     "LIGHT_HEAD_Grey_painted_lightly_scratched_metal"
+    ],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1235,
+    "powerKw": 380,
+    "idleRpm": 1300,
+    "redlineRpm": 8400,
+    "limiterRpm": 8600,
+    "torqueCurve": [
+     [
+      1000,
+      250
+     ],
+     [
+      3000,
+      400
+     ],
+     [
+      5000,
+      480
+     ],
+     [
+      6500,
+      530
+     ],
+     [
+      7500,
+      510
+     ],
+     [
+      8400,
+      450
+     ],
+     [
+      8700,
+      250
+     ]
+    ],
+    "gears": [
+     3.2,
+     2.37,
+     1.89,
+     1.55,
+     1.3,
+     1.11
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.36,
+    "shiftTimeMs": 55,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.42,
+    "comHeightM": 0.39,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8000,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1.03,
+    "downforceArea": 2.29,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 130000,
+    "springRateRear": 145000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "2015_mclaren_650s_gt3",
+   "name": "McLaren 650S GT3",
+   "manufacturer": "McLaren",
+   "year": 2015,
+   "category": "GT3",
+   "color": "#1d1f24",
+   "thumbnail": "assets/cars/2015_mclaren_650s_gt3/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2015_mclaren_650s_gt3/lod0.glb?v=mvck5wjy",
+    "assets/cars/2015_mclaren_650s_gt3/lod1.glb?v=mvck5wjy",
+    "assets/cars/2015_mclaren_650s_gt3/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 3777672,
+   "cockpit": "assets/cars/2015_mclaren_650s_gt3/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 4110200,
+   "dims": {
+    "length": 4.673,
+    "width": 2.1,
+    "height": 1.52
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8635,
+      0.3568,
+      1.3502
+     ],
+     "radius": 0.35,
+     "width": 0.3214
+    },
+    "FR": {
+     "position": [
+      -0.8635,
+      0.3568,
+      1.3502
+     ],
+     "radius": 0.35,
+     "width": 0.3214
+    },
+    "RL": {
+     "position": [
+      0.8388,
+      0.3545,
+      -1.3502
+     ],
+     "radius": 0.3545,
+     "width": 0.339
+    },
+    "RR": {
+     "position": [
+      -0.8388,
+      0.3545,
+      -1.3502
+     ],
+     "radius": 0.3545,
+     "width": 0.339
+    }
+   },
+   "wheelbase": 2.7005,
+   "trackFront": 1.7271,
+   "trackRear": 1.6777,
+   "steering": null,
+   "cockpitCamera": {
+    "position": [
+     0.28,
+     0.9888,
+     0.3237
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_Front_Light_008"
+    ],
+    "tail": [
+     "LIGHT_TAIL_Rear_Light_006",
+     "LIGHT_TAIL_Rear_Light_BIS_006"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1270,
+    "powerKw": 370,
+    "idleRpm": 1200,
+    "redlineRpm": 7500,
+    "limiterRpm": 7700,
+    "torqueCurve": [
+     [
+      1000,
+      330
+     ],
+     [
+      2500,
+      560
+     ],
+     [
+      3500,
+      640
+     ],
+     [
+      5000,
+      650
+     ],
+     [
+      6500,
+      610
+     ],
+     [
+      7500,
+      520
+     ],
+     [
+      7800,
+      300
+     ]
+    ],
+    "gears": [
+     3.05,
+     2.28,
+     1.82,
+     1.5,
+     1.27,
+     1.09
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.27,
+    "shiftTimeMs": 60,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.43,
+    "comHeightM": 0.4,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8200,
+    "brakeBiasFront": 0.6,
+    "dragArea": 0.82,
+    "downforceArea": 2.16,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 135000,
+    "springRateRear": 150000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 285
+   }
+  },
+  {
+   "id": "2020_mclaren_720s_gt3",
+   "name": "McLaren 720S GT3",
+   "manufacturer": "McLaren",
+   "year": 2020,
+   "category": "GT3",
+   "color": "#2a6cc4",
+   "thumbnail": "assets/cars/2020_mclaren_720s_gt3/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2020_mclaren_720s_gt3/lod0.glb?v=mvck5wjy",
+    "assets/cars/2020_mclaren_720s_gt3/lod1.glb?v=mvck5wjy",
+    "assets/cars/2020_mclaren_720s_gt3/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 4646464,
+   "cockpit": "assets/cars/2020_mclaren_720s_gt3/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 5044948,
+   "dims": {
+    "length": 5.087,
+    "width": 2.262,
+    "height": 1.255
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.921,
+      0.414,
+      1.4344
+     ],
+     "radius": 0.3719,
+     "width": 0.3414
+    },
+    "FR": {
+     "position": [
+      -0.9129,
+      0.414,
+      1.4344
+     ],
+     "radius": 0.3719,
+     "width": 0.3414
+    },
+    "RL": {
+     "position": [
+      0.8889,
+      0.3766,
+      -1.4344
+     ],
+     "radius": 0.3766,
+     "width": 0.3601
+    },
+    "RR": {
+     "position": [
+      -0.8924,
+      0.3766,
+      -1.4344
+     ],
+     "radius": 0.3766,
+     "width": 0.3601
+    }
+   },
+   "wheelbase": 2.8688,
+   "trackFront": 1.8339,
+   "trackRear": 1.7813,
+   "steering": {
+    "position": [
+     0.2994,
+     0.7773,
+     0.6076
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.323
+   },
+   "cockpitCamera": {
+    "position": [
+     0.2194,
+     1.0246,
+     0.244
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_EXT_Body_Emissive",
+     "LIGHT_HEAD_EXT_Emissive_Light_Front",
+     "LIGHT_HEAD_EXT_Mechanics_Emissive_1",
+     "LIGHT_HEAD_endu_lights",
+     "LIGHT_HEAD_endu_lights_emissive",
+     "LIGHT_HEAD_lightcup",
+     "LIGHT_HEAD_lights_emissive",
+     "LIGHT_HEAD_lights_emissive_0",
+     "LIGHT_HEAD_lights_glass"
+    ],
+    "tail": [
+     "LIGHT_TAIL_EXT_Emissive_Light_Front",
+     "LIGHT_TAIL_EXT_Glass_Emissive_Rear",
+     "LIGHT_TAIL_brakes_emissive",
+     "LIGHT_TAIL_brakes_emissive_0"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1250,
+    "powerKw": 382,
+    "idleRpm": 1200,
+    "redlineRpm": 7500,
+    "limiterRpm": 7700,
+    "torqueCurve": [
+     [
+      1000,
+      330
+     ],
+     [
+      2500,
+      560
+     ],
+     [
+      3500,
+      640
+     ],
+     [
+      5000,
+      650
+     ],
+     [
+      6500,
+      610
+     ],
+     [
+      7500,
+      520
+     ],
+     [
+      7800,
+      300
+     ]
+    ],
+    "gears": [
+     3.05,
+     2.28,
+     1.82,
+     1.5,
+     1.27,
+     1.09
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.27,
+    "shiftTimeMs": 60,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.43,
+    "comHeightM": 0.4,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8200,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1,
+    "downforceArea": 2.36,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 135000,
+    "springRateRear": 150000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 285
+   }
+  },
+  {
+   "id": "mclaren_720s_gt3_inception_racing",
+   "name": "McLaren 720S GT3 Evo",
+   "manufacturer": "McLaren",
+   "year": 2023,
+   "category": "GT3 Evo",
+   "color": "#c8321e",
+   "thumbnail": "assets/cars/mclaren_720s_gt3_inception_racing/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/mclaren_720s_gt3_inception_racing/lod0.glb?v=mvck5wjy",
+    "assets/cars/mclaren_720s_gt3_inception_racing/lod1.glb?v=mvck5wjy",
+    "assets/cars/mclaren_720s_gt3_inception_racing/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 3322080,
+   "cockpit": "assets/cars/mclaren_720s_gt3_inception_racing/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 5302584,
+   "dims": {
+    "length": 5.078,
+    "width": 2.258,
+    "height": 1.19
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.9161,
+      0.3768,
+      1.4384
+     ],
+     "radius": 0.3712,
+     "width": 0.6507
+    },
+    "FR": {
+     "position": [
+      -0.9161,
+      0.3768,
+      1.4384
+     ],
+     "radius": 0.3712,
+     "width": 0.6507
+    },
+    "RL": {
+     "position": [
+      0.8987,
+      0.376,
+      -1.4384
+     ],
+     "radius": 0.376,
+     "width": 0.3787
+    },
+    "RR": {
+     "position": [
+      -0.8987,
+      0.376,
+      -1.4384
+     ],
+     "radius": 0.376,
+     "width": 0.3787
+    }
+   },
+   "wheelbase": 2.8768,
+   "trackFront": 1.8323,
+   "trackRear": 1.7975,
+   "steering": {
+    "position": [
+     0.3007,
+     0.7782,
+     0.5241
+    ],
+    "axis": [
+     0,
+     0.2529,
+     -0.9675
+    ],
+    "diameter": 0.254
+   },
+   "cockpitCamera": {
+    "position": [
+     0.3007,
+     0.9646,
+     0.0404
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1250,
+    "powerKw": 382,
+    "idleRpm": 1200,
+    "redlineRpm": 7500,
+    "limiterRpm": 7700,
+    "torqueCurve": [
+     [
+      1000,
+      330
+     ],
+     [
+      2500,
+      560
+     ],
+     [
+      3500,
+      640
+     ],
+     [
+      5000,
+      650
+     ],
+     [
+      6500,
+      610
+     ],
+     [
+      7500,
+      520
+     ],
+     [
+      7800,
+      300
+     ]
+    ],
+    "gears": [
+     3.05,
+     2.28,
+     1.82,
+     1.5,
+     1.27,
+     1.09
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.27,
+    "shiftTimeMs": 60,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.43,
+    "comHeightM": 0.4,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8200,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1.03,
+    "downforceArea": 2.43,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 135000,
+    "springRateRear": 150000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 285
+   }
+  },
+  {
+   "id": "mclaren_720s_lmgt3_evo",
+   "name": "McLaren 720S LMGT3 Evo",
+   "manufacturer": "McLaren",
+   "year": 2024,
+   "category": "GT3 Evo",
+   "color": "#d98a2b",
+   "thumbnail": "assets/cars/mclaren_720s_lmgt3_evo/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/mclaren_720s_lmgt3_evo/lod0.glb?v=mvck5wjy",
+    "assets/cars/mclaren_720s_lmgt3_evo/lod1.glb?v=mvck5wjy",
+    "assets/cars/mclaren_720s_lmgt3_evo/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 5306468,
+   "cockpit": "assets/cars/mclaren_720s_lmgt3_evo/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 7228128,
+   "dims": {
+    "length": 5.028,
+    "width": 2.371,
+    "height": 1.61
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.9685,
+      0.36,
+      1.3805
+     ],
+     "radius": 0.36,
+     "width": 0.3858
+    },
+    "FR": {
+     "position": [
+      -0.829,
+      0.3843,
+      1.4761
+     ],
+     "radius": 0.3619,
+     "width": 0.3964
+    },
+    "RL": {
+     "position": [
+      0.8111,
+      0.4167,
+      -1.4757
+     ],
+     "radius": 0.3743,
+     "width": 0.3795
+    },
+    "RR": {
+     "position": [
+      -0.9725,
+      0.4459,
+      -1.3808
+     ],
+     "radius": 0.3751,
+     "width": 0.3962
+    }
+   },
+   "wheelbase": 2.8562,
+   "trackFront": 1.7976,
+   "trackRear": 1.7836,
+   "steering": null,
+   "cockpitCamera": {
+    "position": [
+     0.28,
+     0.9455,
+     0.2307
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": false,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_AR3DMat_PBR_Light_Cool_White"
+    ],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1265,
+    "powerKw": 382,
+    "idleRpm": 1200,
+    "redlineRpm": 7500,
+    "limiterRpm": 7700,
+    "torqueCurve": [
+     [
+      1000,
+      330
+     ],
+     [
+      2500,
+      560
+     ],
+     [
+      3500,
+      640
+     ],
+     [
+      5000,
+      650
+     ],
+     [
+      6500,
+      610
+     ],
+     [
+      7500,
+      520
+     ],
+     [
+      7800,
+      300
+     ]
+    ],
+    "gears": [
+     3.05,
+     2.28,
+     1.82,
+     1.5,
+     1.27,
+     1.09
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.27,
+    "shiftTimeMs": 60,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.43,
+    "comHeightM": 0.4,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8200,
+    "brakeBiasFront": 0.6,
+    "dragArea": 1.06,
+    "downforceArea": 2.43,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 135000,
+    "springRateRear": 150000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 285
+   }
+  },
+  {
+   "id": "2015_mercedes_amg_gt3_marin_kitagawa",
+   "name": "Mercedes-AMG GT3 \"Marin\"",
+   "manufacturer": "Mercedes-AMG",
+   "year": 2015,
+   "category": "GT3",
+   "color": "#f2a7c7",
+   "thumbnail": "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod0.glb?v=mvck5wjy",
+    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod1.glb?v=mvck5wjy",
+    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 4124528,
+   "cockpit": "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 4108532,
+   "dims": {
+    "length": 4.973,
+    "width": 2.131,
+    "height": 1.667
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8809,
+      0.3522,
+      1.3623
+     ],
+     "radius": 0.3522,
+     "width": 0.3567
+    },
+    "FR": {
+     "position": [
+      -0.881,
+      0.3522,
+      1.3623
+     ],
+     "radius": 0.3522,
+     "width": 0.3567
+    },
+    "RL": {
+     "position": [
+      0.8782,
+      0.3681,
+      -1.3623
+     ],
+     "radius": 0.3681,
+     "width": 0.3667
+    },
+    "RR": {
+     "position": [
+      -0.8784,
+      0.3681,
+      -1.3623
+     ],
+     "radius": 0.3681,
+     "width": 0.3667
+    }
+   },
+   "wheelbase": 2.7246,
+   "trackFront": 1.7619,
+   "trackRear": 1.7566,
+   "steering": {
+    "position": [
+     0.4163,
+     0.77,
+     -0.0519
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.394
+   },
+   "cockpitCamera": {
+    "position": [
+     0.4163,
+     1.0173,
+     -0.4155
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_AUX_LIGHT_001",
+     "LIGHT_HEAD_EXT_Emissive_Light_Front_001",
+     "LIGHT_HEAD_EXT_Headlight_Glass_002",
+     "LIGHT_HEAD_EXT_Lighthouse_001"
+    ],
+    "tail": [
+     "LIGHT_TAIL_AUX_LIGHT_001",
+     "LIGHT_TAIL_EXT_Emissive_Light_Rear_001"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1300,
+    "powerKw": 380,
+    "idleRpm": 1100,
+    "redlineRpm": 7200,
+    "limiterRpm": 7400,
+    "torqueCurve": [
+     [
+      1000,
+      400
+     ],
+     [
+      2500,
+      600
+     ],
+     [
+      4000,
+      660
+     ],
+     [
+      5500,
+      650
+     ],
+     [
+      6500,
+      600
+     ],
+     [
+      7200,
+      520
+     ],
+     [
+      7500,
+      300
+     ]
+    ],
+    "gears": [
+     2.95,
+     2.2,
+     1.77,
+     1.47,
+     1.25,
+     1.08
+    ],
+    "reverseRatio": 3.1,
+    "finalDrive": 3.15,
+    "shiftTimeMs": 65,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.49,
+    "comHeightM": 0.42,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8400,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.06,
+    "downforceArea": 2.09,
+    "aeroBalanceFront": 0.44,
+    "diffLock": 0.5,
+    "maxSteerDeg": 25,
+    "springRateFront": 140000,
+    "springRateRear": 140000,
+    "antiRollFront": 45000,
+    "antiRollRear": 28000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "mercedes_amg_gt3_evo",
+   "name": "Mercedes-AMG GT3 EVO",
+   "manufacturer": "Mercedes-AMG",
+   "year": 2020,
+   "category": "GT3 Evo",
+   "color": "#1f3b6b",
+   "thumbnail": "assets/cars/mercedes_amg_gt3_evo/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/mercedes_amg_gt3_evo/lod0.glb?v=mvck5wjy",
+    "assets/cars/mercedes_amg_gt3_evo/lod1.glb?v=mvck5wjy",
+    "assets/cars/mercedes_amg_gt3_evo/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 2512376,
+   "cockpit": "assets/cars/mercedes_amg_gt3_evo/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 2824608,
+   "dims": {
+    "length": 5.018,
+    "width": 2.15,
+    "height": 1.756
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8888,
+      0.3554,
+      1.3746
+     ],
+     "radius": 0.3554,
+     "width": 0.3599
+    },
+    "FR": {
+     "position": [
+      -0.8889,
+      0.3554,
+      1.3746
+     ],
+     "radius": 0.3554,
+     "width": 0.3599
+    },
+    "RL": {
+     "position": [
+      0.8862,
+      0.3715,
+      -1.3746
+     ],
+     "radius": 0.3715,
+     "width": 0.3701
+    },
+    "RR": {
+     "position": [
+      -0.8409,
+      0.3715,
+      -1.3746
+     ],
+     "radius": 0.3715,
+     "width": 0.3701
+    }
+   },
+   "wheelbase": 2.7492,
+   "trackFront": 1.7778,
+   "trackRear": 1.7271,
+   "steering": {
+    "position": [
+     0.4207,
+     0.7628,
+     -0.2066
+    ],
+    "axis": [
+     0.0024,
+     0.3113,
+     -0.9503
+    ],
+    "diameter": 0.305
+   },
+   "cockpitCamera": {
+    "position": [
+     0.3419,
+     1.0385,
+     -0.5818
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [],
+    "tail": []
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1285,
+    "powerKw": 380,
+    "idleRpm": 1100,
+    "redlineRpm": 7200,
+    "limiterRpm": 7400,
+    "torqueCurve": [
+     [
+      1000,
+      400
+     ],
+     [
+      2500,
+      600
+     ],
+     [
+      4000,
+      660
+     ],
+     [
+      5500,
+      650
+     ],
+     [
+      6500,
+      600
+     ],
+     [
+      7200,
+      520
+     ],
+     [
+      7500,
+      300
+     ]
+    ],
+    "gears": [
+     2.95,
+     2.2,
+     1.77,
+     1.47,
+     1.25,
+     1.08
+    ],
+    "reverseRatio": 3.1,
+    "finalDrive": 3.15,
+    "shiftTimeMs": 65,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.49,
+    "comHeightM": 0.42,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8400,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.06,
+    "downforceArea": 2.23,
+    "aeroBalanceFront": 0.44,
+    "diffLock": 0.5,
+    "maxSteerDeg": 25,
+    "springRateFront": 140000,
+    "springRateRear": 140000,
+    "antiRollFront": 45000,
+    "antiRollRear": 28000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "mercedes_amg_gt3_red_bull_racing",
+   "name": "Mercedes-AMG GT3 Red Bull",
+   "manufacturer": "Mercedes-AMG",
+   "year": 2023,
+   "category": "GT3 Evo",
+   "color": "#1c2b4f",
+   "thumbnail": "assets/cars/mercedes_amg_gt3_red_bull_racing/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod0.glb?v=mvck5wjy",
+    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod1.glb?v=mvck5wjy",
+    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 6970704,
+   "cockpit": "assets/cars/mercedes_amg_gt3_red_bull_racing/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 7073404,
+   "dims": {
+    "length": 4.9,
+    "width": 2.164,
+    "height": 1.236
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.9064,
+      0.3586,
+      1.3869
+     ],
+     "radius": 0.3586,
+     "width": 0.3083
+    },
+    "FR": {
+     "position": [
+      -0.9068,
+      0.3587,
+      1.3869
+     ],
+     "radius": 0.3586,
+     "width": 0.3083
+    },
+    "RL": {
+     "position": [
+      0.9121,
+      0.3756,
+      -1.3869
+     ],
+     "radius": 0.3744,
+     "width": 0.3206
+    },
+    "RR": {
+     "position": [
+      -0.9125,
+      0.3757,
+      -1.3869
+     ],
+     "radius": 0.3744,
+     "width": 0.3206
+    }
+   },
+   "wheelbase": 2.7738,
+   "trackFront": 1.8132,
+   "trackRear": 1.8246,
+   "steering": {
+    "position": [
+     0.4198,
+     0.7504,
+     -0.1885
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.345
+   },
+   "cockpitCamera": {
+    "position": [
+     0.3398,
+     0.9977,
+     -0.552
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_MI_Mercedes_AMG_GT3_Evo_Lights",
+     "LIGHT_HEAD_MI_Mercedes_AMG_GT3_Evo_Lights_Glass_Inst"
+    ],
+    "tail": [
+     "LIGHT_TAIL_MI_Mercedes_AMG_GT3_Evo_Lights",
+     "LIGHT_TAIL_MI_Mercedes_AMG_GT3_Evo_Lights_Glass_Inst"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1285,
+    "powerKw": 380,
+    "idleRpm": 1100,
+    "redlineRpm": 7200,
+    "limiterRpm": 7400,
+    "torqueCurve": [
+     [
+      1000,
+      400
+     ],
+     [
+      2500,
+      600
+     ],
+     [
+      4000,
+      660
+     ],
+     [
+      5500,
+      650
+     ],
+     [
+      6500,
+      600
+     ],
+     [
+      7200,
+      520
+     ],
+     [
+      7500,
+      300
+     ]
+    ],
+    "gears": [
+     2.95,
+     2.2,
+     1.77,
+     1.47,
+     1.25,
+     1.08
+    ],
+    "reverseRatio": 3.1,
+    "finalDrive": 3.15,
+    "shiftTimeMs": 65,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.49,
+    "comHeightM": 0.42,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8400,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.06,
+    "downforceArea": 2.32,
+    "aeroBalanceFront": 0.44,
+    "diffLock": 0.5,
+    "maxSteerDeg": 25,
+    "springRateFront": 140000,
+    "springRateRear": 140000,
+    "antiRollFront": 45000,
+    "antiRollRear": 28000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 280
+   }
+  },
+  {
+   "id": "2022_mercedes_amg_project_one",
+   "name": "Mercedes-AMG ONE",
+   "manufacturer": "Mercedes-AMG",
+   "year": 2022,
+   "category": "Hypercar",
+   "color": "#2b2d30",
+   "thumbnail": "assets/cars/2022_mercedes_amg_project_one/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2022_mercedes_amg_project_one/lod0.glb?v=mvck5wjy",
+    "assets/cars/2022_mercedes_amg_project_one/lod1.glb?v=mvck5wjy",
+    "assets/cars/2022_mercedes_amg_project_one/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 4305816,
+   "cockpit": "assets/cars/2022_mercedes_amg_project_one/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 4519704,
+   "dims": {
+    "length": 4.828,
+    "width": 2.212,
+    "height": 1.193
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8808,
+      0.3517,
+      1.3817
+     ],
+     "radius": 0.3517,
+     "width": 0.277
+    },
+    "FR": {
+     "position": [
+      -0.8691,
+      0.3576,
+      1.3812
+     ],
+     "radius": 0.3517,
+     "width": 0.2776
+    },
+    "RL": {
+     "position": [
+      0.8808,
+      0.3693,
+      -1.3812
+     ],
+     "radius": 0.3517,
+     "width": 0.277
+    },
+    "RR": {
+     "position": [
+      -0.8719,
+      0.3716,
+      -1.3817
+     ],
+     "radius": 0.3517,
+     "width": 0.2776
+    }
+   },
+   "wheelbase": 2.763,
+   "trackFront": 1.7499,
+   "trackRear": 1.7527,
+   "steering": {
+    "position": [
+     0.3357,
+     0.7014,
+     0.3983
+    ],
+    "axis": [
+     0.0022,
+     0.1313,
+     -0.9913
+    ],
+    "diameter": 0.357
+   },
+   "cockpitCamera": {
+    "position": [
+     0.3368,
+     0.887,
+     0.0027
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_amgprojone_headlight",
+     "LIGHT_HEAD_amgprojone_runninglight"
+    ],
+    "tail": [
+     "LIGHT_TAIL_amgprojone_headlight",
+     "LIGHT_TAIL_amgprojone_runninglight"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1695,
+    "powerKw": 560,
+    "idleRpm": 1200,
+    "redlineRpm": 11000,
+    "limiterRpm": 11200,
+    "torqueCurve": [
+     [
+      1000,
+      500
+     ],
+     [
+      3000,
+      640
+     ],
+     [
+      5000,
+      640
+     ],
+     [
+      7500,
+      560
+     ],
+     [
+      9500,
+      470
+     ],
+     [
+      11000,
+      400
+     ],
+     [
+      11300,
+      200
+     ]
+    ],
+    "gears": [
+     3.4,
+     2.4,
+     1.85,
+     1.48,
+     1.22,
+     1.03,
+     0.88
+    ],
+    "reverseRatio": 3.2,
+    "finalDrive": 3.2,
+    "shiftTimeMs": 80,
+    "drivetrain": "AWD",
+    "frontTorqueSplit": 0.3,
+    "weightFront": 0.42,
+    "comHeightM": 0.4,
+    "tyreGrip": 1.56,
+    "brakeTorqueNm": 9200,
+    "brakeBiasFront": 0.6,
+    "dragArea": 0.81,
+    "downforceArea": 1.05,
+    "aeroBalanceFront": 0.42,
+    "diffLock": 0.45,
+    "maxSteerDeg": 24,
+    "springRateFront": 132000,
+    "springRateRear": 150000,
+    "antiRollFront": 40000,
+    "antiRollRear": 30000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 330
+   }
+  },
+  {
+   "id": "2024_porsche_992_gt3_r",
+   "name": "Porsche 911 GT3 R (992)",
+   "manufacturer": "Porsche",
+   "year": 2024,
+   "category": "GT3",
+   "color": "#c9962b",
+   "thumbnail": "assets/cars/2024_porsche_992_gt3_r/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/2024_porsche_992_gt3_r/lod0.glb?v=mvck5wjy",
+    "assets/cars/2024_porsche_992_gt3_r/lod1.glb?v=mvck5wjy",
+    "assets/cars/2024_porsche_992_gt3_r/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 4013096,
+   "cockpit": "assets/cars/2024_porsche_992_gt3_r/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 4888308,
+   "dims": {
+    "length": 4.821,
+    "width": 2.072,
+    "height": 1.21
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8449,
+      0.3443,
+      1.2724
+     ],
+     "radius": 0.3443,
+     "width": 0.3377
+    },
+    "FR": {
+     "position": [
+      -0.8561,
+      0.3443,
+      1.2724
+     ],
+     "radius": 0.3443,
+     "width": 0.3377
+    },
+    "RL": {
+     "position": [
+      0.8383,
+      0.3586,
+      -1.2724
+     ],
+     "radius": 0.3562,
+     "width": 0.3581
+    },
+    "RR": {
+     "position": [
+      -0.8345,
+      0.3587,
+      -1.2725
+     ],
+     "radius": 0.3562,
+     "width": 0.3581
+    }
+   },
+   "wheelbase": 2.5448,
+   "trackFront": 1.701,
+   "trackRear": 1.6727,
+   "steering": {
+    "position": [
+     0.3038,
+     0.7132,
+     0.2409
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.314
+   },
+   "cockpitCamera": {
+    "position": [
+     0.2238,
+     0.9605,
+     -0.1227
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_AUX_LIGHT_Porsche992",
+     "LIGHT_HEAD_EXT_Emissive_Light_Front",
+     "LIGHT_HEAD_EXT_Emissive_Light_Rear",
+     "LIGHT_HEAD_EXT_Glass_Emissive_Front"
+    ],
+    "tail": [
+     "LIGHT_TAIL_AUX_LIGHT_Porsche992",
+     "LIGHT_TAIL_EXT_Emissive_Light_Front",
+     "LIGHT_TAIL_EXT_Emissive_Light_Rear",
+     "LIGHT_TAIL_EXT_Glass_Emissive_Rear"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1250,
+    "powerKw": 375,
+    "idleRpm": 1300,
+    "redlineRpm": 9200,
+    "limiterRpm": 9400,
+    "torqueCurve": [
+     [
+      1000,
+      220
+     ],
+     [
+      3000,
+      380
+     ],
+     [
+      5000,
+      440
+     ],
+     [
+      6500,
+      480
+     ],
+     [
+      8000,
+      460
+     ],
+     [
+      9200,
+      400
+     ],
+     [
+      9500,
+      220
+     ]
+    ],
+    "gears": [
+     3.4,
+     2.5,
+     1.98,
+     1.62,
+     1.36,
+     1.15
+    ],
+    "reverseRatio": 3.3,
+    "finalDrive": 3.45,
+    "shiftTimeMs": 50,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.39,
+    "comHeightM": 0.38,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8000,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.01,
+    "downforceArea": 2.32,
+    "aeroBalanceFront": 0.4,
+    "diffLock": 0.4,
+    "maxSteerDeg": 24,
+    "springRateFront": 125000,
+    "springRateRear": 160000,
+    "antiRollFront": 42000,
+    "antiRollRear": 26000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 282
+   }
+  },
+  {
+   "id": "porsche_992_gt3_r",
+   "name": "Porsche 911 GT3 R (992)",
+   "manufacturer": "Porsche",
+   "year": 2023,
+   "category": "GT3",
+   "color": "#d0d0d0",
+   "thumbnail": "assets/cars/porsche_992_gt3_r/thumb.webp?v=mvck5wjy",
+   "lods": [
+    "assets/cars/porsche_992_gt3_r/lod0.glb?v=mvck5wjy",
+    "assets/cars/porsche_992_gt3_r/lod1.glb?v=mvck5wjy",
+    "assets/cars/porsche_992_gt3_r/lod2.glb?v=mvck5wjy"
+   ],
+   "bytes": 5031548,
+   "cockpit": "assets/cars/porsche_992_gt3_r/cockpit.glb?v=mvck5wjy",
+   "cockpitBytes": 6021780,
+   "dims": {
+    "length": 4.821,
+    "width": 2.072,
+    "height": 1.21
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8449,
+      0.3443,
+      1.2724
+     ],
+     "radius": 0.3443,
+     "width": 0.3377
+    },
+    "FR": {
+     "position": [
+      -0.8561,
+      0.3443,
+      1.2724
+     ],
+     "radius": 0.3443,
+     "width": 0.3377
+    },
+    "RL": {
+     "position": [
+      0.8383,
+      0.3586,
+      -1.2724
+     ],
+     "radius": 0.3562,
+     "width": 0.3581
+    },
+    "RR": {
+     "position": [
+      -0.8345,
+      0.3587,
+      -1.2725
+     ],
+     "radius": 0.3562,
+     "width": 0.3581
+    }
+   },
+   "wheelbase": 2.5448,
+   "trackFront": 1.701,
+   "trackRear": 1.6727,
+   "steering": {
+    "position": [
+     0.3038,
+     0.7132,
+     0.2409
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.314
+   },
+   "cockpitCamera": {
+    "position": [
+     0.2238,
+     0.9605,
+     -0.1227
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_AUX_LIGHT_Porsche992",
+     "LIGHT_HEAD_EXT_Emissive_Light_Front_0",
+     "LIGHT_HEAD_EXT_Emissive_Light_Rear",
+     "LIGHT_HEAD_EXT_Glass_Emissive_Front"
+    ],
+    "tail": [
+     "LIGHT_TAIL_AUX_LIGHT_Porsche992",
+     "LIGHT_TAIL_EXT_Emissive_Light_Rear",
+     "LIGHT_TAIL_EXT_Emissive_Light_Rear_0",
+     "LIGHT_TAIL_EXT_Glass_Emissive_Rear"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1250,
+    "powerKw": 375,
+    "idleRpm": 1300,
+    "redlineRpm": 9200,
+    "limiterRpm": 9400,
+    "torqueCurve": [
+     [
+      1000,
+      220
+     ],
+     [
+      3000,
+      380
+     ],
+     [
+      5000,
+      440
+     ],
+     [
+      6500,
+      480
+     ],
+     [
+      8000,
+      460
+     ],
+     [
+      9200,
+      400
+     ],
+     [
+      9500,
+      220
+     ]
+    ],
+    "gears": [
+     3.4,
+     2.5,
+     1.98,
+     1.62,
+     1.36,
+     1.15
+    ],
+    "reverseRatio": 3.3,
+    "finalDrive": 3.45,
+    "shiftTimeMs": 50,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.39,
+    "comHeightM": 0.38,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 8000,
+    "brakeBiasFront": 0.62,
+    "dragArea": 1.01,
+    "downforceArea": 2.32,
+    "aeroBalanceFront": 0.4,
+    "diffLock": 0.4,
+    "maxSteerDeg": 24,
+    "springRateFront": 125000,
+    "springRateRear": 160000,
+    "antiRollFront": 42000,
+    "antiRollRear": 26000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 282
+   }
+  }
+ ]
+}

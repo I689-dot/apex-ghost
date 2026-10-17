@@ -1,0 +1,9 @@
+dist
+node_modules
+.wrangler
+apps/client/public
+tools/asset-pipeline/out
+3D MODELS
+pnpm-lock.yaml
+*.md
+packages/shared/src/generated

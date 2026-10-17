@@ -1,0 +1,551 @@
+{
+  "_comment": "Hand-editable. Keyed by car id (slug of the folder name). 'pipeline' holds conversion hints; 'specs' are the physics values copied into cars.json. Profiles are applied first, then per-car 'specs' overrides.",
+  "profiles": {
+    "gt3_mid_v8tt": {
+      "massKg": 1250,
+      "powerKw": 382,
+      "idleRpm": 1200,
+      "redlineRpm": 7500,
+      "limiterRpm": 7700,
+      "torqueCurve": [
+        [1000, 330],
+        [2500, 560],
+        [3500, 640],
+        [5000, 650],
+        [6500, 610],
+        [7500, 520],
+        [7800, 300]
+      ],
+      "gears": [3.05, 2.28, 1.82, 1.5, 1.27, 1.09],
+      "reverseRatio": 3.2,
+      "finalDrive": 3.27,
+      "shiftTimeMs": 60,
+      "drivetrain": "RWD",
+      "frontTorqueSplit": 0,
+      "weightFront": 0.43,
+      "comHeightM": 0.4,
+      "tyreGrip": 1.95,
+      "brakeTorqueNm": 8200,
+      "brakeBiasFront": 0.6,
+      "dragArea": 0.78,
+      "downforceArea": 2.36,
+      "aeroBalanceFront": 0.42,
+      "diffLock": 0.45,
+      "maxSteerDeg": 24,
+      "springRateFront": 135000,
+      "springRateRear": 150000,
+      "antiRollFront": 40000,
+      "antiRollRear": 30000,
+      "suspTravelM": 0.14,
+      "topSpeedKmh": 285
+    },
+    "gt3_v10_na": {
+      "massKg": 1235,
+      "powerKw": 375,
+      "idleRpm": 1300,
+      "redlineRpm": 8400,
+      "limiterRpm": 8600,
+      "torqueCurve": [
+        [1000, 250],
+        [3000, 400],
+        [5000, 480],
+        [6500, 530],
+        [7500, 510],
+        [8400, 450],
+        [8700, 250]
+      ],
+      "gears": [3.2, 2.37, 1.89, 1.55, 1.3, 1.11],
+      "reverseRatio": 3.2,
+      "finalDrive": 3.36,
+      "shiftTimeMs": 55,
+      "drivetrain": "RWD",
+      "frontTorqueSplit": 0,
+      "weightFront": 0.42,
+      "comHeightM": 0.39,
+      "tyreGrip": 1.95,
+      "brakeTorqueNm": 8000,
+      "brakeBiasFront": 0.6,
+      "dragArea": 0.76,
+      "downforceArea": 2.29,
+      "aeroBalanceFront": 0.42,
+      "diffLock": 0.45,
+      "maxSteerDeg": 24,
+      "springRateFront": 130000,
+      "springRateRear": 145000,
+      "antiRollFront": 40000,
+      "antiRollRear": 30000,
+      "suspTravelM": 0.14,
+      "topSpeedKmh": 280
+    },
+    "gt3_front_v8": {
+      "massKg": 1285,
+      "powerKw": 380,
+      "idleRpm": 1100,
+      "redlineRpm": 7200,
+      "limiterRpm": 7400,
+      "torqueCurve": [
+        [1000, 400],
+        [2500, 600],
+        [4000, 660],
+        [5500, 650],
+        [6500, 600],
+        [7200, 520],
+        [7500, 300]
+      ],
+      "gears": [2.95, 2.2, 1.77, 1.47, 1.25, 1.08],
+      "reverseRatio": 3.1,
+      "finalDrive": 3.15,
+      "shiftTimeMs": 65,
+      "drivetrain": "RWD",
+      "frontTorqueSplit": 0,
+      "weightFront": 0.49,
+      "comHeightM": 0.42,
+      "tyreGrip": 1.95,
+      "brakeTorqueNm": 8400,
+      "brakeBiasFront": 0.62,
+      "dragArea": 0.8,
+      "downforceArea": 2.23,
+      "aeroBalanceFront": 0.44,
+      "diffLock": 0.5,
+      "maxSteerDeg": 25,
+      "springRateFront": 140000,
+      "springRateRear": 140000,
+      "antiRollFront": 45000,
+      "antiRollRear": 28000,
+      "suspTravelM": 0.14,
+      "topSpeedKmh": 280
+    },
+    "gt3_rear_f6": {
+      "massKg": 1250,
+      "powerKw": 375,
+      "idleRpm": 1300,
+      "redlineRpm": 9200,
+      "limiterRpm": 9400,
+      "torqueCurve": [
+        [1000, 220],
+        [3000, 380],
+        [5000, 440],
+        [6500, 480],
+        [8000, 460],
+        [9200, 400],
+        [9500, 220]
+      ],
+      "gears": [3.4, 2.5, 1.98, 1.62, 1.36, 1.15],
+      "reverseRatio": 3.3,
+      "finalDrive": 3.45,
+      "shiftTimeMs": 50,
+      "drivetrain": "RWD",
+      "frontTorqueSplit": 0,
+      "weightFront": 0.39,
+      "comHeightM": 0.38,
+      "tyreGrip": 1.95,
+      "brakeTorqueNm": 8000,
+      "brakeBiasFront": 0.62,
+      "dragArea": 0.77,
+      "downforceArea": 2.32,
+      "aeroBalanceFront": 0.4,
+      "diffLock": 0.4,
+      "maxSteerDeg": 24,
+      "springRateFront": 125000,
+      "springRateRear": 160000,
+      "antiRollFront": 42000,
+      "antiRollRear": 26000,
+      "suspTravelM": 0.14,
+      "topSpeedKmh": 282
+    },
+    "gt3_front_i6tt": {
+      "massKg": 1310,
+      "powerKw": 395,
+      "idleRpm": 1000,
+      "redlineRpm": 7100,
+      "limiterRpm": 7300,
+      "torqueCurve": [
+        [1000, 420],
+        [2200, 640],
+        [3500, 700],
+        [5000, 690],
+        [6200, 620],
+        [7100, 520],
+        [7400, 300]
+      ],
+      "gears": [2.9, 2.17, 1.74, 1.44, 1.22, 1.06],
+      "reverseRatio": 3.1,
+      "finalDrive": 3.08,
+      "shiftTimeMs": 65,
+      "drivetrain": "RWD",
+      "frontTorqueSplit": 0,
+      "weightFront": 0.5,
+      "comHeightM": 0.43,
+      "tyreGrip": 1.95,
+      "brakeTorqueNm": 8600,
+      "brakeBiasFront": 0.62,
+      "dragArea": 0.82,
+      "downforceArea": 2.23,
+      "aeroBalanceFront": 0.44,
+      "diffLock": 0.5,
+      "maxSteerDeg": 25,
+      "springRateFront": 145000,
+      "springRateRear": 145000,
+      "antiRollFront": 46000,
+      "antiRollRear": 28000,
+      "suspTravelM": 0.14,
+      "topSpeedKmh": 278
+    },
+    "gt3_mid_v6tt": {
+      "massKg": 1260,
+      "powerKw": 385,
+      "idleRpm": 1200,
+      "redlineRpm": 8000,
+      "limiterRpm": 8200,
+      "torqueCurve": [
+        [1000, 300],
+        [2500, 560],
+        [3500, 680],
+        [5500, 690],
+        [7000, 610],
+        [8000, 520],
+        [8300, 280]
+      ],
+      "gears": [3.1, 2.3, 1.84, 1.52, 1.29, 1.1],
+      "reverseRatio": 3.2,
+      "finalDrive": 3.3,
+      "shiftTimeMs": 55,
+      "drivetrain": "RWD",
+      "frontTorqueSplit": 0,
+      "weightFront": 0.42,
+      "comHeightM": 0.39,
+      "tyreGrip": 1.95,
+      "brakeTorqueNm": 8200,
+      "brakeBiasFront": 0.6,
+      "dragArea": 0.77,
+      "downforceArea": 2.32,
+      "aeroBalanceFront": 0.42,
+      "diffLock": 0.45,
+      "maxSteerDeg": 24,
+      "springRateFront": 132000,
+      "springRateRear": 150000,
+      "antiRollFront": 40000,
+      "antiRollRear": 30000,
+      "suspTravelM": 0.14,
+      "topSpeedKmh": 284
+    }
+  },
+  "cars": {
+    "2015_mclaren_650s_gt3": {
+      "name": "McLaren 650S GT3",
+      "manufacturer": "McLaren",
+      "year": 2015,
+      "category": "GT3",
+      "color": "#1d1f24",
+      "pipeline": {
+        "realLengthM": 4.53
+      },
+      "profile": "gt3_mid_v8tt",
+      "specs": {
+        "massKg": 1270,
+        "powerKw": 370,
+        "downforceArea": 2.16,
+        "dragArea": 0.82
+      }
+    },
+    "2015_mercedes_amg_gt3_marin_kitagawa": {
+      "name": "Mercedes-AMG GT3 \"Marin\"",
+      "manufacturer": "Mercedes-AMG",
+      "year": 2015,
+      "category": "GT3",
+      "color": "#f2a7c7",
+      "pipeline": {
+        "realLengthM": 4.71
+      },
+      "profile": "gt3_front_v8",
+      "specs": {
+        "massKg": 1300,
+        "downforceArea": 2.09,
+        "dragArea": 1.06
+      }
+    },
+    "2020_audi_r8_lms_evo": {
+      "name": "Audi R8 LMS Evo",
+      "manufacturer": "Audi",
+      "year": 2020,
+      "category": "GT3 Evo",
+      "color": "#c8332b",
+      "pipeline": {
+        "realLengthM": 4.58
+      },
+      "profile": "gt3_v10_na",
+      "specs": {
+        "dragArea": 1.07
+      }
+    },
+    "2020_mclaren_720s_gt3": {
+      "name": "McLaren 720S GT3",
+      "manufacturer": "McLaren",
+      "year": 2020,
+      "category": "GT3",
+      "color": "#2a6cc4",
+      "pipeline": {
+        "realLengthM": 4.8
+      },
+      "profile": "gt3_mid_v8tt",
+      "specs": {
+        "dragArea": 1
+      }
+    },
+    "2022_mercedes_amg_project_one": {
+      "name": "Mercedes-AMG ONE",
+      "manufacturer": "Mercedes-AMG",
+      "year": 2022,
+      "category": "Hypercar",
+      "color": "#2b2d30",
+      "pipeline": {
+        "realLengthM": 4.76
+      },
+      "profile": "gt3_mid_v6tt",
+      "specs": {
+        "_note": "Balanced against the GT3 field: power capped, road-legal tyres and much less aero, but AWD traction.",
+        "massKg": 1695,
+        "powerKw": 560,
+        "redlineRpm": 11000,
+        "limiterRpm": 11200,
+        "torqueCurve": [
+          [1000, 500],
+          [3000, 640],
+          [5000, 640],
+          [7500, 560],
+          [9500, 470],
+          [11000, 400],
+          [11300, 200]
+        ],
+        "gears": [3.4, 2.4, 1.85, 1.48, 1.22, 1.03, 0.88],
+        "finalDrive": 3.2,
+        "shiftTimeMs": 80,
+        "drivetrain": "AWD",
+        "frontTorqueSplit": 0.3,
+        "weightFront": 0.42,
+        "comHeightM": 0.4,
+        "tyreGrip": 1.56,
+        "dragArea": 0.81,
+        "downforceArea": 1.05,
+        "brakeTorqueNm": 9200,
+        "topSpeedKmh": 330
+      }
+    },
+    "2023_lamborghini_huracan_gt3_evo2": {
+      "name": "Lamborghini Huracán GT3 EVO2",
+      "manufacturer": "Lamborghini",
+      "year": 2023,
+      "category": "GT3 Evo",
+      "color": "#1b1b1b",
+      "pipeline": {
+        "realLengthM": 4.55
+      },
+      "profile": "gt3_v10_na",
+      "specs": {
+        "powerKw": 380,
+        "dragArea": 1.06
+      }
+    },
+    "2024_porsche_992_gt3_r": {
+      "name": "Porsche 911 GT3 R (992)",
+      "manufacturer": "Porsche",
+      "year": 2024,
+      "category": "GT3",
+      "color": "#c9962b",
+      "pipeline": {
+        "realLengthM": 4.62
+      },
+      "profile": "gt3_rear_f6",
+      "specs": {
+        "dragArea": 1.01
+      }
+    },
+    "2025_bmw_m4_gt3_evo_g82": {
+      "name": "BMW M4 GT3 EVO",
+      "manufacturer": "BMW",
+      "year": 2025,
+      "category": "GT3 Evo",
+      "color": "#141414",
+      "pipeline": {
+        "realLengthM": 5.02
+      },
+      "profile": "gt3_front_i6tt",
+      "specs": {
+        "dragArea": 1.07
+      }
+    },
+    "bmw_m4_touring_nh_24h": {
+      "name": "BMW M3 Touring 24h",
+      "manufacturer": "BMW",
+      "year": 2024,
+      "category": "Touring",
+      "color": "#d23a2a",
+      "pipeline": {
+        "realLengthM": 4.82,
+        "cockpitOffset": [0.06, -0.06, 0.3]
+      },
+      "profile": "gt3_front_i6tt",
+      "specs": {
+        "massKg": 1420,
+        "powerKw": 405,
+        "tyreGrip": 1.77,
+        "downforceArea": 1.56,
+        "dragArea": 1.18,
+        "comHeightM": 0.46,
+        "topSpeedKmh": 272
+      }
+    },
+    "ferrari_296_challenge_2024": {
+      "name": "Ferrari 296 Challenge",
+      "manufacturer": "Ferrari",
+      "year": 2024,
+      "category": "Cup",
+      "color": "#c8102e",
+      "pipeline": {
+        "realLengthM": 4.63
+      },
+      "profile": "gt3_mid_v6tt",
+      "specs": {
+        "massKg": 1300,
+        "powerKw": 515,
+        "tyreGrip": 1.71,
+        "downforceArea": 1.38,
+        "dragArea": 0.9,
+        "topSpeedKmh": 296,
+        "_note_drag": "Gearing-limited at ~296 km/h; drag area kept at a realistic value (calibrate.ts would push it down)."
+      }
+    },
+    "ferrari_296_gt3": {
+      "name": "Ferrari 296 GT3",
+      "manufacturer": "Ferrari",
+      "year": 2023,
+      "category": "GT3",
+      "color": "#bfbfbf",
+      "pipeline": {
+        "realLengthM": 4.69
+      },
+      "profile": "gt3_mid_v6tt",
+      "exclude": "Source model is an exploded display model: wheels detached beside the car and front bodywork missing."
+    },
+    "lamborghini_huracan_gt3_evo": {
+      "name": "Lamborghini Huracán GT3 EVO",
+      "manufacturer": "Lamborghini",
+      "year": 2019,
+      "category": "GT3 Evo",
+      "color": "#f0f0f0",
+      "pipeline": {
+        "realLengthM": 4.55
+      },
+      "profile": "gt3_v10_na",
+      "specs": {
+        "powerKw": 370,
+        "dragArea": 1.11
+      }
+    },
+    "lamborghini_huracan_gt3_evo2": {
+      "name": "Lamborghini Huracán GT3 EVO2 (Iron Lynx)",
+      "manufacturer": "Lamborghini",
+      "year": 2023,
+      "category": "GT3 Evo",
+      "color": "#c7c22c",
+      "pipeline": {
+        "realLengthM": 4.55
+      },
+      "profile": "gt3_v10_na",
+      "specs": {
+        "powerKw": 380,
+        "dragArea": 1.03
+      }
+    },
+    "mclaren_720s_gt3_inception_racing": {
+      "name": "McLaren 720S GT3 Evo",
+      "manufacturer": "McLaren",
+      "year": 2023,
+      "category": "GT3 Evo",
+      "color": "#c8321e",
+      "pipeline": {
+        "realLengthM": 4.8
+      },
+      "profile": "gt3_mid_v8tt",
+      "specs": {
+        "downforceArea": 2.43,
+        "dragArea": 1.03
+      }
+    },
+    "mclaren_720s_lmgt3_evo": {
+      "name": "McLaren 720S LMGT3 Evo",
+      "manufacturer": "McLaren",
+      "year": 2024,
+      "category": "GT3 Evo",
+      "color": "#d98a2b",
+      "pipeline": {
+        "realLengthM": 4.8
+      },
+      "profile": "gt3_mid_v8tt",
+      "specs": {
+        "massKg": 1265,
+        "downforceArea": 2.43,
+        "dragArea": 1.06
+      }
+    },
+    "mercedes_amg_gt3_evo": {
+      "name": "Mercedes-AMG GT3 EVO",
+      "manufacturer": "Mercedes-AMG",
+      "year": 2020,
+      "category": "GT3 Evo",
+      "color": "#1f3b6b",
+      "pipeline": {
+        "realLengthM": 4.75
+      },
+      "profile": "gt3_front_v8",
+      "specs": {
+        "dragArea": 1.06
+      }
+    },
+    "mercedes_amg_gt3_red_bull_racing": {
+      "name": "Mercedes-AMG GT3 Red Bull",
+      "manufacturer": "Mercedes-AMG",
+      "year": 2023,
+      "category": "GT3 Evo",
+      "color": "#1c2b4f",
+      "pipeline": {
+        "realLengthM": 4.75
+      },
+      "profile": "gt3_front_v8",
+      "specs": {
+        "downforceArea": 2.32,
+        "dragArea": 1.06
+      }
+    },
+    "porsche_992_gt3_r": {
+      "name": "Porsche 911 GT3 R (992)",
+      "manufacturer": "Porsche",
+      "year": 2023,
+      "category": "GT3",
+      "color": "#d0d0d0",
+      "pipeline": {
+        "realLengthM": 4.62
+      },
+      "profile": "gt3_rear_f6",
+      "specs": {
+        "dragArea": 1.01
+      }
+    },
+    "vantage_gt3_evo_heart_of_racing": {
+      "name": "Aston Martin Vantage GT3 Evo",
+      "manufacturer": "Aston Martin",
+      "year": 2024,
+      "category": "GT3 Evo",
+      "color": "#1d2f55",
+      "pipeline": {
+        "realLengthM": 4.65
+      },
+      "profile": "gt3_front_v8",
+      "specs": {
+        "massKg": 1290,
+        "weightFront": 0.48,
+        "dragArea": 1.05
+      }
+    }
+  }
+}

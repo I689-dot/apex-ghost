@@ -1,0 +1,48 @@
+{
+  "name": "apex-ghost",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @apex/client --filter @apex/server dev",
+    "build": "pnpm --filter @apex/shared build && pnpm --filter @apex/client build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "assets": "node tools/asset-pipeline/run.mjs",
+    "loadtest": "tsx tools/loadtest/loadtest.ts",
+    "deploy:server": "pnpm --filter @apex/server run deploy",
+    "deploy:client": "pnpm --filter @apex/client build && vercel deploy apps/client/dist/apex-ghost --prod --yes",
+    "sim": "tsx tools/sim/simtest.ts",
+    "e2e": "node tools/e2e/smoke.mjs",
+    "setup:tools": "bash tools/asset-pipeline/setup-tools.sh"
+  },
+  "devDependencies": {
+    "@dimforge/rapier3d-compat": "0.14.0",
+    "@eslint/js": "^9.17.0",
+    "@gltf-transform/cli": "^4.1.1",
+    "@gltf-transform/core": "^4.1.1",
+    "@gltf-transform/extensions": "^4.1.1",
+    "@gltf-transform/functions": "^4.1.1",
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
+    "eslint": "^9.17.0",
+    "meshoptimizer": "^0.22.0",
+    "playwright": "1.49.1",
+    "prettier": "^3.4.2",
+    "sharp": "^0.33.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8",
+    "ws": "^8.18.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "workerd"
+    ]
+  }
+}
