@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { TrackData } from '@apex/shared';
 import { h } from '../ui/dom';
+import { t } from '../i18n';
 
 export interface Entrant {
   slot: number;
@@ -75,8 +76,8 @@ export class Cinematic {
     this.titleEl = h(
       'div.cine-title',
       {},
-      h('div.cine-kicker', { text: 'LIVE · QUALIFYING SESSION' }),
-      h('h1', { text: info.trackName }),
+      h('div.cine-kicker', { text: t('LIVE · QUALIFYING SESSION') }),
+      h('h1', { text: t(info.trackName) }),
       h('div.cine-facts', {}, ...info.facts.map((f) => h('span', { text: f }))),
       h('div.cine-format', { text: info.format }),
     );
@@ -105,7 +106,7 @@ export class Cinematic {
       this.titleEl,
       h('div.cine-side', {}, this.trackMap(), list),
       this.card,
-      h('div.cine-skip', { text: 'Enter: skip' }),
+      h('div.cine-skip', { text: t('Enter: skip') }),
     );
   }
 
@@ -238,7 +239,7 @@ export class Cinematic {
     this.card.replaceChildren(
       h('div.pos', { text: `P${e.slot + 1}` }),
       h('div.stripe', { style: `background:${e.color}` }),
-      h('div.who', {}, h('div.nick', { text: `${e.nick}${e.me ? '  ·  YOU' : ''}${e.bot ? '  ·  AI' : ''}` }), h('div.car', { text: e.carName })),
+      h('div.who', {}, h('div.nick', { text: `${e.nick}${e.me ? t('  ·  YOU') : ''}${e.bot ? t('  ·  AI') : ''}` }), h('div.car', { text: e.carName })),
     );
     this.card.classList.remove('show');
     // restart the slide-in animation

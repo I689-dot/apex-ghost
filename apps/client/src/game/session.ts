@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
+  WEATHER_LABEL,
   FLAG_BRAKE,
   FLAG_HANDBRAKE,
   FLAG_HEADLIGHTS,
@@ -63,6 +64,7 @@ import { Track } from './track';
 import { PerfOverlay } from './perf';
 import { TrackEditor } from './trackEditor';
 import { IS_DEV } from '../config';
+import { t } from '../i18n';
 
 const FIXED_DT = 1 / PHYSICS_HZ;
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
@@ -234,14 +236,14 @@ export class RaceSession {
   /* ------------------------------------------------------------ loading --- */
 
   async load(progress: Progress): Promise<void> {
-    progress(0, 1, 'Starting physics');
+    progress(0, 1, t('Starting physics'));
     await initRapier();
     this.trackData = await loadTrackFile(this.race.trackId);
     const entries = new Map(this.cars.cars.map((c) => [c.id, c]));
     const racers = this.race.grid.map((id) => ({ id, player: this.room.players.find((p) => p.id === id) }));
     const myCarId = this.room.players.find((p) => p.id === this.me)?.carId;
     const myEntry = myCarId ? entries.get(myCarId) : undefined;
-    if (!myEntry) throw new Error('Your car is not available.');
+    if (!myEntry) throw new Error(t('Your car is not available.'));
 
     // byte budget for the progress bar
     const remoteEntries = racers
@@ -252,7 +254,7 @@ export class RaceSession {
     let loaded = 0;
     const onBytes = (n: number) => {
       loaded += n;
-      progress(Math.min(loaded, total), total, 'Loading track and cars');
+      progress(Math.min(loaded, total), total, t('Loading track and cars'));
     };
 
     const [trackRes, myModel, ...remoteModels] = await Promise.all([
@@ -260,7 +262,7 @@ export class RaceSession {
       loadCarModel(myEntry, onBytes, 1, this.gfx.quality.cockpitDetail),
       ...remoteEntries.map((r) => loadCarModel(r.entry, onBytes, 3)),
     ]);
-    progress(total, total, 'Building the world');
+    progress(total, total, t('Building the world'));
     this.track = trackRes.track;
     this.scene.add(this.track.root);
 
@@ -344,7 +346,7 @@ export class RaceSession {
     this.collectEnvMaterials();
     this.applyWeather();
 
-    progress(total, total, 'Compiling shaders');
+    progress(total, total, t('Compiling shaders'));
     await this.warmUp();
     if (IS_DEV || settings.showPerf) this.perf = new PerfOverlay();
     if (IS_DEV) this.editor = new TrackEditor(this.scene, this.trackData, trackRes.collision);
@@ -365,20 +367,19 @@ export class RaceSession {
       entrants.push({ slot: this.race.slots[id] ?? 0, nick: p.nick, carName: e.name, color: e.color, me: id === this.me, bot: !!p.bot });
     }
     const w0 = this.weather;
-    const kind = this.race.weather.kind.replace('_', ' ');
     const hh = Math.floor(w0.hour);
     const mm = Math.floor((w0.hour - hh) * 60);
     this.cinematic = new Cinematic(this.trackData, entrants, {
       trackName: this.trackData.name,
       facts: [
         `${(this.trackData.length / 1000).toFixed(3)} km`,
-        ...(this.trackData.id.includes('gp') ? ['15 turns'] : []),
+        ...(this.trackData.id.includes('gp') ? [t('15 turns')] : []),
         `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
-        kind[0].toUpperCase() + kind.slice(1),
-        w0.wetness > 0.3 ? 'Wet track' : w0.wetness > 0.05 ? 'Damp track' : 'Dry track',
-        `${entrants.length} drivers`,
+        t(WEATHER_LABEL[this.race.weather.kind]),
+        w0.wetness > 0.3 ? t('Wet track') : w0.wetness > 0.05 ? t('Damp track') : t('Dry track'),
+        t('{n} drivers', { n: entrants.length }),
       ],
-      format: `${Math.round(this.race.sessionMs / 60000)}-minute qualifying · best valid lap wins · pit lane open`,
+      format: t('{min}-minute qualifying · best valid lap wins · pit lane open', { min: Math.round(this.race.sessionMs / 60000) }),
     });
   }
 
@@ -545,12 +546,12 @@ export class RaceSession {
   requestReset(): void {
     const now = this.conn.serverNow();
     if (this.pit?.inLane) {
-      this.flash('In the pit lane: stop in the service box or drive to the pit exit');
+      this.flash(t('In the pit lane: stop in the service box or drive to the pit exit'));
       return;
     }
     if (!this.startAt || now < this.startAt) return;
     if (now - this.lastResetAt < 4000) {
-      this.flash('Reset available again in a moment');
+      this.flash(t('Reset available again in a moment'));
       return;
     }
     const tr = this.localTracker?.players.get(this.me);
@@ -586,7 +587,7 @@ export class RaceSession {
     this.resetFlagSamples = 2; // make sure at least one packet carries the reset flag
     this.track.resetHint();
     this.limits.reset();
-    this.flash(this.myLaps > 0 ? 'Reset: this lap no longer counts' : 'Reset to the track');
+    this.flash(this.myLaps > 0 ? t('Reset: this lap no longer counts') : t('Reset to the track'));
   }
 
   private flash(msg: string, ms = 2500): void {
@@ -613,7 +614,7 @@ export class RaceSession {
           this.myLaps = m.lap;
           this.lapInvalid = false;
           if (m.outLap) {
-            this.flash(`Out lap ${fmtLap(m.lapMs)} (not timed) · timed lap starts now · Tab: timing`, 4000);
+            this.flash(t('Out lap {time} (not timed) · timed lap starts now · Tab: timing', { time: fmtLap(m.lapMs) }), 4000);
             break;
           }
           this.lapTimes.push(m.lapMs);
@@ -622,8 +623,8 @@ export class RaceSession {
             this.bestSectors = m.sectors.slice();
           }
           const sessionBest = this.standings.every((s) => s.id === this.me || s.bestLapMs === null || s.bestLapMs > m.lapMs);
-          const tag = !m.valid ? '  ·  INVALID' : m.best ? (sessionBest ? '  ·  FASTEST LAP' : '  ·  personal best') : '';
-          this.flash(`Lap ${m.lap - 1}: ${fmtLap(m.lapMs)}${tag}`, 3500);
+          const tag = !m.valid ? t('  ·  INVALID') : m.best ? (sessionBest ? t('  ·  FASTEST LAP') : t('  ·  personal best')) : '';
+          this.flash(t('Lap {n}: {time}', { n: m.lap - 1, time: fmtLap(m.lapMs) }) + tag, 3500);
           if (m.valid) this.snd?.chime(m.best ? (sessionBest ? 'session-best' : 'best') : 'lap');
         }
         break;
@@ -633,7 +634,7 @@ export class RaceSession {
       case 'flag':
         if (m.raceId !== this.race.raceId) break;
         this.flagged = true;
-        this.flash(this.pit?.inLane ? 'CHEQUERED FLAG: session over' : 'CHEQUERED FLAG: finish your lap, it still counts', 5000);
+        this.flash(this.pit?.inLane ? t('CHEQUERED FLAG: session over') : t('CHEQUERED FLAG: finish your lap, it still counts'), 5000);
         this.snd?.chime('lap');
         break;
       case 'sector':
@@ -651,9 +652,9 @@ export class RaceSession {
         if (m.playerId === this.me) {
           this.finishedMs = m.totalMs;
           const pos = this.standings.findIndex((s) => s.id === this.me) + 1;
-          this.flash(`SESSION COMPLETE${pos ? ` · P${pos}` : ''}`, 8000);
+          this.flash(`${t('SESSION COMPLETE')}${pos ? ` · P${pos}` : ''}`, 8000);
         } else {
-          this.flash(`${this.names.get(m.playerId) ?? 'A driver'} has completed the session`, 3000);
+          this.flash(t('{name} has completed the session', { name: this.names.get(m.playerId) ?? t('A driver') }), 3000);
         }
         break;
       case 'damage': {
@@ -728,7 +729,7 @@ export class RaceSession {
     } else if (serverNow >= this.freezeUntil && this.vehicle.frozen && raceT >= 0 && !this.pitHold) {
       this.vehicle.frozen = false;
       this.updateCountdown(-1);
-      if (this.myLaps === 0 && raceT < 2000) this.flash('Out lap: bring the tyres up to temperature. Timing starts at the line.', 5000);
+      if (this.myLaps === 0 && raceT < 2000) this.flash(t('Out lap: bring the tyres up to temperature. Timing starts at the line.'), 5000);
     } else if (raceT < 1500) this.updateCountdown(-1);
     else this.clearCountdown();
 
@@ -871,7 +872,7 @@ export class RaceSession {
     if (kb.tapped('toggleGearbox')) {
       settings.manualGearbox = !settings.manualGearbox;
       this.vehicle.drivetrain.manual = settings.manualGearbox;
-      this.flash(settings.manualGearbox ? 'Manual gearbox' : 'Automatic gearbox', 1500);
+      this.flash(settings.manualGearbox ? t('Manual gearbox') : t('Automatic gearbox'), 1500);
     }
     if (kb.tapped('resetCar')) this.requestReset();
     if (this.freezeUntil > 0 && serverNow >= this.freezeUntil && this.startAt !== null && serverNow >= this.startAt && !this.pitHold) {
@@ -886,8 +887,8 @@ export class RaceSession {
     let sub = '';
     if (msLeft === null) {
       // during the cinematic a quiet line is enough
-      text = this.cinematic ? '' : 'Waiting for drivers';
-      sub = 'Everyone is loading the race…';
+      text = this.cinematic ? '' : t('Waiting for drivers');
+      sub = t('Everyone is loading the race…');
       this.track.setStartLights(false, false);
     } else if (msLeft > 3000) {
       text = '';
@@ -1093,7 +1094,7 @@ export class RaceSession {
   }
 
   /** Live delta to my best valid lap, driven by the local mirror of the lap logic (no network delay). */
-  private updateLapDelta(t: number, ev: RaceEvent[]): void {
+  private updateLapDelta(nowMs: number, ev: RaceEvent[]): void {
     const tr = this.localTracker?.players.get(this.me);
     if (!tr) return;
     this.lapDelta ??= new LapDelta(this.trackData.length);
@@ -1106,7 +1107,7 @@ export class RaceSession {
         d.start();
       } else if (e.type === 'invalid' && e.reason === 'track-limits') {
         this.lapInvalid = true;
-        this.flash('Track limits: this lap no longer counts', 2500);
+        this.flash(t('Track limits: this lap no longer counts'), 2500);
         this.snd?.chime('invalid');
       }
     }
@@ -1115,7 +1116,7 @@ export class RaceSession {
       return;
     }
     const lapDist = tr.raceDist - tr.laps * this.trackData.length;
-    const lapMs = t - tr.lapStartMs;
+    const lapMs = nowMs - tr.lapStartMs;
     if (!tr.outLap && !tr.inPit) this.ghost.record(lapMs, this.currPos, this.currRot);
     else this.ghost.abortLap();
     d.record(lapDist, lapMs);
@@ -1163,10 +1164,10 @@ export class RaceSession {
 
   /** Session clock: time left until the chequered flag (the flag falls at start + session length). */
   private sessionText(serverNow: number): string {
-    if (this.finishedMs !== null) return 'SESSION COMPLETE';
-    if (this.startAt === null) return `SESSION ${fmtClock(this.race.sessionMs)}`;
+    if (this.finishedMs !== null) return t('SESSION COMPLETE');
+    if (this.startAt === null) return t('SESSION {clock}', { clock: fmtClock(this.race.sessionMs) });
     const left = this.startAt + this.race.sessionMs - Math.max(serverNow, this.startAt);
-    return this.flagged || left <= 0 ? 'CHEQUERED FLAG · LAST LAP' : `SESSION ${fmtClock(left)}`;
+    return this.flagged || left <= 0 ? t('CHEQUERED FLAG · LAST LAP') : t('SESSION {clock}', { clock: fmtClock(left) });
   }
 
   /** Pit lane: limiter, pit-in/out for the lap logic, the service box. */
@@ -1181,13 +1182,13 @@ export class RaceSession {
       this.lapInvalid = true;
       this.conn.sendJson({ t: 'pit', in: true });
       this.localTracker?.pitIn(this.me, serverNow);
-      this.flash(`Pit lane · limiter ${pit.lane.speedLimitKmh} km/h · stop in the yellow box for service`, 4000);
+      this.flash(t('Pit lane · limiter {n} km/h · stop in the yellow box for service', { n: pit.lane.speedLimitKmh }), 4000);
     } else if (ev === 'exit') {
       v.speedLimitMs = null;
       this.conn.sendJson({ t: 'pit', in: false });
       this.localTracker?.pitOut(this.me, this.trackData.pitLane?.exitS ?? 0);
       this.closePitMenu();
-      this.flash(this.flagged ? 'Session over' : 'Out lap: bring the tyres up to temperature', 3000);
+      this.flash(this.flagged ? t('Session over') : t('Out lap: bring the tyres up to temperature'), 3000);
     } else if (ev === 'box' && !this.pitHold && this.finishedMs === null) {
       this.openPitMenu();
     }
@@ -1239,7 +1240,7 @@ export class RaceSession {
       this.conn.sendJson({ t: 'damage', zones: Array.from(this.damage.zones, (z) => Math.round(z * 100) / 100) });
       this.damageVersionSent = this.damage.version;
     }
-    this.flash('Service complete · GO!', 2500);
+    this.flash(t('Service complete · GO!'), 2500);
     this.releaseFromBox();
   }
 
@@ -1346,16 +1347,16 @@ export class RaceSession {
 
   private updateRaceUi(serverNow: number, raceT: number, dt: number): void {
     const v = this.vehicle;
-    const t = v.telemetry;
+    const tel = v.telemetry;
     const p = this.currPos;
     // forward direction of the car on the ground plane
     _v1.set(0, 0, 1).applyQuaternion(this.currRot);
     this.track.locate(p.x, p.y, p.z, _v1.x, _v1.z, this.loc);
-    const movingWrong = this.loc.dot < -0.45 && Math.abs(t.forwardSpeed) > 4 && !v.reverse;
+    const movingWrong = this.loc.dot < -0.45 && Math.abs(tel.forwardSpeed) > 4 && !v.reverse;
     this.wrongWayTime = movingWrong ? this.wrongWayTime + dt : 0;
     // stuck / upside-down hint
     _v2.set(0, 1, 0).applyQuaternion(this.currRot);
-    const stuck = (t.speed < 1 && raceT > 2000 && !v.frozen) || _v2.y < 0.3 || t.airborne > 2;
+    const stuck = (tel.speed < 1 && raceT > 2000 && !v.frozen) || _v2.y < 0.3 || tel.airborne > 2;
     this.stuckTime = stuck ? this.stuckTime + dt : 0;
 
     const me = this.standings.find((s) => s.id === this.me);
@@ -1365,13 +1366,13 @@ export class RaceSession {
     if (nowMs > this.sectorDeltaUntil) this.sectorDelta = null;
     const curLap = raceT < 0 ? 0 : this.finishedMs !== null ? 0 : serverNow - this.lapStartMs();
     this.hud.update({
-      speedMs: t.speed,
-      rpm: t.rpm,
+      speedMs: tel.speed,
+      rpm: tel.rpm,
       redline: this.vehicle.specs.redlineRpm,
       limiter: this.vehicle.specs.limiterRpm,
-      gear: t.gear,
+      gear: tel.gear,
       manual: v.drivetrain.manual,
-      lapLabel: this.finishedMs !== null ? 'FIN' : this.localTracker?.players.get(this.me)?.outLap !== false ? 'OUT' : String(this.myLaps + 1),
+      lapLabel: this.finishedMs !== null ? t('FIN') : this.localTracker?.players.get(this.me)?.outLap !== false ? t('OUT') : String(this.myLaps + 1),
       lapInvalid: this.lapInvalid && this.myLaps > 0 && this.finishedMs === null,
       liveDelta: this.myLaps > 0 && this.finishedMs === null ? this.liveDelta : null,
       position,
@@ -1382,11 +1383,11 @@ export class RaceSession {
       sectorDelta: this.sectorDelta,
       damage: this.damage.total,
       wrongWay: this.wrongWayTime > 1.2,
-      abs: t.absActive,
-      tc: t.tcActive,
+      abs: tel.absActive,
+      tc: tel.tcActive,
       message: this.message,
       sessionText: this.sessionText(serverNow),
-      pitText: this.pitHold ? 'PIT BOX' : this.pit?.inLane ? `PIT LANE · LIMITER ${this.pit.lane.speedLimitKmh}` : '',
+      pitText: this.pitHold ? t('PIT BOX') : this.pit?.inLane ? t('PIT LANE · LIMITER {n}', { n: this.pit.lane.speedLimitKmh }) : '',
       compound: this.vehicle.compound.id,
       tyreWear: v.wheels.map((w) => w.wear),
       brakeTemps: v.wheels.map((w) => w.brakeTemp),

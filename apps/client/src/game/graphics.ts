@@ -23,6 +23,7 @@ const HdrClampShader = {
     }`,
 };
 import { QUALITY, detectQuality, saveSettings, settings, type QualityConfig } from '../settings';
+import { t } from '../i18n';
 
 /** Owns the WebGL renderer and the (cheap) post-processing chain. */
 export class Graphics {
@@ -48,7 +49,7 @@ export class Graphics {
     this.canvas.className = 'game-canvas';
     container.appendChild(this.canvas);
     const gl = this.canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance', stencil: false, depth: true });
-    if (!gl) throw new Error('WebGL 2 is not available. Please use an up-to-date Chrome, Edge or Firefox with hardware acceleration enabled.');
+    if (!gl) throw new Error(t('WebGL 2 is not available. Please use an up-to-date Chrome, Edge or Firefox with hardware acceleration enabled.'));
     if (settings.qualityAuto) {
       settings.quality = detectQuality(gl);
       settings.qualityAuto = false;

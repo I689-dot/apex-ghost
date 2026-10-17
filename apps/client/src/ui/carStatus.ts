@@ -6,6 +6,7 @@
  * Pure inline SVG: crisp at any size, no image files. Only touches the DOM when a value changes.
  */
 import { COMPOUNDS, type CompoundId } from '../physics/tyres';
+import { t } from '../i18n';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -39,7 +40,7 @@ export class CarStatus {
 
   constructor() {
     // car, front up. viewBox 0..120 × 0..110; body centred at x = 60
-    const svg = el('svg', { viewBox: '0 0 120 110', class: 'car-status-svg', 'aria-label': 'Tyres and damage' });
+    const svg = el('svg', { viewBox: '0 0 120 110', class: 'car-status-svg', 'aria-label': t('Tyres and damage') });
     const body = 'M48 8 Q60 3 72 8 L77 22 L78 86 Q78 98 60 100 Q42 98 42 86 L43 22 Z';
     svg.append(el('path', { d: body, class: 'cs-body' }));
     // damage zones, clipped to the body outline
@@ -97,7 +98,7 @@ export class CarStatus {
       el('path', { d: 'M1.5 3 Q-1.5 9 1.5 15 M16.5 3 Q19.5 9 16.5 15', class: 'cs-lamp-line' }),
     );
     const absText = el('text', { x: 9, y: 11.5, 'text-anchor': 'middle', class: 'cs-lamp-text' });
-    absText.textContent = 'ABS';
+    absText.textContent = t('ABS');
     this.abs.append(absText);
     // traction control lamp: a car with skid lines underneath
     this.tc = el(
@@ -109,11 +110,12 @@ export class CarStatus {
     svg.append(this.abs, this.tc);
     this.el = document.createElement('div');
     this.el.className = 'car-status';
-    this.el.title =
-      'Tyre temperatures (°C; blue cold, green 75–105, red hot), tread worn (dark bar), brake discs (hub dot: blue cold, green ok, orange hot, red fading), fitted compound and damage';
+    this.el.title = t(
+      'Tyre temperatures (°C; blue cold, green 75–105, red hot), tread worn (dark bar), brake discs (hub dot: blue cold, green ok, orange hot, red fading), fitted compound and damage',
+    );
     const cap = document.createElement('div');
     cap.className = 'cs-caption';
-    cap.textContent = 'TYRES °C · DAMAGE';
+    cap.textContent = t('TYRES °C · DAMAGE');
     this.el.append(svg, cap);
   }
 

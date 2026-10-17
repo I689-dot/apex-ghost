@@ -1,6 +1,8 @@
 import './styles.css';
 import { App } from './app';
 import { h } from './ui/dom';
+import { setLang, t } from './i18n';
+import { settings } from './settings';
 
 function isMobile(): boolean {
   const ua = navigator.userAgent;
@@ -8,6 +10,7 @@ function isMobile(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(ua) || touchOnly || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua) && screen.width < 1400);
 }
 
+setLang(settings.language === 'es' ? 'es' : 'en');
 const root = document.getElementById('app') as HTMLElement;
 
 if (isMobile()) {
@@ -16,8 +19,8 @@ if (isMobile()) {
       'div.desktop-only',
       {},
       h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-      h('h2', { text: 'Desktop only' }),
-      h('p', { text: 'This is a keyboard sim racer. Open it on a desktop or laptop with Chrome, Edge or Firefox.' }),
+      h('h2', { text: t('Desktop only') }),
+      h('p', { text: t('This is a keyboard sim racer. Open it on a desktop or laptop with Chrome, Edge or Firefox.') }),
     ),
   );
 } else {
@@ -25,6 +28,6 @@ if (isMobile()) {
     const app = new App(root);
     app.showMenu();
   } catch (e) {
-    root.append(h('div.fatal', {}, h('h2', { text: 'Cannot start' }), h('p', { text: (e as Error).message })));
+    root.append(h('div.fatal', {}, h('h2', { text: t('Cannot start') }), h('p', { text: (e as Error).message })));
   }
 }

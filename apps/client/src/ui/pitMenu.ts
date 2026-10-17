@@ -2,6 +2,7 @@ import { serviceTime, type ServicePlan, type Zones } from '../game/pitService';
 import { COMPOUNDS, type CompoundId } from '../physics/tyres';
 import { h } from './dom';
 import { uiAsset } from './images';
+import { t } from '../i18n';
 
 export interface PitMenuInfo {
   current: CompoundId;
@@ -52,11 +53,16 @@ export class PitMenu {
           {
             onclick: () => this.setTyres(id === 'keep' ? null : id),
             title: comp
-              ? `${comp.name}: grip ${Math.round(comp.grip * 100)} % dry / ${Math.round(comp.wetGrip * 100)} % wet, wear ×${comp.wear}`
-              : 'Keep the current set',
+              ? t('{name}: grip {dry} % dry / {wet} % wet, wear ×{wear}', {
+                  name: t(comp.name),
+                  dry: Math.round(comp.grip * 100),
+                  wet: Math.round(comp.wetGrip * 100),
+                  wear: comp.wear,
+                })
+              : t('Keep the current set'),
           },
           comp ? h('img', { src: uiAsset(`tyre_${id}.webp`), alt: comp.letter, draggable: 'false' }) : h('i', { text: '↺' }),
-          h('span', { text: comp ? comp.name : 'Keep' }),
+          h('span', { text: comp ? comp.name : t('Keep') }),
           h('small', { text: `${i + 1}` }),
         );
         this.tyreBtns.set(id, b);
@@ -71,7 +77,7 @@ export class PitMenu {
           'div',
           {},
           h('b', { text: k }),
-          h('span', { text: `${Math.round(100 - info.wear[i] * 100)} % tread` }),
+          h('span', { text: t('{pct} % tread', { pct: Math.round(100 - info.wear[i] * 100) }) }),
           h('em', { text: `${Math.round(info.temps[i])} °C` }),
         ),
       ),
@@ -93,38 +99,40 @@ export class PitMenu {
         {},
         box,
         h('span', { text: label }),
-        h(`em.${dmg > 0.6 ? 'bad' : dmg > 0.3 ? 'warn' : dmg > 0.005 ? 'ok' : 'none'}`, { text: dmg > 0.005 ? `${pct(dmg)} damaged` : 'no damage' }),
+        h(`em.${dmg > 0.6 ? 'bad' : dmg > 0.3 ? 'warn' : dmg > 0.005 ? 'ok' : 'none'}`, {
+          text: dmg > 0.005 ? t('{pct} damaged', { pct: pct(dmg) }) : t('no damage'),
+        }),
       );
     };
     const wetHint =
       info.wetness > 0.35 && info.current !== 'wet'
-        ? 'Wet track: wet tyres recommended'
+        ? t('Wet track: wet tyres recommended')
         : info.wetness < 0.15 && info.current === 'wet'
-          ? 'Dry track: wets will overheat and wear fast'
-          : `Track ${info.wetness > 0.3 ? 'wet' : info.wetness > 0.05 ? 'damp' : 'dry'}`;
+          ? t('Dry track: wets will overheat and wear fast')
+          : t(`Track ${info.wetness > 0.3 ? 'wet' : info.wetness > 0.05 ? 'damp' : 'dry'}`);
     this.el = h(
       'div.pit-menu',
       {},
       h(
         'div.pit-card',
         {},
-        h('div.pit-head', {}, h('h2', { text: 'PIT BOX' }), this.clockEl),
-        h('p.muted', { text: 'The session clock keeps running. Your next lap after the pit exit is an out lap.' }),
-        h('h3', { text: `Tyres · fitted: ${c.name}, ${pct(1 - avgWear)} tread` }),
+        h('div.pit-head', {}, h('h2', { text: t('PIT BOX') }), this.clockEl),
+        h('p.muted', { text: t('The session clock keeps running. Your next lap after the pit exit is an out lap.') }),
+        h('h3', { text: t('Tyres · fitted: {name}, {pct} tread', { name: t(c.name), pct: pct(1 - avgWear) }) }),
         wearList,
         tyreRow,
         h('div.pit-hint', { text: wetHint }),
-        h('h3', { text: 'Repairs' }),
-        repair('Bodywork & aero', Math.max(z[0], z[1], z[2], z[3]), 'body'),
-        repair('Suspension', z[5], 'suspension'),
-        repair('Engine', z[4], 'engine'),
+        h('h3', { text: t('Repairs') }),
+        repair(t('Bodywork & aero'), Math.max(z[0], z[1], z[2], z[3]), 'body'),
+        repair(t('Suspension'), z[5], 'suspension'),
+        repair(t('Engine'), z[4], 'engine'),
         this.breakdownEl,
         this.totalEl,
         h(
           'div.pit-actions',
           {},
-          h('button.primary', { text: 'Start service (Enter)', onclick: () => this.start() }),
-          h('button', { text: 'Leave the box (Esc)', onclick: () => this.leave() }),
+          h('button.primary', { text: t('Start service (Enter)'), onclick: () => this.start() }),
+          h('button', { text: t('Leave the box (Esc)'), onclick: () => this.leave() }),
         ),
       ),
     );
@@ -150,9 +158,10 @@ export class PitMenu {
 
   private refresh(): void {
     for (const [id, b] of this.tyreBtns) b.classList.toggle('on', (id === 'keep' ? null : id) === this.plan.tyres);
-    const t = serviceTime(this.plan, this.info.zones);
-    this.breakdownEl.replaceChildren(...t.parts.map((p) => h('div', {}, h('span', { text: p.label }), h('b', { text: `${p.seconds.toFixed(1)} s` }))));
-    this.totalEl.textContent = t.total > 0 ? `Stop: ${t.total.toFixed(1)} s (tyres change while the mechanics repair)` : 'Nothing to do: drive on';
+    const st = serviceTime(this.plan, this.info.zones);
+    this.breakdownEl.replaceChildren(...st.parts.map((p) => h('div', {}, h('span', { text: p.label }), h('b', { text: `${p.seconds.toFixed(1)} s` }))));
+    this.totalEl.textContent =
+      st.total > 0 ? t('Stop: {s} s (tyres change while the mechanics repair)', { s: st.total.toFixed(1) }) : t('Nothing to do: drive on');
   }
 
   /** Remaining session time, shown in the box. */
@@ -162,8 +171,8 @@ export class PitMenu {
 
   private start(): void {
     if (this.servicing) return;
-    const t = serviceTime(this.plan, this.info.zones);
-    if (t.total <= 0) {
+    const st = serviceTime(this.plan, this.info.zones);
+    if (st.total <= 0) {
       this.leave();
       return;
     }
@@ -171,18 +180,18 @@ export class PitMenu {
     this.progress = h('div.pit-progress-fill');
     const card = this.el.querySelector('.pit-card') as HTMLElement;
     card.replaceChildren(
-      h('div.pit-head', {}, h('h2', { text: 'SERVICE' }), this.clockEl),
-      h('div.pit-breakdown', {}, ...t.parts.map((p) => h('div', {}, h('span', { text: p.label }), h('b', { text: `${p.seconds.toFixed(1)} s` })))),
+      h('div.pit-head', {}, h('h2', { text: t('SERVICE') }), this.clockEl),
+      h('div.pit-breakdown', {}, ...st.parts.map((p) => h('div', {}, h('span', { text: p.label }), h('b', { text: `${p.seconds.toFixed(1)} s` })))),
       h('div.pit-progress', {}, this.progress),
       this.totalEl,
     );
-    this.onStart(this.plan, t.total);
+    this.onStart(this.plan, st.total);
   }
 
   /** Service progress 0..1 and seconds left. */
   setProgress(u: number, left: number): void {
     if (this.progress) this.progress.style.transform = `scaleX(${Math.min(1, u)})`;
-    this.totalEl.textContent = left > 0 ? `${left.toFixed(1)} s` : 'GO GO GO!';
+    this.totalEl.textContent = left > 0 ? `${left.toFixed(1)} s` : t('GO GO GO!');
   }
 
   private leave(): void {

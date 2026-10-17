@@ -1,5 +1,6 @@
 import type { Standing } from '@apex/shared';
 import { fmtTime, h } from './dom';
+import { t } from '../i18n';
 
 export interface TimingRowInfo {
   nick: string;
@@ -25,14 +26,20 @@ export class TimingScreen {
       h(
         'div.timing-card',
         {},
-        h('div.timing-head', {}, h('h2', { text: 'Timing' }), h('span.muted', { text: 'Best valid lap counts · release Tab to close' })),
+        h('div.timing-head', {}, h('h2', { text: t('Timing') }), h('span.muted', { text: t('Best valid lap counts · release Tab to close') })),
         h(
           'table',
           {},
           h(
             'thead',
             {},
-            h('tr', {}, ...['Pos', 'Driver', 'Car', 'Best lap', 'Gap', 'Last lap', 'S1', 'S2', 'S3', 'Laps', 'Status'].map((t) => h('th', { text: t }))),
+            h(
+              'tr',
+              {},
+              ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Last lap'), 'S1', 'S2', 'S3', t('Laps'), t('Status')].map((t) =>
+                h('th', { text: t }),
+              ),
+            ),
           ),
           this.body,
         ),
@@ -59,23 +66,23 @@ export class TimingScreen {
       ...list.map((r) => {
         const i = info(r.id);
         const status = r.dnf
-          ? 'DNF'
+          ? t('DNF')
           : r.finishedMs !== null
-            ? 'FINISHED'
+            ? t('FINISHED')
             : r.inPit
-              ? 'IN PITS'
+              ? t('IN PITS')
               : r.outLap
-                ? 'OUT LAP'
+                ? t('OUT LAP')
                 : r.lapInvalid
-                  ? 'INVALID LAP'
-                  : 'ON TIMED LAP';
+                  ? t('INVALID LAP')
+                  : t('ON TIMED LAP');
         return h(
           `tr${r.id === me ? '.me' : ''}`,
           {},
           h('td.pos', { text: r.bestLapMs === null ? '–' : String(r.position) }),
           h('td.driver', {}, h('i.swatch', { style: `background:${i.colour}` }), i.nick, i.bot ? h('small', { text: ' AI' }) : null),
           h('td.muted', { text: i.car }),
-          h(`td.mono${r.position === 1 && r.bestLapMs !== null ? '.purple' : ''}`, { text: r.bestLapMs === null ? 'no time' : fmtTime(r.bestLapMs) }),
+          h(`td.mono${r.position === 1 && r.bestLapMs !== null ? '.purple' : ''}`, { text: r.bestLapMs === null ? t('no time') : fmtTime(r.bestLapMs) }),
           h('td.mono.muted', { text: r.bestLapMs === null || r.position === 1 || r.gapMs === null ? '' : `+${(r.gapMs / 1000).toFixed(3)}` }),
           h('td.mono', { text: r.lastLapMs === null ? '' : fmtTime(r.lastLapMs) }),
           ...[0, 1, 2].map((k) => {

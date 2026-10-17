@@ -1,3 +1,4 @@
+import { defaultLang, type Lang } from './i18n';
 export type QualityPreset = 'low' | 'medium' | 'high' | 'ultra';
 
 export const CONTROL_ACTIONS = [
@@ -72,6 +73,8 @@ export interface CarSetup {
 
 export interface Settings {
   nickname: string;
+  /** Interface language (first run: the browser's). */
+  language: Lang;
   quality: QualityPreset;
   qualityAuto: boolean;
   resolutionScale: number;
@@ -99,6 +102,7 @@ const KEY = 'apexghost.settings.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   nickname: '',
+  language: defaultLang(),
   quality: 'medium',
   qualityAuto: true,
   resolutionScale: 1,

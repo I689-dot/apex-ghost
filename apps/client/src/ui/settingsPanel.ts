@@ -1,5 +1,6 @@
 import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, saveSettings, settings, type ControlAction, type QualityPreset } from '../settings';
 import { h } from './dom';
+import { LANGUAGES, setLang, t } from '../i18n';
 
 const KEY_NAMES: Record<string, string> = {
   Space: 'Space',
@@ -9,7 +10,7 @@ const KEY_NAMES: Record<string, string> = {
   ControlRight: 'R-Ctrl',
   Escape: 'Esc',
 };
-const keyName = (c: string) => KEY_NAMES[c] ?? c.replace(/^(Key|Digit)/, '');
+const keyName = (c: string) => (c === 'Space' ? t('Space') : (KEY_NAMES[c] ?? c.replace(/^(Key|Digit)/, '')));
 
 function arrowName(code: string): string {
   if (code === 'ArrowUp') return '↑';
@@ -55,16 +56,25 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   const graphics = h(
     'section',
     {},
-    h('h3', { text: 'Graphics' }),
+    h('h3', { text: t('Language') }),
     row(
-      'Quality preset',
+      'Language / Idioma',
+      select(settings.language, LANGUAGES, (v) => {
+        settings.language = v;
+        setLang(v);
+        changed();
+      }),
+    ),
+    h('h3', { text: t('Graphics') }),
+    row(
+      t('Quality preset'),
       select<QualityPreset>(
         settings.quality,
         [
-          ['low', 'Low'],
-          ['medium', 'Medium'],
-          ['high', 'High'],
-          ['ultra', 'Ultra'],
+          ['low', t('Low')],
+          ['medium', t('Medium')],
+          ['high', t('High')],
+          ['ultra', t('Ultra')],
         ],
         (v) => {
           settings.quality = v;
@@ -73,7 +83,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       ),
     ),
     row(
-      'Resolution scale',
+      t('Resolution scale'),
       range(
         settings.resolutionScale,
         0.5,
@@ -87,15 +97,15 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       ),
     ),
     row(
-      'Dynamic resolution',
+      t('Dynamic resolution'),
       toggle(settings.dynamicResolution, (v) => {
         settings.dynamicResolution = v;
         changed();
       }),
-      'Lowers resolution briefly to stay above 45 fps',
+      t('Lowers resolution briefly to stay above 45 fps'),
     ),
     row(
-      'Field of view',
+      t('Field of view'),
       range(
         settings.fov,
         55,
@@ -109,7 +119,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       ),
     ),
     row(
-      'Seat height',
+      t('Seat height'),
       range(
         settings.seatHeight,
         -0.15,
@@ -121,10 +131,10 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
           changed();
         },
       ),
-      'Raise the cockpit camera to see more road',
+      t('Raise the cockpit camera to see more road'),
     ),
     row(
-      'Seat position',
+      t('Seat position'),
       range(
         settings.seatForward,
         -0.25,
@@ -136,10 +146,10 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
           changed();
         },
       ),
-      'Forward / back',
+      t('Forward / back'),
     ),
     row(
-      'Performance overlay',
+      t('Performance overlay'),
       toggle(settings.showPerf, (v) => {
         settings.showPerf = v;
         changed();
@@ -150,22 +160,22 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   const assists = h(
     'section',
     {},
-    h('h3', { text: 'Driving' }),
+    h('h3', { text: t('Driving') }),
     row(
-      'ABS',
+      t('ABS'),
       toggle(settings.assists.abs, (v) => {
         settings.assists.abs = v;
         changed();
       }),
     ),
     row(
-      'Traction control',
+      t('Traction control'),
       select(
         String(settings.assists.tc) as '0' | '1' | '2',
         [
-          ['0', 'Off'],
-          ['1', 'Low'],
-          ['2', 'High'],
+          ['0', t('Off')],
+          ['1', t('Low')],
+          ['2', t('High')],
         ],
         (v) => {
           settings.assists.tc = Number(v) as 0 | 1 | 2;
@@ -174,53 +184,53 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       ),
     ),
     row(
-      'Stability control',
+      t('Stability control'),
       toggle(settings.assists.stability, (v) => {
         settings.assists.stability = v;
         changed();
       }),
     ),
     row(
-      'Steering assist',
+      t('Steering assist'),
       toggle(settings.assists.steering, (v) => {
         settings.assists.steering = v;
         changed();
       }),
-      'Automatic counter-steer',
+      t('Automatic counter-steer'),
     ),
     row(
-      'Racing line',
+      t('Racing line'),
       select(
         settings.racingLine,
         [
-          ['off', 'Off'],
-          ['corners', 'Braking zones'],
-          ['full', 'Full lap'],
+          ['off', t('Off')],
+          ['corners', t('Braking zones')],
+          ['full', t('Full lap')],
         ],
         (v) => {
           settings.racingLine = v;
           changed();
         },
       ),
-      'Red: brake · yellow: lift · green: throttle',
+      t('Red: brake · yellow: lift · green: throttle'),
     ),
     row(
-      'Best-lap ghost',
+      t('Best-lap ghost'),
       toggle(settings.ghost, (v) => {
         settings.ghost = v;
         changed();
       }),
-      'Your best valid lap replayed as a ghost car',
+      t('Your best valid lap replayed as a ghost car'),
     ),
     row(
-      'Manual gearbox',
+      t('Manual gearbox'),
       toggle(settings.manualGearbox, (v) => {
         settings.manualGearbox = v;
         changed();
       }),
     ),
     row(
-      'Speed units',
+      t('Speed units'),
       select(
         settings.units,
         [
@@ -239,41 +249,46 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   const sound = h(
     'section',
     {},
-    h('h3', { text: 'Sound' }),
+    h('h3', { text: t('Sound') }),
     row(
-      'Master volume',
+      t('Master volume'),
       range(settings.audio.master, 0, 1, 0.05, pct, (v) => {
         settings.audio.master = v;
         changed();
       }),
     ),
     row(
-      'Engines',
+      t('Engines'),
       range(settings.audio.engine, 0, 1, 0.05, pct, (v) => {
         settings.audio.engine = v;
         changed();
       }),
-      'Your car and the cars around you',
+      t('Your car and the cars around you'),
     ),
     row(
-      'Effects',
+      t('Effects'),
       range(settings.audio.effects, 0, 1, 0.05, pct, (v) => {
         settings.audio.effects = v;
         changed();
       }),
-      'Tyres, kerbs, wind, impacts, beeps',
+      t('Tyres, kerbs, wind, impacts, beeps'),
     ),
     row(
-      'Ambience',
+      t('Ambience'),
       range(settings.audio.ambience, 0, 1, 0.05, pct, (v) => {
         settings.audio.ambience = v;
         changed();
       }),
-      'Crowd, birds, wind in the trees, thunder',
+      t('Crowd, birds, wind in the trees, thunder'),
     ),
   );
 
-  const controls = h('section', {}, h('h3', { text: 'Controls' }), h('p.muted', { text: 'Click a key to rebind it, then press the new key. Esc cancels.' }));
+  const controls = h(
+    'section',
+    {},
+    h('h3', { text: t('Controls') }),
+    h('p.muted', { text: t('Click a key to rebind it, then press the new key. Esc cancels.') }),
+  );
   const renderControls = () => {
     controls.querySelectorAll('.set-row').forEach((e) => e.remove());
     for (const a of CONTROL_ACTIONS) {
@@ -286,7 +301,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
         const b = h('button.key.add', { text: '+', onclick: () => capture(a, settings.bindings[a].length, b) });
         keys.append(b);
       }
-      controls.append(row(ACTION_LABEL[a], keys));
+      controls.append(row(t(ACTION_LABEL[a]), keys));
     }
   };
   const capture = (a: ControlAction, idx: number, btn: HTMLElement) => {
@@ -310,7 +325,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   };
   renderControls();
   const resetBtn = h('button.ghost', {
-    text: 'Reset controls',
+    text: t('Reset controls'),
     onclick: () => {
       settings.bindings = structuredClone(DEFAULT_BINDINGS);
       changed();
@@ -325,7 +340,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     h(
       'div.modal-card.settings',
       {},
-      h('header', {}, h('h2', { text: 'Settings' }), h('button.icon', { text: '✕', title: 'Close', onclick: onClose })),
+      h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { text: '✕', title: t('Close'), onclick: onClose })),
       h('div.settings-grid', {}, graphics, assists, sound, controls),
     ),
   );

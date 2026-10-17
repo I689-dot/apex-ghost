@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { PitLane, TrackData } from '@apex/shared';
+import { t } from '../i18n';
 
 export type PitEvent = 'enter' | 'exit' | 'box' | null;
 
@@ -115,13 +116,13 @@ export class PitLaneMonitor {
       m.renderOrder = 2;
       g.add(m);
     };
-    const { boxFrom: f, boxTo: t } = this.lane;
-    strip(f, t, half, 0.25);
-    strip(f, t, -half, 0.25);
+    const { boxFrom: f, boxTo: to } = this.lane;
+    strip(f, to, half, 0.25);
+    strip(f, to, -half, 0.25);
     strip(f, f + 1, 0, half * 2);
-    strip(t - 1, t, 0, half * 2);
+    strip(to - 1, to, 0, half * 2);
     // chevrons every 20 m inside the box
-    for (let i = f + 6; i < t - 4; i += 8) strip(i, i + 1, 0, half * 1.6);
+    for (let i = f + 6; i < to - 4; i += 8) strip(i, i + 1, 0, half * 1.6);
     // board over the middle of the service zone
     const c = document.createElement('canvas');
     c.width = 512;
@@ -132,16 +133,16 @@ export class PitLaneMonitor {
     cx.fillStyle = '#ffd60a';
     cx.font = 'bold 64px sans-serif';
     cx.textAlign = 'center';
-    cx.fillText('PIT SERVICE', 256, 66);
+    cx.fillText(t('PIT SERVICE'), 256, 66);
     cx.font = 'bold 30px sans-serif';
     cx.fillStyle = '#fff';
-    cx.fillText('STOP HERE · TYRES · REPAIRS', 256, 108);
+    cx.fillText(t('STOP HERE · TYRES · REPAIRS'), 256, 108);
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const mid = pts[Math.round((f + t) / 2)];
+    const mid = pts[Math.round((f + to) / 2)];
     const board = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
-    const a = pts[Math.round((f + t) / 2) - 2];
-    const b = pts[Math.round((f + t) / 2) + 2];
+    const a = pts[Math.round((f + to) / 2) - 2];
+    const b = pts[Math.round((f + to) / 2) + 2];
     board.position.set(mid[0], ground(mid[0], mid[2], mid[1]) + 5.2, mid[2]);
     board.rotation.y = Math.atan2(b[0] - a[0], b[2] - a[2]) + Math.PI; // facing the cars coming down the lane
     g.add(board);

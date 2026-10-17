@@ -1,5 +1,6 @@
 import type { CarEntry, WeatherPlan } from '@apex/shared';
 import type { CarSetup } from '../settings';
+import { t } from '../i18n';
 
 /** Rear wing: downforce and drag together (more wing = more grip in corners, less top speed). */
 export const WING = {
@@ -28,8 +29,12 @@ export function recommendSetup(plan: WeatherPlan): { tyre: CarSetup['tyre']; win
   const rainLater = !!plan.change && (plan.change.to === 'light_rain' || plan.change.to === 'heavy_rain');
   const drying = !!plan.change && wetStart && plan.change.to !== 'heavy_rain' && plan.change.to !== 'light_rain';
   if (wetStart)
-    return { tyre: 'wet', wing: 'high', note: drying ? 'Wet start, drying later: wets now, slicks at a pit stop' : 'Wet track: wets and maximum downforce' };
-  if (rainLater) return { tyre: 'medium', wing: 'high', note: 'Rain on the way: mediums now, be ready to pit for wets' };
-  if (plan.startHour < 8 || plan.startHour > 20) return { tyre: 'soft', wing: 'medium', note: 'Cool air: softs warm up quickly' };
-  return { tyre: 'medium', wing: 'medium', note: 'Dry: mediums for a long run, softs for one fast lap' };
+    return {
+      tyre: 'wet',
+      wing: 'high',
+      note: drying ? t('Wet start, drying later: wets now, slicks at a pit stop') : t('Wet track: wets and maximum downforce'),
+    };
+  if (rainLater) return { tyre: 'medium', wing: 'high', note: t('Rain on the way: mediums now, be ready to pit for wets') };
+  if (plan.startHour < 8 || plan.startHour > 20) return { tyre: 'soft', wing: 'medium', note: t('Cool air: softs warm up quickly') };
+  return { tyre: 'medium', wing: 'medium', note: t('Dry: mediums for a long run, softs for one fast lap') };
 }

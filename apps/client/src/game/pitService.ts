@@ -1,4 +1,5 @@
 import type { CompoundId } from '../physics/tyres';
+import { t } from '../i18n';
 
 /** What the crew should do at a pit stop. */
 export interface ServicePlan {
@@ -36,21 +37,21 @@ export function serviceTime(plan: ServicePlan, z: Zones): ServiceBreakdown {
   let repairs = 0;
   if (plan.body) {
     const s = SERVICE.body(z);
-    parts.push({ label: 'Bodywork & aero', seconds: s });
+    parts.push({ label: t('Bodywork & aero'), seconds: s });
     repairs += s;
   }
   if (plan.suspension) {
     const s = SERVICE.suspension(z);
-    parts.push({ label: 'Suspension', seconds: s });
+    parts.push({ label: t('Suspension'), seconds: s });
     repairs += s;
   }
   if (plan.engine) {
     const s = SERVICE.engine(z);
-    parts.push({ label: 'Engine', seconds: s });
+    parts.push({ label: t('Engine'), seconds: s });
     repairs += s;
   }
   const tyres = plan.tyres ? SERVICE.tyres : 0;
-  if (plan.tyres) parts.push({ label: 'Tyres', seconds: tyres });
+  if (plan.tyres) parts.push({ label: t('Tyres'), seconds: tyres });
   const work = Math.max(tyres, repairs);
   return { total: work > 0 ? work + SERVICE.jacks : 0, parts };
 }

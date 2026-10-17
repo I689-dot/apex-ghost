@@ -3,6 +3,7 @@ import { settings } from '../settings';
 import type { CompoundId } from '../physics/tyres';
 import { CarStatus } from './carStatus';
 import { LazyText, fmtDelta, fmtTime, h } from './dom';
+import { t } from '../i18n';
 
 export interface HudState {
   speedMs: number;
@@ -67,13 +68,13 @@ export class Hud {
   private msg: LazyText;
   private fin: LazyText;
   private pitBanner: LazyText;
-  private draft: HTMLElement = h('div.hud-draft', { text: 'SLIPSTREAM' });
+  private draft: HTMLElement = h('div.hud-draft', { text: t('SLIPSTREAM') });
   private rpmFill: HTMLElement;
   private rpmLeds: HTMLElement[] = [];
   private wrong: HTMLElement;
   private status = new CarStatus();
   private resetEl: HTMLElement;
-  private lapTag: HTMLElement = h('label', { text: 'LAP' });
+  private lapTag: HTMLElement = h('label', { text: t('LAP') });
 
   private lastInvalid = false;
   private board: HTMLElement;
@@ -93,7 +94,7 @@ export class Hud {
       this.rpmLeds.push(l);
       leds.append(l);
     }
-    this.lap = new LazyText(h('div.hud-big', { text: 'OUT' }));
+    this.lap = new LazyText(h('div.hud-big', { text: t('OUT') }));
     this.pos = new LazyText(h('div.hud-big', { text: '1/1' }));
     this.cur = new LazyText(h('span'));
     this.best = new LazyText(h('span'));
@@ -102,8 +103,8 @@ export class Hud {
     this.msg = new LazyText(h('div.hud-msg'));
     this.fin = new LazyText(h('div.hud-finish'));
     this.pitBanner = new LazyText(h('div.hud-pit'));
-    this.wrong = h('div.hud-wrong', { text: 'WRONG WAY' });
-    this.resetEl = h('div.hud-reset', { text: 'Press R to reset to the track' });
+    this.wrong = h('div.hud-wrong', { text: t('WRONG WAY') });
+    this.resetEl = h('div.hud-reset', { text: t('Press R to reset to the track') });
     this.board = h('div.hud-board');
     this.map = h('canvas.hud-map', { width: 220, height: 220 });
     this.mapCtx = this.map.getContext('2d') as CanvasRenderingContext2D;
@@ -114,14 +115,14 @@ export class Hud {
       h(
         'div.hud-tl',
         {},
-        h('div.hud-block', {}, h('label', { text: 'LAP' }), this.lap.el),
-        h('div.hud-block', {}, h('label', { text: 'POS' }), this.pos.el),
+        h('div.hud-block', {}, h('label', { text: t('LAP') }), this.lap.el),
+        h('div.hud-block', {}, h('label', { text: t('POS') }), this.pos.el),
         this.board,
       ),
       h(
         'div.hud-tr',
         {},
-        h('div.hud-times', {}, this.lapTag, this.cur.el, h('label', { text: 'BEST' }), this.best.el, h('label', { text: 'LAST' }), this.last.el),
+        h('div.hud-times', {}, this.lapTag, this.cur.el, h('label', { text: t('BEST') }), this.best.el, h('label', { text: t('LAST') }), this.last.el),
         this.delta.el,
       ),
       h('div.hud-bc', {}, leds, h('div.hud-rpm', {}, this.rpmFill), h('div.hud-speedo', {}, this.gear.el, h('div.hud-sp', {}, this.speed.el, this.unit.el))),
@@ -246,7 +247,7 @@ export class Hud {
     this.lap.set(s.lapLabel);
     if (s.lapInvalid !== this.lastInvalid) {
       this.lastInvalid = s.lapInvalid;
-      this.lapTag.textContent = s.lapInvalid ? 'INVALID' : 'LAP';
+      this.lapTag.textContent = s.lapInvalid ? t('INVALID') : t('LAP');
       this.lapTag.classList.toggle('invalid', s.lapInvalid);
       this.cur.el.classList.toggle('invalid', s.lapInvalid);
     }
@@ -285,17 +286,17 @@ export class Hud {
           `div.row${r.id === me ? '.me' : ''}`,
           {},
           h('b', { text: String(r.position) }),
-          h('span', {}, names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: 'PIT' }) : null),
+          h('span', {}, names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: t('PIT') }) : null),
           h(`em${r.position === 1 && r.bestLapMs !== null ? '.p1' : ''}`, {
             text:
               r.bestLapMs === null
                 ? r.dnf
-                  ? 'DNF'
+                  ? t('DNF')
                   : r.inPit
-                    ? 'PIT'
+                    ? t('PIT')
                     : r.outLap
-                      ? 'OUT LAP'
-                      : 'ON LAP'
+                      ? t('OUT LAP')
+                      : t('ON LAP')
                 : r.position === 1
                   ? fmtTime(r.bestLapMs)
                   : `+${((r.gapMs ?? 0) / 1000).toFixed(3)}`,

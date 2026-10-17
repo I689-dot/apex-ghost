@@ -29,6 +29,7 @@ import { initLoaders, loadCarsFile, loadTrackIndex, type TrackIndexEntry } from 
 import { saveSettings, settings } from './settings';
 import { clear, fmtTime, h, toast } from './ui/dom';
 import { settingsPanel } from './ui/settingsPanel';
+import { getLang, t } from './i18n';
 
 type Screen = 'menu' | 'lobby' | 'loading' | 'race' | 'results';
 
@@ -61,7 +62,7 @@ export class App {
     this.gfx.onContextLost = () => this.showContextLost();
     this.gfx.onContextRestored = () => {
       document.querySelector('.context-lost')?.remove();
-      toast('Graphics restored');
+      toast(t('Graphics restored'));
     };
     loadCarsFile()
       .then((c) => {
@@ -109,8 +110,15 @@ export class App {
     this.screen = 'menu';
     this.teardownConnection();
     this.setBackdrop('grid');
-    const nick = h('input', { type: 'text', maxlength: 16, placeholder: 'Your nickname', value: settings.nickname, autocomplete: 'off', spellcheck: 'false' });
-    const code = h('input.code-input', { type: 'text', maxlength: 7, placeholder: 'ROOM CODE', autocomplete: 'off', spellcheck: 'false' });
+    const nick = h('input', {
+      type: 'text',
+      maxlength: 16,
+      placeholder: t('Your nickname'),
+      value: settings.nickname,
+      autocomplete: 'off',
+      spellcheck: 'false',
+    });
+    const code = h('input.code-input', { type: 'text', maxlength: 7, placeholder: t('ROOM CODE'), autocomplete: 'off', spellcheck: 'false' });
     const err = h('div.form-error', { text: error });
     const busy = (b: boolean) => form.classList.toggle('busy', b);
     const readNick = (): string | null => {
@@ -133,7 +141,7 @@ export class App {
         const c = await createRoom();
         await this.join(c, n);
       } catch (e) {
-        err.textContent = (e as Error).message;
+        err.textContent = t((e as Error).message);
       } finally {
         busy(false);
       }
@@ -143,7 +151,7 @@ export class App {
       if (!n) return;
       const c = normalizeRoomCode(code.value);
       if (!c) {
-        err.textContent = 'Enter the 5-character room code.';
+        err.textContent = t('Enter the 5-character room code.');
         code.focus();
         return;
       }
@@ -152,7 +160,7 @@ export class App {
       try {
         await this.join(c, n);
       } catch (e) {
-        err.textContent = (e as Error).message;
+        err.textContent = t((e as Error).message);
       } finally {
         busy(false);
       }
@@ -162,11 +170,11 @@ export class App {
     const form = h(
       'div.menu-card',
       {},
-      h('label', { text: 'Nickname' }),
+      h('label', { text: t('Nickname') }),
       nick,
-      h('button.primary', { text: 'Create room', onclick: () => void create() }),
-      h('div.or', { text: 'or join friends' }),
-      h('div.join-row', {}, code, h('button', { text: 'Join', onclick: () => void joinIt() })),
+      h('button.primary', { text: t('Create room'), onclick: () => void create() }),
+      h('div.or', { text: t('or join friends') }),
+      h('div.join-row', {}, code, h('button', { text: t('Join'), onclick: () => void joinIt() })),
       err,
     );
     this.setUi(
@@ -177,14 +185,14 @@ export class App {
           'div.brand',
           {},
           h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-          h('p', { text: 'Online sim racing for friends · Nürburgring GP' }),
+          h('p', { text: t('Online sim racing for friends · Nürburgring GP') }),
         ),
         form,
         h(
           'div.menu-foot',
           {},
-          h('button.ghost', { text: 'Settings', onclick: () => this.openSettings() }),
-          h('span.muted', { text: 'Keyboard: W/S throttle & brake · A/D steer · Space handbrake · Esc menu' }),
+          h('button.ghost', { text: t('Settings'), onclick: () => this.openSettings() }),
+          h('span.muted', { text: t('Keyboard: W/S throttle & brake · A/D steer · Space handbrake · Esc menu') }),
         ),
       ),
     );
@@ -206,11 +214,11 @@ export class App {
       this.teardownConnection();
       if (e instanceof RoomError) {
         const msg: Record<string, string> = {
-          room_not_found: 'Room not found. Check the code with your friend.',
-          room_full: `Room is full (${MAX_PLAYERS} players).`,
-          nick_taken: 'That nickname is already used in this room. Pick another one.',
+          room_not_found: t('Room not found. Check the code with your friend.'),
+          room_full: t('Room is full ({n} players).', { n: MAX_PLAYERS }),
+          nick_taken: t('That nickname is already used in this room. Pick another one.'),
         };
-        throw new Error(msg[e.code] ?? e.message);
+        throw new Error(msg[e.code] ?? t(e.message));
       }
       throw e;
     }
@@ -237,7 +245,7 @@ export class App {
           // reconnect into a running race
           if (!this.session || this.session.race.raceId !== m.race.raceId) void this.startLoading(m.race, m.startAt);
         } else if (this.screen !== 'results') this.showLobby();
-        if (m.room.players.find((p) => p.id === m.you)?.waiting) toast('A race is in progress. You will join the next one.', 5000);
+        if (m.room.players.find((p) => p.id === m.you)?.waiting) toast(t('A race is in progress. You will join the next one.'), 5000);
         break;
       case 'room':
         this.room = m.room;
@@ -247,7 +255,7 @@ export class App {
       case 'carLock':
         if (!m.ok && m.carId) {
           const owner = this.room?.players.find((p) => p.id === m.owner)?.nick;
-          toast(owner ? `${owner} already has that car.` : 'That car is not available.');
+          toast(owner ? t('{owner} already has that car.', { owner }) : t('That car is not available.'));
         }
         break;
       case 'raceSetup':
@@ -259,8 +267,8 @@ export class App {
         break;
       case 'error':
         if (m.fatal) {
-          this.showMenu(m.message);
-        } else toast(m.message);
+          this.showMenu(t(m.message));
+        } else toast(t(m.message));
         break;
       default:
         break;
@@ -298,12 +306,14 @@ export class App {
             ...options.map(([v, l]) => h('option', { value: v, text: l, selected: v === value })),
           )
         : h('b', { text: options.find(([v]) => v === value)?.[1] ?? String(value) });
-    const tracks = this.trackIndex.length ? this.trackIndex : [{ id: c.trackId, name: 'Nürburgring GP', length: 5148 } as TrackIndexEntry];
+    const tracks = this.trackIndex.length ? this.trackIndex : [{ id: c.trackId, name: t('Nürburgring GP'), length: 5148 } as TrackIndexEntry];
     const row = (label: string, ctrl: HTMLElement) => h('div.prep-row', {}, h('span', { text: label }), ctrl);
     const plan = planWeather(c.seed, c);
     const w0 = weatherAt(plan, 0);
     const state = w0.wetness > 0.3 ? 'wet' : w0.wetness > 0.05 ? 'damp' : 'dry';
-    const change = plan.change ? `${WEATHER_LABEL[plan.change.to]} from about minute ${Math.max(1, Math.round(plan.change.atSec / 60))}` : 'Stable conditions';
+    const change = plan.change
+      ? t('{weather} from about minute {min}', { weather: t(WEATHER_LABEL[plan.change.to]), min: Math.max(1, Math.round(plan.change.atSec / 60)) })
+      : t('Stable conditions');
     const rec = recommendSetup(plan);
     const cs = settings.carSetup;
     const saveSetup = () => {
@@ -318,7 +328,12 @@ export class App {
         return h(
           `button.prep-tyre${cs.tyre === id ? '.on' : ''}`,
           {
-            title: `${comp.name}: grip ${Math.round(comp.grip * 100)} % dry / ${Math.round(comp.wetGrip * 100)} % wet, wear ×${comp.wear}`,
+            title: t('{name}: grip {dry} % dry / {wet} % wet, wear ×{wear}', {
+              name: t(comp.name),
+              dry: Math.round(comp.grip * 100),
+              wet: Math.round(comp.wetGrip * 100),
+              wear: comp.wear,
+            }),
             onclick: () => {
               cs.tyre = id;
               this.conn?.sendJson({ t: 'setTyre', tyre: id });
@@ -326,7 +341,7 @@ export class App {
             },
           },
           h('img', { src: uiAsset(`tyre_${id}.webp`), alt: comp.letter, draggable: 'false' }),
-          h('span', { text: comp.name }),
+          h('span', { text: t(comp.name) }),
         );
       }),
     );
@@ -338,9 +353,9 @@ export class App {
           saveSetup();
         },
       },
-      ...(['low', 'medium', 'high'] as const).map((k) => h('option', { value: k, text: WING[k].label, selected: cs.wing === k })),
+      ...(['low', 'medium', 'high'] as const).map((k) => h('option', { value: k, text: t(WING[k].label), selected: cs.wing === k })),
     );
-    const biasOut = h('output', { text: `${Math.round(cs.brakeBias * 100)} % front` });
+    const biasOut = h('output', { text: t('{pct} % front', { pct: Math.round(cs.brakeBias * 100) }) });
     const bias = h('input', {
       type: 'range',
       min: 0.54,
@@ -349,69 +364,75 @@ export class App {
       value: cs.brakeBias,
       oninput: (e: Event) => {
         cs.brakeBias = Number((e.target as HTMLInputElement).value);
-        biasOut.textContent = `${Math.round(cs.brakeBias * 100)} % front`;
+        biasOut.textContent = t('{pct} % front', { pct: Math.round(cs.brakeBias * 100) });
         saveSettings(settings);
       },
     });
     return h(
       'div.prep',
       {},
-      h('h3', { text: edit ? 'Session · you are the host' : 'Session' }),
+      h('h3', { text: edit ? t('Session · you are the host') : t('Session') }),
       row(
-        'Track',
+        t('Track'),
         sel(
           c.trackId,
-          tracks.map((t) => [t.id, `${t.name} · ${(t.length / 1000).toFixed(2)} km`] as [string, string]),
+          tracks.map((tr) => [tr.id, `${t(tr.name)} · ${(tr.length / 1000).toFixed(2)} km`] as [string, string]),
           (v) => send({ trackId: v }),
         ),
       ),
       row(
-        'Weather',
-        sel(c.weather, [['random', 'Random'], ...WEATHER_KINDS.map((k) => [k, WEATHER_LABEL[k]] as [string, string])] as [string, string][], (v) =>
+        t('Weather'),
+        sel(c.weather, [['random', t('Random')], ...WEATHER_KINDS.map((k) => [k, t(WEATHER_LABEL[k])] as [string, string])] as [string, string][], (v) =>
           send({ weather: v }),
         ),
       ),
       row(
-        'Time of day',
-        sel(c.time, Object.entries(TIME_LABEL) as [string, string][], (v) => send({ time: v })),
+        t('Time of day'),
+        sel(c.time, Object.entries(TIME_LABEL).map(([k, v]) => [k, t(v)]) as [string, string][], (v) => send({ time: v })),
       ),
       row(
-        'Weather changes',
+        t('Weather changes'),
         sel(
           c.changes,
           [
-            ['random', 'Possible'],
-            ['off', 'Stable'],
-            ['on', 'Changing'],
+            ['random', t('Possible')],
+            ['off', t('Stable')],
+            ['on', t('Changing')],
           ],
           (v) => send({ changes: v }),
         ),
       ),
       row(
-        'Length',
+        t('Length'),
         sel(
           room.sessionMinutes,
-          SESSION_MINUTES.map((m) => [m, `${m} min qualifying`] as [number, string]),
+          SESSION_MINUTES.map((m) => [m, t('{m} min qualifying', { m })] as [number, string]),
           (v) => this.conn?.sendJson({ t: 'setSession', minutes: Number(v) }),
         ),
       ),
       h(
         'div.forecast',
         {},
-        h('b', { text: `Forecast: ${WEATHER_LABEL[plan.kind]} · ${formatHour(plan.startHour)} · ${state} track` }),
+        h('b', {
+          text: t('Forecast: {weather} · {hour} · {state}', {
+            weather: t(WEATHER_LABEL[plan.kind]),
+            hour: formatHour(plan.startHour),
+            state: t(`${state} track`),
+          }),
+        }),
         h('span', { text: change }),
-        edit ? h('button.ghost.small', { text: 'New forecast', onclick: () => send({ reroll: true }) }) : null,
+        edit ? h('button.ghost.small', { text: t('New forecast'), onclick: () => send({ reroll: true }) }) : null,
       ),
-      h('h3', { text: 'Your car' }),
-      row('Tyres', tyreBtns),
-      row('Rear wing', wingSel),
-      row('Brake balance', h('div.range', {}, bias, biasOut)),
+      h('h3', { text: t('Your car') }),
+      row(t('Tyres'), tyreBtns),
+      row(t('Rear wing'), wingSel),
+      row(t('Brake balance'), h('div.range', {}, bias, biasOut)),
       h(
         'div.engineer',
         {},
-        h('span', { text: `Engineer: ${rec.note}.` }),
+        h('span', { text: t('Engineer: {note}.', { note: rec.note }) }),
         h('button.ghost.small', {
-          text: `Use ${COMPOUNDS[rec.tyre].name} + ${rec.wing} wing`,
+          text: t('Use {tyre} + {wing} wing', { tyre: t(COMPOUNDS[rec.tyre].name), wing: t(WING[rec.wing].label).split(' (')[0].toLowerCase() }),
           onclick: () => {
             cs.tyre = rec.tyre;
             cs.wing = rec.wing;
@@ -441,7 +462,7 @@ export class App {
 
     const copy = () => {
       void navigator.clipboard?.writeText(room.code).then(
-        () => toast('Room code copied'),
+        () => toast(t('Room code copied')),
         () => toast(room.code),
       );
     };
@@ -453,13 +474,17 @@ export class App {
           `li${p.id === this.me ? '.me' : ''}${p.connected ? '' : '.offline'}`,
           {},
           h('span.nick', { text: p.nick }),
-          p.host ? h('span.badge', { text: 'HOST' }) : null,
-          p.bot ? h('span.badge.bot', { text: 'BOT' }) : null,
-          h('img.tyre-badge', { src: uiAsset(`tyre_${p.tyre ?? 'medium'}.webp`), title: `${COMPOUNDS[p.tyre ?? 'medium'].name} tyres`, alt: '' }),
-          h('span.car', { text: p.carId ? (cars.find((c) => c.id === p.carId)?.name ?? p.carId) : p.waiting ? 'next race' : 'choosing…' }),
-          h(`span.ready${p.ready ? '.on' : ''}`, { text: p.connected ? (p.ready ? 'READY' : '') : 'OFFLINE' }),
+          p.host ? h('span.badge', { text: t('HOST') }) : null,
+          p.bot ? h('span.badge.bot', { text: t('BOT') }) : null,
+          h('img.tyre-badge', {
+            src: uiAsset(`tyre_${p.tyre ?? 'medium'}.webp`),
+            title: t('{name} tyres', { name: t(COMPOUNDS[p.tyre ?? 'medium'].name) }),
+            alt: '',
+          }),
+          h('span.car', { text: p.carId ? (cars.find((c) => c.id === p.carId)?.name ?? p.carId) : p.waiting ? t('next race') : 'choosing…' }),
+          h(`span.ready${p.ready ? '.on' : ''}`, { text: p.connected ? (p.ready ? t('READY') : '') : t('OFFLINE') }),
           p.bot && isHost && room.phase === 'lobby'
-            ? h('button.remove-bot', { text: '✕', title: 'Remove this bot', onclick: () => this.conn?.sendJson({ t: 'removeBot', id: p.id }) })
+            ? h('button.remove-bot', { text: '✕', title: t('Remove this bot'), onclick: () => this.conn?.sendJson({ t: 'removeBot', id: p.id }) })
             : null,
         ),
       ),
@@ -475,7 +500,7 @@ export class App {
           `button.car-card${sel ? '.selected' : ''}${takenBy ? '.taken' : ''}${browsing?.id === c.id ? '.browsing' : ''}`,
           {
             disabled: !!takenBy || room.phase !== 'lobby',
-            title: takenBy ? `Taken by ${takenBy}` : c.name,
+            title: takenBy ? t('Taken by {name}', { name: takenBy }) : c.name,
             onmouseenter: () => this.previewSoon(c),
             onmouseleave: () => this.previewSoon(browsing),
             onclick: () => {
@@ -505,33 +530,33 @@ export class App {
           h(
             'dl',
             {},
-            h('dt', { text: 'Power' }),
-            h('dd', { text: `${hp(browsing.specs.powerKw)} hp` }),
-            h('dt', { text: 'Weight' }),
+            h('dt', { text: t('Power') }),
+            h('dd', { text: t('{n} hp', { n: hp(browsing.specs.powerKw) }) }),
+            h('dt', { text: t('Weight') }),
             h('dd', { text: `${browsing.specs.massKg} kg` }),
-            h('dt', { text: 'Drivetrain' }),
+            h('dt', { text: t('Drivetrain') }),
             h('dd', { text: browsing.specs.drivetrain }),
-            h('dt', { text: 'Top speed' }),
+            h('dt', { text: t('Top speed') }),
             h('dd', { text: `${browsing.specs.topSpeedKmh} km/h` }),
-            h('dt', { text: 'Gears' }),
+            h('dt', { text: t('Gears') }),
             h('dd', { text: String(browsing.specs.gears.length) }),
           ),
         )
-      : h('div.spec', {}, h('h2', { text: 'Pick a car' }));
+      : h('div.spec', {}, h('h2', { text: t('Pick a car') }));
     const readyBtn = h(`button${mine?.ready ? '.on' : ''}`, {
-      text: mine?.ready ? 'Ready ✓' : 'Ready',
+      text: mine?.ready ? t('Ready ✓') : t('Ready'),
       disabled: !mine?.carId || room.phase !== 'lobby' || mine.waiting,
       onclick: () => this.conn?.sendJson({ t: 'ready', ready: !mine?.ready }),
     });
     const startBtn = isHost
       ? h('button.primary', {
-          text: 'Start race',
+          text: t('Start race'),
           disabled: !allReady || room.phase !== 'lobby',
-          title: allReady ? '' : 'Everyone needs a car and must be ready',
+          title: allReady ? '' : t('Everyone needs a car and must be ready'),
           onclick: () => this.conn?.sendJson({ t: 'start' }),
         })
-      : h('div.muted.wait', { text: allReady ? 'Waiting for the host to start' : 'Waiting for everyone to be ready' });
-    const banner = room.phase !== 'lobby' ? h('div.banner', { text: 'A race is in progress. You will join the next one.' }) : null;
+      : h('div.muted.wait', { text: allReady ? t('Waiting for the host to start') : t('Waiting for everyone to be ready') });
+    const banner = room.phase !== 'lobby' ? h('div.banner', { text: t('A race is in progress. You will join the next one.') }) : null;
 
     const el = h(
       'div.lobby',
@@ -539,14 +564,14 @@ export class App {
       h(
         'aside.lobby-side',
         {},
-        h('div.room-code', {}, h('label', { text: 'ROOM CODE' }), h('div.code', { text: room.code }), h('button.ghost', { text: 'Copy', onclick: copy })),
-        h('h3', { text: `Drivers ${room.players.length}/${MAX_PLAYERS}` }),
+        h('div.room-code', {}, h('label', { text: t('ROOM CODE') }), h('div.code', { text: room.code }), h('button.ghost', { text: t('Copy'), onclick: copy })),
+        h('h3', { text: t('Drivers {n}/{max}', { n: room.players.length, max: MAX_PLAYERS }) }),
         players,
         isHost && room.phase === 'lobby'
           ? h('button.ghost.add-bot', {
-              text: '+ Add bot',
+              text: t('+ Add bot'),
               disabled: room.players.length >= MAX_PLAYERS,
-              title: 'An AI driver simulated on your computer (they race as ghosts too)',
+              title: t('An AI driver simulated on your computer (they race as ghosts too)'),
               onclick: () => this.conn?.sendJson({ t: 'addBot' }),
             })
           : null,
@@ -554,8 +579,8 @@ export class App {
         h(
           'div.lobby-foot',
           {},
-          h('button.ghost', { text: 'Settings', onclick: () => this.openSettings() }),
-          h('button.ghost', { text: 'Leave', onclick: () => this.leave() }),
+          h('button.ghost', { text: t('Settings'), onclick: () => this.openSettings() }),
+          h('button.ghost', { text: t('Leave'), onclick: () => this.leave() }),
         ),
       ),
       h('main.lobby-main', {}, banner, h('div.lobby-top', {}, this.prepPanel(room, isHost), spec), grid),
@@ -598,8 +623,10 @@ export class App {
     const w0 = weatherAt(race.weather, 0);
     const slot = (race.slots[this.me] ?? 0) + 1;
     const bar = h('div.bar-fill');
-    const label = h('div.load-label', { text: 'Preparing…' });
-    const weatherTxt = `${WEATHER_LABEL[race.weather.kind]}${race.weather.change ? ` → ${WEATHER_LABEL[race.weather.change.to]} later` : ''}`;
+    const label = h('div.load-label', { text: t('Preparing…') });
+    const weatherTxt = race.weather.change
+      ? t('{weather} → {later} later', { weather: t(WEATHER_LABEL[race.weather.kind]), later: t(WEATHER_LABEL[race.weather.change.to]) })
+      : t(WEATHER_LABEL[race.weather.kind]);
     this.setUi(
       h(
         'div.loading',
@@ -609,15 +636,18 @@ export class App {
           {},
           h('div.logo.small', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
           h('h2', {
-            text: `${this.trackIndex.find((t) => t.id === race.trackId)?.name ?? 'Nürburgring GP'} · ${Math.round(race.sessionMs / 60000)}-minute qualifying`,
+            text: t('{track} · {min}-minute qualifying', {
+              track: t(this.trackIndex.find((tr) => tr.id === race.trackId)?.name ?? 'Nürburgring GP'),
+              min: Math.round(race.sessionMs / 60000),
+            }),
           }),
           h(
             'div.race-facts',
             {},
-            fact('Grid', `P${slot} of ${race.grid.length}`),
-            fact('Weather', weatherTxt),
-            fact('Time', formatHour(w0.hour)),
-            fact('Track', w0.wetness > 0.3 ? 'Wet' : w0.wetness > 0.05 ? 'Damp' : 'Dry'),
+            fact(t('Grid'), t('P{slot} of {n}', { slot, n: race.grid.length })),
+            fact(t('Weather'), weatherTxt),
+            fact(t('Time'), formatHour(w0.hour)),
+            fact(t('Track'), w0.wetness > 0.3 ? t('Wet') : w0.wetness > 0.05 ? t('Damp') : t('Dry')),
           ),
           h('div.bar', {}, bar),
           label,
@@ -641,7 +671,7 @@ export class App {
       console.error(e);
       session.dispose();
       this.session = null;
-      this.fatal(`Could not load the race: ${(e as Error).message}`);
+      this.fatal(t('Could not load the race: {msg}', { msg: (e as Error).message }));
       return;
     }
     if (this.session !== session) return; // superseded
@@ -662,7 +692,7 @@ export class App {
   private setCountdown(text: string, sub: string): void {
     if (!this.countdownEl) return;
     const [big, s, info] = Array.from(this.countdownEl.children) as HTMLElement[];
-    big.textContent = text;
+    big.textContent = t(text);
     big.className = `cd-big ${text === 'GO' ? 'go' : ''}`;
     s.textContent = sub;
     info.style.display = text && text !== 'GO' ? 'block' : sub ? 'block' : 'none';
@@ -682,27 +712,36 @@ export class App {
       h(
         'div.modal-card.pause-card',
         {},
-        h('h2', { text: 'Paused' }),
-        h('p.muted', { text: 'The race keeps running.' }),
-        h('button.primary', { text: 'Resume', onclick: close }),
+        h('h2', { text: t('Paused') }),
+        h('p.muted', { text: t('The race keeps running.') }),
+        h('button.primary', { text: t('Resume'), onclick: close }),
         h('button', {
-          text: 'Reset to track (this lap will not count)',
+          text: t('Reset to track (this lap will not count)'),
           onclick: () => {
             close();
             this.session?.requestReset();
           },
         }),
-        h('button', { text: 'Settings', onclick: () => this.openSettings() }),
-        h('button.danger', { text: 'Leave race', onclick: () => this.leave() }),
+        h('button', { text: t('Settings'), onclick: () => this.openSettings() }),
+        h('button.danger', { text: t('Leave race'), onclick: () => this.leave() }),
       ),
     );
     document.body.append(this.overlay);
   }
 
   private openSettings(): void {
+    const lang = getLang();
     const panel = settingsPanel(
       () => panel.remove(),
       () => {
+        if (getLang() !== lang) {
+          // new language: redraw the screen behind and the panel itself (race texts follow on their own)
+          panel.remove();
+          if (this.screen === 'menu') this.showMenu();
+          else if (this.screen === 'lobby') this.renderLobby();
+          this.openSettings();
+          return;
+        }
         this.session?.applySettings();
         if (!this.session) this.gfx.applyQuality();
         this.audio?.setLevels(settings.audio);
@@ -727,9 +766,9 @@ export class App {
         h('td.pos', { text: r.bestLapMs === null ? '—' : String(r.position) }),
         h('td', { text: r.nick }),
         h('td.muted', { text: cars.find((c) => c.id === r.carId)?.name ?? '' }),
-        h(`td.mono${m.fastestLap?.id === r.id ? '.fastest' : ''}`, { text: r.bestLapMs === null ? 'no time' : fmtTime(r.bestLapMs) }),
+        h(`td.mono${m.fastestLap?.id === r.id ? '.fastest' : ''}`, { text: r.bestLapMs === null ? t('no time') : fmtTime(r.bestLapMs) }),
         h('td.mono.muted', { text: r.bestLapMs === null || !r.gapMs ? '' : `+${(r.gapMs / 1000).toFixed(3)}` }),
-        h('td.muted', { text: `${r.validLaps}${r.dnf ? ' · DNF' : ''}` }),
+        h('td.muted', { text: `${r.validLaps}${r.dnf ? ` · ${t('DNF')}` : ''}` }),
       ),
     );
     this.setUi(
@@ -739,7 +778,7 @@ export class App {
         h(
           'div.results-card',
           {},
-          h('h2', { text: 'Classification' }),
+          h('h2', { text: t('Classification') }),
           h(
             'div.podium',
             {},
@@ -760,17 +799,19 @@ export class App {
                 );
               }),
           ),
-          h('p.muted', { text: 'Ranked by best valid lap. Laps beyond track limits or after a reset do not count.' }),
+          h('p.muted', { text: t('Ranked by best valid lap. Laps beyond track limits or after a reset do not count.') }),
           h(
             'table',
             {},
-            h('thead', {}, h('tr', {}, ...['Pos', 'Driver', 'Car', 'Best lap', 'Gap', 'Valid laps'].map((t) => h('th', { text: t })))),
+            h('thead', {}, h('tr', {}, ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Valid laps')].map((t) => h('th', { text: t })))),
             h('tbody', {}, ...rows),
           ),
           m.fastestLap
-            ? h('p.fastest-note', { text: `Fastest lap: ${m.rows.find((r) => r.id === m.fastestLap?.id)?.nick ?? ''} · ${fmtTime(m.fastestLap.ms)}` })
+            ? h('p.fastest-note', {
+                text: t('Fastest lap: {nick} · {time}', { nick: m.rows.find((r) => r.id === m.fastestLap?.id)?.nick ?? '', time: fmtTime(m.fastestLap.ms) }),
+              })
             : null,
-          h('button.primary', { text: 'Back to lobby', onclick: () => this.showLobby() }),
+          h('button.primary', { text: t('Back to lobby'), onclick: () => this.showLobby() }),
         ),
       ),
     );
@@ -791,9 +832,9 @@ export class App {
       h(
         'div.modal-card',
         {},
-        h('h2', { text: 'Graphics reset' }),
-        h('p', { text: 'The graphics driver reset the WebGL context. Trying to recover…' }),
-        h('button', { text: 'Reload page', onclick: () => location.reload() }),
+        h('h2', { text: t('Graphics reset') }),
+        h('p', { text: t('The graphics driver reset the WebGL context. Trying to recover…') }),
+        h('button', { text: t('Reload page'), onclick: () => location.reload() }),
       ),
     );
     document.body.append(el);
@@ -804,9 +845,9 @@ export class App {
       h(
         'div.fatal',
         {},
-        h('h2', { text: 'Something went wrong' }),
+        h('h2', { text: t('Something went wrong') }),
         h('p', { text: msg }),
-        h('button.primary', { text: 'Back to menu', onclick: () => this.showMenu() }),
+        h('button.primary', { text: t('Back to menu'), onclick: () => this.showMenu() }),
       ),
     );
   }
