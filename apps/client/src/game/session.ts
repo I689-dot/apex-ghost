@@ -418,7 +418,7 @@ export class RaceSession {
       vehicle.fitTyres(COMPOUNDS[compoundForWeather(this.weather.wetness)], vehicle.ambientC + 12);
       // skill and racing line differ per bot so they spread out (deterministic per slot)
       const skill = 0.88 + ((r.slot * 37) % 10) / 100;
-      const lane = (((r.slot * 7) % 5) - 2) * 0.9;
+      const lane = (((r.slot * 7) % 5) - 2) * 0.45;
       const t = vehicle.body.translation();
       const q = vehicle.body.rotation();
       const pos = new THREE.Vector3(t.x, t.y, t.z);
@@ -1024,11 +1024,11 @@ export class RaceSession {
       const lat = dx * fz - dz * fx; // + = left of the bot
       // alongside on the side we moved to: hold that side until it is behind us
       if (along > -6 && along <= 3 && Math.abs(lat) < 3.4) beside = true;
-      if (along <= 3 || along > 40 || Math.abs(lat) > 2.6) return;
-      if (speed > mySpeed - 1.5 && along > 14) return; // as fast as us and not close: just follow
+      if (along <= 0 || along > 40 || Math.abs(lat) > 2.6) return;
+      // in our path (narrower once we are pulling out): keep about 10 m, back off if closer
+      if (Math.abs(lat) < (b.ai.passTarget !== 0 ? 1.6 : 2.2)) cap = Math.min(cap, Math.max(0, speed + (along - 10) * 0.7));
+      if (along <= 3 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
       if (!block || along < block.along) block = { along, lat };
-      // about to hit it before having moved over: slow to its speed
-      if (Math.abs(lat) < 1.6) cap = Math.min(cap, Math.max(speed, speed + (along - 6) * 0.9));
     };
     for (const o of this.remotes.values()) {
       if (o === r) continue;
@@ -1038,7 +1038,7 @@ export class RaceSession {
     const me = this.vehicle.body.translation();
     check(me.x, me.z, this.vehicle.telemetry.speed);
     const found = block as { along: number; lat: number } | null;
-    if (found) {
+    if (found && (b.ai.passTarget !== 0 || b.ai.canPass())) {
       // pass on the side away from it (it is left of us → go right), else keep the side already chosen
       if (b.ai.passTarget === 0) b.ai.passTarget = found.lat > 0.3 ? -PASS_OFFSET : found.lat < -0.3 ? PASS_OFFSET : b.ai.roomySide() * PASS_OFFSET;
       b.passHold = 1;

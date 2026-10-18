@@ -121,7 +121,7 @@ let failed = false;
 for (const skill of skills) {
   const s = setup();
   // the lane the game gives a bot in this grid slot
-  const ai = new AiDriver(track, s.v, skill, startSlot ? (((startSlot * 7) % 5) - 2) * 0.9 : 0);
+  const ai = new AiDriver(track, s.v, skill, startSlot ? (((startSlot * 7) % 5) - 2) * 0.45 : 0);
   // ride: body heave acceleration, wheels losing the ground at speed, and the first 6 s from the grid
   let heaveSq = 0;
   let heaveN = 0;

@@ -211,6 +211,7 @@ export class AiDriver {
   /** Passing: lateral offset (m, + = left) asked for by the traffic logic, and the one applied now. */
   passTarget = 0;
   private passOff = 0;
+  private laneNow = 0;
   private roomy = 1;
 
   constructor(
@@ -224,6 +225,15 @@ export class AiDriver {
     this.line = racingLineFor(track);
     this.limits = carLimits(vehicle.specs, skill);
     this.profile = speedProfile(this.line, this.limits);
+  }
+
+  private lastS = 0;
+
+  /** Room to pass: no corner or braking zone in the next 150 m (pulling out mid-corner in the wet spun bots). */
+  canPass(): boolean {
+    const v = this.vehicle.telemetry.speed;
+    for (let d = 0; d <= 150; d += 10) if (this.profile[indexAt(this.track, this.lastS + d)] < Math.max(v, 20) * 0.92) return false;
+    return true;
   }
 
   /** The side (+1 left, −1 right) with more track beside the line here. */
@@ -279,7 +289,16 @@ export class AiDriver {
     tz /= tl;
     // the line plus lane, merge and passing offsets, kept on the asphalt (1.2 m inside the edges)
     const lineOff = L.offset[j] + (L.offset[j2] - L.offset[j]) * f;
-    const extra = clamp(lineOff + this.lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2) - lineOff;
+    // the bot's own lane only on straights: shifted through a corner its path is tighter than the line the speed
+    // profile was made for (a Ferrari 1.8 m to the side overheated its rear tyres, spun and ran wide every lap).
+    // It moves back onto the line before a corner (radius under ~300 m within 120 m), 4 cm per metre travelled.
+    let kMax = 0;
+    for (let d = 0; d <= 120; d += 10) kMax = Math.max(kMax, Math.abs(L.curvature[indexAt(t, s + d)]));
+    const laneTarget = this.lane * clamp(1 - kMax * 300, 0, 1);
+    const laneStep = 0.04 * Math.max(speed, 5) * dt;
+    this.laneNow += clamp(laneTarget - this.laneNow, -laneStep, laneStep);
+    const lane = this.laneNow;
+    const extra = clamp(lineOff + lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2) - lineOff;
     this.roomy = t.widthL[j] - lineOff > t.widthR[j] + lineOff ? 1 : -1;
     const px = L.x[j] + (L.x[j2] - L.x[j]) * f + tz * extra;
     const pz = L.z[j] + (L.z[j2] - L.z[j]) * f - tx * extra;
@@ -323,7 +342,11 @@ export class AiDriver {
       // is harder to catch): 0.8 grip → 7 % more margin
       this.profile = speedProfile(this.line, this.limits, weatherGrip * (1 - 0.35 * Math.max(0, 1 - weatherGrip)));
     }
-    const vt = Math.min(this.profile[indexAt(t, s + 2 + speed * 0.12)], speedCap);
+    let vt = this.profile[indexAt(t, s + 2 + speed * 0.12)];
+    // in a car's dirty air (less downforce: Vehicle.wake) corners must be taken slower; straights keep the tow
+    if (vt < this.limits.vMax * 0.9) vt *= 1 - 0.35 * (1 - v.wake.downforce);
+    vt = Math.min(vt, speedCap);
+    this.lastS = s;
     this.dbgVt = vt;
     const err = vt - speed;
     if (err > 0) {
@@ -333,7 +356,7 @@ export class AiDriver {
       if (vF > 3) {
         const betaR = Math.abs(Math.atan2(vL - 0.5 * v.wheelbase * yawRate, vF));
         const a = v.tire.p.alphaPeak;
-        thr *= clamp(1 - (betaR - 0.8 * a) / (0.5 * a), 0, 1);
+        thr *= clamp(1 - (betaR - 0.6 * a) / (0.5 * a), 0, 1);
       }
       // and squeeze the throttle on instead of stamping on it
       c.throttle = Math.min(thr, c.throttle + dt * THROTTLE_RISE);
@@ -345,7 +368,9 @@ export class AiDriver {
       c.brake = 0;
     } else {
       c.throttle = 0;
-      c.brake = clamp(-err * 0.35, 0, 1);
+      // trail-braking: less brake with more lock, and off the brake while the rear is sliding (it spun bots on
+      // entry once their rear tyres were hot)
+      c.brake = clamp(-err * 0.35, 0, 1) * clamp(1.3 - Math.abs(c.steer), 0.35, 1) * (1 - 0.8 * slide);
     }
     if (!raceStarted) {
       c.throttle = 0;
