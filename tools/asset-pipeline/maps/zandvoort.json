@@ -9,7 +9,7 @@
     "zandvoort": { "turns": 14 }
   },
   "fixPitEntry": false,
-  "bank": true,
+  "fillGrass": "grass_zv97",
   "analysis": {
     "id": "zandvoort",
     "name": "Circuit Zandvoort",
@@ -95,7 +95,7 @@
     "widthDespike": 1.0,
     "markings": { "mode": "boxes", "finish": "lines_zv58", "finishHint": [720, -80], "grid": "lines_zv59", "gridBehindFinish": true },
     "pitLane": {
-      "_note": "Measured beside the circuit on the road/boundary rasters: the entry leaves the right edge of the main straight ~100 m before the line (hatched blend line), the lane runs between the pit wall and the garages (lateral -9 to -21 m), and the exit lane continues past the end of the pit wall and along the inside of Tarzan, merging at Gerlach (~612 m).",
+      "_note": "Measured beside the circuit on the road/boundary rasters: the entry leaves the right edge of the main straight ~100 m before the line (hatched blend line), the lane runs between the pit wall and the garages (lateral -9 to -21 m), and the exit lane (lateral -12 to -6 m) continues past the end of the pit wall and along the inside of Tarzan, merging at Gerlach (~612 m).",
       "sLat": [
         [-100, -2.5],
         [-85, -5],
@@ -105,7 +105,8 @@
         [60, -15],
         [300, -15],
         [340, -12],
-        [400, -11],
+        [380, -10],
+        [420, -9.5],
         [480, -9.5],
         [540, -8.5],
         [590, -7.5],

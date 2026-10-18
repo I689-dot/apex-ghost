@@ -65,6 +65,8 @@ export interface TrackIndexEntry {
   turns: number | null;
   file: string;
   default: boolean;
+  /** Map the layout belongs to (maps/<id>.json); absent = the Nürburgring. */
+  map?: string;
 }
 
 let indexCache: Promise<TrackIndexEntry[]> | null = null;

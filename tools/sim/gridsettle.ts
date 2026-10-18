@@ -2,23 +2,24 @@
  * Grid check: every slot, a car placed as at the start and left standing for 3 s (as during the countdown).
  * Prints the slot height against the collision surface under it, and how much the car jumps, bounces or rolls.
  *
- *   pnpm tsx tools/sim/gridsettle.ts [carId]
+ *   pnpm tsx tools/sim/gridsettle.ts [carId] [--track <layout id>]
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { readFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CarsFile, Surface, TrackData } from '../../packages/shared/src/index.ts';
 import { Vehicle, type GroundHit, type GroundQuery } from '../../apps/client/src/physics/vehicle.ts';
 import { DamageState } from '../../apps/client/src/physics/damage.ts';
 import { BOT_ASSISTS } from '../../apps/client/src/game/ai.ts';
+import { loadTrack, trackArg } from './trackfile.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.resolve(here, '../../apps/client/public/assets');
 const cars = JSON.parse(readFileSync(path.join(pub, 'cars.json'), 'utf8')) as CarsFile;
 const args = process.argv.slice(2);
-const carId = args.find((a) => !a.startsWith('--')) ?? '2022_mercedes_amg_project_one';
+const carId = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--track') ?? '2022_mercedes_amg_project_one';
+const loaded = loadTrack(trackArg(args));
 const useTrack = true;
 const entry = cars.cars.find((c) => c.id === carId) ?? cars.cars[0];
 const DT = 1 / 120;
@@ -30,8 +31,8 @@ function makeWorld() {
   world.timestep = DT;
   const surf = new Map<number, Surface>();
   if (useTrack) {
-    const track = JSON.parse(readFileSync(path.join(pub, 'track.json'), 'utf8')) as TrackData;
-    const buf = gunzipSync(readFileSync(path.join(pub, 'track', 'collision.apxc')));
+    const track = loaded.track as TrackData;
+    const buf = loaded.collision;
     const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
     let o = 12;
     for (let i = 0; i < dv.getUint32(8, true); i++) {
@@ -83,7 +84,7 @@ function setup() {
   return { world, v, events, ground };
 }
 
-const track = JSON.parse(readFileSync(path.join(pub, 'track.json'), 'utf8')) as TrackData;
+const track = loaded.track as TrackData;
 const s = setup();
 const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' } as GroundHit;
 for (let i = 0; i < track.grid.length; i++) {

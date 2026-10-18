@@ -134,7 +134,8 @@ for (const skill of [0.88, 0.97]) {
   for (let i = 0; i < 120 * 240 * LAPS && laps.length < LAPS; i++) {
     const pr0 = tr.players.get('ai');
     const cp = pr0 && pr0.passed >= 0 ? track.gates[(pr0.nextGate - 1 + track.gates.length) % track.gates.length].s : undefined;
-    const c = ai.update(DT, true, 1, cp);
+    // as in the game (session.ts): the profile follows the grip left in the tyres
+    const c = ai.update(DT, true, s.v.weatherGrip * s.v.wearGripAvg, cp);
     if (ai.resetRequested) {
       resets++;
       ai.resetRequested = false;

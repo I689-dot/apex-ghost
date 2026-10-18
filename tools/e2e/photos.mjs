@@ -4,7 +4,10 @@
  * Starts a session with bots on the grid in clear light, hides the UI, places cameras and saves frames to
  * apps/client/public/assets/ui/photo_<name>.webp.
  *
- *   node tools/e2e/photos.mjs [--url http://127.0.0.1:5173] [--time afternoon]
+ *   node tools/e2e/photos.mjs [--url http://127.0.0.1:5173] [--time afternoon] [--track zandvoort --map zandvoort]
+ *
+ * With --track the shots are taken on that layout; --map names the set (photo_<name>_<map>.webp), which the menus
+ * show for that map's layouts.
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -19,6 +22,8 @@ const args = process.argv.slice(2);
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
 const URL = opt('url', 'http://127.0.0.1:5173');
 const TIME = opt('time', 'morning');
+const TRACK = opt('track', '');
+const MAP = opt('map', '');
 
 const browser = await chromium.launch({ args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
@@ -43,6 +48,7 @@ await page.waitForSelector('.menu-card', { timeout: 30_000 });
 await page.click('button.primary:has-text("Create room")');
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.waitForTimeout(1500);
+if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);
 await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
 await page.selectOption('.prep .prep-row:nth-of-type(3) select', TIME);
 await page.waitForTimeout(400);
@@ -69,8 +75,8 @@ const save = async (name) => {
     .modulate({ saturation: 1.2, brightness: 0.9 })
     .linear(1.18, -22)
     .webp({ quality: 82 })
-    .toFile(path.join(ui, `photo_${name}.webp`));
-  console.log(`  photo_${name}.webp`);
+    .toFile(path.join(ui, `photo_${name}${MAP ? `_${MAP}` : ''}.webp`));
+  console.log(`  photo_${name}${MAP ? `_${MAP}` : ''}.webp`);
 };
 await save('aerial');
 await page.keyboard.press('Enter'); // skip the cinematic

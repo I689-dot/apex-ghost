@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * One-command asset pipeline:  pnpm assets [--only cars|map|optimize|inventory] [--car <id>] [--jobs N] [--force]
+ * One-command asset pipeline:  pnpm assets [--only cars|map|optimize|inventory] [--car <id>] [--map <id>] [--jobs N] [--force]
+ *
+ * Maps are configured in maps/<id>.json (nurburgring, zandvoort). Without --map the map and optimize steps run for
+ * every map; with --map only for that one (and optimize leaves the cars alone).
  *
  * 1. inventory  — usd-core walks `3D MODELS/` → ASSET_REPORT.md
  * 2. cars       — Blender headless: USDC → normalised GLB + meta JSON + thumbnail (per car)
@@ -18,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
-const srcDir = path.join(root, '3D MODELS');
+const srcDir = process.env.MODELS_DIR ?? path.join(root, '3D MODELS'); // MODELS_DIR: sources elsewhere (e.g. from a git worktree)
 const outDir = path.join(here, 'out');
 
 const BLENDER = process.env.BLENDER ?? path.join(homedir(), '.local/opt/blender-4.2.3-linux-x64/blender');
@@ -31,6 +34,12 @@ const opt = (name, def) => {
 };
 const only = opt('only', null);
 const carFilter = opt('car', null);
+const mapFilter = opt('map', null);
+const MAPS = readdirSync(path.join(here, 'maps'))
+  .filter((f) => f.endsWith('.json'))
+  .map((f) => ({ ...JSON.parse(readFileSync(path.join(here, 'maps', f), 'utf8')), config: path.join(here, 'maps', f) }))
+  .sort((a, b) => Number(b.default) - Number(a.default))
+  .filter((m) => !mapFilter || m.id === mapFilter);
 const jobs = Number(opt('jobs', '2'));
 const force = args.includes('--force');
 
@@ -131,17 +140,22 @@ async function cars() {
 }
 
 async function map() {
-  console.log('▶ map (track analysis + Blender)');
-  const mapOut = path.join(outDir, 'map');
-  mkdirSync(mapOut, { recursive: true });
-  const usd = path.join(srcDir, 'MAP', 'Nürburgring_GP_2022_layout', 'scene.usdc');
-  await run(USD_PYTHON, ['tools/asset-pipeline/track_analysis.py', usd, mapOut], 'track');
-  await run(BLENDER, ['-b', '--factory-startup', '-P', 'tools/asset-pipeline/blender/convert_map.py', '--', usd, mapOut], 'map');
+  for (const m of MAPS) {
+    console.log(`▶ map ${m.id} (track analysis + Blender)`);
+    const mapOut = path.join(outDir, m.out);
+    mkdirSync(mapOut, { recursive: true });
+    const usd = path.join(srcDir, m.source);
+    // the Nürburgring analysis has no config section (its defaults are built in)
+    const cfg = m.analysis ? [m.config] : [];
+    await run(USD_PYTHON, ['tools/asset-pipeline/track_analysis.py', usd, mapOut, ...cfg], 'track');
+    await run(BLENDER, ['-b', '--factory-startup', '-P', 'tools/asset-pipeline/blender/convert_map.py', '--', usd, mapOut, ...cfg], 'map');
+  }
 }
 
 async function optimize() {
   console.log('▶ optimize (gltf-transform)');
-  await run(process.execPath, ['tools/asset-pipeline/optimize.mjs', ...(carFilter ? ['--car', carFilter] : [])], 'optimize');
+  if (!mapFilter) await run(process.execPath, ['tools/asset-pipeline/optimize.mjs', '--only', 'cars', ...(carFilter ? ['--car', carFilter] : [])], 'optimize');
+  for (const m of MAPS) await run(process.execPath, ['tools/asset-pipeline/optimize.mjs', '--map', m.id, '--only', 'map'], 'optimize');
 }
 
 async function report() {

@@ -352,6 +352,65 @@ The real "Sprintstrecke" (3.63 km) also skips other sections, so the short layou
 - **Engineer suggestion:** a recommendation from the forecast (wets in the wet, softs in cool air, mediums otherwise), applied with one click.
 - **Bots:** wets on a wet forecast, mediums otherwise.
 
+## Zandvoort
+
+A second map: **Circuit Zandvoort, 2023 layout** (`3D MODELS/MAP/Circuit_Zandvoort_2023_layout/scene.usdc`, the same Sketchfab USD export format as the Nürburgring). The host picks it in the lobby like a layout; the client loads its own chunks and collision, the server validates its laps.
+
+**The source.** 141 meshes, 1.06 M triangles, 100 materials, 138 small textures (mostly 128 px tiles, a 2048 px satellite photo). It is an Assetto Corsa conversion (Sylracing and "Circuit Park Zandvoort" boards in the textures) and every material has a generic name (`Dado_LW_041_<n>`, `Merged_materials`), so nothing can be matched by name as on the Nürburgring.
+
+**Materials identified by hand.** A contact sheet of every texture, top-down plots of every material's triangles, and per-material statistics (area, share of flat triangles, height above the nearest road) told them apart. The map config (`tools/asset-pipeline/maps/zandvoort.json`) renames them to the prefixes the pipeline and the client already key on, so Blender chunking, simplification, cut-out foliage, wet asphalt, macro variation and the surface rules work unchanged:
+
+| Renamed to | Source | Surface |
+|---|---|---|
+| `asph_zv61` (racing surface), `asph_zv42` (new asphalt: banked corners, Tarzan apron, pit exit), `asph_zv96` (run-off, pit lane, paddock), `asph_zv60` (rubbered strips) | 61, 42, 96, 60 | asphalt |
+| `lines_zv75` (edge lines), `lines_zv59` (grid brackets, pit hatching), `lines_zv58` (start/finish), `lines_zv92`, `lines_zv21` ("PITLANE"), `lines_zv7` | | asphalt |
+| `conc_`, `pavement_`, `tiles_`, `grille_` | 26, 22, 28, 6, 34, 23 | asphalt |
+| `curb_zv44`, `curb_zv48`, `curb_zv25` | red/white textures | curb |
+| `grass_zv97`, `86`, `24`, `71`, `74`, `55`, `81`, `51`, `31`, `66` (grass, dune grass, edge blends) | | grass |
+| `gravel_zv43` | | gravel |
+| `top2_zv73` (satellite terrain) | | grass (ground) |
+| `trees_new_zv87` | billboards | render only |
+| `wall_zv49` (untextured concrete barriers), `wall_zv50/20/9/41/33/8`, `tyrewall_zv18/19`, `galvanized_zv93` (rails and posts), `fence_zv68/89/64/54/63` | | wall |
+| `struct_zv84` (garages), `struct_zv65`, `struct_zv16`, `struct_zvmerged` (buildings, bridges) | | wall |
+
+Everything else (grandstands, signs, lamp posts, cables) is render-only scenery.
+
+**Scale and direction.** The trace measured 12,223 source units for the lap, scaled to the official 4,259 m: **0.348 m per unit**. The painted grid brackets then sit 8.1 m apart, the FIA spacing, which confirms it (the Nürburgring check was the same). The circuit runs clockwise: up the main straight, Tarzan is a right-hander, Hugenholtz a left-hander, as in reality. The lap line is 4,299 m (+0.9 %, as the Nürburgring's is +1 %).
+
+**Track analysis** (`track_analysis.py <usd> <out> maps/zandvoort.json`; the Nürburgring run without a config gives byte-identical output):
+- Distances tuned in Nürburgring units scale with `unit` (5: Zandvoort's model is ~5× finer).
+- **Centreline:** traced on the racing-surface materials only (`traceRoad`). On the whole asphalt it turned into service roads at two junctions and skipped the western loop. Where the racing surface has a short gap (the start of the Arie Luyendyk banking) the trace follows the whole road for those steps, and one hand-placed boundary segment closes the run-off lane it otherwise slid into. Widths come from the whole asphalt between the painted edge lines, walls and kerbs, as before.
+- **Walls above the road** (bridges, roofs, the gantry over the line) no longer cut the road in plan: a wall triangle counts as a track edge only if its foot is within 1.5 units of the road surface around it.
+- **Width spikes:** where a service road or run-off joins, the measured width jumped by up to 6 m for a few metres, and the racing line swung into it (bots ran wide at ~1,450 m). Each side is capped at its ±40 m running median + 1 m.
+- **Start/finish and grid:** one painted line (`lines_zv58`, the copy in the pit lane is ignored), the grid behind it. The brackets are unwelded pieces (bar and legs), grouped by distance. The 12 slots follow the pole bracket every 8.1 m in alternating columns; one bracket merges with the pit-entry hatching and is placed on its column at the expected distance. Pole is on the right, 20 m behind the line; cars face along the straight. The first gate is the line itself.
+- **Gates and sectors:** 123 gates (35 m), sectors split at gates 41 and 82 (1,430 m and 2,865 m).
+- **Start lights:** the model has none. The gantry over the line is a bridge without lamps, and the only traffic-light objects are marshal posts and the pit-exit light. The countdown uses the HUD lights only, as before.
+- **Pit lane:** the automatic trace (a sideways scan from the line) found the right corridor but wandered into the paddock in both directions, so the lane is given as (lap distance, lateral offset) pairs on the lap line in the map config, measured from the road rasters and checked against the collision surfaces with `node tools/sim/pitlat.mjs <from> <to> --track zandvoort`. The entry leaves the right edge of the main straight 100 m before the line (the hatched blend line), the lane runs between the pit wall and the garages 15 m right of the lap line, and the exit lane continues past the end of the pit wall and along the inside of Tarzan, separated by a line, merging at Gerlach. Entry at 4,199 m, exit at 612 m, 682 m long. The service box is 140–240 m, in front of the garages.
+
+**Render chunks and collision** (`blender/convert_map.py` with the same config renames the materials on import):
+- 750 k track, 297 k scenery, 1.4 k tree and 2.8 k terrain triangles; the heavy barriers are simplified to 465 k for the track chunks.
+- Collision: walls 768 k → 338 k, 479 k triangles in all, 4.8 MB gzipped.
+- `fill_holes.mjs` filled 11.9 k cells of 2 m (4.8 ha) with the main grass texture (`fillGrass` in the map config; otherwise the first grass material would be used, here an edge blend). `pnpm tsx tools/sim/holes.ts --track zandvoort`: no holes on the track, its run-off or the pit lane.
+- Assets: 18.4 MB in `public/assets/maps/zandvoort/`, plus 0.6 MB of menu photos.
+
+**Banking (tried, not kept).** Hugenholtz and Arie Luyendyk are banked about 11° and 14° in the model (19° and 18° in reality); the physics feels it through the collision mesh. A bank-aware speed profile for the bots (bank measured from the road surface at every lap-line point) made the quasi-steady lap 6 s faster, but bots trusting it ran wide on flying laps (resets at 1,464 m and 3,632 m). Counted only from 7° and at 70 % it was safe but gained 0.3 s, so it was dropped: the bots' profile stays flat-corner, as on the Nürburgring.
+
+**Per-map pipeline.** `tools/asset-pipeline/maps/<id>.json` holds the source model, output folder (`out/map`, `out/map_zandvoort`), asset folder (`public/assets/track`, `public/assets/maps/zandvoort`), layouts with their turn count, and the map-specific steps (the Nürburgring's pit-entry fix, the fill grass). `optimize.mjs --map <id>` writes that map's layouts and merges them into `tracks.json` and `tracks-race.json`, keeping the other maps' entries. Every Nürburgring file and URL stays where it was.
+
+**Client.** Nothing in the race code was Nürburgring-specific beyond the "15 turns" fact in the TV intro (now `turns` from the track index: 15 and 14) and the menu tagline. The menus' photo backdrops follow the session's map (`photo_<shot>_zandvoort.webp`, made with `node tools/e2e/photos.mjs --track zandvoort --map zandvoort`). Spanish: "Circuito de Zandvoort", "{n} curvas".
+
+**Checks:**
+- `pnpm tsx tools/sim/ailap.ts <car> --track zandvoort --laps 3`, Porsche 911 GT3 R (992): standing lap 1:58.8, flying laps 1:53.1 / 1:53.2 at skill 0.97 (1:56.8 at 0.88), no resets, no track-limit violations, top speed 243 km/h. Quasi-steady-state lap 1:48.7. A real GT3 pole is 1:33–1:35; the gap (+20 %) is about the same as on the Nürburgring (bots 2:12 against 1:54), from the conservative widths and the bots' safety margins. McLaren 720S LMGT3 Evo (1:52.3 flying) and Mercedes-AMG ONE: clean over 3 laps.
+- The Ferrari 296 Challenge at the top skill (0.97) loses the car on lap 3 with overheated brakes and worn rear tyres. It does the same at the Nürburgring, so it isn't the track.
+- `ailap.ts` now gives the bot the grip left in its tyres, as the game does (it passed a fixed 1 before), and can run several laps.
+- `node tools/e2e/smoke.mjs --track zandvoort --gpu --bots 3 --pit`: passed. Lobby with Zandvoort, cinematic, grid pass, start, driving with 3 bots, pit lane limiter and service box, 58 fps average on the iGPU (Low; the Nürburgring run: 70). The Nürburgring smoke test passes unchanged.
+- `node tools/e2e/tour.mjs --track zandvoort --aerial`: driver's-eye and aerial frames every 300 m; no holes, missing textures or scale problems were found.
+- `apps/server/test/tracks.test.ts`: every layout in the index has validation data, and a lap along its lap line is counted by the server's tracker.
+
+**Known limits.**
+- The sun is still computed for the Nürburg's latitude, and the map's north isn't known; Zandvoort is 2° further north, which doesn't visibly change the sky.
+- The pit lane isn't traced automatically on this map; if the model changes, re-measure the pairs with `pitlat.mjs`.
+
 ## Timing screen
 
 Hold **Tab** for the full timing screen: position, driver, car, best lap, gap, last lap, best sectors (purple = fastest of the session), laps, and status (out lap / in pits / invalid / on a timed lap / finished).

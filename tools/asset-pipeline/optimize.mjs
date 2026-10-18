@@ -533,7 +533,6 @@ function writeTracks(mapOut, render) {
   const surf = roadSurface(mapOut);
   if (MAP.fixPitEntry) fixPitEntry(bases);
   for (const b of bases) fixHeights(b, surf);
-  if (MAP.bank) for (const b of bases) b.bank = measureBank(b, surf);
   mkdirSync(path.join(pub, 'tracks'), { recursive: true });
   const index = [];
   const races = {};
@@ -797,39 +796,6 @@ function fixHeights(base, surf) {
   if (fixed) log(`${base.id}: ${fixed} lap-line heights corrected from the road surface (>1.5 m off)`);
 }
 
-/**
- * Banking at every lap-line point from the road surface 3.5 m either side (rad, + = left side higher), lightly
- * smoothed. Zandvoort's Hugenholtz and Arie Luyendyk corners are banked ~11° and ~14° in the model; the AI's speed
- * profile takes it into account.
- */
-function measureBank(base, surf) {
-  const cl = base.centerline;
-  const n = cl.length / 3;
-  const W = 3.5;
-  const near = (x, z, y) => {
-    const ys = surf(x, z);
-    return ys.length ? ys.reduce((b, v) => (Math.abs(v - y) < Math.abs(b - y) ? v : b), ys[0]) : NaN;
-  };
-  const raw = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    const a = (i - 1 + n) % n;
-    let tx = cl[j * 3] - cl[a * 3];
-    let tz = cl[j * 3 + 2] - cl[a * 3 + 2];
-    const tl = Math.hypot(tx, tz) || 1;
-    tx /= tl;
-    tz /= tl;
-    const y = cl[i * 3 + 1];
-    const yl = near(cl[i * 3] + tz * W, cl[i * 3 + 2] - tx * W, y);
-    const yr = near(cl[i * 3] - tz * W, cl[i * 3 + 2] + tx * W, y);
-    raw[i] = Number.isFinite(yl) && Number.isFinite(yr) ? Math.atan2(yl - yr, 2 * W) : 0;
-  }
-  const out = [];
-  for (let i = 0; i < n; i++) out.push(Math.round(((raw[(i - 1 + n) % n] + 2 * raw[i] + raw[(i + 1) % n]) / 4) * 1000) / 1000);
-  log(`${base.id}: banking up to ${((Math.max(...out.map(Math.abs)) * 180) / Math.PI).toFixed(1)}°`);
-  return out;
-}
-
 /** Re-write the layout JSONs only (after a new track analysis), keeping the optimized meshes. */
 function tracksOnly() {
   const first = JSON.parse(readFileSync(path.join(out, MAP.out, 'track_base.json'), 'utf8')).id;
@@ -917,7 +883,9 @@ async function collision(mapOut, dstDir) {
     total += fill.idx.length / 3;
     const terrain = await fillTerrain(io, path.join(mapOut, 'map_terrain.glb'), parts, SURF);
     log(`terrain holes filled: ${terrain.cells} cells of 20 m`);
-    const bounds = await writeFillGlb(io, fill, path.join(mapOut, 'map_track.glb'), path.join(dstDir, 'map_fill.glb'), terrain);
+    // the grass texture for the fill: the map's main grass (maps/<id>.json "fillGrass"), else the first grass material
+    const grassRe = MAP.fillGrass ? new RegExp(`^${MAP.fillGrass}$`) : undefined;
+    const bounds = await writeFillGlb(io, fill, path.join(mapOut, 'map_track.glb'), path.join(dstDir, 'map_fill.glb'), terrain, grassRe);
     writeFileSync(path.join(mapOut, 'fill.json'), JSON.stringify({ file: 'map_fill.glb', cells: fill.cells, ...bounds }));
     log(`ground holes filled: ${fill.cells} cells of 2 m (${((fill.cells * 4) / 1e4).toFixed(2)} ha)`);
   }
