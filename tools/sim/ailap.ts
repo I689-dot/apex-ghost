@@ -24,7 +24,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.resolve(here, '../../apps/client/public/assets');
 const cars = JSON.parse(readFileSync(path.join(pub, 'cars.json'), 'utf8')) as CarsFile;
 const args = process.argv.slice(2);
-const carId = args.find((a) => !a.startsWith('--')) ?? '2024_porsche_992_gt3_r';
+const opt = (k: string, d: string) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
+const optVals = new Set(['--collision', '--slot', '--skills'].flatMap((k) => (args.includes(k) ? [args[args.indexOf(k) + 1]] : [])));
+const carId = args.find((a) => !a.startsWith('--') && !optVals.has(a)) ?? '2024_porsche_992_gt3_r';
+const collisionFile = opt('collision', path.join(pub, 'track', 'collision.apxc'));
+const startSlot = Number(opt('slot', '0'));
+const skills = opt('skills', '0.88,0.97').split(',').map(Number);
 const useTrack = true;
 const entry = cars.cars.find((c) => c.id === carId) ?? cars.cars[0];
 const DT = 1 / 120;
@@ -37,7 +42,7 @@ function makeWorld() {
   const surf = new Map<number, Surface>();
   if (useTrack) {
     const track = JSON.parse(readFileSync(path.join(pub, 'track.json'), 'utf8')) as TrackData;
-    const buf = gunzipSync(readFileSync(path.join(pub, 'track', 'collision.apxc')));
+    const buf = gunzipSync(readFileSync(collisionFile));
     const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
     let o = 12;
     for (let i = 0; i < dv.getUint32(8, true); i++) {
@@ -56,6 +61,8 @@ function makeWorld() {
     const c = world.createCollider(RAPIER.ColliderDesc.cuboid(20000, 1, 20000).setTranslation(0, -1, 0));
     surf.set(c.handle, 'asphalt');
   }
+  // ray casts (wheels, placing a car on the ground) only see colliders once the query structure is built
+  world.updateSceneQueries();
   return { world, surf };
 }
 
@@ -87,7 +94,7 @@ function setup() {
   excl.body = v.body;
   if (useTrack) {
     const track = JSON.parse(readFileSync(path.join(pub, 'track.json'), 'utf8')) as TrackData;
-    const g = track.grid[0];
+    const g = track.grid[startSlot] ?? track.grid[0];
     v.place(g.p[0], g.p[1], g.p[2], g.yaw);
   } else v.place(0, 0, 0, 0);
   const events = new RAPIER.EventQueue(true);
@@ -107,9 +114,21 @@ let failed = false;
   const ideal = profileLapTime(line, speedProfile(line, carLimits(entry.specs), 1, true));
   console.log(`  quasi-steady-state lap on the racing line: ${fmt(ideal)} (real GT3 pole here: ~1:54-1:55)`);
 }
-for (const skill of [0.88, 0.97]) {
+for (const skill of skills) {
   const s = setup();
-  const ai = new AiDriver(track, s.v, skill, 0);
+  // the lane the game gives a bot in this grid slot
+  const ai = new AiDriver(track, s.v, skill, startSlot ? (((startSlot * 7) % 5) - 2) * 0.9 : 0);
+  // ride: body heave acceleration, wheels losing the ground at speed, and the first 6 s from the grid
+  let heaveSq = 0;
+  let heaveN = 0;
+  let heaveMax = 0;
+  let heaveMaxAt = 0;
+  let flicker = 0;
+  let startVy = 0;
+  let startHeave = 0;
+  let prevVy = 0;
+  const prevContact = [true, true, true, true];
+  const bumpy: Record<number, number> = {};
   const tr = new RaceTracker(track, 0, 1);
   tr.addPlayer('ai');
   let t = 0;
@@ -135,6 +154,40 @@ for (const skill of [0.88, 0.97]) {
     }
     step(s, c);
     t += DT;
+    {
+      const vy = s.v.body.linvel().y;
+      const heave = i > 0 ? Math.abs(vy - prevVy) / DT : 0;
+      prevVy = vy;
+      const sp = s.v.telemetry.speed;
+      if (t < 6) {
+        startVy = Math.max(startVy, Math.abs(vy));
+        if (t > 0.3) startHeave = Math.max(startHeave, heave);
+      }
+      if (sp > 5 && !ai.resetRequested) {
+        heaveSq += heave * heave;
+        heaveN++;
+        const sNow = track.cumS[Math.max(0, hint)];
+        if (heave > heaveMax) {
+          heaveMax = heave;
+          heaveMaxAt = sNow;
+        }
+        if (heave > 15 && process.env.VERBOSE) {
+          const pp = s.v.body.translation();
+          const cl = track.centerline;
+          const j = (hint + 1) % (cl.length / 3);
+          const tx = cl[j * 3] - cl[hint * 3];
+          const tz = cl[j * 3 + 2] - cl[hint * 3 + 2];
+          const lat = ((pp.x - cl[hint * 3]) * tz - (pp.z - cl[hint * 3 + 2]) * tx) / (Math.hypot(tx, tz) || 1);
+          const ws = s.v.wheels.map((w) => (w.contact ? `${w.surface[0]}${(w.compression * 100).toFixed(0)}` : '-')).join(' ');
+          console.log(`    heave ${heave.toFixed(0)} m/s² at ${sNow.toFixed(0)} m lateral ${lat.toFixed(1)} ${(sp * 3.6).toFixed(0)} km/h wheels ${ws}`);
+        }
+        if (heave > 15) bumpy[Math.floor(sNow / 100) * 100] = (bumpy[Math.floor(sNow / 100) * 100] ?? 0) + 1;
+        s.v.wheels.forEach((w, k) => {
+          if (prevContact[k] && !w.contact) flicker++;
+          prevContact[k] = w.contact;
+        });
+      }
+    }
     maxV = Math.max(maxV, s.v.telemetry.speed * 3.6);
     brakeMax = Math.max(brakeMax, s.v.wheels[0].brakeTemp);
     brakeSum += s.v.wheels[0].brakeTemp;
@@ -164,6 +217,13 @@ for (const skill of [0.88, 0.97]) {
   if (lapMs === null || resets > 2) failed = true;
   const lap = lapMs ? fmt(lapMs / 1000) : `NOT FINISHED (${pr?.raceDist.toFixed(0)} m)`;
   const wear = s.v.wheels.map((w) => `${(w.wear * 100).toFixed(1)}%`).join('/');
+  const bumpList = Object.entries(bumpy)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(' ');
+  console.log(
+    `  ride: heave rms ${Math.sqrt(heaveSq / Math.max(1, heaveN)).toFixed(2)} m/s², max ${heaveMax.toFixed(0)} m/s² at ${heaveMaxAt.toFixed(0)} m, ` +
+      `wheel lift-offs ${flicker}, first 6 s from the grid: max |vy| ${startVy.toFixed(2)} m/s, max heave ${startHeave.toFixed(1)} m/s²; steps >15 m/s² per 100 m: ${bumpList || 'none'}`,
+  );
   console.log(
     `skill ${skill}: lap ${lap}, resets ${resets}, top ${maxV.toFixed(0)} km/h, track-limit violations ${violations} (${offTime.toFixed(1)} s), tread used FL/FR/RL/RR ${wear} (${s.v.compound.name}), front brake ${Math.round(brakeSum / brakeN)} °C avg / ${Math.round(brakeMax)} °C peak`,
   );

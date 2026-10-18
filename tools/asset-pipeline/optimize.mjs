@@ -20,6 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { fillHoles, fillTerrain, groundPartsFromGlb, writeFillGlb } from './fill_holes.mjs';
+import { snapStackedLayers } from './flatten_layers.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -844,6 +845,12 @@ async function collision(mapOut, dstDir) {
     const rawIdx = new Uint32Array(fileBytes(path.join(mapOut, 'collision_raw', `${s}.idx.bin`)));
     let { pos, idx } = weldPositions(rawPos, rawIdx);
     const before = idx.length / 3;
+    // paint, grid-box bars and patches lie a few cm above the road: one surface for the wheels (flatten_layers.mjs)
+    if (s !== 'wall') {
+      const r = snapStackedLayers({ pos, idx });
+      idx = r.idx;
+      log(`collision ${s}: stacked layers: ${r.snapped} vertices snapped down (up to ${(r.maxGap * 100).toFixed(1)} cm), ${r.dropped} triangles dropped`);
+    }
     if (SIMPLIFY_ERR[s] > 0) {
       const [simp] = MeshoptSimplifier.simplify(idx, pos, 3, 0, SIMPLIFY_ERR[s], ['LockBorder']);
       idx = simp;

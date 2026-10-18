@@ -345,7 +345,11 @@ export class Vehicle {
 
   place(x: number, y: number, z: number, yaw: number): void {
     const h = yaw / 2;
-    this.body.setTranslation({ x, y: y + 0.05, z }, true);
+    // On the ground under (x, z) when it can be found (grid slots, resets): dropped from a few centimetres the
+    // car landed and bounced on its springs in front of everyone during the countdown.
+    const gh = this.ground.cast(x, y + 1.2, z, 0, -1, 0, 3, this.hit);
+    const gy = gh ? gh.py + 0.005 : y + 0.05;
+    this.body.setTranslation({ x, y: gy, z }, true);
     this.body.setRotation({ x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) }, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);

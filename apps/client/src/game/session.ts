@@ -271,6 +271,8 @@ export class RaceSession {
     this.world.timestep = FIXED_DT;
     this.events = new RAPIER.EventQueue(true);
     this.track.buildColliders(RAPIER, this.world, trackRes.collision);
+    // ray casts only see colliders once the query structure is built: placing the cars on the ground needs it
+    this.world.updateSceneQueries();
 
     // weather & environment
     this.weather = weatherAt(this.race.weather, 0);

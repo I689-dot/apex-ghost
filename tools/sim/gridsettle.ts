@@ -50,6 +50,8 @@ function makeWorld() {
     const c = world.createCollider(RAPIER.ColliderDesc.cuboid(20000, 1, 20000).setTranslation(0, -1, 0));
     surf.set(c.handle, 'asphalt');
   }
+  // ray casts (wheels, placing a car on the ground) only see colliders once the query structure is built
+  world.updateSceneQueries();
   return { world, surf };
 }
 
