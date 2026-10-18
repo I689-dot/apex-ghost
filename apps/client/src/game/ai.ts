@@ -8,6 +8,12 @@ const G = 9.81;
 export const BOT_ASSISTS = { abs: true, tc: 2 as const, stability: true, steering: false };
 
 const RHO = 1.225;
+/** Fastest throttle application (per second): 0 → full in 0.25 s. */
+const THROTTLE_RISE = 4;
+/** Distance over which a bot merges from its grid box (or a reset) onto its racing line (m). */
+const BLEND_M = 260;
+/** How fast a bot moves sideways to pass (m per second of lateral target shift). */
+const PASS_RATE = 2.5;
 
 /**
  * A racing line: lateral offset of the centreline at every centreline point, found by minimising
@@ -189,10 +195,24 @@ export class AiDriver {
   private readonly limits: CarLimits;
   private hint = -1;
   private stuck = 0;
+  private wrongWay = 0;
   private offTrack = 0;
   /** Set when the AI teleported itself back onto the track (forwarded as the reset flag). */
   resetRequested = false;
   dbgVt = 0;
+  /**
+   * Joining the racing line: from the grid (or a reset) the bot first holds the line it stands on and merges
+   * onto its racing line over BLEND_M. Steering straight for the line at the green light swerved every car
+   * across the grid, through the cars still waiting in their boxes.
+   */
+  private blendOff = 0;
+  private blendLeft = 0;
+  private needBlend = true;
+  /** Passing: lateral offset (m, + = left) asked for by the traffic logic, and the one applied now. */
+  passTarget = 0;
+  private passOff = 0;
+  private laneNow = 0;
+  private roomy = 1;
 
   constructor(
     private readonly track: TrackData,
@@ -205,6 +225,20 @@ export class AiDriver {
     this.line = racingLineFor(track);
     this.limits = carLimits(vehicle.specs, skill);
     this.profile = speedProfile(this.line, this.limits);
+  }
+
+  private lastS = 0;
+
+  /** Room to pass: no corner or braking zone in the next 150 m (pulling out mid-corner in the wet spun bots). */
+  canPass(): boolean {
+    const v = this.vehicle.telemetry.speed;
+    for (let d = 0; d <= 150; d += 10) if (this.profile[indexAt(this.track, this.lastS + d)] < Math.max(v, 20) * 0.92) return false;
+    return true;
+  }
+
+  /** The side (+1 left, −1 right) with more track beside the line here. */
+  roomySide(): number {
+    return this.roomy;
   }
 
   /**
@@ -223,6 +257,22 @@ export class AiDriver {
     const s = progressAt(t, i, p.x, p.z);
     const cl = t.centerline;
     const n = cl.length / 3;
+    if (this.needBlend) {
+      // where the car stands relative to its own racing line (+ = left)
+      const k2 = (i + 1) % n;
+      let ux = cl[k2 * 3] - cl[i * 3];
+      let uz = cl[k2 * 3 + 2] - cl[i * 3 + 2];
+      const ul = Math.hypot(ux, uz) || 1;
+      ux /= ul;
+      uz /= ul;
+      this.blendOff = (p.x - this.line.x[i]) * uz - (p.z - this.line.z[i]) * ux - this.lane;
+      this.blendLeft = BLEND_M;
+      this.needBlend = false;
+    }
+    if (raceStarted) this.blendLeft = Math.max(0, this.blendLeft - speed * dt);
+    const u = this.blendLeft / BLEND_M;
+    const merge = this.blendOff * u * u * (3 - 2 * u);
+    this.passOff += clamp(this.passTarget - this.passOff, -PASS_RATE * dt, PASS_RATE * dt);
 
     // target point ahead on the racing line (interpolated between line points)
     const L = this.line;
@@ -237,8 +287,21 @@ export class AiDriver {
     const tl = Math.hypot(tx, tz) || 1;
     tx /= tl;
     tz /= tl;
-    const px = L.x[j] + (L.x[j2] - L.x[j]) * f + tz * this.lane;
-    const pz = L.z[j] + (L.z[j2] - L.z[j]) * f - tx * this.lane;
+    // the line plus lane, merge and passing offsets, kept on the asphalt (1.2 m inside the edges)
+    const lineOff = L.offset[j] + (L.offset[j2] - L.offset[j]) * f;
+    // the bot's own lane only on straights: shifted through a corner its path is tighter than the line the speed
+    // profile was made for (a Ferrari 1.8 m to the side overheated its rear tyres, spun and ran wide every lap).
+    // It moves back onto the line before a corner (radius under ~300 m within 120 m), 4 cm per metre travelled.
+    let kMax = 0;
+    for (let d = 0; d <= 120; d += 10) kMax = Math.max(kMax, Math.abs(L.curvature[indexAt(t, s + d)]));
+    const laneTarget = this.lane * clamp(1 - kMax * 300, 0, 1);
+    const laneStep = 0.04 * Math.max(speed, 5) * dt;
+    this.laneNow += clamp(laneTarget - this.laneNow, -laneStep, laneStep);
+    const lane = this.laneNow;
+    const extra = clamp(lineOff + lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2) - lineOff;
+    this.roomy = t.widthL[j] - lineOff > t.widthR[j] + lineOff ? 1 : -1;
+    const px = L.x[j] + (L.x[j2] - L.x[j]) * f + tz * extra;
+    const pz = L.z[j] + (L.z[j2] - L.z[j]) * f - tx * extra;
 
     // into the car frame (+X left, +Z forward)
     const q = v.body.rotation();
@@ -258,28 +321,56 @@ export class AiDriver {
     const vF = lin.x * fx + lin.z * fz;
     const vL = lin.x * lx + lin.z * lz;
     const yawRate = v.body.angvel().y;
+    let slide = 0;
     if (vF > 4) {
       const betaF = Math.atan2(vL + 0.5 * v.wheelbase * yawRate, vF);
-      const lim = 0.9 * v.tire.p.alphaPeak;
+      // Catching a slide: once the rear axle slips past the tyre's peak, the line no longer matters: point the
+      // front wheels where the car is going (counter-steer), quickly. Following the line through a wet
+      // chicane kept the fronts loaded at their limit while the rear swung round (a spin per lap).
+      const betaR = Math.atan2(vL - 0.5 * v.wheelbase * yawRate, vF);
+      slide = clamp((Math.abs(betaR) - v.tire.p.alphaPeak) / v.tire.p.alphaPeak, 0, 1);
+      const lim = 0.9 * v.tire.p.alphaPeak * (1 - 0.85 * slide);
       steerAngle = clamp(steerAngle, betaF - lim, betaF + lim);
     }
     const target = clamp(steerAngle / v.maxSteer, -1, 1);
-    c.steer += (target - c.steer) * Math.min(1, dt * 12);
+    c.steer += (target - c.steer) * Math.min(1, dt * (12 + 24 * slide));
 
     // speed: the profile a little ahead (actuation lag); rebuilt when the track gets wetter or drier
     if (Math.abs(weatherGrip - this.profileGrip) > 0.02) {
       this.profileGrip = weatherGrip;
-      this.profile = speedProfile(this.line, this.limits, weatherGrip);
+      // on a slippery track a driver keeps more in hand than the lost grip alone (wet kerbs, puddles, a slide
+      // is harder to catch): 0.8 grip → 7 % more margin
+      this.profile = speedProfile(this.line, this.limits, weatherGrip * (1 - 0.35 * Math.max(0, 1 - weatherGrip)));
     }
-    const vt = Math.min(this.profile[indexAt(t, s + 2 + speed * 0.12)], speedCap);
+    let vt = this.profile[indexAt(t, s + 2 + speed * 0.12)];
+    // in a car's dirty air (less downforce: Vehicle.wake) corners must be taken slower; straights keep the tow
+    if (vt < this.limits.vMax * 0.9) vt *= 1 - 0.35 * (1 - v.wake.downforce);
+    vt = Math.min(vt, speedCap);
+    this.lastS = s;
     this.dbgVt = vt;
     const err = vt - speed;
     if (err > 0) {
-      c.throttle = clamp(0.4 + err * 0.3, 0, 1);
+      let thr = clamp(0.4 + err * 0.3, 0, 1);
+      // Rear grip guard: on the exit of slow corners (worst in the wet, on hot or worn tyres) full throttle stepped
+      // the rear out into a spin. Like a driver, back out of it as the rear axle's slip angle passes the tyre's peak.
+      if (vF > 3) {
+        const betaR = Math.abs(Math.atan2(vL - 0.5 * v.wheelbase * yawRate, vF));
+        const a = v.tire.p.alphaPeak;
+        thr *= clamp(1 - (betaR - 0.6 * a) / (0.5 * a), 0, 1);
+      }
+      // and squeeze the throttle on instead of stamping on it
+      c.throttle = Math.min(thr, c.throttle + dt * THROTTLE_RISE);
+      c.brake = 0;
+    } else if (err > -0.6) {
+      // a little over the target: ease off to a balancing throttle instead of snapping it shut (a sudden lift at
+      // the limit mid-corner turned the car in and spun it)
+      c.throttle = Math.max(clamp(0.3 + err * 0.5, 0, 1), c.throttle - dt * 6);
       c.brake = 0;
     } else {
       c.throttle = 0;
-      c.brake = err < -0.6 ? clamp(-err * 0.35, 0, 1) : 0;
+      // trail-braking: less brake with more lock, and off the brake while the rear is sliding (it spun bots on
+      // entry once their rear tyres were hot)
+      c.brake = clamp(-err * 0.35, 0, 1) * clamp(1.3 - Math.abs(c.steer), 0.35, 1) * (1 - 0.8 * slide);
     }
     if (!raceStarted) {
       c.throttle = 0;
@@ -290,14 +381,17 @@ export class AiDriver {
     const lateral = Math.abs((p.x - cl[i * 3]) * tz - (p.z - cl[i * 3 + 2]) * tx);
     this.stuck = raceStarted && speed < 2 ? this.stuck + dt : 0;
     this.offTrack = lateral > 22 ? this.offTrack + dt : 0;
-    if (this.stuck > 4 || this.offTrack > 3) {
+    // spun and facing the wrong way: a three-point turn on track is slow and puts it in everyone's path
+    this.wrongWay = raceStarted && fx * tx + fz * tz < -0.2 && speed < 12 ? this.wrongWay + dt : 0;
+    if (this.stuck > 4 || this.offTrack > 3 || this.wrongWay > 3) {
       const k = indexAt(t, checkpointS !== undefined ? checkpointS + 2 : s - 10);
       const k2 = (k + 1) % n;
       const yaw = Math.atan2(cl[k2 * 3] - cl[k * 3], cl[k2 * 3 + 2] - cl[k * 3 + 2]);
       v.place(cl[k * 3], cl[k * 3 + 1] + 0.3, cl[k * 3 + 2], yaw);
-      this.stuck = this.offTrack = 0;
+      this.stuck = this.offTrack = this.wrongWay = 0;
       this.hint = -1;
       this.resetRequested = true;
+      this.needBlend = true;
     }
     return c;
   }

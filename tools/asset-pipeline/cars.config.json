@@ -238,7 +238,8 @@
       "category": "GT3",
       "color": "#1d1f24",
       "pipeline": {
-        "realLengthM": 4.53
+        "realLengthM": 4.53,
+        "cockpitEye": [0.28, 0.93, 0.26]
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
@@ -255,7 +256,8 @@
       "category": "GT3",
       "color": "#f2a7c7",
       "pipeline": {
-        "realLengthM": 4.71
+        "realLengthM": 4.71,
+        "cockpitEye": [0.42, 1, -0.43]
       },
       "profile": "gt3_front_v8",
       "specs": {
@@ -271,7 +273,8 @@
       "category": "GT3 Evo",
       "color": "#c8332b",
       "pipeline": {
-        "realLengthM": 4.58
+        "realLengthM": 4.58,
+        "cockpitEye": [0.33, 0.95, 0.04]
       },
       "profile": "gt3_v10_na",
       "specs": {
@@ -285,7 +288,8 @@
       "category": "GT3",
       "color": "#2a6cc4",
       "pipeline": {
-        "realLengthM": 4.8
+        "realLengthM": 4.8,
+        "cockpitEye": [0.29, 0.98, 0.22]
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
@@ -299,7 +303,8 @@
       "category": "Hypercar",
       "color": "#2b2d30",
       "pipeline": {
-        "realLengthM": 4.76
+        "realLengthM": 4.76,
+        "cockpitEye": [0.34, 0.93, 0]
       },
       "profile": "gt3_mid_v6tt",
       "specs": {
@@ -338,7 +343,8 @@
       "category": "GT3 Evo",
       "color": "#1b1b1b",
       "pipeline": {
-        "realLengthM": 4.55
+        "realLengthM": 4.55,
+        "cockpitEye": [0.37, 0.93, -0.06]
       },
       "profile": "gt3_v10_na",
       "specs": {
@@ -353,7 +359,8 @@
       "category": "GT3",
       "color": "#c9962b",
       "pipeline": {
-        "realLengthM": 4.62
+        "realLengthM": 4.62,
+        "cockpitEye": [0.29, 0.96, -0.18]
       },
       "profile": "gt3_rear_f6",
       "specs": {
@@ -367,7 +374,8 @@
       "category": "GT3 Evo",
       "color": "#141414",
       "pipeline": {
-        "realLengthM": 5.02
+        "realLengthM": 5.02,
+        "cockpitEye": [0.32, 1.01, -0.46]
       },
       "profile": "gt3_front_i6tt",
       "specs": {
@@ -382,7 +390,8 @@
       "color": "#d23a2a",
       "pipeline": {
         "realLengthM": 4.82,
-        "cockpitOffset": [0.06, -0.06, 0.3]
+        "cockpitOffset": [0.06, -0.06, 0.3],
+        "cockpitEye": [0.31, 1, -0.26]
       },
       "profile": "gt3_front_i6tt",
       "specs": {
@@ -402,7 +411,8 @@
       "category": "Cup",
       "color": "#c8102e",
       "pipeline": {
-        "realLengthM": 4.63
+        "realLengthM": 4.63,
+        "cockpitEye": [0.29, 0.92, -0.02]
       },
       "profile": "gt3_mid_v6tt",
       "specs": {
@@ -434,7 +444,8 @@
       "category": "GT3 Evo",
       "color": "#f0f0f0",
       "pipeline": {
-        "realLengthM": 4.55
+        "realLengthM": 4.55,
+        "cockpitEye": [0.4, 0.89, -0.12]
       },
       "profile": "gt3_v10_na",
       "specs": {
@@ -449,7 +460,9 @@
       "category": "GT3 Evo",
       "color": "#c7c22c",
       "pipeline": {
-        "realLengthM": 4.55
+        "realLengthM": 4.55,
+        "cockpitEye": [0.42, 0.95, -0.04],
+        "hasInterior": true
       },
       "profile": "gt3_v10_na",
       "specs": {
@@ -464,7 +477,8 @@
       "category": "GT3 Evo",
       "color": "#c8321e",
       "pipeline": {
-        "realLengthM": 4.8
+        "realLengthM": 4.8,
+        "cockpitEye": [0.3, 0.99, 0.06]
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
@@ -479,7 +493,9 @@
       "category": "GT3 Evo",
       "color": "#d98a2b",
       "pipeline": {
-        "realLengthM": 4.8
+        "realLengthM": 4.8,
+        "cockpitEye": [0.28, 0.93, 0.24],
+        "hasInterior": true
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
@@ -495,7 +511,8 @@
       "category": "GT3 Evo",
       "color": "#1f3b6b",
       "pipeline": {
-        "realLengthM": 4.75
+        "realLengthM": 4.75,
+        "cockpitEye": [0.4, 1.03, -0.58]
       },
       "profile": "gt3_front_v8",
       "specs": {
@@ -509,7 +526,8 @@
       "category": "GT3 Evo",
       "color": "#1c2b4f",
       "pipeline": {
-        "realLengthM": 4.75
+        "realLengthM": 4.75,
+        "cockpitEye": [0.42, 1, -0.62]
       },
       "profile": "gt3_front_v8",
       "specs": {
@@ -524,7 +542,8 @@
       "category": "GT3",
       "color": "#d0d0d0",
       "pipeline": {
-        "realLengthM": 4.62
+        "realLengthM": 4.62,
+        "cockpitEye": [0.29, 0.96, -0.18]
       },
       "profile": "gt3_rear_f6",
       "specs": {
@@ -538,7 +557,13 @@
       "category": "GT3 Evo",
       "color": "#1d2f55",
       "pipeline": {
-        "realLengthM": 4.65
+        "realLengthM": 4.65,
+        "cockpitEye": [0.33, 0.97, -0.3],
+        "steering": {
+          "position": [0.33, 0.67, 0.16],
+          "axis": [0, 0.3746, -0.9272],
+          "diameter": 0.29
+        }
       },
       "profile": "gt3_front_v8",
       "specs": {

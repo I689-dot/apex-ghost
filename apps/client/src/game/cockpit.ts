@@ -37,6 +37,41 @@ export class CockpitCamera {
     this.camera.rotation.set(PITCH, Math.PI, 0);
     this.applySeat();
     if (!entry.hasInterior) this.buildDash();
+    else if (entry.steering && !carObject.getObjectByName('steering_wheel') && !carObject.getObjectByName('steering_pivot'))
+      this.buildWheel(carObject, entry.steering);
+  }
+
+  /**
+   * A steering wheel for an interior modelled without one (the Aston Martin's column ends in a bare hub): a GT3
+   * style rim with grips and a centre display box, at the position and column angle set in cars.config.json.
+   */
+  private buildWheel(carObject: THREE.Object3D, st: NonNullable<CarEntry['steering']>): void {
+    const carbon = new THREE.MeshStandardMaterial({ color: 0x1a1b1e, roughness: 0.5, metalness: 0.25 });
+    const grip = new THREE.MeshStandardMaterial({ color: 0x0d0d0f, roughness: 0.95 });
+    const r = st.diameter / 2;
+    const spin = new THREE.Group();
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(r, 0.016, 10, 40, Math.PI * 1.25), carbon);
+    rim.rotation.z = -Math.PI * 0.125;
+    const gripL = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.11, 12), grip);
+    gripL.position.set(r, -0.01, 0);
+    const gripR = gripL.clone();
+    gripR.position.x = -r;
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(r * 1.45, r * 0.62, 0.03), carbon);
+    plate.position.y = -r * 0.15;
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(r * 0.7, r * 0.32), new THREE.MeshBasicMaterial({ color: 0x0b2030 }));
+    screen.position.set(0, r * 0.05, -0.017);
+    screen.rotation.y = Math.PI;
+    spin.add(rim, gripL, gripR, plate, screen);
+    const holder = new THREE.Group();
+    holder.position.set(...st.position);
+    // the wheel's face (local −Z here, the screen side) looks along the column axis, towards the driver
+    holder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), new THREE.Vector3(...st.axis).normalize());
+    holder.add(spin);
+    holder.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = false;
+    });
+    carObject.add(holder);
+    this.dashWheel = spin;
   }
 
   /** Minimal dashboard + wheel for models without an interior. */
@@ -83,6 +118,8 @@ export class CockpitCamera {
    * Runs once while loading.
    */
   autoSeat(car: THREE.Object3D): void {
+    // an eye set by hand per car is already clear of the dash (and raising it put some under the roof)
+    if (this.entry.cockpitCamera.tuned) return;
     car.updateMatrixWorld(true);
     const meshes: THREE.Object3D[] = [];
     car.traverse((o) => {

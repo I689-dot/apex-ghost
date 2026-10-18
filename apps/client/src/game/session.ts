@@ -69,6 +69,8 @@ import { t } from '../i18n';
 const FIXED_DT = 1 / PHYSICS_HZ;
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
 const MAX_FRAME_DT = 0.1;
+/** How far a bot moves over to pass a slower car (m). */
+const PASS_OFFSET = 3.6;
 /** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). */
 const BOT_RELEASE_MS = 2500;
 
@@ -99,6 +101,8 @@ interface LocalBot {
   resetFlagSamples: number;
   limits: TrackLimits;
   hint: number;
+  /** Seconds left before a pass manoeuvre is given up (traffic cleared). */
+  passHold: number;
 }
 
 export interface SessionCallbacks {
@@ -271,6 +275,8 @@ export class RaceSession {
     this.world.timestep = FIXED_DT;
     this.events = new RAPIER.EventQueue(true);
     this.track.buildColliders(RAPIER, this.world, trackRes.collision);
+    // ray casts only see colliders once the query structure is built: placing the cars on the ground needs it
+    this.world.updateSceneQueries();
 
     // weather & environment
     this.weather = weatherAt(this.race.weather, 0);
@@ -412,7 +418,7 @@ export class RaceSession {
       vehicle.fitTyres(COMPOUNDS[compoundForWeather(this.weather.wetness)], vehicle.ambientC + 12);
       // skill and racing line differ per bot so they spread out (deterministic per slot)
       const skill = 0.88 + ((r.slot * 37) % 10) / 100;
-      const lane = (((r.slot * 7) % 5) - 2) * 0.9;
+      const lane = (((r.slot * 7) % 5) - 2) * 0.45;
       const t = vehicle.body.translation();
       const q = vehicle.body.rotation();
       const pos = new THREE.Vector3(t.x, t.y, t.z);
@@ -430,6 +436,7 @@ export class RaceSession {
         resetFlagSamples: 0,
         limits: new TrackLimits(),
         hint: -1,
+        passHold: 0,
       };
     }
   }
@@ -987,27 +994,41 @@ export class RaceSession {
       const tr = this.localTracker?.players.get(r.id);
       const gates = this.trackData.gates;
       const cp = tr && tr.passed >= 0 ? gates[(tr.nextGate - 1 + gates.length) % gates.length].s : undefined;
-      const c = b.ai.update(FIXED_DT, started, b.vehicle.weatherGrip * b.vehicle.wearGripAvg, cp, started ? this.followCap(r) : Infinity);
+      const c = b.ai.update(FIXED_DT, started, b.vehicle.weatherGrip * b.vehicle.tyreGripAvg, cp, started ? this.followCap(r) : Infinity);
       b.vehicle.step(FIXED_DT, c);
     });
   }
 
-  /** Speed cap for a bot with a car directly ahead in its lane: hold about 12 m, never drive into it. */
+  /**
+   * Traffic for a bot: a slower car ahead in its lane (a car still in its grid box, a player taking it easy, a car
+   * that spun) makes it pull out and pass, keeping to that side until the car is behind it; it only lifts when it
+   * is about to run into one before it has moved over. Returns the speed cap (cars are ghosts: before this the
+   * bots queued 12 m behind a car parked on the grid, then reset themselves, or drove through it).
+   */
   private followCap(r: Remote): number {
-    const v = r.bot?.vehicle;
-    if (!v) return Infinity;
+    const b = r.bot;
+    if (!b) return Infinity;
+    const v = b.vehicle;
     const p = v.body.translation();
     const q = v.body.rotation();
     const fx = 2 * (q.x * q.z + q.y * q.w);
     const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
+    const mySpeed = v.telemetry.speed;
     let cap = Infinity;
+    let block: { along: number; lat: number } | null = null;
+    let beside = false;
     const check = (ox: number, oz: number, speed: number) => {
       const dx = ox - p.x;
       const dz = oz - p.z;
       const along = dx * fx + dz * fz;
-      if (along < 2 || along > 30) return;
-      if (Math.abs(dx * fz - dz * fx) > 2.4) return;
-      cap = Math.min(cap, Math.max(0, speed + (along - 12) * 0.6));
+      const lat = dx * fz - dz * fx; // + = left of the bot
+      // alongside on the side we moved to: hold that side until it is behind us
+      if (along > -6 && along <= 3 && Math.abs(lat) < 3.4) beside = true;
+      if (along <= 0 || along > 40 || Math.abs(lat) > 2.6) return;
+      // in our path (narrower once we are pulling out): keep about 10 m, back off if closer
+      if (Math.abs(lat) < (b.ai.passTarget !== 0 ? 1.6 : 2.2)) cap = Math.min(cap, Math.max(0, speed + (along - 10) * 0.7));
+      if (along <= 3 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
+      if (!block || along < block.along) block = { along, lat };
     };
     for (const o of this.remotes.values()) {
       if (o === r) continue;
@@ -1016,6 +1037,13 @@ export class RaceSession {
     }
     const me = this.vehicle.body.translation();
     check(me.x, me.z, this.vehicle.telemetry.speed);
+    const found = block as { along: number; lat: number } | null;
+    if (found && (b.ai.passTarget !== 0 || b.ai.canPass())) {
+      // pass on the side away from it (it is left of us → go right), else keep the side already chosen
+      if (b.ai.passTarget === 0) b.ai.passTarget = found.lat > 0.3 ? -PASS_OFFSET : found.lat < -0.3 ? PASS_OFFSET : b.ai.roomySide() * PASS_OFFSET;
+      b.passHold = 1;
+    } else if (beside && b.ai.passTarget !== 0) b.passHold = 1;
+    else if ((b.passHold -= FIXED_DT) <= 0) b.ai.passTarget = 0;
     return cap;
   }
 
