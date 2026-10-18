@@ -302,18 +302,26 @@ export class AiDriver {
     const vF = lin.x * fx + lin.z * fz;
     const vL = lin.x * lx + lin.z * lz;
     const yawRate = v.body.angvel().y;
+    let slide = 0;
     if (vF > 4) {
       const betaF = Math.atan2(vL + 0.5 * v.wheelbase * yawRate, vF);
-      const lim = 0.9 * v.tire.p.alphaPeak;
+      // Catching a slide: once the rear axle slips past the tyre's peak, the line no longer matters: point the
+      // front wheels where the car is going (counter-steer), quickly. Following the line through a wet
+      // chicane kept the fronts loaded at their limit while the rear swung round (a spin per lap).
+      const betaR = Math.atan2(vL - 0.5 * v.wheelbase * yawRate, vF);
+      slide = clamp((Math.abs(betaR) - v.tire.p.alphaPeak) / v.tire.p.alphaPeak, 0, 1);
+      const lim = 0.9 * v.tire.p.alphaPeak * (1 - 0.85 * slide);
       steerAngle = clamp(steerAngle, betaF - lim, betaF + lim);
     }
     const target = clamp(steerAngle / v.maxSteer, -1, 1);
-    c.steer += (target - c.steer) * Math.min(1, dt * 12);
+    c.steer += (target - c.steer) * Math.min(1, dt * (12 + 24 * slide));
 
     // speed: the profile a little ahead (actuation lag); rebuilt when the track gets wetter or drier
     if (Math.abs(weatherGrip - this.profileGrip) > 0.02) {
       this.profileGrip = weatherGrip;
-      this.profile = speedProfile(this.line, this.limits, weatherGrip);
+      // on a slippery track a driver keeps more in hand than the lost grip alone (wet kerbs, puddles, a slide
+      // is harder to catch): 0.8 grip → 7 % more margin
+      this.profile = speedProfile(this.line, this.limits, weatherGrip * (1 - 0.35 * Math.max(0, 1 - weatherGrip)));
     }
     const vt = Math.min(this.profile[indexAt(t, s + 2 + speed * 0.12)], speedCap);
     this.dbgVt = vt;

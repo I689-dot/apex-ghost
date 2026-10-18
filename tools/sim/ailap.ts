@@ -166,11 +166,13 @@ for (const skill of skills) {
     }
     step(s, c);
     s.events.drainContactForceEvents(() => wallHits++);
-    if (process.env.SLIPLOG && i % 60 === 0) {
+    const logWin = process.env.SLIPLOG?.split(',').map(Number);
+    const sHere = track.cumS[Math.max(0, hint)];
+    if (logWin && (logWin.length < 2 ? i % 60 === 0 : sHere >= logWin[0] && sHere <= logWin[1] && i % 6 === 0)) {
       const w = s.v.wheels;
       console.log(
         `    t ${t.toFixed(1)} s ${track.cumS[Math.max(0, hint)].toFixed(0)} v ${(s.v.telemetry.speed * 3.6).toFixed(0)} thr ${c.throttle.toFixed(2)} brk ${c.brake.toFixed(2)} st ${c.steer.toFixed(2)} ` +
-          `alpha F ${((w[0].slipAngle * 180) / Math.PI).toFixed(1)} R ${((w[2].slipAngle * 180) / Math.PI).toFixed(1)} kappa R ${w[2].slipRatio.toFixed(3)} temps ${w.map((x) => x.temp.toFixed(0)).join('/')} tc ${s.v.telemetry.tcActive}`,
+          `alpha F ${((w[0].slipAngle * 180) / Math.PI).toFixed(1)} R ${((w[2].slipAngle * 180) / Math.PI).toFixed(1)} kappa R ${w[2].slipRatio.toFixed(3)} slip ${((s.v.telemetry.slipBody * 180) / Math.PI).toFixed(1)} surf ${w.map((x) => (x.contact ? x.surface[0] : '-')).join('')} tc ${s.v.telemetry.tcActive} vt ${(ai.dbgVt * 3.6).toFixed(0)}`,
       );
     }
     t += DT;
