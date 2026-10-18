@@ -180,6 +180,11 @@ export class Track {
         seen.add(m);
         const sm = m as THREE.MeshStandardMaterial;
         if (!sm.isMeshStandardMaterial) continue;
+        // Export slips: one grass material is fully metallic (a dark mirror on High/Ultra, where scenery is PBR),
+        // and the main racing asphalt (asph_003) is glossier than the rest (0.80): a wet-looking glare lobe down
+        // every straight towards the sun on a dry track. Dry asphalt and grass are rough dielectrics.
+        if (GROUND_MAT_RE.test(sm.name)) sm.metalness = 0;
+        if (/^asph/i.test(sm.name)) sm.roughness = Math.max(sm.roughness, 0.9);
         if (ROAD_MAT_RE.test(sm.name)) t.roadMaterials.push({ mat: sm, color: sm.color.clone(), roughness: sm.roughness });
         if (LIGHT_MAT_RE.test(sm.name)) t.lightMaterials.push(sm);
         if (/^red_lights/i.test(sm.name)) t.startLights.red.push(sm);
