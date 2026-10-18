@@ -70,6 +70,8 @@ export const TYRE_TEMP = {
   coolBase: 13, // W/K
   coolPerMs: 1.4, // W/K per m/s
   rolling: 0.0075, // × Fz × speed
+  /** Extra cooling on a fully wet track (×). */
+  wetCool: 1.5,
 };
 
 /**
@@ -337,10 +339,19 @@ export class Vehicle {
   }
 
   /** Average grip factor left from wear (for the AI's speed profile). */
-  get wearGripAvg(): number {
-    let g = 0;
-    for (const w of this.wheels) g += wearGrip(w.wear);
-    return g / this.wheels.length;
+  /**
+   * Grip left in the tyres from wear and temperature, of the weaker axle (for the AI's speed profile: wets
+   * overheating on a drying track, or a worn rear, would otherwise send the bots in too fast and spin them).
+   */
+  get tyreGripAvg(): number {
+    let f = 0;
+    let r = 0;
+    for (const w of this.wheels) {
+      const g = wearGrip(w.wear) * tyreTempGrip(w.temp, this.compound.optimumC);
+      if (w.front) f += g;
+      else r += g;
+    }
+    return Math.min(f, r) / 2;
   }
 
   place(x: number, y: number, z: number, yaw: number): void {
@@ -696,7 +707,9 @@ export class Vehicle {
       // tyre temperature
       const slipPower = Math.abs((fxSum / SUB) * (w.omega * R - vx)) + Math.abs(fyT * vy);
       const heat = slipPower + TYRE_TEMP.rolling * fz * Math.abs(vx);
-      const cool = (TYRE_TEMP.coolBase + TYRE_TEMP.coolPerMs * Math.abs(vx)) * (w.temp - this.ambientC);
+      // water on the track carries heat away (why slicks never reach their window in the rain, and why wets on
+      // a wet track stay near their 65 °C instead of cooking: bots' rear wets ran away past 200 °C and spun)
+      const cool = (TYRE_TEMP.coolBase + TYRE_TEMP.coolPerMs * Math.abs(vx)) * (1 + TYRE_TEMP.wetCool * this.wetness) * (w.temp - this.ambientC);
       w.temp += ((heat - cool) / (TYRE_TEMP.heatCapacity * this.compound.heatCap)) * dt;
       // tread wear from sliding energy, faster when overheated
       const over = Math.max(0, w.temp - this.compound.optimumC - 15) / 30;

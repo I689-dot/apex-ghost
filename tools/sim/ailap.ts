@@ -19,17 +19,21 @@ import { AiDriver, BOT_ASSISTS, carLimits, profileLapTime, racingLineFor, speedP
 import { nearestCenterlineIndex } from '../../packages/shared/src/index.ts';
 import { TrackLimits, beyondLimitsNow } from '../../apps/client/src/game/trackLimits.ts';
 import { RaceTracker } from '../../packages/shared/src/race.ts';
+import { COMPOUNDS, compoundForWeather, compoundGrip } from '../../apps/client/src/physics/tyres.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.resolve(here, '../../apps/client/public/assets');
 const cars = JSON.parse(readFileSync(path.join(pub, 'cars.json'), 'utf8')) as CarsFile;
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
-const optVals = new Set(['--collision', '--slot', '--skills'].flatMap((k) => (args.includes(k) ? [args[args.indexOf(k) + 1]] : [])));
+const optVals = new Set(['--collision', '--slot', '--skills', '--laps', '--wet'].flatMap((k) => (args.includes(k) ? [args[args.indexOf(k) + 1]] : [])));
 const carId = args.find((a) => !a.startsWith('--') && !optVals.has(a)) ?? '2024_porsche_992_gt3_r';
 const collisionFile = opt('collision', path.join(pub, 'track', 'collision.apxc'));
 const startSlot = Number(opt('slot', '0'));
 const skills = opt('skills', '0.88,0.97').split(',').map(Number);
+const LAPS = Number(opt('laps', '1'));
+/** Track wetness 0…1 (rain falling as hard): wets on a wet track, as the game gives bots. */
+const WET = Number(opt('wet', '0'));
 const useTrack = true;
 const entry = cars.cars.find((c) => c.id === carId) ?? cars.cars[0];
 const DT = 1 / 120;
@@ -129,11 +133,19 @@ for (const skill of skills) {
   let prevVy = 0;
   const prevContact = [true, true, true, true];
   const bumpy: Record<number, number> = {};
-  const tr = new RaceTracker(track, 0, 1);
+  s.v.fitTyres(COMPOUNDS[compoundForWeather(WET)], 30);
+  s.v.wetness = WET;
+  s.v.weatherGrip = compoundGrip(s.v.compound, WET, WET);
+  const tr = new RaceTracker(track, 0, LAPS);
   tr.addPlayer('ai');
+  const laps: number[] = [];
+  let spins = 0;
+  let spinning = false;
+  let wallHits = 0;
+  const splits: string[] = [];
+  let nextSplit = 500;
   let t = 0;
   let resets = 0;
-  let lapMs: number | null = null;
   let maxV = 0;
   let offTime = 0;
   let brakeMax = 0;
@@ -142,10 +154,10 @@ for (const skill of skills) {
   let violations = 0;
   let hint = -1;
   const limits = new TrackLimits();
-  for (let i = 0; i < 120 * 240 && lapMs === null; i++) {
+  for (let i = 0; i < 120 * 240 * LAPS && laps.length < LAPS; i++) {
     const pr0 = tr.players.get('ai');
     const cp = pr0 && pr0.passed >= 0 ? track.gates[(pr0.nextGate - 1 + track.gates.length) % track.gates.length].s : undefined;
-    const c = ai.update(DT, true, 1, cp);
+    const c = ai.update(DT, true, s.v.weatherGrip * s.v.tyreGripAvg, cp);
     if (ai.resetRequested) {
       resets++;
       ai.resetRequested = false;
@@ -153,8 +165,27 @@ for (const skill of skills) {
       tr.ingest('ai', t * 1000 + 1, p.x, p.y, p.z, true);
     }
     step(s, c);
+    s.events.drainContactForceEvents(() => wallHits++);
+    if (process.env.SLIPLOG && i % 60 === 0) {
+      const w = s.v.wheels;
+      console.log(
+        `    t ${t.toFixed(1)} s ${track.cumS[Math.max(0, hint)].toFixed(0)} v ${(s.v.telemetry.speed * 3.6).toFixed(0)} thr ${c.throttle.toFixed(2)} brk ${c.brake.toFixed(2)} st ${c.steer.toFixed(2)} ` +
+          `alpha F ${((w[0].slipAngle * 180) / Math.PI).toFixed(1)} R ${((w[2].slipAngle * 180) / Math.PI).toFixed(1)} kappa R ${w[2].slipRatio.toFixed(3)} temps ${w.map((x) => x.temp.toFixed(0)).join('/')} tc ${s.v.telemetry.tcActive}`,
+      );
+    }
     t += DT;
     {
+      const sl = Math.abs(s.v.telemetry.slipBody);
+      if (!spinning && sl > 0.35 && s.v.telemetry.speed > 6) {
+        spins++;
+        spinning = true;
+        if (process.env.VERBOSE)
+          console.log(
+            `    spin at ${track.cumS[Math.max(0, hint)].toFixed(0)} m: ${(s.v.telemetry.speed * 3.6).toFixed(0)} km/h, target ${(ai.dbgVt * 3.6).toFixed(0)}, ` +
+              `throttle ${c.throttle.toFixed(2)} brake ${c.brake.toFixed(2)} steer ${c.steer.toFixed(2)}, tyres ${s.v.wheels.map((w) => w.temp.toFixed(0)).join('/')} °C, ` +
+              `wear ${s.v.wheels.map((w) => (w.wear * 100).toFixed(0)).join('/')}%, grip ${s.v.weatherGrip.toFixed(2)}`,
+          );
+      } else if (spinning && sl < 0.1) spinning = false;
       const vy = s.v.body.linvel().y;
       const heave = i > 0 ? Math.abs(vy - prevVy) / DT : 0;
       prevVy = vy;
@@ -193,6 +224,14 @@ for (const skill of skills) {
     brakeSum += s.v.wheels[0].brakeTemp;
     brakeN++;
     {
+      const pr1 = tr.players.get('ai');
+      const lapS = pr1 ? pr1.raceDist - Math.max(0, laps.length) * track.length : 0;
+      if (process.env.SPLITS && lapS >= nextSplit) {
+        splits.push(`${nextSplit}:${t.toFixed(1)}`);
+        nextSplit += 500;
+      }
+    }
+    {
       const p = s.v.body.translation();
       hint = nearestCenterlineIndex(track, p.x, p.y, p.z, hint, 30);
       const cl = track.centerline;
@@ -210,12 +249,18 @@ for (const skill of skills) {
     }
     if (i % 12 === 0) {
       const p = s.v.body.translation();
-      for (const e of tr.ingest('ai', t * 1000, p.x, p.y, p.z, false)) if (e.type === 'lap') lapMs = e.lapMs;
+      for (const e of tr.ingest('ai', t * 1000, p.x, p.y, p.z, false))
+        if (e.type === 'lap') {
+          nextSplit = 500;
+          laps.push(e.lapMs);
+        }
     }
   }
   const pr = tr.players.get('ai');
-  if (lapMs === null || resets > 2) failed = true;
-  const lap = lapMs ? fmt(lapMs / 1000) : `NOT FINISHED (${pr?.raceDist.toFixed(0)} m)`;
+  if (splits.length) console.log(`  splits (lap m: race s) ${splits.join(' ')}`);
+  if (laps.length < LAPS || resets > 2) failed = true;
+  const lap = laps.length ? laps.map((l) => fmt(l / 1000)).join(' ') : `NOT FINISHED (${pr?.raceDist.toFixed(0)} m)`;
+  if (laps.length < LAPS && laps.length) console.log(`  NOT FINISHED (${pr?.raceDist.toFixed(0)} m)`);
   const wear = s.v.wheels.map((w) => `${(w.wear * 100).toFixed(1)}%`).join('/');
   const bumpList = Object.entries(bumpy)
     .map(([k, v]) => `${k}:${v}`)
@@ -225,7 +270,7 @@ for (const skill of skills) {
       `wheel lift-offs ${flicker}, first 6 s from the grid: max |vy| ${startVy.toFixed(2)} m/s, max heave ${startHeave.toFixed(1)} m/s²; steps >15 m/s² per 100 m: ${bumpList || 'none'}`,
   );
   console.log(
-    `skill ${skill}: lap ${lap}, resets ${resets}, top ${maxV.toFixed(0)} km/h, track-limit violations ${violations} (${offTime.toFixed(1)} s), tread used FL/FR/RL/RR ${wear} (${s.v.compound.name}), front brake ${Math.round(brakeSum / brakeN)} °C avg / ${Math.round(brakeMax)} °C peak`,
+    `skill ${skill}${WET ? ` wet ${WET}` : ''}: lap ${lap}, resets ${resets}, spins ${spins}, wall contacts ${wallHits}, top ${maxV.toFixed(0)} km/h, track-limit violations ${violations} (${offTime.toFixed(1)} s), tread used FL/FR/RL/RR ${wear} (${s.v.compound.name}), front brake ${Math.round(brakeSum / brakeN)} °C avg / ${Math.round(brakeMax)} °C peak`,
   );
 }
 process.exit(failed ? 1 : 0);
