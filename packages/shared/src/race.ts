@@ -2,19 +2,57 @@ import { MAX_PLAUSIBLE_SPEED_MS, RACE_LAPS } from './constants';
 import { crossesGate, nearestCenterlineIndex, progressAt, wrapDelta, type TrackRaceData } from './track';
 
 export type RaceEvent =
-  | { type: 'lap'; playerId: string; lap: number; lapMs: number; sectors: number[]; best: boolean; valid: boolean; outLap: boolean }
-  | { type: 'invalid'; playerId: string; reason: 'track-limits' | 'reset' }
+  | {
+      type: 'lap';
+      playerId: string;
+      lap: number;
+      /** Lap time including penalties (what counts). */
+      lapMs: number;
+      /** Time penalties added to this lap. */
+      penaltyMs: number;
+      sectors: number[];
+      best: boolean;
+      /** Timed and plausible: false only for the out lap and impossibly fast laps. */
+      valid: boolean;
+      outLap: boolean;
+    }
+  | { type: 'penalty'; playerId: string; reason: PenaltyReason; ms: number; lapPenaltyMs: number }
   | { type: 'sector'; playerId: string; sector: number; ms: number }
   | { type: 'finish'; playerId: string; totalMs: number }
   | { type: 'flag' }
   | { type: 'rejected'; playerId: string; reason: string };
 
+export type PenaltyReason = 'track-limits' | 'reset' | 'shortcut';
+
+/**
+ * Time penalties instead of deleted laps (a game choice: real GT3 qualifying cancels a lap beyond track limits).
+ * Sized like the advantage they stop, after the F1 games and real penalty sizes (5 s, 10 s):
+ *  - track limits (all four wheels beyond the white line, held 0.25 s): 1 s + 1.5 s per second off, ≤ 5 s;
+ *  - reset to the track: 5 s (on top of the time lost going back to the last checkpoint);
+ *  - shortcut (checkpoints skipped): 5 s + 0.05 s per metre of track skipped (a 70 m chicane: ~8.5 s).
+ */
+export const PENALTY = {
+  limitsBaseMs: 1000,
+  limitsPerSecMs: 1500,
+  limitsMaxMs: 5000,
+  resetMs: 5000,
+  shortcutBaseMs: 5000,
+  shortcutPerMeterMs: 50,
+  /** A checkpoint up to this far ahead (m of track) is accepted, the ones in between count as skipped; a bigger
+   * jump is not a shortcut but a teleport/cheat and gets no credit at all. */
+  maxSkipM: 300,
+};
+
 export interface PlayerRaceState {
   id: string;
   /** Laps completed, the out lap included. */
   laps: number;
-  /** The current lap no longer counts (track limits, reset). The out lap never counts. */
-  lapInvalid: boolean;
+  /** Time penalties collected on the lap in progress (ms). */
+  lapPenaltyMs: number;
+  /** Start of the current track-limits excursion (server ms), or null when on track. */
+  offSince: number | null;
+  /** Last time an off-track sample was seen. */
+  offLast: number;
   /** The lap in progress is an out lap (from the grid or from the pits): never timed. */
   outLap: boolean;
   /** In the garage (pit stop). */
@@ -60,7 +98,8 @@ export interface Standing {
   /** Gap of the best lap to the session's best lap. */
   gapMs: number | null;
   validLaps: number;
-  lapInvalid: boolean;
+  /** Penalties on the lap in progress (ms). */
+  lapPenaltyMs: number;
   inPit: boolean;
   /** On an out lap (from the grid or the pits): not timed. */
   outLap: boolean;
@@ -74,7 +113,9 @@ export interface Standing {
  *  - a timed session: drive as many laps as you like until the chequered flag (`sessionMs`), then finish the lap
  *    you are on; the best *valid* lap decides the order. (A lap-count mode, `laps`, remains for tests.)
  *  - pit stops: the car goes to the garage, the next lap is an out lap; the session clock keeps running;
- *  - a lap is invalid after exceeding track limits (all four wheels off the asphalt and kerbs) or a reset.
+ *  - laps always count: track limits, resets and shortcuts add time penalties (PENALTY) instead;
+ *  - checkpoints (gates every ~35 m) are crossed in order; one up to PENALTY.maxSkipM ahead is accepted and the
+ *    skipped ones are a shortcut, so a missed checkpoint never freezes the lap.
  * Consumes position samples (server-clock time), detects gate crossings in order, times laps and sectors.
  * Clients never report laps; they can only send positions (and the off-track flag).
  */
@@ -111,7 +152,8 @@ export class RaceTracker {
     p.inPit = true;
     p.pitStops++;
     p.outLap = true;
-    p.lapInvalid = true;
+    p.lapPenaltyMs = 0;
+    p.offSince = null;
     p.sectors = [];
     // after the flag, coming into the pits ends the session
     if (this.flagAt !== null && t >= this.flagAt) this.finish(p, t, out);
@@ -157,7 +199,9 @@ export class RaceTracker {
     const p: PlayerRaceState = {
       id,
       laps: 0,
-      lapInvalid: true,
+      lapPenaltyMs: 0,
+      offSince: null,
+      offLast: 0,
       outLap: true,
       inPit: false,
       pitStops: 0,
@@ -202,9 +246,11 @@ export class RaceTracker {
     const p = this.players.get(id);
     if (!p || p.dnf || p.finishedMs !== null) return out;
     if (t < this.startMs - 10_000) return out;
-    if (offTrack && !p.lapInvalid && t >= this.startMs) {
-      p.lapInvalid = true;
-      if (p.laps > 0) out.push({ type: 'invalid', playerId: id, reason: 'track-limits' });
+    if (t >= this.startMs && !p.inPit) {
+      if (offTrack) {
+        if (p.offSince === null) p.offSince = t;
+        p.offLast = t;
+      } else if (p.offSince !== null) this.closeExcursion(p, out);
     }
     const tr = this.track;
     const n = tr.gates.length;
@@ -231,8 +277,8 @@ export class RaceTracker {
         out.push({ type: 'rejected', playerId: id, reason: 'reset-far-from-checkpoint' });
       }
       p.resets++;
-      if (!p.lapInvalid && p.laps > 0) out.push({ type: 'invalid', playerId: id, reason: 'reset' });
-      p.lapInvalid = true;
+      p.offSince = null;
+      if (t >= this.startMs && !p.outLap) this.addPenalty(p, 'reset', PENALTY.resetMs, out);
       this.place(p, t, x, y, z, true);
       return out;
     }
@@ -246,16 +292,41 @@ export class RaceTracker {
     }
 
     // Cross as many gates as the segment covers (packet loss can skip several samples).
+    let sNew: number | undefined;
     let ax = p.lx;
     let ay = p.ly;
     let az = p.lz;
     let at = p.lt;
     for (let guard = 0; guard < n; guard++) {
-      const g = tr.gates[p.nextGate];
-      const f = crossesGate(g, ax, ay, az, x, y, z);
-      if (f < 0) break;
+      let gi = p.nextGate;
+      let f = crossesGate(tr.gates[gi], ax, ay, az, x, y, z);
+      if (f < 0) {
+        // a checkpoint further on (a cut, or a missed sample): accept it if the car really is there along the
+        // track (in a hairpin a later gate can lie right beside it), the ones in between were skipped
+        sNew ??= progressAt(tr, nearestCenterlineIndex(tr, x, y, z, p.clIndex), x, z);
+        for (let k = 1; k < n && f < 0; k++) {
+          const cand = (p.nextGate + k) % n;
+          const ahead = wrapDelta(tr.gates[p.nextGate].s, tr.gates[cand].s, tr.length);
+          if (ahead > PENALTY.maxSkipM || ahead < 0) break;
+          const off = wrapDelta(tr.gates[cand].s, sNew, tr.length);
+          if (off < -15 || off > 60) continue;
+          const fc = crossesGate(tr.gates[cand], ax, ay, az, x, y, z);
+          if (fc >= 0) {
+            gi = cand;
+            f = fc;
+          }
+        }
+        if (f < 0) break;
+      }
+      const g = tr.gates[gi];
       const tc = at + (t - at) * f;
-      this.onGate(p, p.nextGate, tc, out);
+      if (gi !== p.nextGate) {
+        const skipped = wrapDelta(tr.gates[p.nextGate].s, g.s, tr.length);
+        const counts = !p.outLap && p.passed >= 0;
+        for (let k = p.nextGate; k !== gi; k = (k + 1) % n) this.onGate(p, k, tc, out);
+        if (counts) this.addPenalty(p, 'shortcut', Math.round((PENALTY.shortcutBaseMs + PENALTY.shortcutPerMeterMs * Math.max(0, skipped)) / 100) * 100, out);
+      }
+      this.onGate(p, gi, tc, out);
       if (p.finishedMs !== null) break;
       // continue from the crossing point
       ax = ax + (x - ax) * f;
@@ -285,21 +356,25 @@ export class RaceTracker {
           out.push({ type: 'rejected', playerId: p.id, reason: 'lap-too-fast' });
         }
         const outLap = p.outLap;
-        const valid = !outLap && !p.lapInvalid && lapMs >= tr.minLapMs;
-        const best = valid && (p.bestLapMs === null || lapMs < p.bestLapMs);
+        // an excursion still going at the line is charged to this lap
+        if (p.offSince !== null) this.closeExcursion(p, out);
+        const penaltyMs = outLap ? 0 : p.lapPenaltyMs;
+        const timed = lapMs + penaltyMs;
+        const valid = !outLap && lapMs >= tr.minLapMs;
+        const best = valid && (p.bestLapMs === null || timed < p.bestLapMs);
         if (best) {
-          p.bestLapMs = lapMs;
+          p.bestLapMs = timed;
           p.bestSectors = p.sectors.slice();
         }
         if (valid) p.validLaps++;
-        p.lastLapMs = lapMs;
+        p.lastLapMs = outLap ? lapMs : timed;
         p.laps++;
-        out.push({ type: 'lap', playerId: p.id, lap: p.laps, lapMs, sectors: p.sectors.slice(), best, valid, outLap });
+        out.push({ type: 'lap', playerId: p.id, lap: p.laps, lapMs: timed, penaltyMs, sectors: p.sectors.slice(), best, valid, outLap });
         p.lapStartMs = tc;
         p.sectorStartMs = tc;
         p.sectors = [];
         p.passed = 0;
-        p.lapInvalid = false;
+        p.lapPenaltyMs = 0;
         p.outLap = false;
         const lapsDone = this.laps > 0 && p.laps >= this.laps + 1;
         const flagged = this.flagAt !== null && tc >= this.flagAt;
@@ -309,7 +384,8 @@ export class RaceTracker {
         p.passed = 0;
         if (p.outLap && p.laps > 0) {
           p.outLap = false;
-          p.lapInvalid = false;
+          p.lapPenaltyMs = 0;
+          p.offSince = null;
           p.lapStartMs = tc;
           p.sectorStartMs = tc;
           p.sectors = [];
@@ -327,6 +403,22 @@ export class RaceTracker {
       }
     }
     p.nextGate = (gi + 1) % n;
+  }
+
+  private addPenalty(p: PlayerRaceState, reason: PenaltyReason, ms: number, out: RaceEvent[]): void {
+    if (p.outLap || ms <= 0) return;
+    p.lapPenaltyMs += ms;
+    p.penaltyMs += ms;
+    out.push({ type: 'penalty', playerId: p.id, reason, ms, lapPenaltyMs: p.lapPenaltyMs });
+  }
+
+  /** End of a track-limits excursion: 1 s + 1.5 s per second beyond the limits, at most 5 s. */
+  private closeExcursion(p: PlayerRaceState, out: RaceEvent[]): void {
+    if (p.offSince === null) return;
+    const dur = Math.max(0, p.offLast - p.offSince) / 1000;
+    p.offSince = null;
+    const ms = Math.min(PENALTY.limitsMaxMs, PENALTY.limitsBaseMs + PENALTY.limitsPerSecMs * dur);
+    this.addPenalty(p, 'track-limits', Math.round(ms / 100) * 100, out);
   }
 
   private place(p: PlayerRaceState, t: number, x: number, y: number, z: number, fullSearch: boolean): void {
@@ -391,7 +483,7 @@ export class RaceTracker {
       penaltyMs: p.penaltyMs,
       gapMs: leader && leader.bestLapMs !== null && p.bestLapMs !== null ? p.bestLapMs - leader.bestLapMs : null,
       validLaps: p.validLaps,
-      lapInvalid: p.lapInvalid,
+      lapPenaltyMs: p.lapPenaltyMs,
       inPit: p.inPit,
       outLap: p.outLap,
       bestSectors: p.bestSectors.slice(),

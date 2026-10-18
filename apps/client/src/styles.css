@@ -1803,7 +1803,7 @@ button.small {
 .timing td.status.out {
   color: var(--accent-2);
 }
-.timing td.status.invalid {
+.timing td.status.pen {
   color: var(--bad);
 }
 .timing td.status.finished {

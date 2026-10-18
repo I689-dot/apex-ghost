@@ -26,7 +26,7 @@ export class TimingScreen {
       h(
         'div.timing-card',
         {},
-        h('div.timing-head', {}, h('h2', { text: t('Timing') }), h('span.muted', { text: t('Best valid lap counts · release Tab to close') })),
+        h('div.timing-head', {}, h('h2', { text: t('Timing') }), h('span.muted', { text: t('Best lap counts (penalties included) · release Tab to close') })),
         h(
           'table',
           {},
@@ -36,7 +36,7 @@ export class TimingScreen {
             h(
               'tr',
               {},
-              ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Last lap'), 'S1', 'S2', 'S3', t('Laps'), t('Status')].map((t) =>
+              ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Last lap'), 'S1', 'S2', 'S3', t('Laps'), t('Penalties'), t('Status')].map((t) =>
                 h('th', { text: t }),
               ),
             ),
@@ -56,7 +56,9 @@ export class TimingScreen {
   }
 
   update(list: Standing[], me: string, info: (id: string) => TimingRowInfo): void {
-    const key = list.map((r) => `${r.id}${r.position}${r.bestLapMs}${r.lastLapMs}${r.laps}${r.inPit}${r.outLap}${r.lapInvalid}${r.finishedMs}`).join('|');
+    const key = list
+      .map((r) => `${r.id}${r.position}${r.bestLapMs}${r.lastLapMs}${r.laps}${r.inPit}${r.outLap}${r.lapPenaltyMs}${r.penaltyMs}${r.finishedMs}`)
+      .join('|');
     if (key === this.key) return;
     this.key = key;
     // fastest sector of the session (purple)
@@ -65,17 +67,17 @@ export class TimingScreen {
     this.body.replaceChildren(
       ...list.map((r) => {
         const i = info(r.id);
-        const status = r.dnf
-          ? t('DNF')
+        const [cls, status] = r.dnf
+          ? ['dnf', t('DNF')]
           : r.finishedMs !== null
-            ? t('FINISHED')
+            ? ['finished', t('FINISHED')]
             : r.inPit
-              ? t('IN PITS')
+              ? ['in', t('IN PITS')]
               : r.outLap
-                ? t('OUT LAP')
-                : r.lapInvalid
-                  ? t('INVALID LAP')
-                  : t('ON TIMED LAP');
+                ? ['out', t('OUT LAP')]
+                : r.lapPenaltyMs > 0
+                  ? ['pen', `${t('PEN')} +${(r.lapPenaltyMs / 1000).toFixed(1)} s`]
+                  : ['on', t('ON TIMED LAP')];
         return h(
           `tr${r.id === me ? '.me' : ''}`,
           {},
@@ -90,7 +92,8 @@ export class TimingScreen {
             return h(`td.mono.sector${s !== undefined && s <= best[k] ? '.purple' : ''}`, { text: s === undefined ? '' : (s / 1000).toFixed(3) });
           }),
           h('td.mono', { text: String(r.laps) }),
-          h(`td.status.${status.split(' ')[0].toLowerCase()}`, { text: status }),
+          h('td.mono.muted', { text: r.penaltyMs > 0 ? `+${(r.penaltyMs / 1000).toFixed(1)} s` : '' }),
+          h(`td.status.${cls}`, { text: status }),
         );
       }),
     );

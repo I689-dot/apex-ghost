@@ -693,7 +693,7 @@ export class App {
   private setCountdown(text: string, sub: string): void {
     if (!this.countdownEl) return;
     const [big, s, info] = Array.from(this.countdownEl.children) as HTMLElement[];
-    big.textContent = t(text);
+    big.textContent = text === 'GO' ? t(text) : text;
     big.className = `cd-big ${text === 'GO' ? 'go' : ''}`;
     s.textContent = sub;
     info.style.display = text && text !== 'GO' ? 'block' : sub ? 'block' : 'none';
@@ -717,7 +717,7 @@ export class App {
         h('p.muted', { text: t('The race keeps running.') }),
         h('button.primary', { text: t('Resume'), onclick: close }),
         h('button', {
-          text: t('Reset to track (this lap will not count)'),
+          text: t('Reset to track (+5 s penalty)'),
           onclick: () => {
             close();
             this.session?.requestReset();
@@ -770,6 +770,7 @@ export class App {
         h(`td.mono${m.fastestLap?.id === r.id ? '.fastest' : ''}`, { text: r.bestLapMs === null ? t('no time') : fmtTime(r.bestLapMs) }),
         h('td.mono.muted', { text: r.bestLapMs === null || !r.gapMs ? '' : `+${(r.gapMs / 1000).toFixed(3)}` }),
         h('td.muted', { text: `${r.validLaps}${r.dnf ? ` · ${t('DNF')}` : ''}` }),
+        h('td.mono.muted', { text: r.penaltyMs > 0 ? `+${(r.penaltyMs / 1000).toFixed(1)} s` : '' }),
       ),
     );
     this.setUi(
@@ -800,11 +801,15 @@ export class App {
                 );
               }),
           ),
-          h('p.muted', { text: t('Ranked by best valid lap. Laps beyond track limits or after a reset do not count.') }),
+          h('p.muted', { text: t('Ranked by best lap. Time penalties are added to the lap: track limits (1–5 s), reset (5 s), shortcut (5 s and more).') }),
           h(
             'table',
             {},
-            h('thead', {}, h('tr', {}, ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Valid laps')].map((t) => h('th', { text: t })))),
+            h(
+              'thead',
+              {},
+              h('tr', {}, ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Timed laps'), t('Penalties')].map((t) => h('th', { text: t }))),
+            ),
             h('tbody', {}, ...rows),
           ),
           m.fastestLap

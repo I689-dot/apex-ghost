@@ -14,7 +14,8 @@ export interface HudState {
   manual: boolean;
   /** "OUT", "2/3" or "FIN" */
   lapLabel: string;
-  lapInvalid: boolean;
+  /** Time penalties on the lap in progress (ms). */
+  lapPenaltyMs: number;
   /** Live delta to the personal best (ms), null without a reference lap. */
   liveDelta: number | null;
   position: number;
@@ -76,7 +77,7 @@ export class Hud {
   private resetEl: HTMLElement;
   private lapTag: HTMLElement = h('label', { text: t('LAP') });
 
-  private lastInvalid = false;
+  private lastPenalty = 0;
   private board: HTMLElement;
   private boardKey = '';
   private map: HTMLCanvasElement;
@@ -245,11 +246,12 @@ export class Hud {
       this.rpmLeds.forEach((l, i) => (l.className = i < lit ? (i < 4 ? 'g' : i < 8 ? 'r' : 'b') : ''));
     }
     this.lap.set(s.lapLabel);
-    if (s.lapInvalid !== this.lastInvalid) {
-      this.lastInvalid = s.lapInvalid;
-      this.lapTag.textContent = s.lapInvalid ? t('INVALID') : t('LAP');
-      this.lapTag.classList.toggle('invalid', s.lapInvalid);
-      this.cur.el.classList.toggle('invalid', s.lapInvalid);
+    if (s.lapPenaltyMs !== this.lastPenalty) {
+      this.lastPenalty = s.lapPenaltyMs;
+      const pen = s.lapPenaltyMs > 0;
+      this.lapTag.textContent = pen ? `${t('PEN')} +${(s.lapPenaltyMs / 1000).toFixed(1)} s` : t('LAP');
+      this.lapTag.classList.toggle('invalid', pen);
+      this.cur.el.classList.toggle('invalid', pen);
     }
     this.pos.set(`${s.bestLapMs === null ? '–' : s.position}/${s.total}`);
     this.cur.set(fmtTime(s.currentLapMs));
@@ -260,7 +262,7 @@ export class Hud {
     else {
       // tenths are enough while driving (hundredths flicker unreadably)
       this.delta.set(fmtDelta(Math.round(d / 10) * 10));
-      this.delta.el.className = `hud-delta ${d <= 0 ? 'good' : 'bad'}${s.lapInvalid ? ' void' : ''}`;
+      this.delta.el.className = `hud-delta ${d <= 0 ? 'good' : 'bad'}${s.lapPenaltyMs > 0 ? ' void' : ''}`;
     }
     this.wrong.classList.toggle('show', s.wrongWay);
     this.status.update(s.tyreTemps, s.damageZones, s.abs, s.tc, s.compound, s.tyreWear, s.brakeTemps);
@@ -277,7 +279,7 @@ export class Hud {
     const i = list.findIndex((x) => x.id === me);
     const from = Math.max(0, Math.min(i - 2, list.length - 5));
     const rows = list.slice(from, from + 5);
-    const key = rows.map((r) => `${r.id}${r.position}${r.bestLapMs ?? ''}${r.finishedMs ?? ''}${r.dnf}${r.inPit}${r.outLap}${r.lapInvalid}`).join('|');
+    const key = rows.map((r) => `${r.id}${r.position}${r.bestLapMs ?? ''}${r.finishedMs ?? ''}${r.dnf}${r.inPit}${r.outLap}${r.lapPenaltyMs}`).join('|');
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.board.replaceChildren(
@@ -296,8 +298,8 @@ export class Hud {
                     ? t('PIT')
                     : r.outLap
                       ? t('OUT LAP')
-                      : r.lapInvalid
-                        ? t('INVALID LAP')
+                      : r.lapPenaltyMs > 0
+                        ? `${t('PEN')} +${(r.lapPenaltyMs / 1000).toFixed(1)} s`
                         : t('ON LAP')
                 : r.position === 1
                   ? fmtTime(r.bestLapMs)

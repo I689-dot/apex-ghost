@@ -9,15 +9,73 @@ type R = typeof RAPIER;
 
 /** Large areas whose small texture tile repeats visibly: they get world-space macro variation. */
 const GROUND_MAT_RE = /^(grass|top2|terrain_fill|astroturf|sand|gravel)/i;
-const PAVED_MAT_RE = /^(asph|conc_|pavement|pits)/i;
+const PAVED_MAT_RE = /^(asph|conc_|pavement|pits|concrete|paddock_roof|ponyva|tiles)/i;
+
+/**
+ * The source model's asphalt and concrete textures are nearly uniform (pixel deviation 1–4 of 255: the original
+ * game added detail and wear maps the export does not carry), so large paved areas looked untextured. A procedural
+ * detail texture adds the grain back: multi-scale noise for the binder and light/dark speckles for the aggregate,
+ * tiled in world space (about 1.6 m).
+ */
+let detailTex: THREE.DataTexture | null = null;
+function pavedDetail(): THREE.DataTexture {
+  if (detailTex) return detailTex;
+  const N = 256;
+  const d = new Uint8Array(N * N * 4);
+  let seed = 1234567;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const lattice = (f: number) => {
+    const g = new Float32Array((f + 1) * (f + 1)).map(() => rnd());
+    for (let i = 0; i <= f; i++) {
+      g[i * (f + 1) + f] = g[i * (f + 1)];
+      g[f * (f + 1) + i] = g[i];
+    }
+    return (x: number, y: number) => {
+      const fx = (x / N) * f;
+      const fy = (y / N) * f;
+      const ix = Math.floor(fx);
+      const iy = Math.floor(fy);
+      const tx = fx - ix;
+      const ty = fy - iy;
+      const sx = tx * tx * (3 - 2 * tx);
+      const sy = ty * ty * (3 - 2 * ty);
+      const at = (a: number, b: number) => g[(b % (f + 1)) * (f + 1) + (a % (f + 1))];
+      return (at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy;
+    };
+  };
+  const o1 = lattice(8);
+  const o2 = lattice(32);
+  const o3 = lattice(128);
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      let v = 0.45 * o1(x, y) + 0.3 * o2(x, y) + 0.25 * o3(x, y);
+      const r = rnd();
+      if (r < 0.035)
+        v += 0.35; // light stone
+      else if (r < 0.07) v -= 0.3; // dark pore
+      const b = Math.max(0, Math.min(255, Math.round(v * 255)));
+      const k = (y * N + x) * 4;
+      d[k] = d[k + 1] = d[k + 2] = b;
+      d[k + 3] = 255;
+    }
+  detailTex = new THREE.DataTexture(d, N, N);
+  detailTex.wrapS = detailTex.wrapT = THREE.RepeatWrapping;
+  detailTex.magFilter = THREE.LinearFilter;
+  detailTex.minFilter = THREE.LinearMipmapLinearFilter;
+  detailTex.generateMipmaps = true;
+  detailTex.anisotropy = 8;
+  detailTex.needsUpdate = true;
+  return detailTex;
+}
 
 /**
  * Macro variation (as racing games break texture tiling): the colour is modulated by two octaves of smooth
  * value noise in world space, metres to tens of metres across, plus a slight dry/lush hue drift on grass. Paved
  * surfaces get a weaker, greyer version (patches of newer and older asphalt).
  */
-function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean): void {
+function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean, detail = 0): void {
   m.onBeforeCompile = (sh) => {
+    if (detail > 0) sh.uniforms.apxDetail = { value: pavedDetail() };
     sh.vertexShader = sh.vertexShader
       .replace('void main() {', 'varying vec3 vApxW;\nvoid main() {')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvApxW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -25,6 +83,7 @@ function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue:
       .replace(
         'void main() {',
         `varying vec3 vApxW;
+${detail > 0 ? 'uniform sampler2D apxDetail;' : ''}
 float apxHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float apxNoise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -40,17 +99,24 @@ void main() {`,
   float n = apxNoise(wp / 37.0) * 0.65 + apxNoise(wp / 9.0) * 0.35;
   diffuseColor.rgb *= 1.0 + (n - 0.5) * ${(strength * 2).toFixed(2)};
   ${hue ? 'float d = apxNoise(wp / 61.0 + 7.3); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.04, 0.78), smoothstep(0.55, 0.9, d) * 0.6);' : ''}
+  ${detail > 0 ? `float g = texture2D(apxDetail, wp / 1.6).r * 0.6 + texture2D(apxDetail, wp / 7.3 + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};` : ''}
 }`,
       );
   };
-  m.customProgramCacheKey = () => `macro-${strength}-${hue}`;
+  m.customProgramCacheKey = () => `macro-${strength}-${hue}-${detail}`;
 }
 
 const ROAD_MAT_RE = /^(asph|curb|lines|redline|pits|conc_|travert_0|box_decal|pavement)/i;
 const LIGHT_MAT_RE = /^(lights_emissive|lights_0)/i;
 /** Small, dense trackside detail: invisible far away, so culled per mesh by distance. */
 const DETAIL_MAT_RE =
-  /^(galvanized|fence|fences_b|details|metals|signs|grille|marshal|stairs|handle|spons|speaker|box_fence|electric_box|tent|medical|building|plastic_cone|curb_misc|tuv|logos|garage_spons)/i;
+  /^(galvanized|fence|fences_b|details|metals|signs|marshal|stairs|handle|spons|speaker|box_fence|electric_box|tent|medical|building|plastic_cone|tuv|logos|garage_spons)/i;
+/**
+ * Flat ground pieces exported among the scenery (the drainage grates along the track edges, kerb bits). There is
+ * no ground under them, so when distance culling hid them the sky showed through as white strips along the
+ * track ("missing textures"): they always draw, like the road (tools/e2e/trackscan.mjs).
+ */
+const GROUND_PIECE_RE = /^(grille|curb_misc)/i;
 
 interface Chunk {
   object: THREE.Object3D;
@@ -90,6 +156,17 @@ export class Track {
       if (!obj) continue;
       t.chunks.push({ object: obj, kind: c.kind, center: new THREE.Vector3(...c.center), radius: c.radius });
     }
+    // ground pieces leave their (culled) scenery chunk for an always-visible group
+    const ground = new THREE.Group();
+    ground.name = 'ground_pieces';
+    const pieces: THREE.Mesh[] = [];
+    t.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const m0 = mesh.isMesh ? ([mesh.material].flat()[0] as THREE.Material | undefined) : undefined;
+      if (m0 && GROUND_PIECE_RE.test(m0.name)) pieces.push(mesh);
+    });
+    t.root.add(ground);
+    for (const m of pieces) ground.attach(m);
     const seen = new Set<THREE.Material>();
     t.root.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -109,7 +186,7 @@ export class Track {
         if (/^green_lights/i.test(sm.name)) t.startLights.green.push(sm);
         sm.side = sm.alphaTest > 0 || sm.transparent ? THREE.DoubleSide : THREE.FrontSide;
         if (GROUND_MAT_RE.test(sm.name) || sm.name === 'grass_fill') addMacroVariation(sm, 0.22, /grass|top2|fill|turf/i.test(sm.name));
-        else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false);
+        else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : 0.22);
       }
       const first = mats[0] as THREE.MeshStandardMaterial | undefined;
       if (first && DETAIL_MAT_RE.test(first.name)) {

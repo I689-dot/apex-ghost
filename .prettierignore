@@ -7,3 +7,4 @@ tools/asset-pipeline/out
 pnpm-lock.yaml
 *.md
 packages/shared/src/generated
+.claude

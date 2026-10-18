@@ -179,8 +179,7 @@ export class RaceSession {
   private sectorDelta: number | null = null;
   private sectorDeltaUntil = 0;
   private finishedMs: number | null = null;
-  /** The current lap won't count: out lap, track limits or a reset. */
-  private lapInvalid = true;
+  /** All four wheels beyond the limits (held): reported to the lap logic, which adds a time penalty. */
   private limits = new TrackLimits();
   private lapDelta: LapDelta | null = null;
   private liveDelta: number | null = null;
@@ -589,7 +588,8 @@ export class RaceSession {
     this.resetFlagSamples = 2; // make sure at least one packet carries the reset flag
     this.track.resetHint();
     this.limits.reset();
-    this.flash(this.myLaps > 0 ? t('Reset: this lap no longer counts') : t('Reset to the track'));
+    // the time penalty (if any) is announced by the lap logic's penalty event
+    if (this.myLaps === 0) this.flash(t('Reset to the track'));
   }
 
   private flash(msg: string, ms = 2500): void {
@@ -614,7 +614,6 @@ export class RaceSession {
       case 'lap':
         if (m.playerId === this.me) {
           this.myLaps = m.lap;
-          this.lapInvalid = false;
           if (m.outLap) {
             this.flash(t('Out lap {time} (not timed) · timed lap starts now · Tab: timing', { time: fmtLap(m.lapMs) }), 4000);
             break;
@@ -626,12 +625,14 @@ export class RaceSession {
           }
           const sessionBest = this.standings.every((s) => s.id === this.me || s.bestLapMs === null || s.bestLapMs > m.lapMs);
           const tag = !m.valid ? t('  ·  INVALID') : m.best ? (sessionBest ? t('  ·  FASTEST LAP') : t('  ·  personal best')) : '';
-          this.flash(t('Lap {n}: {time}', { n: m.lap - 1, time: fmtLap(m.lapMs) }) + tag, 3500);
+          const pen = m.penaltyMs > 0 ? t('  ·  incl. +{s} s penalties', { s: (m.penaltyMs / 1000).toFixed(1) }) : '';
+          this.flash(t('Lap {n}: {time}', { n: m.lap - 1, time: fmtLap(m.lapMs) }) + tag + pen, 3500);
           if (m.valid) this.snd?.chime(m.best ? (sessionBest ? 'session-best' : 'best') : 'lap');
         }
         break;
-      case 'invalid':
-        if (m.playerId === this.me) this.lapInvalid = true;
+      case 'penalty':
+        // announced at once by the local mirror of the lap logic (updateLapDelta); the server's copy is authoritative
+        // for the standings, which carry each driver's lap penalty
         break;
       case 'flag':
         if (m.raceId !== this.race.raceId) break;
@@ -1149,9 +1150,16 @@ export class RaceSession {
         this.ghost.lapEnded(e.valid && e.best);
         if (e.valid && e.best) this.ensureGhostVisual();
         d.start();
-      } else if (e.type === 'invalid' && e.reason === 'track-limits') {
-        this.lapInvalid = true;
-        this.flash(t('Track limits: this lap no longer counts'), 2500);
+      } else if (e.type === 'penalty' && e.playerId === this.me) {
+        const s = (e.ms / 1000).toFixed(1);
+        this.flash(
+          e.reason === 'track-limits'
+            ? t('Track limits: +{s} s', { s })
+            : e.reason === 'reset'
+              ? t('Reset: +{s} s penalty', { s })
+              : t('Shortcut: +{s} s penalty', { s }),
+          2500,
+        );
         this.snd?.chime('invalid');
       }
     }
@@ -1223,7 +1231,6 @@ export class RaceSession {
     const ev = pit.update(this.currPos.x, this.currPos.z, Math.abs(this.loc.lateral) - (edge ?? 6), v.telemetry.speed);
     if (ev === 'enter') {
       v.speedLimitMs = pit.limitMs;
-      this.lapInvalid = true;
       this.conn.sendJson({ t: 'pit', in: true });
       this.localTracker?.pitIn(this.me, serverNow);
       this.flash(t('Pit lane · limiter {n} km/h · stop in the yellow box for service', { n: pit.lane.speedLimitKmh }), 4000);
@@ -1417,8 +1424,11 @@ export class RaceSession {
       gear: tel.gear,
       manual: v.drivetrain.manual,
       lapLabel: this.finishedMs !== null ? t('FIN') : this.localTracker?.players.get(this.me)?.outLap !== false ? t('OUT') : String(this.myLaps + 1),
-      lapInvalid: this.lapInvalid && this.myLaps > 0 && this.finishedMs === null,
-      liveDelta: this.myLaps > 0 && this.finishedMs === null ? this.liveDelta : null,
+      lapPenaltyMs: this.myLaps > 0 && this.finishedMs === null ? (this.localTracker?.players.get(this.me)?.lapPenaltyMs ?? 0) : 0,
+      liveDelta:
+        this.myLaps > 0 && this.finishedMs === null && this.liveDelta !== null
+          ? this.liveDelta + (this.localTracker?.players.get(this.me)?.lapPenaltyMs ?? 0)
+          : null,
       position,
       total: this.race.grid.length,
       currentLapMs: curLap,

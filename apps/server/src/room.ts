@@ -608,13 +608,23 @@ export class RoomCore {
     if (this.tracker.allDone()) this.endRace();
   }
 
-  /** Broadcast what the lap logic decided (laps, sectors, invalid laps, finishes, the flag). */
+  /** Broadcast what the lap logic decided (laps, sectors, penalties, finishes, the flag). */
   private handleRaceEvents(ev: RaceEvent[], p: Player, now: number): void {
     for (const e of ev) {
-      if (e.type === 'lap') this.lastStandingsAt = 0; // the timing screen updates at once
+      if (e.type === 'lap' || e.type === 'penalty') this.lastStandingsAt = 0; // the timing screen updates at once
       if (e.type === 'lap')
-        this.broadcast({ t: 'lap', playerId: e.playerId, lap: e.lap, lapMs: e.lapMs, sectors: e.sectors, best: e.best, valid: e.valid, outLap: e.outLap });
-      else if (e.type === 'invalid' && !p.bot) this.send(p, { t: 'invalid', playerId: e.playerId, reason: e.reason });
+        this.broadcast({
+          t: 'lap',
+          playerId: e.playerId,
+          lap: e.lap,
+          lapMs: e.lapMs,
+          penaltyMs: e.penaltyMs,
+          sectors: e.sectors,
+          best: e.best,
+          valid: e.valid,
+          outLap: e.outLap,
+        });
+      else if (e.type === 'penalty' && !p.bot) this.send(p, { t: 'penalty', playerId: e.playerId, reason: e.reason, ms: e.ms, lapPenaltyMs: e.lapPenaltyMs });
       else if (e.type === 'sector' && !p.bot) this.send(p, { t: 'sector', playerId: e.playerId, sector: e.sector, ms: e.ms });
       else if (e.type === 'finish') {
         this.broadcast({ t: 'finished', playerId: e.playerId, totalMs: e.totalMs });

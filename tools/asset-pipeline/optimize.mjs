@@ -19,7 +19,7 @@ import { homedir, tmpdir, cpus } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { fillHoles, fillTerrain, writeFillGlb } from './fill_holes.mjs';
+import { fillHoles, fillTerrain, groundPartsFromGlb, writeFillGlb } from './fill_holes.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -461,6 +461,31 @@ const HEAVY_RE =
   /^(galvanized|grail|fence|fences_b|details|metals|signs|marshal|gantry|lights_0|garage|handle|spons|speaker|box_fence|wall|tyrewall|grille|stairs|window_doors|openstand)/i;
 const CUTOUT_RE = /^(tree|pines|trees_new|fence|fences_b|grille|box_fence|galvanized|net|glass_railing|spons_panels)/i;
 
+/**
+ * Grass and sand border strips (grassbrd_gp, sandbrd) fade out with alpha over ground the export does not
+ * contain, so their transparent part showed the void (magenta in tools/e2e/trackscan.mjs) right along the track
+ * edges. Flatten them onto the average colour of the ground they blend into and make them opaque.
+ */
+async function flattenBorderStrips(doc) {
+  const mats = doc.getRoot().listMaterials();
+  const meanOf = async (re) => {
+    const m = mats.find((x) => re.test(x.getName()) && x.getBaseColorTexture());
+    if (!m) return null;
+    const st = await sharp(Buffer.from(m.getBaseColorTexture().getImage())).stats();
+    return { r: Math.round(st.channels[0].mean), g: Math.round(st.channels[1].mean), b: Math.round(st.channels[2].mean) };
+  };
+  const ground = { grassbrd: await meanOf(/^grass_?0/i), sandbrd: await meanOf(/^sand_?0/i) };
+  for (const m of mats) {
+    const k = /^grassbrd/i.test(m.getName()) ? 'grassbrd' : /^sandbrd/i.test(m.getName()) ? 'sandbrd' : null;
+    const tex = m.getBaseColorTexture();
+    if (!k || !tex || !ground[k]) continue;
+    const png = await sharp(Buffer.from(tex.getImage())).flatten({ background: ground[k] }).png().toBuffer();
+    tex.setImage(new Uint8Array(png)).setMimeType('image/png');
+    m.setAlphaMode('OPAQUE');
+    log(`border strip ${m.getName()}: flattened onto ${JSON.stringify(ground[k])}, opaque`);
+  }
+}
+
 async function map() {
   const mapOut = path.join(out, 'map');
   const dstDir = path.join(pub, 'track');
@@ -472,6 +497,7 @@ async function map() {
     if (!existsSync(src)) continue;
     const doc = await io.read(src);
     await inlineTinyTextures(doc);
+    if (kind === 'track') await flattenBorderStrips(doc);
     await doc.transform(dedup(), weld());
     const before = triCount(doc);
     if (kind === 'track' || kind === 'scenery') {
@@ -479,7 +505,8 @@ async function map() {
         for (const prim of mesh.listPrimitives()) {
           const name = prim.getMaterial()?.getName() ?? '';
           if (!HEAVY_RE.test(name)) continue;
-          simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio: 0, error: kind === 'track' ? 0.00025 : 0.0006, lockBorder: false });
+          // borders locked: free borders shrank away from the neighbouring mesh (kerb ↔ grass) and the sky showed through the cracks
+          simplifyPrimitive(prim, { simplifier: MeshoptSimplifier, ratio: 0, error: kind === 'track' ? 0.00025 : 0.0006, lockBorder: true });
         }
       }
     }
@@ -839,7 +866,13 @@ async function collision(mapOut, dstDir) {
   }
   // ground holes in the source model (sky showing through, cars falling out of the world): fill them with grass
   const base = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
-  const fill = fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : []);
+  const GROUND_VIS_RE = /^(asph|curb|lines|redline|grass|sand|gravel|travert|conc_|pits|astroturf|box_decal|pavement|tiles|grille|top2)/i;
+  const visual = [];
+  for (const k of ['track', 'scenery', 'terrain']) {
+    const f = path.join(mapOut, `map_${k}.glb`);
+    if (existsSync(f)) visual.push(...(await groundPartsFromGlb(io, f, GROUND_VIS_RE)));
+  }
+  const fill = fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : [], visual);
   if (fill.cells) {
     const gi = SURF.indexOf('grass');
     parts.push({ si: gi, pos: fill.pos, idx: fill.idx });

@@ -5,6 +5,7 @@ import {
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LENGTH,
   STATE_BYTES,
+  PENALTY,
   RaceTracker,
   type RaceEvent,
   decodeClientStates,
@@ -341,28 +342,51 @@ describe('race logic (server-authoritative laps)', () => {
     expect(st.map((s) => s.position)).toEqual([1, 2, 3]);
   });
 
-  it('track limits and resets invalidate the current lap', () => {
+  it('track limits, resets and shortcuts add time penalties; the lap still counts', () => {
     const track = ovalTrack(R, 12);
-    const tr = new RaceTracker(track, 0, 3);
+    const tr = new RaceTracker(track, 0, 4);
     tr.addPlayer('x');
     const ev: RaceEvent[] = [];
     let t = drive(tr, 'x', 0, -10, L + 1, 50, 0, 50, ev);
-    // timed lap 1: all four wheels off for a moment mid-lap
+    // timed lap 1: off track for 10 m (0.17 s at 60 m/s): 1 s + 1.5 s/s
     t = drive(tr, 'x', t, L + 1, 2 * L + 6, 60, 0, 50, ev, [L + 400, L + 410]);
-    expect(ev.some((e) => e.type === 'invalid' && e.reason === 'track-limits')).toBe(true);
-    let laps = ev.filter((e) => e.type === 'lap');
-    expect(laps[1]).toMatchObject({ valid: false, best: false });
-    expect(tr.players.get('x')?.bestLapMs).toBeNull();
-    // timed lap 2: clean, slower, but it is the only valid one
-    t = drive(tr, 'x', t, 2 * L + 6, 3 * L + 6, 50, 0, 50, ev);
-    laps = ev.filter((e) => e.type === 'lap');
-    expect(laps[2]).toMatchObject({ valid: true, best: true });
-    // a reset invalidates the lap in progress
+    const pen = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
+    expect(pen).toHaveLength(1);
+    expect(pen[0]).toMatchObject({ reason: 'track-limits' });
+    expect(pen[0].ms).toBeGreaterThanOrEqual(PENALTY.limitsBaseMs);
+    expect(pen[0].ms).toBeLessThanOrEqual(PENALTY.limitsMaxMs);
+    let laps = ev.filter((e) => e.type === 'lap') as Extract<RaceEvent, { type: 'lap' }>[];
+    expect(laps[1]).toMatchObject({ valid: true, best: true, penaltyMs: pen[0].ms });
+    const raw1 = ((L + 5) / 60) * 1000;
+    expect(laps[1].lapMs).toBeGreaterThan(raw1 + pen[0].ms - 200);
+    expect(tr.players.get('x')?.bestLapMs).toBe(laps[1].lapMs);
+    // timed lap 2: clean and only a little slower, so it beats the penalised lap
+    t = drive(tr, 'x', t, 2 * L + 6, 3 * L + 6, 58, 0, 50, ev);
+    laps = ev.filter((e) => e.type === 'lap') as Extract<RaceEvent, { type: 'lap' }>[];
+    expect(laps[2]).toMatchObject({ valid: true, best: true, penaltyMs: 0 });
+    // lap 3: a reset (+5 s), then a cut across the inside skipping checkpoints (+5 s + 0.05 s/m)
     t = drive(tr, 'x', t, 3 * L + 6, 3 * L + 400, 50, 0, 50, ev);
     const g = track.gates[(tr.players.get('x')?.nextGate ?? 1) - 1];
+    ev.length = 0;
     tr.ingest('x', t + 50, g.p[0], g.p[1], g.p[2], true, ev);
-    expect(ev.some((e) => e.type === 'invalid' && e.reason === 'reset')).toBe(true);
-    expect(tr.players.get('x')?.lapInvalid).toBe(true);
+    expect(ev).toContainEqual(expect.objectContaining({ type: 'penalty', reason: 'reset', ms: PENALTY.resetMs }));
+    t += 100;
+    const sG = g.s + 3 * L;
+    t = drive(tr, 'x', t, sG + 1, sG + 60, 50, 0, 50, ev);
+    // swing 40 m inside (outside the gates' half-width) and back, smoothly
+    for (let s = sG + 60; s <= sG + 200; s += 2.5) {
+      const lat = 40 * Math.sin((Math.PI * (s - sG - 60)) / 140);
+      const [x, y, z] = ovalPos(R, s, lat);
+      tr.ingest('x', t, x, y, z, false, ev);
+      t += 50;
+    }
+    t = drive(tr, 'x', t, sG + 201, 4 * L + 6, 50, 0, 50, ev);
+    const cut = ev.find((e) => e.type === 'penalty' && e.reason === 'shortcut') as Extract<RaceEvent, { type: 'penalty' }> | undefined;
+    expect(cut).toBeDefined();
+    expect(cut?.ms).toBeGreaterThan(PENALTY.shortcutBaseMs);
+    const last = ev.filter((e) => e.type === 'lap').pop() as Extract<RaceEvent, { type: 'lap' }>;
+    expect(last).toMatchObject({ valid: true, outLap: false });
+    expect(last.penaltyMs).toBe(PENALTY.resetMs + (cut?.ms ?? 0));
   });
 
   it('orders cars on the same lap by distance along the track', () => {
@@ -403,7 +427,7 @@ describe('race logic (server-authoritative laps)', () => {
     let t = drive(tr, 'p', 0, -10, L + 1, 50, 0, 50, ev); // out lap
     t = drive(tr, 'p', t, L + 1, 2 * L - 60, 50, 0, 50, ev); // most of a timed lap
     tr.pitIn('p', t, ev);
-    expect(tr.players.get('p')?.lapInvalid).toBe(true);
+    expect(tr.players.get('p')?.outLap).toBe(true);
     // the pit lane runs 25 m inside the circuit past the line to the exit: no gate credit, no lap
     const lapsBefore = tr.players.get('p')?.laps;
     t = drive(tr, 'p', t, 2 * L - 60, 2 * L + 150, 15, -25, 50, ev);

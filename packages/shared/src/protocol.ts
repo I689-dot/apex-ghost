@@ -1,5 +1,5 @@
 import { MAX_PLAYERS, PROTOCOL_VERSION } from './constants';
-import type { Standing } from './race';
+import type { PenaltyReason, Standing } from './race';
 import { WEATHER_KINDS, type ChangeChoice, type TimeChoice, type WeatherChoice } from './weather';
 import type { WeatherPlan } from './weather';
 import { isRecord } from './validation';
@@ -118,8 +118,8 @@ export type ServerMsg =
   | { t: 'raceSetup'; race: RaceSetup }
   | { t: 'countdown'; raceId: number; startAt: number }
   | { t: 'standings'; raceId: number; list: Standing[]; finishDeadline: number | null }
-  | { t: 'lap'; playerId: string; lap: number; lapMs: number; sectors: number[]; best: boolean; valid: boolean; outLap: boolean }
-  | { t: 'invalid'; playerId: string; reason: 'track-limits' | 'reset' }
+  | { t: 'lap'; playerId: string; lap: number; lapMs: number; penaltyMs: number; sectors: number[]; best: boolean; valid: boolean; outLap: boolean }
+  | { t: 'penalty'; playerId: string; reason: PenaltyReason; ms: number; lapPenaltyMs: number }
   | { t: 'flag'; raceId: number }
   | { t: 'pit'; playerId: string; in: boolean }
   | { t: 'sector'; playerId: string; sector: number; ms: number }

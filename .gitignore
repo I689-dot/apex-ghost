@@ -11,3 +11,4 @@ tools/sim/out/
 # source downloads (third-party licences, 373 MB): the optimised game assets are committed instead
 3D MODELS/
 tools/e2e/out/
+.claude/

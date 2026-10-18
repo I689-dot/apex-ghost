@@ -25,7 +25,7 @@ const NEAR = 8; // a surface further than this above/below the nearest centrelin
  * @param pitPoints flat [x,y,z,...] (may be empty)
  * @returns {{ pos: Float32Array, idx: Uint32Array, cells: number }}
  */
-export function fillHoles(parts, surfaces, centerline, pitPoints) {
+export function fillHoles(parts, surfaces, centerline, pitPoints, visualParts = null) {
   const ref = [];
   for (let i = 0; i < centerline.length; i += 3) ref.push([centerline[i], centerline[i + 1], centerline[i + 2], RADIUS]);
   for (let i = 0; i < pitPoints.length; i += 3) ref.push([pitPoints[i], pitPoints[i + 1], pitPoints[i + 2], PIT_RADIUS]);
@@ -71,10 +71,10 @@ export function fillHoles(parts, surfaces, centerline, pitPoints) {
   // ground height per lattice point: the surface closest to the reference height (bridges and tunnels have two
   // levels). Also sampled at the cell centres and edge midpoints, which catches cracks narrower than a cell.
   const ground = new Set(['asphalt', 'curb', 'grass', 'gravel', 'sand']);
-  const raster = (ox, oz) => {
+  const raster = (ox, oz, src = parts) => {
     const out = new Float32Array(N).fill(NaN);
-    for (const p of parts) {
-      if (!ground.has(surfaces[p.si])) continue;
+    for (const p of src) {
+      if (src === parts && !ground.has(surfaces[p.si])) continue;
       const P = p.pos;
       const I = p.idx;
       for (let t = 0; t < I.length; t += 3) {
@@ -113,8 +113,17 @@ export function fillHoles(parts, surfaces, centerline, pitPoints) {
     }
     return out;
   };
-  const h = raster(0, 0);
-  const mid = [raster(0.5, 0.5), raster(0.5, 0), raster(0, 0.5)];
+  // covered = solid (collision) AND drawn (the visible ground meshes, when given): the source has spots with one
+  // and not the other, and either way the player sees the sky or falls through
+  const both = (ox, oz) => {
+    const c = raster(ox, oz);
+    if (!visualParts) return c;
+    const v = raster(ox, oz, visualParts);
+    for (let k = 0; k < N; k++) if (Number.isNaN(v[k])) c[k] = NaN;
+    return c;
+  };
+  const h = both(0, 0);
+  const mid = [both(0.5, 0.5), both(0.5, 0), both(0, 0.5)];
   // fill heights: seed holes with the reference height, relax towards the covered neighbours
   const covered = new Uint8Array(N);
   const f = new Float32Array(N);
@@ -395,4 +404,17 @@ export async function fillTerrain(io, terrainGlb, parts, surfaces) {
     }
   }
   return { pos: new Float32Array(pos), uv: new Float32Array(uv), idx: new Uint32Array(idx), cells, image: tex.getImage(), mime: tex.getMimeType() };
+}
+
+/** Visible ground primitives of a raw (untransformed, world-space) map GLB, as raster parts. */
+export async function groundPartsFromGlb(io, file, re) {
+  const doc = await io.read(file);
+  const out = [];
+  for (const m of doc.getRoot().listMeshes())
+    for (const p of m.listPrimitives()) {
+      const name = p.getMaterial()?.getName() ?? '';
+      if (!re.test(name) || !p.getIndices()) continue;
+      out.push({ si: -1, pos: p.getAttribute('POSITION').getArray(), idx: p.getIndices().getArray() });
+    }
+  return out;
 }
