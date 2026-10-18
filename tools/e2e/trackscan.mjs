@@ -73,10 +73,10 @@ for (let s = 0; s < n; s += STEP) {
         while (i < m - 1 && td.cumS[i] < s) i++;
         const j = (i + 1) % m;
         const yaw = Math.atan2(cl[j * 3] - cl[i * 3], cl[j * 3 + 2] - cl[i * 3 + 2]) + yawOff;
-        const cam = (window.__scanCam ??= new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.2, 4000));
+        const cam = (window.__scanCam ??= new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.2, 4000));
         cam.position.set(cl[i * 3], cl[i * 3 + 1] + 3.5, cl[i * 3 + 2]);
         cam.lookAt(cl[i * 3] + Math.sin(yaw) * 40, cl[i * 3 + 1] - 2, cl[i * 3 + 2] + Math.cos(yaw) * 40);
-        cam.aspect = innerWidth / innerHeight;
+        cam.aspect = window.innerWidth / window.innerHeight;
         cam.updateProjectionMatrix();
         gfx.setCamera(cam);
         session.track.updateVisibility(cam.position, gfx.quality);
