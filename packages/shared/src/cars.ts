@@ -73,7 +73,8 @@ export interface CarEntry {
   trackRear: number;
   /** Steering wheel pivot and rotation axis (null when the model has none: generic one is drawn). */
   steering: { position: Vec3; axis: Vec3; diameter: number } | null;
-  cockpitCamera: { position: Vec3; driverSide: 'left' | 'right' };
+  /** tuned: the eye was set by hand per car (no automatic raise at load). */
+  cockpitCamera: { position: Vec3; driverSide: 'left' | 'right'; tuned?: boolean };
   hasInterior: boolean;
   lights: { head: string[]; tail: string[] };
   /** Wheels that use the generic fallback model. */

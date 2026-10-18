@@ -438,9 +438,11 @@ async function cars() {
       wheelbase: meta.wheelbase,
       trackFront: meta.trackFront,
       trackRear: meta.trackRear,
-      steering: meta.steering,
-      cockpitCamera: meta.cockpitCamera,
-      hasInterior: meta.hasInterior,
+      // hand-set in cars.config.json → pipeline (checked with tools/e2e/cockpitlab.mjs): the driver's eye
+      // (cockpitEye), a steering wheel for a model without one (steering), an interior the detection missed
+      steering: c.pipeline?.steering ?? meta.steering,
+      cockpitCamera: c.pipeline?.cockpitEye ? { ...meta.cockpitCamera, position: c.pipeline.cockpitEye, tuned: true } : meta.cockpitCamera,
+      hasInterior: c.pipeline?.hasInterior ?? meta.hasInterior,
       lights: meta.lights,
       genericWheels: meta.genericWheels,
       specs,

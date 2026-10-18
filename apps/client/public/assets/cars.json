@@ -66,14 +66,27 @@
    "wheelbase": 2.8599,
    "trackFront": 1.7694,
    "trackRear": 1.7573,
-   "steering": null,
+   "steering": {
+    "position": [
+     0.33,
+     0.67,
+     0.16
+    ],
+    "axis": [
+     0,
+     0.3746,
+     -0.9272
+    ],
+    "diameter": 0.29
+   },
    "cockpitCamera": {
     "position": [
-     0.3326,
-     0.9839,
-     -0.2011
+     0.33,
+     0.97,
+     -0.3
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -225,11 +238,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.4153,
-     0.9881,
-     0.0063
+     0.33,
+     0.95,
+     0.04
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -381,11 +395,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2909,
-     1.0199,
-     0.0346
+     0.31,
+     1,
+     -0.26
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -540,11 +555,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3988,
-     0.9267,
-     -0.4603
+     0.32,
+     1.01,
+     -0.46
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -700,11 +716,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2211,
-     0.896,
-     0.0111
+     0.29,
+     0.92,
+     -0.02
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -846,11 +863,12 @@
    "steering": null,
    "cockpitCamera": {
     "position": [
-     0.44,
-     0.9057,
-     -0.1012
+     0.4,
+     0.89,
+     -0.12
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1009,11 +1027,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.4067,
-     0.9942,
-     -0.0937
+     0.37,
+     0.93,
+     -0.06
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1160,13 +1179,14 @@
    "steering": null,
    "cockpitCamera": {
     "position": [
-     0.44,
-     1.0145,
-     -0.0894
+     0.42,
+     0.95,
+     -0.04
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
-   "hasInterior": false,
+   "hasInterior": true,
    "lights": {
     "head": [
      "LIGHT_HEAD_AR3DMat_PBR_Light_Cool_White",
@@ -1308,10 +1328,11 @@
    "cockpitCamera": {
     "position": [
      0.28,
-     0.9888,
-     0.3237
+     0.93,
+     0.26
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1468,11 +1489,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2194,
-     1.0246,
-     0.244
+     0.29,
+     0.98,
+     0.22
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1639,11 +1661,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3007,
-     0.9646,
-     0.0404
+     0.3,
+     0.99,
+     0.06
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1784,12 +1807,13 @@
    "cockpitCamera": {
     "position": [
      0.28,
-     0.9455,
-     0.2307
+     0.93,
+     0.24
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
-   "hasInterior": false,
+   "hasInterior": true,
    "lights": {
     "head": [
      "LIGHT_HEAD_AR3DMat_PBR_Light_Cool_White"
@@ -1941,11 +1965,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.4163,
-     1.0173,
-     -0.4155
+     0.42,
+     1,
+     -0.43
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2105,11 +2130,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3419,
-     1.0385,
-     -0.5818
+     0.4,
+     1.03,
+     -0.58
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2261,11 +2287,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3398,
-     0.9977,
-     -0.552
+     0.42,
+     1,
+     -0.62
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2423,11 +2450,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3368,
-     0.887,
-     0.0027
+     0.34,
+     0.93,
+     0
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2586,11 +2614,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2238,
-     0.9605,
-     -0.1227
+     0.29,
+     0.96,
+     -0.18
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2752,11 +2781,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2238,
-     0.9605,
-     -0.1227
+     0.29,
+     0.96,
+     -0.18
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
