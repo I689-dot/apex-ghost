@@ -434,7 +434,7 @@ One lumped temperature per tyre (`TYRE_TEMP` in `vehicle.ts`):
 
 ## Start and AI traffic
 
-- At the green light every AI car launched side by side onto the same racing line; cars pass through each other here, so they visibly drove into each other ("the cars start bumping"). As in a real qualifying session, AI cars now leave the grid one at a time, 2.5 s apart in grid order, and keep about 12 m behind a car directly ahead in their lane. The grid itself was checked (`pnpm tsx tools/sim/gridsettle.ts`): slots are 11.4 m apart and cars settle within a few centimetres without bouncing.
+- At the green light every AI car launched side by side onto the same racing line; cars pass through each other here, so they visibly drove into each other ("the cars start bumping"). As in a real qualifying session, AI cars now leave the grid one at a time, 2.5 s apart in grid order, and keep about 12 m behind a car directly ahead in their lane (revised since: see "Start bumping, flat ground and AI traffic"). The grid itself was checked (`pnpm tsx tools/sim/gridsettle.ts`): slots are 11.4 m apart and cars settle within a few centimetres without bouncing.
 
 ## Timing board and session clock
 
@@ -762,6 +762,53 @@ The unit tests cover:
 - the car-lock race condition;
 - host transfer, reconnection and late joiners;
 - bots: host-only add/remove, free-car lock, and bot state packets accepted only from the host.
+
+More tools: `pnpm tsx tools/sim/flatness.ts` (every ground layer under the road: bumps, steps and stacked surfaces per stretch; `--profile s0,s1,lat`, `--xprofile s,l0,l1`), `node tools/e2e/botrace.mjs [--bots 7] [--minutes 3] [--weather heavy_rain]` (bots in a real browser session: laps, resets, spins, offs, launch, overlapping cars), `node tools/e2e/cockpitlab.mjs [--cars 0,3]` (each car's cockpit from several eye positions), `node tools/e2e/lapviews.mjs` (the lap at driver height and from the air, with a z-fighting measure).
+
+## Start bumping, flat ground and AI traffic (2026-10-18)
+
+### "At the start the cars are bumping" / "the terrain is not flat"
+
+- **Cause 1, the ground:** the painted lines and the grid-box bars are separate meshes laid 1–7 cm above the asphalt, and since the collision fix they are collidable (as asphalt, because the asphalt has gaps under some of them). On the start/finish straight every grid-box bar was a **6.7 cm ledge**, one every 16 m in each lane: a car leaving its box hit the bar 1.4 m ahead of its front wheels at once (a 39 m/s², 4 g heave spike in `ailap.ts`), and every car hopped every 16 m down the straight. Edge lines were 1.2 cm steps, and long painted slivers crossing crests floated up to 7 cm over the road (a bot's front wheels left the ground in the Veedol chicane at 85 km/h).
+- **Fix** (`tools/asset-pipeline/flatten_layers.mjs`, called by the optimizer's collision step before simplification and the hole fill): a vertex of a ground surface that lies 3 mm–15 cm above another triangle of the *same* surface (with that lower surface continuing 2 cm around it in at least 6 of 8 directions, so the top of a real raised edge stays) is snapped down onto it; triangles that still float over one at 5 of 7 sample points are dropped. Kerbs over asphalt and road over the hole fill keep their real steps. 15,334 asphalt, 8,078 grass and 1,668 sand vertices snapped; 1,452 / 7,885 / 337 triangles dropped. The render meshes are unchanged (the raised paint is what keeps it from z-fighting).
+- **Cause 2, the spawn:** cars were placed 5 cm above the grid point and dropped onto their springs during the countdown. `Vehicle.place()` now casts down and puts the car on the ground under it (grid, resets, bot resets); the session builds the ray-cast structure before placing.
+- **Cause 3, the bots:** at the green light each AI car steered at full lock straight for the racing line, across the grid, through the cars still waiting in their boxes. Bots now hold the line they stand on and merge onto their racing line over 260 m (also after a reset).
+- **Measured** (`tools/sim/flatness.ts` on the road surface; `ailap.ts` ride numbers, Porsche 992):
+
+  | | before | after |
+  |---|---|---|
+  | Start/finish straight (5,000 → 260 m): steps over 1 cm, largest bump | ~650 steps, 6.2 cm | 0, 0.3 cm |
+  | Whole lap: steps over 1 cm / stacked layers / median bump | 3,580 / 1.2 % / 0.9 cm | 2,219 / 0.5 % / 0.6 cm |
+  | 50 m stretches with a bump over 3 cm | 22 of 105 | 9 of 105 |
+  | Launch from the grid: largest heave in the first 6 s | 39 m/s² | 2.8 m/s² |
+  | Lap: heave rms / max, wheel lift-offs | 1.84 / 58 m/s², 14 | 1.47 / 10 m/s², 2 |
+  | Grid settle (`gridsettle.ts`): max vertical speed | 0.10–0.60 m/s | 0.12–0.18 m/s |
+
+- **Left:** a 10 cm twist seam between two road pieces at 3,353 m (the cross-slope changes at a mesh border; near the crown, where the line crosses it, it is under 2 cm), the kerbs of the Mercedes Arena and the Veedol chicane (real raised kerbs), and the hole-fill edges beside the road at 4,600–4,900 m. The grass collision simplification (`SIMPLIFY_ERR`) was left alone: none of the remaining bumps over 3 cm is on simplified grass.
+
+### AI traffic, the wet and spins
+
+Found with `ailap.ts` (now `--laps`, `--wet`, `--slot`, spins and wall contacts) and in real browser sessions (`botrace.mjs`: 7–9 bots for 3–5 minutes, your car parked in its box):
+- **Wet:** rear wet tyres ran away past 200 °C and bots spun 14–43 times a lap at wetness 0.5. Water on the track now cools the tyres (`TYRE_TEMP.wetCool`: up to 2.5× on a fully wet track, so wets sit near their 65 °C window and slicks stay cold in the rain, as in reality). The AI's grip estimate includes tyre temperature (`Vehicle.tyreGripAvg`, the weaker axle), and it keeps more in hand on a slippery track (0.8 grip → 7 % more margin).
+- **Driving:** it eases to a balancing throttle instead of snapping it shut mid-corner (lift-off oversteer), squeezes the throttle on (0 → full in 0.25 s), backs off as the rear axle's slip angle passes 60 % of the tyre's peak, counter-steers once the rear lets go, trail-brakes (less brake with more lock, off the brake while sliding), and takes corners slower in another car's dirty air. A wrong-way bot resets after 3 s.
+- **Lanes:** each bot's own lane offset (now ±0.9 m, was ±1.8 m) only applies on straights and moves back onto the racing line before a corner. A Ferrari 296 driving 1.8 m off the line through corners overheated its rear tyres and spun 34 times in 3 laps with the old AI.
+- **Traffic:** a slow or parked car ahead (your car still in its box, a car that spun) made bots queue 12 m behind it and then reset. Now they pull out 3.6 m and pass when there is no corner within 150 m, keep that side while alongside, and otherwise follow about 10 m back (a car 0–3 m ahead used to be ignored, so bodies overlapped).
+- **Results:** `ailap.ts`, 18 cars × dry / damp (0.6) / wet × skill 0.88 and 0.97 × 2 laps: no spins, resets, wall contacts or track-limit violations; flying laps 2:11.8 (McLaren 720S) to 2:24 (AMG ONE) at 0.97 in the dry, 2:26–2:40 fully wet. Browser, heavy rain, 7 bots, 4 min: 10 spins, 4 offs and 1 reset before; 0 / 0 / 0 after. Dry, 9 bots, 5 min: no spins, offs or resets; overlapping car bodies 0–30 samples of ~1,100.
+- **Pace** is unchanged (2:12–2:13 for the Porsche at 0.97 on a flying lap); the out lap is ~1 s slower because the bots now respect cold tyres. Robustness came first: the 2:07 quasi-steady limit and the ~1:54 real pole remain open.
+- **Left:** at a forced skill of 0.97 the Ferrari 296 Challenge (more power, less grip) still overheats its rear tyres by the third lap and spins in some lanes. Bots still don't pit.
+
+### Cockpit eye per car
+
+- **Checked** every car from several eye positions (`cockpitlab.mjs`: one solo race per car, views side by side, wheel position and headroom printed) against what GT3 onboard (helmet) footage shows: the top of the wheel rim and the display in the lower third, the dash across, the windscreen clear, the roof or cage bar at the top edge, the A-pillar to the left.
+- **Found:** the automatic raise (`autoSeat`, up to 14 cm so the road shows over the dash) had lifted the Audi and BMW M4 GT3 eyes 12 cm, the Audi's to 9 cm under the roof (the cage filled the view); the McLaren 650S eye sat 6 cm under the roof and ahead of its wheel; several eyes were 8 cm inboard of the wheel (Porsche, AMG, Ferrari, 720S); the Aston, 650S and BMW Touring eyes were too far forward to see a wheel. The Huracán EVO2 Iron Lynx and McLaren 720S LMGT3 were flagged "no interior", so a generated dash wheel was drawn over their real one. The Aston Martin's interior has no wheel rim (the column ends in a bare hub).
+- **Fix:** `cars.config.json → pipeline.cockpitEye` per car (applied by `optimize.mjs`, and to `cars.json`; marked `tuned`, so there is no automatic raise), mostly 0.35–0.45 m behind and 0.25–0.30 m above the wheel centre and in line with it; cars with a low cage bar sit a little lower to keep it at the top edge. `pipeline.hasInterior` corrects the two cars above; `pipeline.steering` gives the Aston a generated GT3 wheel (rim, grips, display) that turns with the steering. The field of view stays 72° vertical (the Settings default); the seat height and position settings still offset the eye. This supersedes `pipeline.cockpitOffset` (still read by the Blender step).
+- **Left:** the McLaren 720S's mirrored "BLANCPAIN" sun strip is part of its roof texture; the BMW M3 Touring's interior is one dark atlas.
+
+### Render audit
+
+`lapviews.mjs` (the lap every 100 m at driver height and every 400 m from the air, plus two renders 2 mm apart to catch z-fighting): no holes or z-fighting (at most 0.4 % of pixels change between the two renders, distant shimmer). Fixed: one grass material exported fully metallic (a dark mirror on High/Ultra), and the main racing asphalt (`asph_003`) at roughness 0.80 against 0.90 for the rest, which drew a wet-looking glare lobe down every straight towards the sun on a dry track. Not changed: darker new-asphalt patches (source model), sparse trees from the air (distance culling by preset).
+
+Frame rate (`smoke.mjs --gpu --bots 5`, 1080p, this machine's iGPU, shared with another session): Medium 37.6 / 35.8 fps before, 36.0 / 33.3 after; High 13.5 / 13.1 before, 13.3 / 13.0 after: within run-to-run noise.
 
 ## Known limitations
 

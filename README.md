@@ -75,7 +75,11 @@ pnpm typecheck     # strict TypeScript in every package
 pnpm loadtest      # 12 headless clients race a full 3-lap race (needs `pnpm dev` running in another terminal)
 pnpm sim -- 2024_porsche_992_gt3_r   # vehicle-dynamics numbers for one car (0-100, top speed, braking, cornering g, drift)
 pnpm e2e           # browser smoke test with Playwright (needs `pnpm dev`; first run: `npx playwright install chromium`); add --gpu for real GPU fps, --bots 5 to race bots
-pnpm tsx tools/sim/ailap.ts 2024_porsche_992_gt3_r   # one bot lap on the real track per skill level (+ theoretical lap time)
+pnpm tsx tools/sim/ailap.ts 2024_porsche_992_gt3_r   # one bot lap on the real track per skill level (+ theoretical lap time); --laps 3 --wet 1 --slot 5
+pnpm tsx tools/sim/flatness.ts       # bumps, steps and stacked ground layers under the road, per stretch
+node tools/e2e/botrace.mjs --bots 7 --minutes 3 --gpu   # bots in a real session: resets, spins, offs, overlaps (needs `pnpm dev`)
+node tools/e2e/cockpitlab.mjs --cars 0,16             # each car's cockpit from several eye positions
+node tools/e2e/lapviews.mjs                           # the lap at driver height and from the air, with a z-fighting check
 pnpm tsx tools/sim/calibrate.ts      # fit each car's drag to its spec top speed (--write to save)
 pnpm tsx tools/sim/engineaudio.ts    # render every engine's rev sweep to tools/sim/out/*.wav (--synth: old procedural sound)
 pnpm tsx tools/sim/steerresp.ts      # keyboard steering response of every car at 120/200/250 km/h
