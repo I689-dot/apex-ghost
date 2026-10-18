@@ -1,6 +1,6 @@
 """Blender headless map converter.
 
-blender -b --factory-startup -P convert_map.py -- <in.usdc> <out_dir>
+blender -b --factory-startup -P convert_map.py -- <in.usdc> <out_dir> [<map config json>]
 
 Needs <out_dir>/analysis.json and track_base.json from track_analysis.py (scale/offset/centreline).
 Writes <out_dir>/map_track.glb, map_trees.glb, map_terrain.glb and chunks.json.
@@ -20,6 +20,7 @@ from mathutils import Matrix
 
 argv = sys.argv[sys.argv.index("--") + 1 :]
 IN_USD, OUT = argv[0], Path(argv[1])
+CFG = (json.loads(Path(argv[2]).read_text()).get("analysis") or {}) if len(argv) > 2 else {}
 an = json.loads((OUT / "analysis.json").read_text())
 base = json.loads((OUT / "track_base.json").read_text())
 S = an["scale"]
@@ -41,6 +42,16 @@ def log(*a):
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.wm.usd_import(filepath=IN_USD, import_cameras=False, import_lights=False, import_materials=True)
 meshes = [o for o in bpy.data.objects if o.type == "MESH"]
+# generic source material names → the semantic names the pipeline and the client key on (same table as the analysis)
+RENAME = CFG.get("materials", {})
+if RENAME:
+    renamed = 0
+    for mat in list(bpy.data.materials):
+        base_name = re.sub(r"\.\d{3}$", "", mat.name)
+        if base_name in RENAME:
+            mat.name = RENAME[base_name]
+            renamed += 1
+    log("materials renamed", renamed)
 
 # USD (Y-up) is imported as Blender (x, -z, y). Game metres: g = (u + off) * S, and the glTF exporter maps
 # Blender (X, Y, Z) → glTF (X, Z, -Y). So the Blender target is (gx, -gz, gy).

@@ -59,6 +59,8 @@ export interface TrackData extends TrackRaceData {
   startLine: { p: Vec3; d: Vec3; hw: number };
   /** Pit lane: from the entry (inside of the last corner) to the exit (before Turn 1). */
   pitLane: PitLane | null;
+  /** Number of corners (from the track index, for the TV intro); null/absent = not stated. */
+  turns?: number | null;
 }
 
 export interface PitLane {

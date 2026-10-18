@@ -2,18 +2,17 @@
  * Collision-hole scan: casts rays down across the circuit (and its run-off) every 5 m and reports places where
  * nothing is hit, i.e. where a car would fall through the world.
  *
- *   pnpm tsx tools/sim/holes.ts [trackFile]
+ *   pnpm tsx tools/sim/holes.ts [--track <layout id>]
  */
 import RAPIER from '@dimforge/rapier3d-compat';
-import { readFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import type { TrackData } from '../../packages/shared/src/index.ts';
+import { loadTrack, trackArg } from './trackfile.mjs';
 
 await RAPIER.init();
-const pub = 'apps/client/public/assets';
-const track = JSON.parse(readFileSync(process.argv[2] ?? `${pub}/track.json`, 'utf8')) as TrackData;
+const loaded = loadTrack(trackArg(process.argv));
+const track = loaded.track as TrackData;
 const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-const buf = gunzipSync(readFileSync(`${pub}/track/collision.apxc`));
+const buf = loaded.collision;
 const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
 let o = 12;
 for (let i = 0; i < dv.getUint32(8, true); i++) {

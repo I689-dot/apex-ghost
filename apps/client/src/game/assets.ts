@@ -65,6 +65,8 @@ export interface TrackIndexEntry {
   turns: number | null;
   file: string;
   default: boolean;
+  /** Map the layout belongs to (maps/<id>.json); absent = the Nürburgring. */
+  map?: string;
 }
 
 let indexCache: Promise<TrackIndexEntry[]> | null = null;
@@ -85,10 +87,12 @@ export async function loadTrackFile(trackId?: string): Promise<TrackData> {
   const file = entry?.file ?? 'assets/track.json';
   let p = trackFiles.get(file);
   if (!p) {
-    p = fetch(url(file)).then((r) => {
-      if (!r.ok) throw new Error(`Could not load the track (${file}).`);
-      return r.json() as Promise<TrackData>;
-    });
+    p = fetch(url(file))
+      .then((r) => {
+        if (!r.ok) throw new Error(`Could not load the track (${file}).`);
+        return r.json() as Promise<TrackData>;
+      })
+      .then((d) => ({ ...d, turns: d.turns ?? entry?.turns ?? null }));
     trackFiles.set(file, p);
   }
   return p;

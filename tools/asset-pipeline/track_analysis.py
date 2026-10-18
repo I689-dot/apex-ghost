@@ -1,6 +1,11 @@
 """Track analysis (usd-core + numpy + Pillow).
 
-python track_analysis.py <usdc> <out_dir>
+python track_analysis.py <usdc> <out_dir> [<map config json>]
+
+Without a config it analyses the Nürburgring GP 2022 model (the original target). A map config
+(tools/asset-pipeline/maps/<id>.json, key "analysis") adapts it to another model: material renames, surface rules,
+which materials are road / edge lines / kerbs, the official lap length, the size of a source unit and how the
+start/finish line and the grid are painted.
 
 Produces in <out_dir>:
   analysis.json        scale/offset used to convert USD units → game metres (consumed by Blender + optimizer)
@@ -26,8 +31,13 @@ from pxr import Usd, UsdGeom, UsdShade
 USD_PATH = Path(sys.argv[1])
 OUT = Path(sys.argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
+CFG: dict = (json.loads(Path(sys.argv[3]).read_text()).get("analysis") or {}) if len(sys.argv) > 3 else {}
+# Source units relative to the Nürburgring model (~2 m per unit): every distance below that is given in raw units
+# was tuned there and is multiplied by U (Zandvoort's model is ~5x finer).
+U = float(CFG.get("unit", 1.0))
+RENAME: dict = CFG.get("materials", {})
 
-OFFICIAL_LENGTH_M = 5148.0  # Nürburgring GP-Strecke incl. Mercedes-Arena
+OFFICIAL_LENGTH_M = float(CFG.get("officialLengthM", 5148.0))  # Nürburgring GP-Strecke incl. Mercedes-Arena
 GRID_SLOTS = 12
 GATE_SPACING_M = 35.0  # dense checkpoints: resets put you back close to where you left the track
 RUNOFF_MARGIN_M = 14.0
@@ -49,6 +59,8 @@ SURFACE_RULES: list[tuple[str, str]] = [
     (r"^(sand)", "sand"),
     (r"^(tyrewall|walls_new|wall_|grail|galvanized|fence_green|fences_b|sound_barrier|rockwall|metal_wall|box_fence|concrete_0)", "wall"),
 ]
+if "surfaceRules" in CFG:
+    SURFACE_RULES = [(rx, s) for rx, s in CFG["surfaceRules"]]
 SURFACES = ["asphalt", "curb", "grass", "gravel", "sand", "wall"]
 
 
@@ -69,6 +81,7 @@ for prim in stage.Traverse():
     m = UsdGeom.Mesh(prim)
     mat, _ = UsdShade.MaterialBindingAPI(prim).ComputeBoundMaterial()
     name = mat.GetPrim().GetName() if mat else ""
+    name = RENAME.get(name, name)
     pts = np.array(m.GetPointsAttr().Get(), dtype=np.float64)
     M = np.array(xc.GetLocalToWorldTransform(prim))
     w = pts @ M[:3, :3] + M[3, :3]
@@ -90,11 +103,11 @@ def by_prefix(*prefixes: str) -> list[dict]:
 
 
 # ------------------------------------------------------------- raster ---
-road = by_prefix("asph_new", "asph_003", "asph_mid")
+road = [m for m in meshes if m["mat"] in CFG["road"]] if "road" in CFG else by_prefix("asph_new", "asph_003", "asph_mid")
 allroad = np.concatenate([m["v"] for m in road])
-mn = allroad.min(axis=0) - 20
-mx = allroad.max(axis=0) + 20
-RES = 0.25  # raw units per pixel (~0.5 m)
+mn = allroad.min(axis=0) - 20 * U
+mx = allroad.max(axis=0) + 20 * U
+RES = 0.25 * U  # raw units per pixel (~0.5 m)
 W = int((mx[0] - mn[0]) / RES) + 1
 H = int((mx[2] - mn[2]) / RES) + 1
 
@@ -138,14 +151,88 @@ def components(m: dict) -> list[np.ndarray]:
     return [np.nonzero(lab == l)[0] for l in np.unique(lab)]
 
 
-lines = by_prefix("lines_003")[0]
-line_comps = components(lines)
+def merged(name: str) -> dict:
+    """all meshes with this (renamed) material as one triangle soup"""
+    ms_ = [m for m in meshes if m["mat"] == name]
+    vs_, ts_, o_ = [], [], 0
+    for m in ms_:
+        vs_.append(m["v"])
+        ts_.append(m["t"] + o_)
+        o_ += len(m["v"])
+    return {"mat": name, "v": np.concatenate(vs_), "t": np.concatenate(ts_)}
+
+
+def shape(v: np.ndarray) -> dict:
+    c = v.mean(axis=0)
+    xz = v[:, [0, 2]] - c[[0, 2]]
+    ev, evec = np.linalg.eigh(np.cov(xz.T))
+    major = evec[:, 1]
+    return {"c": c, "len": float(np.ptp(xz @ major)), "wid": float(np.ptp(xz @ evec[:, 0])), "dir": major, "nv": len(v)}
+
+
+MARKINGS = CFG.get("markings", {})
+BOXES = MARKINGS.get("mode") == "boxes"
 boundary_img = Image.new("1", (W, H), 0)
 bdr = ImageDraw.Draw(boundary_img)
 slot_bars = []
 finish = None
 start_line = None
-for comp in line_comps:
+if BOXES:
+    # Painted edge lines bound the track (long components only); the start/finish line is its own material; each
+    # grid slot is a bracket (a bar across the front and two short legs) of the grid-markings material.
+    lines = merged(CFG["edgeLines"])
+    px_l, pz_l = to_px(lines["v"][:, 0], lines["v"][:, 2])
+    lab_tris = {}
+    for comp in components(lines):
+        if len(comp) >= 3 and shape(lines["v"][comp])["len"] > 10 * U:
+            for k in comp.tolist():
+                lab_tris[k] = True
+    for a, b, cc in lines["t"]:
+        if a in lab_tris:
+            bdr.polygon([(px_l[a], pz_l[a]), (px_l[b], pz_l[b]), (px_l[cc], pz_l[cc])], fill=1)
+    # the line across the circuit (the same material also marks a line in the pit lane): nearest the hint
+    fm = merged(MARKINGS["finish"])
+    hint = np.array(MARKINGS["finishHint"])
+    fcomps = [shape(fm["v"][comp]) for comp in components(fm) if len(comp) >= 3]
+    finish = min(fcomps, key=lambda f: float(np.linalg.norm(f["c"][[0, 2]] - hint)))
+    fdir_ = finish["dir"] / np.linalg.norm(finish["dir"])
+    gm = merged(MARKINGS["grid"])
+    # a bracket is several unwelded pieces (bar, legs): group small pieces whose centres are close
+    pieces = [comp for comp in components(gm) if len(comp) >= 3 and np.ptp(gm["v"][comp][:, [0, 2]], axis=0).max() < 2.4 * U]
+    pc_ = np.array([gm["v"][comp][:, [0, 2]].mean(axis=0) for comp in pieces]) if pieces else np.zeros((0, 2))
+    grp = list(range(len(pieces)))
+
+    def gf(a: int) -> int:
+        while grp[a] != a:
+            grp[a] = grp[grp[a]]
+            a = grp[a]
+        return a
+
+    for i_ in range(len(pieces)):
+        for j_ in range(i_ + 1, len(pieces)):
+            if np.linalg.norm(pc_[i_] - pc_[j_]) < 1.6 * U:
+                grp[gf(j_)] = gf(i_)
+    clusters: dict = {}
+    for i_, comp in enumerate(pieces):
+        clusters.setdefault(gf(i_), []).append(comp)
+    for parts_ in clusters.values():
+        v = gm["v"][np.concatenate(parts_)]
+        ext = np.ptp(v[:, [0, 2]], axis=0)
+        rel_ = v.mean(axis=0)[[0, 2]] - finish["c"][[0, 2]]
+        # brackets on the circuit (between the ends of the line), not the pit boxes beside it
+        on_track = abs(float(rel_ @ fdir_)) < finish["len"] / 2 and np.linalg.norm(rel_) < 120 * U
+        if 1.0 * U < ext.max() < 4.0 * U and ext.min() > 0.4 * U and on_track:
+            info = shape(v)
+            info["dir"] = finish["dir"]  # the bar is across the track like the line
+            info["verts"] = v
+            slot_bars.append(info)
+            if os.environ.get("GRID_DEBUG"):
+                print("[track] bracket", np.round(info["c"], 1), np.round(ext, 1), round(info["len"], 1), round(info["wid"], 1), len(parts_), flush=True)
+    start_line = finish
+else:
+    lines = by_prefix("lines_003")[0]
+    line_comps = components(lines)
+for comp in ([] if BOXES else line_comps):
     v = lines["v"][comp]
     c = v.mean(axis=0)
     xz = v[:, [0, 2]] - c[[0, 2]]
@@ -172,18 +259,38 @@ for comp in line_comps:
 # base height of the wall drawn at each pixel (NaN = no wall), to tell barriers from bridges overhead
 wall_img = Image.new("F", (W, H), float("nan"))
 wdr = ImageDraw.Draw(wall_img)
+MAX_ABOVE = CFG.get("boundaryMaxAboveRoad")
+if MAX_ABOVE is not None:
+    # highest road surface around each 16-px cell: a wall triangle whose bottom is well above it is overhead
+    # (bridge deck, roof, gantry) and must not cut the road in plan
+    CB = 16
+    hc = np.full(((H + CB - 1) // CB, (W + CB - 1) // CB), -np.inf)
+    hpad = np.where(road_mask, height, -np.inf)
+    hpad = np.pad(hpad, ((0, hc.shape[0] * CB - H), (0, hc.shape[1] * CB - W)), constant_values=-np.inf)
+    hc = hpad.reshape(hc.shape[0], CB, hc.shape[1], CB).max(axis=(1, 3))
+    for _ in range(2):
+        hp = np.pad(hc, 1, constant_values=-np.inf)
+        hc = np.max([hp[1 + dj : 1 + dj + hc.shape[0], 1 + di : 1 + di + hc.shape[1]] for dj in (-1, 0, 1) for di in (-1, 0, 1)], axis=0)
 for m in meshes:
     if surface_of(m["mat"]) != "wall":
         continue
     v, t = m["v"], m["t"]
     px, pz = to_px(v[:, 0], v[:, 2])
+    if MAX_ABOVE is not None:
+        ci_ = np.clip((px[t].mean(axis=1) / CB).astype(int), 0, hc.shape[1] - 1)
+        cj_ = np.clip((pz[t].mean(axis=1) / CB).astype(int), 0, hc.shape[0] - 1)
+        t = t[v[t, 1].min(axis=1) < hc[cj_, ci_] + MAX_ABOVE * U]
     for a, b, c in t:
         bdr.line([(px[a], pz[a]), (px[b], pz[b]), (px[c], pz[c]), (px[a], pz[a])], fill=1, width=3)
         wdr.line([(px[a], pz[a]), (px[b], pz[b]), (px[c], pz[c]), (px[a], pz[a])], fill=float(min(v[a, 1], v[b, 1], v[c, 1])), width=3)
+# hand-placed boundary segments (raw x, z) where the painted edge lines leave a gap into a run-off lane
+for (ax_, az_), (bx_, bz_) in CFG.get("extraBoundaries", []):
+    pa_, pb_ = to_px(np.array([ax_, bx_]), np.array([az_, bz_]))
+    bdr.line([(pa_[0], pb_[0]), (pa_[1], pb_[1])], fill=1, width=3)
 boundary = np.array(boundary_img).astype(bool)
 wall_base = np.array(wall_img)
 # curbs also bound the racing surface
-curb_mask = rasterize(by_prefix("curb_b_001", "curbs_new", "curb_001", "curb_b_yellow")).astype(bool)
+curb_mask = rasterize([m for m in meshes if m["mat"] in CFG["curbs"]] if "curbs" in CFG else by_prefix("curb_b_001", "curbs_new", "curb_001", "curb_b_yellow")).astype(bool)
 assert finish is not None, "finish line not found"
 print(f"[track] finish line at {finish['c'].round(2)}, slot bars {len(slot_bars)}", flush=True)
 
@@ -196,12 +303,40 @@ def is_road(x: float, z: float) -> bool:
     return bool(road_mask[j, i]) and not bool(boundary[j, i])
 
 
-def edge_dist(p: np.ndarray, n: np.ndarray, maxd: float) -> float:
+# The centreline trace can follow a narrower mask (Zandvoort: only the racing surface, so it cannot turn into the
+# service roads and run-off that join the circuit); widths and the pit lane use the whole road.
+trace_mask = road_mask
+if "traceRoad" in CFG:
+    # the racing surface, grown along the road by traceDilate (raw units) to bridge the short stretches where the
+    # model paints it with another asphalt material
+    trace_mask = rasterize([m for m in meshes if m["mat"] in CFG["traceRoad"]]).astype(bool)
+    for _ in range(int(CFG.get("traceDilate", 0) / RES)):
+        g_ = trace_mask.copy()
+        g_[1:, :] |= trace_mask[:-1, :]
+        g_[:-1, :] |= trace_mask[1:, :]
+        g_[:, 1:] |= trace_mask[:, :-1]
+        g_[:, :-1] |= trace_mask[:, 1:]
+        trace_mask = g_ & road_mask
+
+
+if os.environ.get("TRACE_DEBUG"):
+    np.savez_compressed(OUT / "trace_debug.npz", road=road_mask, trace=trace_mask, boundary=boundary, mn=mn, res=RES)
+
+
+def is_trace(x: float, z: float) -> bool:
+    i, j = int((x - mn[0]) / RES), int((z - mn[2]) / RES)
+    if i < 0 or j < 0 or i >= W or j >= H:
+        return False
+    return bool(trace_mask[j, i]) and not bool(boundary[j, i])
+
+
+def edge_dist(p: np.ndarray, n: np.ndarray, maxd: float, inside=None) -> float:
+    inside = inside or is_road
     d = 0.0
     while d < maxd:
         d += RES * 0.5
         q = p + n * d
-        if not is_road(q[0], q[1]):
+        if not inside(q[0], q[1]):
             return d
     return math.inf
 
@@ -212,6 +347,9 @@ perp = np.array([fd[1], -fd[0]])
 pole_side = np.mean([b["c"][[0, 2]] for b in slot_bars], axis=0) - finish["c"][[0, 2]]
 if np.dot(perp, pole_side) < 0:
     perp = -perp
+GRID_BEHIND = bool(MARKINGS.get("gridBehindFinish"))
+if GRID_BEHIND:
+    perp = -perp  # one line for start and finish, the grid behind it: race away from the grid
 # the grid lies behind the start line, which is ahead of the finish line on this layout
 p0 = finish["c"][[0, 2]].copy()
 # The chequered strip only covers the pit-wall side of the straight: starting the trace there sent it down
@@ -222,19 +360,21 @@ grid_mid = np.mean([b["c"][[0, 2]] for b in slot_bars], axis=0)
 p0 = p0 + fdn * float(np.dot(grid_mid - p0, fdn))
 d = perp / np.linalg.norm(perp)
 d0 = d.copy()
-STEP = 0.5  # raw units
-HALF_MAX = 9.0  # raw units: beyond this a "side" is run-off or a junction
+STEP = 0.5 * U  # raw units
+HALF_MAX = 9.0 * U  # raw units: beyond this a "side" is run-off or a junction
 pts = [p0.copy()]
 halfL, halfR = [], []
 p = p0.copy()
-prev_l, prev_r = 3.5, 3.5
+prev_l, prev_r = 3.5 * U, 3.5 * U
 closed_at: int | None = None
 EXTRA = 1200
 for it in range(30000):
     q = p + d * STEP
     n = np.array([d[1], -d[0]])  # left of travel (x,z with y up: left = (dz, -dx))
-    l = edge_dist(q, n, HALF_MAX)
-    r = edge_dist(q, -n, HALF_MAX)
+    # (between two pieces of the racing-surface mesh: follow the whole road for a step)
+    inside_ = is_trace if is_trace(q[0], q[1]) else is_road
+    l = edge_dist(q, n, HALF_MAX, inside_)
+    r = edge_dist(q, -n, HALF_MAX, inside_)
     if math.isfinite(l) and math.isfinite(r) and l + r < 2 * HALF_MAX:
         shift = (l - r) / 2
         prev_l, prev_r = l, r
@@ -244,7 +384,7 @@ for it in range(30000):
         shift = prev_r - r
     else:
         shift = 0.0
-    shift = max(-0.15, min(0.15, shift))
+    shift = max(-0.15 * U, min(0.15 * U, shift))
     q = q + n * shift
     nd = q - p
     nd /= np.linalg.norm(nd)
@@ -252,14 +392,14 @@ for it in range(30000):
     d /= np.linalg.norm(d)
     p = q
     pts.append(p.copy())
-    halfL.append(min(l, prev_l + 1) if math.isfinite(l) else prev_l)
-    halfR.append(min(r, prev_r + 1) if math.isfinite(r) else prev_r)
+    halfL.append(min(l, prev_l + U) if math.isfinite(l) else prev_l)
+    halfR.append(min(r, prev_r + U) if math.isfinite(r) else prev_r)
     # Close at the finish line, then keep tracing 300 steps: the very first steps were still converging
     # from the finish line's mid-point (near the pit wall); the extra steps replace them below.
     if closed_at is None and it > 2000:
         before = np.dot(pts[-2] - p0, d0)
         after = np.dot(p - p0, d0)
-        if before < 0 <= after and np.linalg.norm(p - p0) < 15:
+        if before < 0 <= after and np.linalg.norm(p - p0) < 15 * U:
             closed_at = len(pts) - 1
     if closed_at is not None and len(pts) - 1 >= closed_at + EXTRA:
         break
@@ -271,10 +411,15 @@ else:
         import matplotlib.pyplot as plt
 
         tp = np.array(pts)
-        fig, ax = plt.subplots(figsize=(14, 16), dpi=70)
+        fig, ax = plt.subplots(figsize=(20, 22), dpi=70)
         ax.imshow(road_mask[::2, ::2] * 1 + boundary[::2, ::2] * 2, origin="lower", extent=[mn[0], mn[0] + W * RES, mn[2], mn[2] + H * RES], cmap="viridis")
         ax.plot(tp[:, 0], tp[:, 1], "r-", lw=1)
         ax.plot(tp[-1, 0], tp[-1, 1], "wo", ms=8)
+        for k_ in range(0, len(tp), 500):
+            if mn[0] < tp[k_, 0] < mx[0] and mn[2] < tp[k_, 1] < mx[2]:
+                ax.text(tp[k_, 0], tp[k_, 1], str(k_), color="w", fontsize=7)
+        ax.set_xlim(mn[0], mx[0])
+        ax.set_ylim(mn[2], mx[2])
         plt.savefig(OUT / "debug_trace_fail.png", bbox_inches="tight")
     except Exception as e:  # noqa: BLE001
         print("[track] plot failed", e)
@@ -311,13 +456,16 @@ hr_raw = np.array(halfR)
 seg = np.linalg.norm(np.diff(np.vstack([pts, pts[:1]]), axis=0), axis=1)
 raw_cum = np.concatenate([[0], np.cumsum(seg)])
 raw_len_unsmoothed = float(raw_cum[-1])
-smooth_raw, _, _ = resample(pts, int(raw_len_unsmoothed / 2.0))
+smooth_raw, _, _ = resample(pts, int(raw_len_unsmoothed / (2.0 * U)))
 for _ in range(2):
     smooth_raw = np.stack([circ_smooth(smooth_raw[:, 0]), circ_smooth(smooth_raw[:, 1])], axis=1)
 raw_len = float(np.linalg.norm(np.diff(np.vstack([smooth_raw, smooth_raw[:1]]), axis=0), axis=1).sum())
 SCALE = OFFICIAL_LENGTH_M / raw_len
 print(f"[track] traced {len(pts)} pts, smoothed raw length {raw_len:.1f} units → scale {SCALE:.4f} m/unit", flush=True)
-if not (1.8 < SCALE < 2.1):
+SCALE_RANGE = CFG.get("scaleRange", [1.8, 2.1])
+if not (SCALE_RANGE[0] < SCALE < SCALE_RANGE[1]):
+    if CFG:
+        raise SystemExit(f"[track] scale {SCALE:.4f} outside the expected range {SCALE_RANGE}: the trace went wrong")
     print("[track] WARNING scale outside the expected range, falling back to 1/0.5143", flush=True)
     SCALE = 1 / 0.5143
 
@@ -349,7 +497,7 @@ hr = circ_smooth(hr_raw[nearest])
 # Re-centre on the asphalt and measure the widths directly along each point's normal. The smoothing above
 # straightens tight chicanes (Veedol) and hairpins, which put the line on the grass and let the widths of
 # one side bleed into the other.
-SEARCH = 9.0  # raw units either side (~18 m)
+SEARCH = 9.0 * U  # raw units either side (~18 m)
 offs = np.arange(-SEARCH, SEARCH + 1e-9, RES * 0.5)
 
 
@@ -376,7 +524,7 @@ def road_interval(k: int):
         if a_ <= 0 <= b_:
             return a_, b_
     a_, b_ = min(segs, key=lambda sg: min(abs(sg[0]), abs(sg[1])))
-    return (a_, b_) if min(abs(a_), abs(b_)) < 4.0 else None
+    return (a_, b_) if min(abs(a_), abs(b_)) < 4.0 * U else None
 
 
 recentred = 0
@@ -385,9 +533,9 @@ for _ in range(3):
     for k in range(len(cx)):
         iv = road_interval(k)
         if iv is not None:
-            shift[k] = max(-3.0, min(3.0, (iv[0] + iv[1]) / 2))
+            shift[k] = max(-3.0 * U, min(3.0 * U, (iv[0] + iv[1]) / 2))
     shift = np.convolve(np.concatenate([shift[-2:], shift, shift[:2]]), np.ones(5) / 5, mode="valid")
-    recentred = int((np.abs(shift) > 0.5).sum())
+    recentred = int((np.abs(shift) > 0.5 * U).sum())
     for k in range(len(cx)):
         nx_, nz_ = normal_at(k)
         cx[k] += nx_ * shift[k]
@@ -403,7 +551,7 @@ for k in range(len(cx)):
     if not is_road(cx[k], cz[k]):
         iv = road_interval(k)
         if iv is not None:
-            o_ = iv[0] + 0.5 if iv[0] > 0 else iv[1] - 0.5
+            o_ = iv[0] + 0.5 * U if iv[0] > 0 else iv[1] - 0.5 * U
             nx_, nz_ = normal_at(k)
             cx[k] += nx_ * o_
             cz[k] += nz_ * o_
@@ -446,7 +594,7 @@ def wall_dist(x: float, z: float, road_y: float, nx_: float, nz_: float, maxd: f
         d += RES * 0.5
         i, j = int((x + nx_ * d - mn[0]) / RES), int((z + nz_ * d - mn[2]) / RES)
         # a barrier stands on the ground; a bridge deck or gantry is well above the road
-        if 0 <= i < W and 0 <= j < H and wall_base[j, i] < road_y + 1.0:
+        if 0 <= i < W and 0 <= j < H and wall_base[j, i] < road_y + 1.0 * U:
             return d
     return math.inf
 
@@ -469,6 +617,17 @@ for k in range(len(cx)):
             arr[k] = max(1.5, v_)
             clamped += 1
 print(f"[track] widths clamped near walls at {clamped} points", flush=True)
+if "widthDespike" in CFG:
+    # side roads and run-off joining the circuit read as short width spikes (the racing line swung into them):
+    # cap each side at the running median (±40 m) plus a margin
+    lim_ = float(CFG["widthDespike"])
+    nd_ = 0
+    for arr in (widthL, widthR):
+        ext_ = np.concatenate([arr[-8:], arr, arr[:8]])
+        med_ = np.array([np.median(ext_[k : k + 17]) for k in range(len(arr))])
+        nd_ += int((arr > med_ + lim_).sum())
+        np.minimum(arr, med_ + lim_, out=arr)
+    print(f"[track] width spikes capped at {nd_} points", flush=True)
 print(f"[track] centreline {len(cl)} pts, length {length:.1f} m", flush=True)
 
 
@@ -500,6 +659,40 @@ def along(pxz: np.ndarray) -> float:
 
 
 race_dir_raw = perp / np.linalg.norm(perp)
+if BOXES:
+    # a slot's reference point is the middle of its front bar (the bracket's foremost edge)
+    for b in slot_bars:
+        rel = b["verts"][:, [0, 2]] @ race_dir_raw
+        cc = b["c"].copy()
+        delta = float(rel.max() - cc[[0, 2]] @ race_dir_raw)
+        cc[0] += race_dir_raw[0] * delta
+        cc[2] += race_dir_raw[1] * delta
+        b["c"] = cc
+    # Keep clean brackets only (a few merge with the pit-entry hatching), then rebuild the staggered sequence
+    # from the pole: one slot every `step` along the straight, alternating columns; a slot whose bracket was not
+    # found is placed on its column at the expected distance.
+    fdn_ = finish["dir"] / np.linalg.norm(finish["dir"])
+    ok_ = [b for b in slot_bars if 1.6 * U < np.ptp(b["verts"][:, [0, 2]] @ race_dir_raw) < 2.4 * U and 1.0 * U < np.ptp(b["verts"][:, [0, 2]] @ fdn_) < 1.6 * U]
+    rows_ = sorted(((float((b["c"][[0, 2]] - finish["c"][[0, 2]]) @ race_dir_raw), float((b["c"][[0, 2]] - finish["c"][[0, 2]]) @ fdn_), b) for b in ok_), key=lambda r_: -r_[0])
+    lat_mid = float(min(r_[1] for r_ in rows_) + max(r_[1] for r_ in rows_)) / 2
+    cols_ = {side: [r_ for r_ in rows_ if (r_[1] > lat_mid) == side] for side in (True, False)}
+    step_ = float(np.median(np.concatenate([-np.diff([r_[0] for r_ in c_]) for c_ in cols_.values() if len(c_) > 1]))) / 2
+    col_lat = {side: float(np.median([r_[1] for r_ in c_])) for side, c_ in cols_.items()}
+    pole_side_ = rows_[0][1] > lat_mid
+    regular = []
+    synthesized = 0
+    for k_ in range(GRID_SLOTS):
+        side = pole_side_ if k_ % 2 == 0 else not pole_side_
+        exp_ = rows_[0][0] - k_ * step_
+        hit = [r_ for r_ in cols_[side] if abs(r_[0] - exp_) < 0.3 * step_]
+        if hit:
+            regular.append(hit[0][2])
+            continue
+        p2 = finish["c"][[0, 2]] + race_dir_raw * exp_ + fdn_ * col_lat[side]
+        regular.append({"c": np.array([p2[0], sample_height(p2[0], p2[1]), p2[1]]), "dir": finish["dir"]})
+        synthesized += 1
+    print(f"[track] grid brackets {len(ok_)}, slot step {step_ * SCALE:.2f} m, {synthesized} of {GRID_SLOTS} slots synthesized", flush=True)
+    slot_bars = regular
 cands = []
 for b in slot_bars:
     c = b["c"]
@@ -507,17 +700,24 @@ for b in slot_bars:
     if abs(np.dot(b["dir"], race_dir_raw)) > 0.35:
         continue
     s = along(c[[0, 2]])
-    if s < 0 or s > 350:
+    if (s < length - 350) if GRID_BEHIND else (s < 0 or s > 350):
         continue
     cands.append((s, b))
 cands.sort(key=lambda x: -x[0])
 # de-duplicate (some boxes have two parallel bars)
 grid_raw = []
 for s, b in cands:
-    if all(np.linalg.norm(b["c"][[0, 2]] - o["c"][[0, 2]]) > 1.0 for _, o in grid_raw):
+    if all(np.linalg.norm(b["c"][[0, 2]] - o["c"][[0, 2]]) > 1.0 * U for _, o in grid_raw):
         grid_raw.append((s, b))
 grid = []
 fwd = np.array([race_dir_raw[0], 0, race_dir_raw[1]])
+if BOXES and grid_raw:
+    # face along the straight (a line fitted through the lap line beside the grid), not square to the painted line
+    s_last = grid_raw[min(len(grid_raw), GRID_SLOTS) - 1][0]
+    near_ = cl[(cumS >= s_last - 10) | (cumS <= 5)][:, [0, 2]]
+    ax_ = np.linalg.eigh(np.cov((near_ - near_.mean(axis=0)).T))[1][:, 1]
+    ax_ = ax_ if ax_ @ race_dir_raw > 0 else -ax_
+    fwd = np.array([ax_[0], 0, ax_[1]])
 yaw = math.atan2(fwd[0], fwd[2])  # rotation about +Y so that +Z (car forward) points along fwd
 for s, b in grid_raw[:GRID_SLOTS]:
     gp = np.array(to_game(*b["c"]))
@@ -608,14 +808,14 @@ def pit_trace(p_start: np.ndarray, d_start: np.ndarray, max_steps: int = 2400):
     p = p_start.copy()
     d = d_start / np.linalg.norm(d_start)
     pts_ = [p.copy()]
-    prev_l_, prev_r_ = 1.5, 1.5
+    prev_l_, prev_r_ = 1.5 * U, 1.5 * U
     left_main = False
     merged_at = None
     for it in range(max_steps):
         q = p + d * STEP
         n = np.array([d[1], -d[0]])
-        l = edge_dist(q, n, 6.0)
-        r_ = edge_dist(q, -n, 6.0)
+        l = edge_dist(q, n, 6.0 * U)
+        r_ = edge_dist(q, -n, 6.0 * U)
         if math.isfinite(l) and math.isfinite(r_):
             shift = (l - r_) / 2
             prev_l_, prev_r_ = l, r_
@@ -625,7 +825,7 @@ def pit_trace(p_start: np.ndarray, d_start: np.ndarray, max_steps: int = 2400):
             shift = prev_r_ - r_
         else:
             shift = 0.0
-        q = q + n * max(-0.15, min(0.15, shift))
+        q = q + n * max(-0.15 * U, min(0.15 * U, shift))
         nd = q - p
         nd /= np.linalg.norm(nd)
         d = d * 0.75 + nd * 0.25
@@ -633,115 +833,152 @@ def pit_trace(p_start: np.ndarray, d_start: np.ndarray, max_steps: int = 2400):
         p = q
         pts_.append(p.copy())
         dm, _ = dist_to_main(p)
-        if dm > 5.0:
+        if dm > 5.0 * U:
             left_main = True
-        if left_main and dm < 1.2:
+        if left_main and dm < 1.2 * U:
             merged_at = it
             break
     return np.array(pts_), merged_at
 
 
+
+
+def pit_from_lap(spec: dict) -> dict:
+    """Pit lane given as (lap distance, lateral offset) pairs on the centreline (+ = left of travel), measured on
+    the surfaces beside the circuit; s may run past the line (negative before it)."""
+    sl = np.array(spec["sLat"], dtype=float)
+    pts_ = []
+    lap_s = []
+    for s_ in np.arange(sl[0, 0], sl[-1, 0] + 1e-6, 2.5):
+        lat_ = float(np.interp(s_, sl[:, 0], sl[:, 1]))
+        sm_ = s_ % length
+        i_ = int(np.searchsorted(cumS, sm_, side="right") - 1)
+        j_ = (i_ + 1) % len(cl)
+        seg_ = (length if j_ == 0 else cumS[j_]) - cumS[i_]
+        f_ = (sm_ - cumS[i_]) / seg_ if seg_ > 0 else 0.0
+        p_ = cl[i_] + (cl[j_] - cl[i_]) * f_
+        t_ = tangent(i_)
+        pts_.append([float(p_[0] + t_[2] * lat_), float(p_[1]), float(p_[2] - t_[0] * lat_)])
+        lap_s.append(s_)
+    lap_s = np.array(lap_s)
+    box = [int(np.argmin(np.abs(lap_s - spec["box"][0]))), int(np.argmin(np.abs(lap_s - spec["box"][1])))]
+    plen = float(sum(np.linalg.norm(np.array(pts_[k + 1]) - np.array(pts_[k])) for k in range(len(pts_) - 1)))
+    print(f"[track] pit lane from the map config: {plen:.0f} m, entry at {sl[0, 0] % length:.0f} m, exit at {sl[-1, 0] % length:.0f} m, boxes {box[0]}..{box[1]}", flush=True)
+    return {
+        "points": [[round(v, 3) for v in q] for q in pts_],
+        "length": round(plen, 1),
+        "entryS": round(float(sl[0, 0] % length), 1),
+        "exitS": round(float(sl[-1, 0] % length), 1),
+        "boxFrom": box[0],
+        "boxTo": box[1],
+        "speedLimitKmh": int(spec.get("speedLimitKmh", 60)),
+    }
+
+
 pit = None
-try:
-    fwd_dir = d0 / np.linalg.norm(d0)
-    # find the corridor: scan sideways from the main straight at the line; the pit lane is the next strip of
-    # asphalt after the track's edge (on the garage side, either side is tried)
-    fin = finish["c"][[0, 2]]
-    _, k0 = dist_to_main(fin)
-    on_main = main_xz[k0]
-    side = np.array([fwd_dir[1], -fwd_dir[0]])
-    start = None
-    offs_ = np.arange(0, 16, RES * 0.5)
-    best = None
-    for sgn in (-1.0, 1.0):
-        flags = [is_road(*(on_main + side * sgn * o)) for o in offs_]
-        i = 0
-        while i < len(flags) and flags[i]:
-            i += 1  # the track itself
-        # road strips beyond it: the pit lane is the widest one of pit-lane width (the narrow strip in front of
-        # the pit wall is run-off)
-        while i < len(flags):
-            while i < len(flags) and not flags[i]:
-                i += 1
-            j = i
-            while j < len(flags) and flags[j]:
-                j += 1
-            w_ = offs_[min(j, len(offs_) - 1)] - offs_[min(i, len(offs_) - 1)]
-            if 2.5 <= w_ <= 7.0 and (best is None or w_ > best[0]):
-                best = (w_, sgn, (offs_[i] + offs_[min(j, len(offs_) - 1)]) / 2)
-            i = j
-    if best is not None:
-        start = on_main + side * best[1] * best[2]
-        print(f"[track] pit lane found {best[2] * SCALE:.1f} m beside the line, {best[0] * SCALE:.1f} m wide", flush=True)
-    if start is None:
+if CFG.get("pitLane"):
+    pit = pit_from_lap(CFG["pitLane"])
+else:
+    try:
+        fwd_dir = d0 / np.linalg.norm(d0)
+        # find the corridor: scan sideways from the main straight at the line; the pit lane is the next strip of
+        # asphalt after the track's edge (on the garage side, either side is tried)
+        fin = finish["c"][[0, 2]]
+        _, k0 = dist_to_main(fin)
+        on_main = main_xz[k0]
+        side = np.array([fwd_dir[1], -fwd_dir[0]])
+        start = None
+        offs_ = np.arange(0, 16 * U, RES * 0.5)
+        best = None
         for sgn in (-1.0, 1.0):
-            row = ""
-            for o in np.arange(0, 16, RES * 0.5):
-                q_ = on_main + side * sgn * o
-                i_, j_ = int((q_[0] - mn[0]) / RES), int((q_[1] - mn[2]) / RES)
-                row += "#" if boundary[j_, i_] else ("." if road_mask[j_, i_] else " ")
-            print(f"[track] scan {sgn:+.0f}: |{row}|", flush=True)
-        raise RuntimeError("no corridor beside the start/finish line")
-    ahead, merge_out = pit_trace(start, fwd_dir)
-    behind, merge_in = pit_trace(start, -fwd_dir)
-    if os.environ.get("PIT_DEBUG"):
-        import matplotlib
+            flags = [is_road(*(on_main + side * sgn * o)) for o in offs_]
+            i = 0
+            while i < len(flags) and flags[i]:
+                i += 1  # the track itself
+            # road strips beyond it: the pit lane is the widest one of pit-lane width (the narrow strip in front of
+            # the pit wall is run-off)
+            while i < len(flags):
+                while i < len(flags) and not flags[i]:
+                    i += 1
+                j = i
+                while j < len(flags) and flags[j]:
+                    j += 1
+                w_ = offs_[min(j, len(offs_) - 1)] - offs_[min(i, len(offs_) - 1)]
+                if 2.5 * U <= w_ <= 7.0 * U and (best is None or w_ > best[0]):
+                    best = (w_, sgn, (offs_[i] + offs_[min(j, len(offs_) - 1)]) / 2)
+                i = j
+        if best is not None:
+            start = on_main + side * best[1] * best[2]
+            print(f"[track] pit lane found {best[2] * SCALE:.1f} m beside the line, {best[0] * SCALE:.1f} m wide", flush=True)
+        if start is None:
+            for sgn in (-1.0, 1.0):
+                row = ""
+                for o in np.arange(0, 16 * U, RES * 0.5):
+                    q_ = on_main + side * sgn * o
+                    i_, j_ = int((q_[0] - mn[0]) / RES), int((q_[1] - mn[2]) / RES)
+                    row += "#" if boundary[j_, i_] else ("." if road_mask[j_, i_] else " ")
+                print(f"[track] scan {sgn:+.0f}: |{row}|", flush=True)
+            raise RuntimeError("no corridor beside the start/finish line")
+        ahead, merge_out = pit_trace(start, fwd_dir)
+        behind, merge_in = pit_trace(start, -fwd_dir)
+        if os.environ.get("PIT_DEBUG"):
+            import matplotlib
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots(figsize=(14, 14), dpi=80)
-        ax.imshow(road_mask * 1 + boundary * 2, origin="lower", cmap="Greys", alpha=0.5, extent=[mn[0], mn[0] + W * RES, mn[2], mn[2] + H * RES])
-        ax.plot(main_xz[:, 0], main_xz[:, 1], "b-", lw=1)
-        ax.plot(ahead[:, 0], ahead[:, 1], "r-", lw=1.5)
-        ax.plot(behind[:, 0], behind[:, 1], "m-", lw=1.5)
-        c0 = finish["c"][[0, 2]]
-        for b in slot_bars:
-            ax.plot(b["c"][0], b["c"][2], "go", ms=3)
-        ax.plot(main_xz[0, 0], main_xz[0, 1], "ko", ms=8)
-        ax.set_xlim(c0[0] - 600, c0[0] + 600)
-        ax.set_ylim(c0[1] - 600, c0[1] + 600)
-        plt.savefig(OUT / "debug_pit.png", bbox_inches="tight")
-    if merge_out is None or merge_in is None:
-        print(f"[track] pit lane: trace did not merge (out {merge_out}, in {merge_in})", flush=True)
-    else:
-        pit_raw = np.vstack([behind[::-1], ahead[1:]])
-        # resample every 2.5 m and smooth lightly
-        segp = np.linalg.norm(np.diff(pit_raw, axis=0), axis=1)
-        cump = np.concatenate([[0], np.cumsum(segp)])
-        npts = max(4, int(cump[-1] * SCALE / 2.5))
-        sp = np.linspace(0, cump[-1], npts)
-        px_ = np.interp(sp, cump, pit_raw[:, 0])
-        pz_ = np.interp(sp, cump, pit_raw[:, 1])
-        for _ in range(3):
-            px_[1:-1] = (px_[:-2] + px_[1:-1] + px_[2:]) / 3
-            pz_[1:-1] = (pz_[:-2] + pz_[1:-1] + pz_[2:]) / 3
-        pit_pts = [to_game(x, sample_height(x, z), z) for x, z in zip(px_, pz_)]
-        pit_len = float(sum(np.linalg.norm(np.array(pit_pts[i + 1]) - np.array(pit_pts[i])) for i in range(len(pit_pts) - 1)))
-        _, i_in = dist_to_main(pit_raw[0])
-        _, i_out = dist_to_main(pit_raw[-1])
-        # service boxes: on the straight part of the lane alongside the start/finish line (where the garages are)
-        k_fin = int(np.argmin((px_ - start[0]) ** 2 + (pz_ - start[1]) ** 2))
-        box_from = max(0, k_fin - int(70 / 2.5))
-        box_to = min(len(pit_pts) - 1, k_fin + int(70 / 2.5))
-        pit = {
-            "points": [[round(v, 3) for v in q] for q in pit_pts],
-            "length": round(pit_len, 1),
-            "entryS": round(float(cumS[i_in]), 1),
-            "exitS": round(float(cumS[i_out]), 1),
-            "boxFrom": box_from,
-            "boxTo": box_to,
-            "speedLimitKmh": 60,
-        }
-        print(f"[track] pit lane {pit_len:.0f} m, entry at {cumS[i_in]:.0f} m, exit at {cumS[i_out]:.0f} m, boxes {box_from}..{box_to}", flush=True)
-except Exception as e:  # noqa: BLE001
-    print("[track] pit lane trace failed", e, flush=True)
+            fig, ax = plt.subplots(figsize=(14, 14), dpi=80)
+            ax.imshow(road_mask * 1 + boundary * 2, origin="lower", cmap="Greys", alpha=0.5, extent=[mn[0], mn[0] + W * RES, mn[2], mn[2] + H * RES])
+            ax.plot(main_xz[:, 0], main_xz[:, 1], "b-", lw=1)
+            ax.plot(ahead[:, 0], ahead[:, 1], "r-", lw=1.5)
+            ax.plot(behind[:, 0], behind[:, 1], "m-", lw=1.5)
+            c0 = finish["c"][[0, 2]]
+            for b in slot_bars:
+                ax.plot(b["c"][0], b["c"][2], "go", ms=3)
+            ax.plot(main_xz[0, 0], main_xz[0, 1], "ko", ms=8)
+            ax.set_xlim(c0[0] - 600 * U, c0[0] + 600 * U)
+            ax.set_ylim(c0[1] - 600 * U, c0[1] + 600 * U)
+            plt.savefig(OUT / "debug_pit.png", bbox_inches="tight")
+        if merge_out is None or merge_in is None:
+            print(f"[track] pit lane: trace did not merge (out {merge_out}, in {merge_in})", flush=True)
+        else:
+            pit_raw = np.vstack([behind[::-1], ahead[1:]])
+            # resample every 2.5 m and smooth lightly
+            segp = np.linalg.norm(np.diff(pit_raw, axis=0), axis=1)
+            cump = np.concatenate([[0], np.cumsum(segp)])
+            npts = max(4, int(cump[-1] * SCALE / 2.5))
+            sp = np.linspace(0, cump[-1], npts)
+            px_ = np.interp(sp, cump, pit_raw[:, 0])
+            pz_ = np.interp(sp, cump, pit_raw[:, 1])
+            for _ in range(3):
+                px_[1:-1] = (px_[:-2] + px_[1:-1] + px_[2:]) / 3
+                pz_[1:-1] = (pz_[:-2] + pz_[1:-1] + pz_[2:]) / 3
+            pit_pts = [to_game(x, sample_height(x, z), z) for x, z in zip(px_, pz_)]
+            pit_len = float(sum(np.linalg.norm(np.array(pit_pts[i + 1]) - np.array(pit_pts[i])) for i in range(len(pit_pts) - 1)))
+            _, i_in = dist_to_main(pit_raw[0])
+            _, i_out = dist_to_main(pit_raw[-1])
+            # service boxes: on the straight part of the lane alongside the start/finish line (where the garages are)
+            k_fin = int(np.argmin((px_ - start[0]) ** 2 + (pz_ - start[1]) ** 2))
+            box_from = max(0, k_fin - int(70 / 2.5))
+            box_to = min(len(pit_pts) - 1, k_fin + int(70 / 2.5))
+            pit = {
+                "points": [[round(v, 3) for v in q] for q in pit_pts],
+                "length": round(pit_len, 1),
+                "entryS": round(float(cumS[i_in]), 1),
+                "exitS": round(float(cumS[i_out]), 1),
+                "boxFrom": box_from,
+                "boxTo": box_to,
+                "speedLimitKmh": 60,
+            }
+            print(f"[track] pit lane {pit_len:.0f} m, entry at {cumS[i_in]:.0f} m, exit at {cumS[i_out]:.0f} m, boxes {box_from}..{box_to}", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print("[track] pit lane trace failed", e, flush=True)
 
 r = lambda a: [round(float(v), 3) for v in a]
 track = {
     "version": 1,
-    "id": "nurburgring_gp_2022",
-    "name": "Nürburgring GP",
+    "id": CFG.get("id", "nurburgring_gp_2022"),
+    "name": CFG.get("name", "Nürburgring GP"),
     "length": round(length, 2),
     "centerline": [round(float(v), 3) for v in cl.reshape(-1)],
     "cumS": [round(float(v), 3) for v in cumS],
@@ -764,7 +1001,7 @@ track = {
 # The map also contains the link road that skips the Müllenbachschleife (the northern loop): the GP-Strecke
 # without it is the short layout. Built by tracing the link from its middle in both directions until it merges
 # with the circuit, then splicing it into the GP centreline (same start/finish, grid and pit lane).
-LAYOUTS = [
+LAYOUTS = CFG["layouts"] if "layouts" in CFG else [
     {
         "id": "nurburgring_short",
         "name": "Nürburgring GP · Short (no Müllenbachschleife)",

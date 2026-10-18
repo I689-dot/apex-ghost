@@ -93,15 +93,20 @@ export class App {
   private audio: GameAudio | null = null;
   private backdropEl: HTMLElement | null = null;
 
-  /** Full-screen photo behind the menus (in-engine shots of the circuit, tools/e2e/photos.mjs); null in races. */
-  private setBackdrop(name: 'grid' | 'straight' | 'aerial' | 'pole' | null): void {
+  /**
+   * Full-screen photo behind the menus (in-engine shots of the circuit, tools/e2e/photos.mjs); null in races.
+   * Other maps than the Nürburgring have their own set (photo_<name>_<map>.webp), picked by the session's track.
+   */
+  private setBackdrop(name: 'grid' | 'straight' | 'aerial' | 'pole' | null, trackId?: string): void {
     this.showroom.stop();
     if (!this.backdropEl) {
       this.backdropEl = h('div.backdrop');
       document.getElementById('app')?.prepend(this.backdropEl);
     }
     this.backdropEl.classList.toggle('show', !!name);
-    if (name) this.backdropEl.style.backgroundImage = `url(${uiAsset(`photo_${name}.webp`)})`;
+    const map = this.trackIndex.find((tr) => tr.id === trackId)?.map;
+    const img = `url(${uiAsset(`photo_${name}${map && map !== 'nurburgring' ? `_${map}` : ''}.webp`)})`;
+    if (name && this.backdropEl.style.backgroundImage !== img) this.backdropEl.style.backgroundImage = img;
   }
 
   /* ----------------------------------------------------------------- menu --- */
@@ -185,7 +190,7 @@ export class App {
           'div.brand',
           {},
           h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-          h('p', { text: t('Online sim racing for friends · Nürburgring GP') }),
+          h('p', { text: t('Online sim racing for friends · Nürburgring · Zandvoort') }),
         ),
         form,
         h(
@@ -281,7 +286,7 @@ export class App {
     this.screen = 'lobby';
     this.session?.dispose();
     this.session = null;
-    this.setBackdrop('straight');
+    this.setBackdrop('straight', this.room?.conditions.trackId);
     this.lobbyEl = null;
     this.renderLobby();
   }
@@ -448,6 +453,7 @@ export class App {
   private renderLobby(): void {
     const room = this.room;
     if (!room || !this.conn) return;
+    if (this.screen === 'lobby') this.setBackdrop('straight', room.conditions.trackId); // follows the host's track choice
     const mine = this.myInfo();
     const cars = this.cars?.cars ?? [];
     const browsing = cars.find((c) => c.id === (this.browsing ?? mine?.carId)) ?? cars.find((c) => c.id === mine?.carId) ?? null;
@@ -619,7 +625,7 @@ export class App {
     this.screen = 'loading';
     this.pendingRace = race;
     this.pendingStartAt = startAt;
-    this.setBackdrop('aerial');
+    this.setBackdrop('aerial', race.trackId);
     this.session?.dispose();
     const w0 = weatherAt(race.weather, 0);
     const slot = (race.slots[this.me] ?? 0) + 1;
@@ -758,7 +764,7 @@ export class App {
     this.session?.dispose();
     this.session = null;
     this.screen = 'results';
-    this.setBackdrop('pole');
+    this.setBackdrop('pole', this.pendingRace?.trackId);
     const cars = this.cars?.cars ?? [];
     const rows = m.rows.map((r) =>
       h(
