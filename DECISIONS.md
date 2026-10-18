@@ -471,6 +471,22 @@ One lumped temperature per tyre (`TYRE_TEMP` in `vehicle.ts`):
 - **Air temperature:** follows the time of day, cloud and rain.
 - **HUD:** four small indicators: blue cold, green in the window, red overheating.
 
+## Time penalties instead of deleted laps
+
+- **Request:** "don't erase or not count a lap time; if someone resets, penalise him by adding more time, and if he gets off the road too", with real-world sizes.
+- **Real rules:** GT3 qualifying (SRO stewards' decisions) cancels a lap beyond track limits; F1 treats the white line as the limit (all four wheels over it) and in races gives warnings, then 5 s and 10 s penalties; the F1 games size corner-cutting penalties by the advantage (about 3 s for a small cut, 10 s for straight-lining a chicane).
+- **Rule here:** every lap counts (except the untimed out lap and laps physically too fast to be real) and penalties are added to it (`PENALTY` in `packages/shared/src/race.ts`):
+  - track limits (all four wheels beyond the line, held 0.25 s): 1 s + 1.5 s per second off, at most 5 s per excursion;
+  - reset to the track: 5 s, on top of the time lost going back to the last checkpoint;
+  - shortcut (checkpoints skipped): 5 s + 0.05 s per metre of track skipped.
+- **Checkpoints:** gates every ~35 m used to be strictly in order, and a single missed gate (a cut, a rejected sample) froze the lap for the rest of the session: one reason times "did not update". Now a gate up to 300 m ahead is accepted when the car really is there along the track (a hairpin can put a later gate beside it); the gates in between count as a shortcut. A bigger jump is a teleport and gets no credit, as before.
+- Shown in the HUD ("PEN +2.3 s" by the lap timer, included in the live delta), on the board and the timing screen (status and a Penalties column), in the lap message and the results. Protocol version 6.
+
+## Briefing before the session
+
+- **Request:** tyres, wing and the rest should be chosen after the weather, the track and the settings are revealed; otherwise only the host knows them.
+- When the host starts, the room enters a `briefing` phase (30 s, `BRIEFING_MS`): the conditions are locked and shown resolved (the weather and time actually drawn, not "Random"), and each driver chooses tyres, rear wing and brake balance with the engineer's suggestion and the tyre guide. The session loads when every connected driver presses "Ready to go" or the timer runs out. The lobby only shows the session settings, with a note that the car is set up in the briefing.
+
 ## Interface language
 
 - English or Spanish (Settings → "Language / Idioma"; first run follows the browser). `src/i18n.ts`: `t()` looks the English text up in the Spanish table and falls back to English, so a missing entry never breaks anything; `{name}` placeholders.

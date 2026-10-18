@@ -7,6 +7,7 @@ import {
   COUNTDOWN_MS,
   FINISH_TIMEOUT_MS,
   LOAD_TIMEOUT_MS,
+  BRIEFING_MS,
   MAX_CLOCK_SKEW_MS,
   MAX_PLAYERS,
   PROTOCOL_VERSION,
@@ -89,6 +90,8 @@ export interface PersistedRoom {
 
 interface Player extends PersistedPlayer {
   conn: Conn | null;
+  /** Done with the pre-session briefing. */
+  briefed?: boolean;
   disconnectedAt: number | null;
   slot: number;
   lastDamageAt: number;
@@ -122,6 +125,8 @@ export class RoomCore {
   readonly carLocks = new Map<string, string>();
   private readonly connPlayer = new Map<string, string>();
   race: RaceSetup | null = null;
+  /** Briefing phase end (server time). */
+  briefingUntil = 0;
   tracker: RaceTracker | null = null;
   startAt: number | null = null;
   private loaded = new Set<string>();
@@ -212,6 +217,7 @@ export class RoomCore {
         waiting: p.waiting,
         bot: p.bot,
         tyre: p.tyre ?? 'medium',
+        briefed: !!p.briefed,
       }));
     return {
       code: this.code,
@@ -221,6 +227,7 @@ export class RoomCore {
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
       conditions: this.conditions,
+      briefingUntil: this.phase === 'briefing' ? this.briefingUntil : null,
     };
   }
 
@@ -358,6 +365,12 @@ export class RoomCore {
         return this.broadcastRoom();
       case 'start':
         return this.start(p);
+      case 'briefed':
+        if (this.phase !== 'briefing') return;
+        p.briefed = true;
+        this.broadcastRoom();
+        this.maybeLaunch();
+        return;
       case 'loaded':
         if (this.race && msg.raceId === this.race.raceId) {
           this.loaded.add(p.id);
@@ -391,7 +404,7 @@ export class RoomCore {
         return;
       }
       case 'setTyre':
-        if (this.phase !== 'lobby' && !p.waiting) return;
+        if (this.phase !== 'lobby' && this.phase !== 'briefing' && !p.waiting) return;
         p.tyre = msg.tyre;
         this.persist();
         this.broadcastRoom();
@@ -508,6 +521,32 @@ export class RoomCore {
       this.send(p, { t: 'error', code: 'not_ready', message: 'Everyone needs a car and must be ready.', fatal: false });
       return;
     }
+    // Briefing: the conditions are final now, everyone sees them and sets up their car (tyres, wing, brakes).
+    // The session loads when all drivers are done or after BRIEFING_MS.
+    this.phase = 'briefing';
+    this.briefingUntil = this.env.now() + BRIEFING_MS;
+    for (const x of this.players.values()) x.briefed = x.bot;
+    this.updateBotTyres();
+    this.persist();
+    this.broadcastRoom();
+    this.scheduleNext();
+  }
+
+  /** End of the briefing: everyone connected is done (or the time is up). */
+  private maybeLaunch(force = false): void {
+    if (this.phase !== 'briefing') return;
+    const humans = [...this.players.values()].filter((x) => !x.bot && x.conn !== null && x.carId);
+    if (!force && humans.some((x) => !x.briefed)) return;
+    const entrants = [...this.players.values()].filter((x) => (x.conn !== null || x.bot) && x.carId);
+    if (entrants.length === 0) {
+      this.phase = 'lobby';
+      this.broadcastRoom();
+      return;
+    }
+    this.launch(entrants);
+  }
+
+  private launch(entrants: Player[]): void {
     const now = this.env.now();
     this.raceId++;
     const seed = Math.floor(this.env.random() * 0xffffffff) >>> 0;
@@ -694,6 +733,7 @@ export class RoomCore {
     this.scheduleNext();
     this.broadcastRoom();
     if (this.phase === 'loading') this.maybeBeginCountdown();
+    if (this.phase === 'briefing') this.maybeLaunch();
   }
 
   removePlayer(id: string): void {
@@ -727,6 +767,7 @@ export class RoomCore {
     this.broadcastRoom();
     if (this.tracker && this.tracker.allDone()) this.endRace();
     if (this.phase === 'loading') this.maybeBeginCountdown();
+    if (this.phase === 'briefing') this.maybeLaunch();
   }
 
   /** Process deadlines. Returns the next time we need a tick, or null. */
@@ -735,6 +776,7 @@ export class RoomCore {
     for (const p of [...this.players.values()]) {
       if (p.disconnectedAt !== null && now - p.disconnectedAt >= RECONNECT_GRACE_MS) this.removePlayer(p.id);
     }
+    if (this.phase === 'briefing' && now >= this.briefingUntil) this.maybeLaunch(true);
     if (this.phase === 'loading' && this.loadDeadline !== null && now >= this.loadDeadline) this.maybeBeginCountdown(true);
     if (this.phase === 'countdown' && this.startAt !== null && now >= this.startAt) this.phase = 'racing';
     if (this.tracker && this.race && (this.phase === 'racing' || this.phase === 'countdown')) {
@@ -752,6 +794,7 @@ export class RoomCore {
   private scheduleNext(): number | null {
     const times: number[] = [];
     for (const p of this.players.values()) if (p.disconnectedAt !== null) times.push(p.disconnectedAt + RECONNECT_GRACE_MS);
+    if (this.phase === 'briefing') times.push(this.briefingUntil);
     if (this.phase === 'loading' && this.loadDeadline !== null) times.push(this.loadDeadline);
     if (this.phase === 'countdown' && this.startAt !== null) times.push(this.startAt);
     if (this.finishDeadline !== null) times.push(this.finishDeadline);

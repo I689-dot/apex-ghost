@@ -29,6 +29,8 @@ export const SNAP_DISTANCE_M = 12;
 
 export const RECONNECT_GRACE_MS = 30_000;
 export const LOAD_TIMEOUT_MS = 45_000;
+/** Briefing before the session: final conditions revealed, everyone sets up their car. */
+export const BRIEFING_MS = 30_000;
 /** Pre-race cinematic (aerial flyover, grid pass with driver names), then the 3-2-1 start lights. */
 export const COUNTDOWN_MS = 16_000;
 export const FINISH_TIMEOUT_MS = 60_000;

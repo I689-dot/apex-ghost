@@ -31,7 +31,7 @@ import { clear, fmtTime, h, toast } from './ui/dom';
 import { settingsPanel } from './ui/settingsPanel';
 import { getLang, t } from './i18n';
 
-type Screen = 'menu' | 'lobby' | 'loading' | 'race' | 'results';
+type Screen = 'menu' | 'lobby' | 'briefing' | 'loading' | 'race' | 'results';
 
 const hp = (kw: number) => Math.round(kw * 1.341);
 
@@ -254,7 +254,9 @@ export class App {
         break;
       case 'room':
         this.room = m.room;
-        if (this.screen === 'lobby') this.renderLobby();
+        if (m.room.phase === 'briefing' && (this.screen === 'lobby' || this.screen === 'briefing')) this.renderBriefing();
+        else if (this.screen === 'briefing') this.showLobby();
+        else if (this.screen === 'lobby') this.renderLobby();
         this.session?.updateRoom(m.room);
         break;
       case 'carLock':
@@ -288,7 +290,8 @@ export class App {
     this.session = null;
     this.setBackdrop('straight', this.room?.conditions.trackId);
     this.lobbyEl = null;
-    this.renderLobby();
+    if (this.room?.phase === 'briefing') this.renderBriefing();
+    else this.renderLobby();
   }
 
   private myInfo() {
@@ -299,7 +302,7 @@ export class App {
   private tyreSentFor = '';
 
   /** Session setup (host), forecast, and the player's car setup (tyres, wing, brake bias). */
-  private prepPanel(room: RoomSnapshot, isHost: boolean): HTMLElement {
+  private prepPanel(room: RoomSnapshot, isHost: boolean, withCar = false): HTMLElement {
     const c = room.conditions;
     const edit = isHost && room.phase === 'lobby';
     const send = (patch: Record<string, unknown>) => this.conn?.sendJson({ t: 'setConditions', ...patch } as ClientMsg);
@@ -323,7 +326,8 @@ export class App {
     const cs = settings.carSetup;
     const saveSetup = () => {
       saveSettings(settings);
-      this.renderLobby();
+      if (this.screen === 'briefing') this.renderBriefing();
+      else this.renderLobby();
     };
     const tyreBtns = h(
       'div.prep-tyres',
@@ -387,25 +391,31 @@ export class App {
       ),
       row(
         t('Weather'),
-        sel(c.weather, [['random', t('Random')], ...WEATHER_KINDS.map((k) => [k, t(WEATHER_LABEL[k])] as [string, string])] as [string, string][], (v) =>
-          send({ weather: v }),
-        ),
+        withCar
+          ? h('b', { text: t(WEATHER_LABEL[plan.kind]) })
+          : sel(c.weather, [['random', t('Random')], ...WEATHER_KINDS.map((k) => [k, t(WEATHER_LABEL[k])] as [string, string])] as [string, string][], (v) =>
+              send({ weather: v }),
+            ),
       ),
       row(
         t('Time of day'),
-        sel(c.time, Object.entries(TIME_LABEL).map(([k, v]) => [k, t(v)]) as [string, string][], (v) => send({ time: v })),
+        withCar
+          ? h('b', { text: formatHour(plan.startHour) })
+          : sel(c.time, Object.entries(TIME_LABEL).map(([k, v]) => [k, t(v)]) as [string, string][], (v) => send({ time: v })),
       ),
       row(
         t('Weather changes'),
-        sel(
-          c.changes,
-          [
-            ['random', t('Possible')],
-            ['off', t('Stable')],
-            ['on', t('Changing')],
-          ],
-          (v) => send({ changes: v }),
-        ),
+        withCar
+          ? h('b', { text: change })
+          : sel(
+              c.changes,
+              [
+                ['random', t('Possible')],
+                ['off', t('Stable')],
+                ['on', t('Changing')],
+              ],
+              (v) => send({ changes: v }),
+            ),
       ),
       row(
         t('Length'),
@@ -428,25 +438,32 @@ export class App {
         h('span', { text: change }),
         edit ? h('button.ghost.small', { text: t('New forecast'), onclick: () => send({ reroll: true }) }) : null,
       ),
-      h('h3', { text: t('Your car') }),
-      row(t('Tyres'), tyreBtns),
-      tyreGuide(),
-      row(t('Rear wing'), wingSel),
-      row(t('Brake balance'), h('div.range', {}, bias, biasOut)),
-      h(
-        'div.engineer',
-        {},
-        h('span', { text: t('Engineer: {note}.', { note: rec.note }) }),
-        h('button.ghost.small', {
-          text: t('Use {tyre} + {wing} wing', { tyre: t(COMPOUNDS[rec.tyre].name), wing: t(WING[rec.wing].label).split(' (')[0].toLowerCase() }),
-          onclick: () => {
-            cs.tyre = rec.tyre;
-            cs.wing = rec.wing;
-            this.conn?.sendJson({ t: 'setTyre', tyre: rec.tyre });
-            saveSetup();
-          },
-        }),
-      ),
+      withCar
+        ? null
+        : h('p.prep-note', {
+            text: t('Tyres, rear wing and brakes are chosen in the briefing, once the host starts: everyone sees the final conditions first.'),
+          }),
+      withCar ? h('h3', { text: t('Your car') }) : null,
+      withCar ? row(t('Tyres'), tyreBtns) : null,
+      withCar ? tyreGuide() : null,
+      withCar ? row(t('Rear wing'), wingSel) : null,
+      withCar ? row(t('Brake balance'), h('div.range', {}, bias, biasOut)) : null,
+      !withCar
+        ? null
+        : h(
+            'div.engineer',
+            {},
+            h('span', { text: t('Engineer: {note}.', { note: rec.note }) }),
+            h('button.ghost.small', {
+              text: t('Use {tyre} + {wing} wing', { tyre: t(COMPOUNDS[rec.tyre].name), wing: t(WING[rec.wing].label).split(' (')[0].toLowerCase() }),
+              onclick: () => {
+                cs.tyre = rec.tyre;
+                cs.wing = rec.wing;
+                this.conn?.sendJson({ t: 'setTyre', tyre: rec.tyre });
+                saveSetup();
+              },
+            }),
+          ),
     );
   }
 
@@ -459,7 +476,7 @@ export class App {
     const browsing = cars.find((c) => c.id === (this.browsing ?? mine?.carId)) ?? cars.find((c) => c.id === mine?.carId) ?? null;
     const isHost = !!mine?.host;
     // the room shows everyone's starting tyres: tell it ours (saved from last time)
-    if (mine && room.phase === 'lobby' && mine.tyre !== settings.carSetup.tyre && this.tyreSentFor !== room.code) {
+    if (mine && (room.phase === 'lobby' || room.phase === 'briefing') && mine.tyre !== settings.carSetup.tyre && this.tyreSentFor !== room.code) {
       this.tyreSentFor = room.code;
       this.conn.sendJson({ t: 'setTyre', tyre: settings.carSetup.tyre });
     }
@@ -599,6 +616,73 @@ export class App {
     this.lobbyEl = el;
     const ng = el.querySelector('.car-grid');
     if (ng) ng.scrollTop = scroll;
+  }
+
+  private briefTimer = 0;
+
+  /**
+   * Briefing (after the host starts): the final track, weather forecast, time and length for everyone, then each
+   * driver sets up their car for them. The session loads when all are done or the timer runs out.
+   */
+  private renderBriefing(): void {
+    const room = this.room;
+    if (!room || !this.conn) return;
+    this.screen = 'briefing';
+    const mine = this.myInfo();
+    const cars = this.cars?.cars ?? [];
+    if (mine && mine.tyre !== settings.carSetup.tyre) this.conn.sendJson({ t: 'setTyre', tyre: settings.carSetup.tyre });
+    const track = this.trackIndex.find((x) => x.id === room.conditions.trackId);
+    this.setBackdrop('aerial', room.conditions.trackId);
+    const clock = h('b.brief-clock');
+    const tickClock = () => {
+      const left = Math.max(0, (room.briefingUntil ?? 0) - (this.conn?.serverNow() ?? 0));
+      clock.textContent = `${Math.ceil(left / 1000)} s`;
+    };
+    tickClock();
+    clearInterval(this.briefTimer);
+    this.briefTimer = window.setInterval(() => {
+      if (this.screen !== 'briefing') clearInterval(this.briefTimer);
+      else tickClock();
+    }, 250);
+    const drivers = h(
+      'ul.players',
+      {},
+      ...room.players
+        .filter((p) => p.carId && (p.connected || p.bot) && !p.waiting)
+        .map((p) =>
+          h(
+            `li${p.id === this.me ? '.me' : ''}`,
+            {},
+            h('span.nick', { text: p.nick }),
+            p.bot ? h('span.badge.bot', { text: t('BOT') }) : null,
+            h('img.tyre-badge', { src: uiAsset(`tyre_${p.tyre ?? 'medium'}.webp`), alt: '' }),
+            h('span.car', { text: cars.find((c) => c.id === p.carId)?.name ?? '' }),
+            h(`span.ready${p.briefed ? '.on' : ''}`, { text: p.briefed ? t('READY') : '…' }),
+          ),
+        ),
+    );
+    const done = !!mine?.briefed;
+    const el = h(
+      'div.lobby.briefing',
+      {},
+      h(
+        'aside.lobby-side',
+        {},
+        h('div.brief-head', {}, h('span.muted', { text: t('BRIEFING') }), clock),
+        h('h2', { text: t(track?.name ?? 'Nürburgring GP') }),
+        h('p.muted', { text: t('The conditions are final. Set up your car for them; the session loads when everyone is ready.') }),
+        h('h3', { text: t('Drivers') }),
+        drivers,
+        h(
+          `button.primary${done ? '.on' : ''}`,
+          { disabled: done, onclick: () => this.conn?.sendJson({ t: 'briefed' }) },
+          done ? t('Ready ✓') : t('Ready to go'),
+        ),
+      ),
+      h('main.lobby-main', {}, h('div.lobby-top', {}, this.prepPanel(room, false, true))),
+    );
+    this.setUi(el);
+    this.lobbyEl = null;
   }
 
   private hoverTimer = 0;

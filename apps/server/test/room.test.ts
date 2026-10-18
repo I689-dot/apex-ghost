@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROTOCOL_VERSION, RECONNECT_GRACE_MS, mulberry32, type ServerMsg } from '@apex/shared';
+import { BRIEFING_MS, PROTOCOL_VERSION, RECONNECT_GRACE_MS, mulberry32, type ServerMsg } from '@apex/shared';
 import { RoomCore, type Conn, type PersistedRoom } from '../src/room';
 import { ovalTrack } from '../../../packages/shared/test/helpers';
 
@@ -19,7 +19,7 @@ class FakeConn implements Conn {
   }
 }
 
-function makeRoom(cars = ['car_a', 'car_b', 'car_c']) {
+function makeRoom(cars = ['car_a', 'car_b', 'car_c'], autoBrief = true) {
   let now = 1_000_000;
   const persisted: PersistedRoom[] = [];
   const rand = mulberry32(99);
@@ -33,13 +33,20 @@ function makeRoom(cars = ['car_a', 'car_b', 'car_c']) {
   });
   room.init('ABCDE');
   let n = 0;
+  const conns: Conn[] = [];
   const join = (nick: string, session: string | null = null) => {
     const c = new FakeConn(`c${n++}`);
+    conns.push(c);
     room.onMessage(c, JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, nick, session }));
     const w = c.last('welcome');
     return { conn: c, id: w?.you ?? '', session: w?.session ?? '' };
   };
-  const send = (c: Conn, msg: object) => room.onMessage(c, JSON.stringify(msg));
+  // most tests are about what comes after the briefing: everyone finishes it at once
+  const send = (c: Conn, msg: object) => {
+    room.onMessage(c, JSON.stringify(msg));
+    if (autoBrief && (msg as { t: string }).t === 'start' && room.phase === 'briefing')
+      for (const x of conns) room.onMessage(x, JSON.stringify({ t: 'briefed' }));
+  };
   return { room, join, send, advance: (ms: number) => (now += ms), persisted };
 }
 
@@ -155,6 +162,43 @@ describe('room membership', () => {
     const setup = b.conn.last('raceSetup')?.race;
     expect(setup?.grid.sort()).toEqual([a.id, b.id].sort());
     expect(setup?.weather).toBeDefined();
+  });
+
+  it('briefing: the start reveals the final conditions; the session loads when all are briefed or time is up', () => {
+    const { room, join, send, advance } = makeRoom(['car_a', 'car_b', 'car_c'], false);
+    const a = join('Ana');
+    const b = join('Ben');
+    for (const [p, car] of [
+      [a, 'car_a'],
+      [b, 'car_b'],
+    ] as const) {
+      send(p.conn, { t: 'selectCar', carId: car });
+      send(p.conn, { t: 'ready', ready: true });
+    }
+    send(a.conn, { t: 'start' });
+    expect(room.phase).toBe('briefing');
+    expect(b.conn.last('room')?.room.briefingUntil).toBeGreaterThan(0);
+    // conditions are locked, tyres can still be chosen
+    send(a.conn, { t: 'setConditions', weather: 'heavy_rain' });
+    expect(b.conn.last('room')?.room.conditions.weather).not.toBe('heavy_rain');
+    send(b.conn, { t: 'setTyre', tyre: 'soft' });
+    expect(b.conn.last('room')?.room.players.find((p) => p.id === b.id)?.tyre).toBe('soft');
+    send(a.conn, { t: 'briefed' });
+    expect(room.phase).toBe('briefing');
+    send(b.conn, { t: 'briefed' });
+    expect(room.phase).toBe('loading');
+    expect(b.conn.last('raceSetup')?.race.grid.sort()).toEqual([a.id, b.id].sort());
+    // a second start where nobody confirms: the timer launches it
+    const r2 = makeRoom(['car_a'], false);
+    const c = r2.join('Cid');
+    r2.send(c.conn, { t: 'selectCar', carId: 'car_a' });
+    r2.send(c.conn, { t: 'ready', ready: true });
+    r2.send(c.conn, { t: 'start' });
+    expect(r2.room.phase).toBe('briefing');
+    r2.advance(BRIEFING_MS + 10);
+    r2.room.tick();
+    expect(r2.room.phase).toBe('loading');
+    void advance;
   });
 
   it('late joiners wait in the lobby during a race', () => {

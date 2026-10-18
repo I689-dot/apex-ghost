@@ -59,6 +59,8 @@ await page.waitForTimeout(300);
 await page.click('.lobby-actions button:has-text("Listo")');
 await page.waitForTimeout(400);
 await page.click('button:has-text("Iniciar carrera")');
+// briefing: confirm the car setup
+await page.click('button:has-text("Listo para salir")', { timeout: 20_000 }).catch(() => {});
 await page.waitForSelector('.race-ui', { timeout: 240_000 });
 await page.waitForTimeout(3000);
 await shot('4-cinematic');

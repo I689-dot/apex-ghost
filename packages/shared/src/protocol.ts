@@ -6,7 +6,8 @@ import { isRecord } from './validation';
 
 /* ------------------------------------------------------------------ lobby --- */
 
-export type Phase = 'lobby' | 'loading' | 'countdown' | 'racing' | 'results';
+/** briefing: the host started; everyone sees the final conditions and sets up their car (BRIEFING_MS). */
+export type Phase = 'lobby' | 'briefing' | 'loading' | 'countdown' | 'racing' | 'results';
 
 export interface PlayerInfo {
   id: string;
@@ -21,6 +22,8 @@ export interface PlayerInfo {
   bot: boolean;
   /** Tyres chosen for the start (shown in the lobby). */
   tyre: TyreChoice;
+  /** Done with the briefing (car set up). */
+  briefed: boolean;
 }
 
 export type TyreChoice = 'soft' | 'medium' | 'hard' | 'wet';
@@ -45,6 +48,8 @@ export interface RoomSnapshot {
   /** Qualifying session length chosen by the host. */
   sessionMinutes: number;
   conditions: Conditions;
+  /** Briefing phase: when it ends (server time). */
+  briefingUntil: number | null;
 }
 
 export interface RaceSetup {
@@ -95,6 +100,7 @@ export type ClientMsg =
   | { t: 'selectCar'; carId: string | null }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
+  | { t: 'briefed' }
   | { t: 'loaded'; raceId: number }
   | { t: 'ping'; c: number }
   | { t: 'damage'; zones: number[] }
@@ -150,6 +156,8 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       return typeof v.ready === 'boolean' ? { t: 'ready', ready: v.ready } : null;
     case 'start':
       return { t: 'start' };
+    case 'briefed':
+      return { t: 'briefed' };
     case 'loaded':
       return num(v.raceId) ? { t: 'loaded', raceId: v.raceId } : null;
     case 'ping':

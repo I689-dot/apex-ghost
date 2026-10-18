@@ -37,6 +37,8 @@ for (let i = from; i <= to; i++) {
     await page.click('.lobby-actions button:has-text("Ready")');
     await page.waitForTimeout(400);
     await page.click('button:has-text("Start race")');
+    // briefing: confirm the car setup
+    await page.click('button:has-text("Ready to go")', { timeout: 20_000 }).catch(() => {});
     await page.waitForSelector('.race-ui', { timeout: 180_000 });
     await page.waitForTimeout(1500);
     await page.keyboard.press('Enter'); // skip the intro cinematic

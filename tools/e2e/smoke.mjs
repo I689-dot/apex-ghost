@@ -95,6 +95,11 @@ await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(800);
 await shot('02-lobby');
 await page.click('button:has-text("Start race")');
+// briefing: confirm the car setup
+await page.waitForSelector('.briefing', { timeout: 20_000 }).catch(() => {});
+await page.waitForTimeout(800);
+await shot('02b-briefing');
+await page.click('button:has-text("Ready to go")', { timeout: 20_000 }).catch(() => {});
 await page.waitForSelector('.loading', { timeout: 20_000 });
 await page.waitForTimeout(1500);
 await shot('03-loading');

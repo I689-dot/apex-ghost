@@ -2215,3 +2215,23 @@ button.pit-tyre.on {
   color: var(--muted, #9aa);
   margin: 6px 0 0;
 }
+
+/* briefing */
+.brief-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+}
+.brief-clock {
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.prep-note {
+  font-size: 12px;
+  color: var(--muted, #9aa);
+  margin: 10px 0 0;
+  line-height: 1.35;
+}

@@ -61,6 +61,8 @@ for (let i = 0; i < 7; i++) {
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(400);
 await page.click('button:has-text("Start race")');
+// briefing: confirm the car setup
+await page.click('button:has-text("Ready to go")', { timeout: 20_000 }).catch(() => {});
 await page.waitForSelector('.race-ui', { timeout: 240_000 });
 await page.addStyleTag({ content: '.perf { display: none !important; }' });
 await page.waitForTimeout(1200);

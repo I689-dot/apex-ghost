@@ -175,6 +175,13 @@ const ES: Record<string, string> = {
   '+ Add bot': '+ Añadir bot',
   'An AI driver simulated on your computer (they race as ghosts too)': 'Un piloto IA simulado en tu ordenador (también corre como fantasma)',
   Leave: 'Salir',
+  BRIEFING: 'BRIEFING',
+  Drivers: 'Pilotos',
+  'Ready to go': 'Listo para salir',
+  'The conditions are final. Set up your car for them; the session loads when everyone is ready.':
+    'Las condiciones son definitivas. Prepara tu coche para ellas; la sesión carga cuando todos estén listos.',
+  'Tyres, rear wing and brakes are chosen in the briefing, once the host starts: everyone sees the final conditions first.':
+    'Neumáticos, alerón y frenos se eligen en el briefing, cuando el anfitrión inicia: todos ven antes las condiciones definitivas.',
 
   // loading
   'Preparing…': 'Preparando…',
