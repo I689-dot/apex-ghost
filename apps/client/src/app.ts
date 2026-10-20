@@ -4,6 +4,7 @@ import { COMPOUNDS, type CompoundId } from './physics/tyres';
 import { WING, recommendSetup } from './game/carSetup';
 import {
   SESSION_MINUTES,
+  RACE_LAP_CHOICES,
   TIME_LABEL,
   WEATHER_KINDS,
   planWeather,
@@ -444,6 +445,14 @@ export class App {
           (v) => this.conn?.sendJson({ t: 'setSession', minutes: Number(v) }),
         ),
       ),
+      row(
+        t('Race'),
+        sel(
+          room.raceLaps,
+          RACE_LAP_CHOICES.map((n) => [n, n === 0 ? t('Qualifying only') : t('Race: {n} laps', { n })] as [number, string]),
+          (v) => this.conn?.sendJson({ t: 'setRaceLaps', laps: Number(v) }),
+        ),
+      ),
       h(
         'div.forecast',
         {},
@@ -870,6 +879,8 @@ export class App {
 
   /* -------------------------------------------------------------- results --- */
 
+  private resultsTimer = 0;
+
   private showResults(m: Extract<ServerMsg, { t: 'results' }>): void {
     this.setPause(false);
     this.session?.dispose();
@@ -877,19 +888,41 @@ export class App {
     this.screen = 'results';
     this.setBackdrop('pole', this.pendingRace?.trackId);
     const cars = this.cars?.cars ?? [];
+    const race = m.kind === 'race';
+    const total = (r: (typeof m.rows)[number]) => (r.totalMs === null ? null : r.totalMs + r.penaltyMs);
+    const classified = (r: (typeof m.rows)[number]) => (race ? !r.dnf && r.totalMs !== null : r.bestLapMs !== null);
+    const sec = (ms: number) => `+${(ms / 1000).toFixed(3)}`;
     const rows = m.rows.map((r) =>
       h(
         `tr${r.id === this.me ? '.me' : ''}`,
         {},
-        h('td.pos', { text: r.bestLapMs === null ? '—' : String(r.position) }),
+        h('td.pos', { text: classified(r) ? String(r.position) : '—' }),
         h('td', { text: r.nick }),
         h('td.muted', { text: cars.find((c) => c.id === r.carId)?.name ?? '' }),
-        h(`td.mono${m.fastestLap?.id === r.id ? '.fastest' : ''}`, { text: r.bestLapMs === null ? t('no time') : fmtTime(r.bestLapMs) }),
-        h('td.mono.muted', { text: r.bestLapMs === null || !r.gapMs ? '' : `+${(r.gapMs / 1000).toFixed(3)}` }),
-        h('td.muted', { text: `${r.validLaps}${r.dnf ? ` · ${t('DNF')}` : ''}` }),
+        race
+          ? h('td.mono', { text: r.dnf || total(r) === null ? t('DNF') : fmtTime(total(r) as number) })
+          : h(`td.mono${m.fastestLap?.id === r.id ? '.fastest' : ''}`, { text: r.bestLapMs === null ? t('no time') : fmtTime(r.bestLapMs) }),
+        h('td.mono.muted', { text: !classified(r) || !r.gapMs ? '' : sec(r.gapMs) }),
+        race ? h(`td.mono${m.fastestLap?.id === r.id ? '.fastest' : ''}`, { text: r.bestLapMs === null ? '' : fmtTime(r.bestLapMs) }) : null,
+        h('td.muted', { text: `${r.validLaps}${r.dnf && !race ? ` · ${t('DNF')}` : ''}` }),
         h('td.mono.muted', { text: r.penaltyMs > 0 ? `+${(r.penaltyMs / 1000).toFixed(1)} s` : '' }),
       ),
     );
+    const heads = race
+      ? [t('Pos'), t('Driver'), t('Car'), t('Race time'), t('Gap'), t('Best lap'), t('Laps'), t('Penalties')]
+      : [t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Timed laps'), t('Penalties')];
+    // after qualifying: the race loads by itself, gridded in this order
+    const next = m.raceAt !== null ? h('p.race-next') : null;
+    clearInterval(this.resultsTimer);
+    if (next && m.raceAt !== null) {
+      const at = m.raceAt;
+      const tick = () => {
+        const left = Math.max(0, Math.ceil((at - (this.conn?.serverNow() ?? 0)) / 1000));
+        next.textContent = t('The race starts in {s} s · grid in qualifying order', { s: left });
+      };
+      tick();
+      this.resultsTimer = window.setInterval(() => (this.screen === 'results' ? tick() : clearInterval(this.resultsTimer)), 250);
+    }
     this.setUi(
       h(
         'div.results',
@@ -897,12 +930,12 @@ export class App {
         h(
           'div.results-card',
           {},
-          h('h2', { text: t('Classification') }),
+          h('h2', { text: race ? t('Race results') : t('Qualifying results') }),
           h(
             'div.podium',
             {},
             ...m.rows
-              .filter((r) => r.bestLapMs !== null)
+              .filter(classified)
               .slice(0, 3)
               .map((r, i) => {
                 const car = cars.find((c) => c.id === r.carId);
@@ -914,29 +947,22 @@ export class App {
                     : null,
                   h('b', { text: `P${i + 1}` }),
                   h('span', { text: r.nick }),
-                  h('em', { text: fmtTime(r.bestLapMs) }),
+                  h('em', { text: race ? (i === 0 ? fmtTime(total(r) as number) : sec(r.gapMs ?? 0)) : fmtTime(r.bestLapMs) }),
                 );
               }),
           ),
           h('p.muted', {
-            text: t('Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).'),
+            text: race
+              ? t('Race time includes penalties: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).')
+              : t('Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).'),
           }),
-          h(
-            'table',
-            {},
-            h(
-              'thead',
-              {},
-              h('tr', {}, ...[t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Timed laps'), t('Penalties')].map((t) => h('th', { text: t }))),
-            ),
-            h('tbody', {}, ...rows),
-          ),
+          h('table', {}, h('thead', {}, h('tr', {}, ...heads.map((x) => h('th', { text: x })))), h('tbody', {}, ...rows)),
           m.fastestLap
             ? h('p.fastest-note', {
                 text: t('Fastest lap: {nick} · {time}', { nick: m.rows.find((r) => r.id === m.fastestLap?.id)?.nick ?? '', time: fmtTime(m.fastestLap.ms) }),
               })
             : null,
-          h('button.primary', { text: t('Back to lobby'), onclick: () => this.showLobby() }),
+          next ?? h('button.primary', { text: t('Back to lobby'), onclick: () => this.showLobby() }),
         ),
       ),
     );

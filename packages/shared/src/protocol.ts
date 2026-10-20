@@ -50,6 +50,8 @@ export interface RoomSnapshot {
   conditions: Conditions;
   /** Briefing phase: when it ends (server time). */
   briefingUntil: number | null;
+  /** Race after qualifying: laps (0 = qualifying only). */
+  raceLaps: number;
 }
 
 export interface RaceSetup {
@@ -64,6 +66,10 @@ export interface RaceSetup {
   sessionMs: number;
   /** Layout (tracks.json id). */
   trackId: string;
+  /** Qualifying (timed, best lap) or the race after it (laps, grid from qualifying). */
+  kind: 'qualifying' | 'race';
+  /** Race laps (kind 'race'); for qualifying, the race that follows (0 = none). */
+  laps: number;
 }
 
 export interface RaceResultRow {
@@ -108,6 +114,7 @@ export type ClientMsg =
   | { t: 'addBot' }
   | { t: 'removeBot'; id: string }
   | { t: 'setSession'; minutes: number }
+  | { t: 'setRaceLaps'; laps: number }
   /** Host: track, weather, time, changes; reroll = new forecast. */
   | { t: 'setConditions'; trackId?: string; weather?: WeatherChoice; time?: TimeChoice; changes?: ChangeChoice; reroll?: boolean }
   | { t: 'setTyre'; tyre: TyreChoice }
@@ -130,7 +137,15 @@ export type ServerMsg =
   | { t: 'pit'; playerId: string; in: boolean }
   | { t: 'sector'; playerId: string; sector: number; ms: number }
   | { t: 'finished'; playerId: string; totalMs: number }
-  | { t: 'results'; raceId: number; rows: RaceResultRow[]; fastestLap: { id: string; ms: number } | null }
+  | {
+      t: 'results';
+      raceId: number;
+      kind: 'qualifying' | 'race';
+      rows: RaceResultRow[];
+      fastestLap: { id: string; ms: number } | null;
+      /** After qualifying: when the race loads (server time), or null. */
+      raceAt: number | null;
+    }
   | { t: 'damage'; playerId: string; zones: number[] }
   | { t: 'pong'; c: number; s: number };
 
@@ -174,6 +189,8 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       return str(v.id, 32) ? { t: 'removeBot', id: v.id } : null;
     case 'setSession':
       return num(v.minutes) && Number.isInteger(v.minutes) && v.minutes >= 1 && v.minutes <= 60 ? { t: 'setSession', minutes: v.minutes } : null;
+    case 'setRaceLaps':
+      return num(v.laps) && Number.isInteger(v.laps) && v.laps >= 0 && v.laps <= 50 ? { t: 'setRaceLaps', laps: v.laps } : null;
     case 'pit':
       return typeof v.in === 'boolean' ? { t: 'pit', in: v.in } : null;
     case 'setTyre':

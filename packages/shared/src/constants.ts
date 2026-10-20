@@ -7,6 +7,11 @@ export const RACE_LAPS = 3;
 /** Qualifying session length the host can choose (minutes). */
 export const SESSION_MINUTES = [5, 10, 15, 20, 30] as const;
 export const DEFAULT_SESSION_MINUTES = 10;
+/** Race after qualifying: laps the host can choose (0 = qualifying only). */
+export const RACE_LAP_CHOICES = [0, 3, 5, 10, 15] as const;
+export const DEFAULT_RACE_LAPS = 5;
+/** Qualifying results on screen before the race loads. */
+export const QUALI_TO_RACE_MS = 20_000;
 /** After the chequered flag, drivers may finish the lap they are on: at most this long. */
 export const FLAG_GRACE_MS = 240_000;
 

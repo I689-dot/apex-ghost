@@ -213,6 +213,20 @@ const ES: Record<string, string> = {
   'Leave race': 'Abandonar carrera',
   'no time': 'sin tiempo',
   Classification: 'Clasificación',
+  'Race results': 'Resultados de la carrera',
+  'Qualifying results': 'Resultados de la clasificación',
+  'Race time': 'Tiempo de carrera',
+  'The race starts in {s} s · grid in qualifying order': 'La carrera empieza en {s} s · parrilla en el orden de la clasificación',
+  'Race time includes penalties: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).':
+    'El tiempo de carrera incluye penalizaciones: límites de pista tras 3 avisos (0,5–3 s), volver a la pista (5 s), atajo (5 s o más).',
+  Race: 'Carrera',
+  'Qualifying only': 'Solo clasificación',
+  'Race: {n} laps': 'Carrera: {n} vueltas',
+  'LAP {n}/{max}': 'VUELTA {n}/{max}',
+  FINISHED: 'TERMINADO',
+  'Race: {n} laps from a standing start. Go at the green light; penalties are added to your race time.':
+    'Carrera: {n} vueltas con salida parada. Sal con la luz verde; las penalizaciones se suman a tu tiempo de carrera.',
+  'Race · {n} laps · grid from qualifying': 'Carrera · {n} vueltas · parrilla de la clasificación',
   'Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).':
     'Ordenado por la mejor vuelta. Las penalizaciones se suman a la vuelta: límites de pista tras 3 avisos (0,5–3 s), volver a la pista (5 s), atajo (5 s o más).',
   Pos: 'Pos',
@@ -245,7 +259,6 @@ const ES: Record<string, string> = {
   Laps: 'Vueltas',
   Status: 'Estado',
   DNF: 'ABANDONO',
-  FINISHED: 'TERMINADO',
   'IN PITS': 'EN BOXES',
   'OUT LAP': 'VUELTA DE SALIDA',
   'INVALID LAP': 'VUELTA INVÁLIDA',

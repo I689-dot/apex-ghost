@@ -365,6 +365,7 @@ export class RaceSession {
 
     this.buildCinematic(entries);
     this.hud.setTrack(this.trackData);
+    this.hud.raceLaps = this.race.kind === 'race' ? this.race.laps : 0;
     this.hud.el.append(this.timing.el);
     this.gfx.setScene(this.scene, this.cockpit.camera);
     this.gfx.resize();
@@ -406,7 +407,10 @@ export class RaceSession {
         w0.wetness > 0.3 ? t('Wet track') : w0.wetness > 0.05 ? t('Damp track') : t('Dry track'),
         t('{n} drivers', { n: entrants.length }),
       ],
-      format: t('{min}-minute qualifying · best valid lap wins · pit lane open', { min: Math.round(this.race.sessionMs / 60000) }),
+      format:
+        this.race.kind === 'race'
+          ? t('Race · {n} laps · grid from qualifying', { n: this.race.laps })
+          : t('{min}-minute qualifying · best valid lap wins · pit lane open', { min: Math.round(this.race.sessionMs / 60000) }),
     });
   }
 
@@ -534,7 +538,7 @@ export class RaceSession {
 
   /** Local mirror of the server's gate logic: my car, plus the bots when I simulate them. */
   private makeTracker(startMs: number): RaceTracker {
-    const tr = new RaceTracker(this.trackData, startMs, { sessionMs: this.race.sessionMs });
+    const tr = new RaceTracker(this.trackData, startMs, this.race.kind === 'race' ? { raceLaps: this.race.laps } : { sessionMs: this.race.sessionMs });
     tr.addPlayer(this.me);
     for (const r of this.remotes.values()) if (r.bot) tr.addPlayer(r.id);
     return tr;
@@ -682,7 +686,7 @@ export class RaceSession {
         if (m.playerId === this.me) {
           this.finishedMs = m.totalMs;
           const pos = this.standings.findIndex((s) => s.id === this.me) + 1;
-          this.flash(`${t('SESSION COMPLETE')}${pos ? ` · P${pos}` : ''}`, 8000);
+          this.flash(`${this.race.kind === 'race' ? t('FINISHED') : t('SESSION COMPLETE')}${pos ? ` · P${pos}` : ''}`, 8000);
         } else {
           this.flash(t('{name} has completed the session', { name: this.names.get(m.playerId) ?? t('A driver') }), 3000);
         }
@@ -761,9 +765,11 @@ export class RaceSession {
       this.updateCountdown(-1);
       if (this.myLaps === 0 && raceT < 2000)
         this.flash(
-          t('Qualifying: {min} minutes to set your best lap (clock at the top). Out lap first: warm the tyres, timing starts at the line.', {
-            min: Math.round(this.race.sessionMs / 60000),
-          }),
+          this.race.kind === 'race'
+            ? t('Race: {n} laps from a standing start. Go at the green light; penalties are added to your race time.', { n: this.race.laps })
+            : t('Qualifying: {min} minutes to set your best lap (clock at the top). Out lap first: warm the tyres, timing starts at the line.', {
+                min: Math.round(this.race.sessionMs / 60000),
+              }),
           7000,
         );
     } else if (raceT < 1500) this.updateCountdown(-1);
@@ -1009,7 +1015,8 @@ export class RaceSession {
     bots.forEach((r, order) => {
       const b = r.bot;
       if (!b) return;
-      const started = raceT >= order * BOT_RELEASE_MS;
+      // qualifying: one at a time; the race: everyone at the green light
+      const started = raceT >= (this.race.kind === 'race' ? 0 : order * BOT_RELEASE_MS);
       b.vehicle.frozen = !started;
       const tr = this.localTracker?.players.get(r.id);
       const gates = this.trackData.gates;
@@ -1271,6 +1278,11 @@ export class RaceSession {
 
   /** Session clock: time left until the chequered flag (the flag falls at start + session length). */
   private sessionText(serverNow: number): string {
+    if (this.race.kind === 'race') {
+      if (this.finishedMs !== null) return t('FINISHED');
+      const flag = this.standings.some((x) => x.finishedMs !== null);
+      return flag ? t('CHEQUERED FLAG · LAST LAP') : t('LAP {n}/{max}', { n: Math.min(this.myLaps + 1, this.race.laps), max: this.race.laps });
+    }
     if (this.finishedMs !== null) return t('SESSION COMPLETE');
     if (this.startAt === null) return t('TIME LEFT {clock}', { clock: fmtClock(this.race.sessionMs) });
     const left = this.startAt + this.race.sessionMs - Math.max(serverNow, this.startAt);

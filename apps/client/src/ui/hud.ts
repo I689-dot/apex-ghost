@@ -253,7 +253,7 @@ export class Hud {
       this.lapTag.classList.toggle('invalid', pen);
       this.cur.el.classList.toggle('invalid', pen);
     }
-    this.pos.set(`${s.bestLapMs === null ? '–' : s.position}/${s.total}`);
+    this.pos.set(`${s.bestLapMs === null && !this.raceLaps ? '–' : s.position}/${s.total}`);
     this.cur.set(fmtTime(s.currentLapMs));
     this.best.set(fmtTime(s.bestLapMs));
     this.last.set(fmtTime(s.lastLapMs));
@@ -275,7 +275,14 @@ export class Hud {
   }
 
   /** Timing screen around the player's position: best lap for the leader, gaps for the others. */
+  /** Race (after qualifying): positions and gaps on the board instead of best laps. */
+  raceLaps = 0;
+
   setBoard(list: Standing[], me: string, names: Map<string, string>): void {
+    if (this.raceLaps) {
+      this.setRaceBoard(list, me, names);
+      return;
+    }
     const i = list.findIndex((x) => x.id === me);
     const from = Math.max(0, Math.min(i - 2, list.length - 5));
     const rows = list.slice(from, from + 5);
@@ -305,6 +312,39 @@ export class Hud {
                   ? fmtTime(r.bestLapMs)
                   : `+${((r.gapMs ?? 0) / 1000).toFixed(3)}`,
           }),
+        ),
+      ),
+    );
+  }
+
+  private setRaceBoard(list: Standing[], me: string, names: Map<string, string>): void {
+    const i = list.findIndex((x) => x.id === me);
+    const from = Math.max(0, Math.min(i - 2, list.length - 5));
+    const rows = list.slice(from, from + 5);
+    const leaderLaps = list[0]?.laps ?? 0;
+    const text = (r: Standing) =>
+      r.dnf
+        ? t('DNF')
+        : r.finishedMs !== null && r.position > 1
+          ? `+${((r.gapMs ?? 0) / 1000).toFixed(1)} · ${t('FIN')}`
+          : r.position === 1
+            ? r.finishedMs !== null
+              ? t('FIN')
+              : t('LAP {n}/{max}', { n: Math.min(r.laps + 1, this.raceLaps), max: this.raceLaps })
+            : leaderLaps - r.laps >= 2 || (leaderLaps - r.laps === 1 && (r.gapMs ?? 0) > 60_000)
+              ? `+${leaderLaps - r.laps} ${t('LAP')}`
+              : `+${((r.gapMs ?? 0) / 1000).toFixed(1)}`;
+    const key = rows.map((r) => `${r.id}${r.position}${text(r)}${r.inPit}`).join('|');
+    if (key === this.boardKey) return;
+    this.boardKey = key;
+    this.board.replaceChildren(
+      ...rows.map((r) =>
+        h(
+          `div.row${r.id === me ? '.me' : ''}`,
+          {},
+          h('b', { text: String(r.position) }),
+          h('span', {}, names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: t('PIT') }) : null),
+          h(`em${r.position === 1 ? '.p1' : ''}`, { text: text(r) }),
         ),
       ),
     );

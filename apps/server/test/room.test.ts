@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEFING_MS, PROTOCOL_VERSION, RECONNECT_GRACE_MS, mulberry32, type ServerMsg } from '@apex/shared';
+import { BRIEFING_MS, PROTOCOL_VERSION, QUALI_TO_RACE_MS, RECONNECT_GRACE_MS, mulberry32, type ServerMsg } from '@apex/shared';
 import { RoomCore, type Conn, type PersistedRoom } from '../src/room';
 import { ovalTrack } from '../../../packages/shared/test/helpers';
 
@@ -355,7 +355,33 @@ describe('qualifying sessions', () => {
     // after the grace period the session ends with results
     advance(250_000);
     room.tick();
-    expect(b.conn.last('results')).toBeDefined();
+    const res = b.conn.last('results');
+    expect(res?.kind).toBe('qualifying');
+    // then the race (5 laps by default), gridded in qualifying order
+    expect(room.phase).toBe('results');
+    expect(res?.raceAt).toBeGreaterThan(0);
+    advance(QUALI_TO_RACE_MS + 10);
+    room.tick();
+    expect(room.phase).toBe('loading');
+    const race = b.conn.last('raceSetup')?.race;
+    expect(race?.kind).toBe('race');
+    expect(race?.laps).toBe(5);
+    expect(race?.grid).toEqual(res?.rows.map((r) => r.id).filter((id) => race?.grid.includes(id)));
+  });
+
+  it('qualifying only: back to the lobby after the results', () => {
+    const { room, join, send, advance } = makeRoom(['car_a']);
+    const a = join('Ana');
+    send(a.conn, { t: 'setRaceLaps', laps: 0 });
+    send(a.conn, { t: 'selectCar', carId: 'car_a' });
+    send(a.conn, { t: 'ready', ready: true });
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded', raceId: room.raceId });
+    advance(30 * 60_000);
+    room.tick();
+    advance(300_000);
+    room.tick();
+    expect(a.conn.last('results')?.raceAt).toBeNull();
     expect(room.phase).toBe('lobby');
   });
 });

@@ -8,6 +8,8 @@ import {
   FINISH_TIMEOUT_MS,
   LOAD_TIMEOUT_MS,
   BRIEFING_MS,
+  DEFAULT_RACE_LAPS,
+  QUALI_TO_RACE_MS,
   MAX_CLOCK_SKEW_MS,
   MAX_PLAYERS,
   PROTOCOL_VERSION,
@@ -85,6 +87,7 @@ export interface PersistedRoom {
   raceId: number;
   players: PersistedPlayer[];
   sessionMinutes?: number;
+  raceLaps?: number;
   conditions?: Conditions;
 }
 
@@ -133,6 +136,11 @@ export class RoomCore {
   private loadDeadline: number | null = null;
   finishDeadline: number | null = null;
   sessionMinutes = DEFAULT_SESSION_MINUTES;
+  /** Race after qualifying (0 = qualifying only). */
+  raceLaps = DEFAULT_RACE_LAPS;
+  /** After qualifying: when the race loads, and its grid (qualifying order). */
+  raceAt: number | null = null;
+  private raceGrid: string[] = [];
   conditions: Conditions = { trackId: '', weather: 'random', time: 'random', changes: 'random', seed: 1 };
   private lastStandingsAt = 0;
   private readonly scratch: CarState[] = [makeCarState(), makeCarState(), makeCarState(), makeCarState()];
@@ -157,6 +165,7 @@ export class RoomCore {
     this.hostId = s.hostId;
     this.raceId = s.raceId;
     this.sessionMinutes = s.sessionMinutes ?? DEFAULT_SESSION_MINUTES;
+    this.raceLaps = s.raceLaps ?? DEFAULT_RACE_LAPS;
     this.conditions = s.conditions ?? { trackId: this.env.track.id, weather: 'random', time: 'random', changes: 'random', seed: this.newSeed() };
     for (const p of s.players) {
       this.players.set(p.id, { ...p, bot: !!p.bot, conn: null, disconnectedAt: p.bot ? null : this.env.now(), slot: -1, lastDamageAt: 0, lastPacketAt: 0 });
@@ -181,6 +190,7 @@ export class RoomCore {
       hostId: this.hostId,
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
+      raceLaps: this.raceLaps,
       conditions: this.conditions,
       players: [...this.players.values()].map(({ id, nick, session, carId, ready, joinedAt, waiting, bot, tyre }) => ({
         id,
@@ -226,6 +236,7 @@ export class RoomCore {
       carLocks: Object.fromEntries(this.carLocks),
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
+      raceLaps: this.raceLaps,
       conditions: this.conditions,
       briefingUntil: this.phase === 'briefing' ? this.briefingUntil : null,
     };
@@ -409,6 +420,12 @@ export class RoomCore {
         this.persist();
         this.broadcastRoom();
         return;
+      case 'setRaceLaps':
+        if (p.id !== this.hostId || this.phase !== 'lobby') return;
+        this.raceLaps = msg.laps;
+        this.persist();
+        this.broadcastRoom();
+        return;
       case 'setSession':
         if (p.id !== this.hostId || this.phase !== 'lobby') return;
         this.sessionMinutes = msg.minutes;
@@ -532,6 +549,18 @@ export class RoomCore {
     this.scheduleNext();
   }
 
+  /** After the qualifying results: the race, gridded in qualifying order. */
+  private launchRace(): void {
+    this.raceAt = null;
+    const entrants = [...this.players.values()].filter((x) => (x.conn !== null || x.bot) && x.carId);
+    if (entrants.length === 0) {
+      this.phase = 'lobby';
+      this.broadcastRoom();
+      return;
+    }
+    this.launch(entrants, this.raceGrid);
+  }
+
   /** End of the briefing: everyone connected is done (or the time is up). */
   private maybeLaunch(force = false): void {
     if (this.phase !== 'briefing') return;
@@ -546,15 +575,14 @@ export class RoomCore {
     this.launch(entrants);
   }
 
-  private launch(entrants: Player[]): void {
+  /** Load a session: qualifying (random grid: it does not matter, the out lap is untimed) or the race (grid = `raceGrid`). */
+  private launch(entrants: Player[], raceGrid?: string[]): void {
     const now = this.env.now();
     this.raceId++;
     const seed = Math.floor(this.env.random() * 0xffffffff) >>> 0;
     const rand = mulberry32(seed);
-    const grid = shuffle(
-      entrants.map((x) => x.id),
-      rand,
-    );
+    const ids = entrants.map((x) => x.id);
+    const grid = raceGrid ? [...raceGrid.filter((id) => ids.includes(id)), ...ids.filter((id) => !raceGrid.includes(id))] : shuffle(ids, rand);
     const slots: Record<string, number> = {};
     grid.forEach((id, i) => {
       slots[id] = i;
@@ -569,8 +597,10 @@ export class RoomCore {
       weather: planWeather(cond.seed, cond),
       grid,
       slots,
-      sessionMs: this.sessionMinutes * 60_000,
+      sessionMs: raceGrid ? 0 : this.sessionMinutes * 60_000,
       trackId: this.tracks()[cond.trackId] ? cond.trackId : this.env.track.id,
+      kind: raceGrid ? 'race' : 'qualifying',
+      laps: this.raceLaps,
     };
     this.phase = 'loading';
     this.loaded = new Set();
@@ -590,7 +620,11 @@ export class RoomCore {
     if (!force && waitingFor.length > 0) return;
     const now = this.env.now();
     this.startAt = now + COUNTDOWN_MS;
-    this.tracker = new RaceTracker(this.tracks()[this.race.trackId] ?? this.env.track, this.startAt, { sessionMs: this.race.sessionMs });
+    this.tracker = new RaceTracker(
+      this.tracks()[this.race.trackId] ?? this.env.track,
+      this.startAt,
+      this.race.kind === 'race' ? { raceLaps: this.race.laps } : { sessionMs: this.race.sessionMs },
+    );
     for (const id of this.race.grid) this.tracker.addPlayer(id);
     this.phase = 'countdown';
     this.broadcast({ t: 'countdown', raceId: this.race.raceId, startAt: this.startAt });
@@ -713,9 +747,13 @@ export class RoomCore {
         penaltyMs: s.penaltyMs,
       };
     });
-    this.broadcast({ t: 'results', raceId: this.race.raceId, rows, fastestLap: fastest });
-    // back to the lobby for a rematch with the same code
-    this.phase = 'lobby';
+    // after qualifying, the race: grid in qualifying order (drivers without a time at the back)
+    const raceNext = this.race.kind === 'qualifying' && this.raceLaps > 0 && st.some((x) => !x.dnf || x.bestLapMs !== null);
+    this.raceAt = raceNext ? this.env.now() + QUALI_TO_RACE_MS : null;
+    this.raceGrid = raceNext ? st.map((x) => x.id) : [];
+    this.broadcast({ t: 'results', raceId: this.race.raceId, kind: this.race.kind, rows, fastestLap: fastest, raceAt: this.raceAt });
+    // back to the lobby for a rematch with the same code (or, after qualifying, to the race)
+    this.phase = raceNext ? 'results' : 'lobby';
     this.race = null;
     this.tracker = null;
     this.startAt = null;
@@ -786,6 +824,7 @@ export class RoomCore {
       if (p.disconnectedAt !== null && now - p.disconnectedAt >= RECONNECT_GRACE_MS) this.removePlayer(p.id);
     }
     if (this.phase === 'briefing' && now >= this.briefingUntil) this.maybeLaunch(true);
+    if (this.phase === 'results' && this.raceAt !== null && now >= this.raceAt) this.launchRace();
     if (this.phase === 'loading' && this.loadDeadline !== null && now >= this.loadDeadline) this.maybeBeginCountdown(true);
     if (this.phase === 'countdown' && this.startAt !== null && now >= this.startAt) this.phase = 'racing';
     if (this.tracker && this.race && (this.phase === 'racing' || this.phase === 'countdown')) {
@@ -804,6 +843,7 @@ export class RoomCore {
     const times: number[] = [];
     for (const p of this.players.values()) if (p.disconnectedAt !== null) times.push(p.disconnectedAt + RECONNECT_GRACE_MS);
     if (this.phase === 'briefing') times.push(this.briefingUntil);
+    if (this.phase === 'results' && this.raceAt !== null) times.push(this.raceAt);
     if (this.phase === 'loading' && this.loadDeadline !== null) times.push(this.loadDeadline);
     if (this.phase === 'countdown' && this.startAt !== null) times.push(this.startAt);
     if (this.finishDeadline !== null) times.push(this.finishDeadline);

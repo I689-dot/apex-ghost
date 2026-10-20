@@ -27,6 +27,7 @@ if (isMobile()) {
   try {
     const app = new App(root);
     app.showMenu();
+    if (import.meta.env.DEV) (window as unknown as { __app?: App }).__app = app; // e2e tools
   } catch (e) {
     root.append(h('div.fatal', {}, h('h2', { text: t('Cannot start') }), h('p', { text: (e as Error).message })));
   }

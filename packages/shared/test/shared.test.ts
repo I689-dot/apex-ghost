@@ -393,6 +393,36 @@ describe('race logic (server-authoritative laps)', () => {
     expect(last.penaltyMs).toBe(PENALTY.resetMs + (cut?.ms ?? 0));
   });
 
+  it("race: standing start, laps from the green light, everyone finishes on the leader's lap, penalties count", () => {
+    const track = ovalTrack(R, 12);
+    const tr = new RaceTracker(track, 0, { raceLaps: 2 });
+    for (const id of ['fast', 'slow', 'pen']) tr.addPlayer(id);
+    const ev: RaceEvent[] = [];
+    // fast: 2 laps at 60 m/s from the grid (just behind the line)
+    drive(tr, 'fast', 0, -10, 2 * L + 6, 60, 0, 50, ev);
+    const laps = ev.filter((e) => e.type === 'lap' && e.playerId === 'fast') as Extract<RaceEvent, { type: 'lap' }>[];
+    expect(laps).toHaveLength(2);
+    expect(laps[0]).toMatchObject({ outLap: false, valid: true });
+    // lap 1 is timed from the green light (t = 0) to the first full lap
+    expect(laps[0].lapMs).toBeGreaterThan(((L - 10) / 60) * 1000);
+    expect(tr.players.get('fast')?.finishedMs).not.toBeNull();
+    // slow: still on lap 1 when the leader finishes: not done yet; finishes at its first crossing after the flag
+    drive(tr, 'slow', 0, -10, L + 6, 40, 0, 50, ev);
+    expect(tr.players.get('slow')?.finishedMs).toBeNull();
+    drive(tr, 'slow', ((L + 16) / 40) * 1000, L + 6, 2 * L + 6, 40, 0, 50, ev);
+    expect(tr.players.get('slow')?.finishedMs).not.toBeNull();
+    // pen: as fast as `fast` but a reset (+5 s)
+    let t = drive(tr, 'pen', 0, -10, L + 300, 60, 0, 50, ev);
+    const g = track.gates[(tr.players.get('pen')?.nextGate ?? 1) - 1];
+    tr.ingest('pen', t + 50, g.p[0], g.p[1], g.p[2], true, ev);
+    t += 100;
+    drive(tr, 'pen', t, g.s + L + 1, 2 * L + 6, 60, 0, 50, ev);
+    const st = tr.standings();
+    expect(st.map((x) => x.id)).toEqual(['fast', 'pen', 'slow']);
+    expect(st[1].gapMs).toBeGreaterThan(4000);
+    expect(st[0].gapMs).toBe(0);
+  });
+
   it('orders cars on the same lap by distance along the track', () => {
     const track = ovalTrack(R, 12);
     const tr = new RaceTracker(track, 0, 3);

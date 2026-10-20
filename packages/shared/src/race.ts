@@ -150,15 +150,22 @@ export class RaceTracker {
   readonly flagAt: number | null;
   firstFinishMs: number | null = null;
   flagShown = false;
+  /** Race (after qualifying): no out lap, finish after `laps`, everyone finishes on the lap the leader does. */
+  readonly isRace: boolean = false;
 
   constructor(
     readonly track: TrackRaceData,
     readonly startMs: number,
-    mode: number | { sessionMs: number } = RACE_LAPS,
+    mode: number | { sessionMs: number } | { raceLaps: number } = RACE_LAPS,
   ) {
     if (typeof mode === 'number') {
       this.laps = mode;
       this.flagAt = null;
+    } else if ('raceLaps' in mode) {
+      // the race: standing start, every lap timed from the green light, finish after raceLaps
+      this.laps = mode.raceLaps;
+      this.flagAt = null;
+      this.isRace = true;
     } else {
       this.laps = 0;
       this.flagAt = startMs + mode.sessionMs;
@@ -174,8 +181,11 @@ export class RaceTracker {
     if (!p || p.dnf || p.finishedMs !== null || p.inPit) return out;
     p.inPit = true;
     p.pitStops++;
-    p.outLap = true;
-    p.lapPenaltyMs = 0;
+    if (!this.isRace) {
+      // qualifying: the lap in progress is lost, the next one is an out lap
+      p.outLap = true;
+      p.lapPenaltyMs = 0;
+    }
     p.offSince = null;
     p.sectors = [];
     // after the flag, coming into the pits ends the session
@@ -184,7 +194,7 @@ export class RaceTracker {
   }
 
   /** The car leaves the pit lane at lap distance `exitS`: the out lap continues from the next gate. */
-  pitOut(id: string, exitS: number): void {
+  pitOut(id: string, exitS: number, t?: number, out: RaceEvent[] = []): void {
     const p = this.players.get(id);
     if (!p || !p.inPit) return;
     const gates = this.track.gates;
@@ -194,6 +204,28 @@ export class RaceTracker {
     p.nextGate = gi;
     p.passed = gi === 0 ? gates.length - 1 : gi - 1;
     p.hasPos = false;
+    // the race: the pit lane runs past the line, so the lap of the stop ends here
+    if (this.isRace && t !== undefined && p.finishedMs === null) {
+      const lapMs = t - p.lapStartMs;
+      p.laps++;
+      p.lastLapMs = lapMs + p.lapPenaltyMs;
+      out.push({
+        type: 'lap',
+        playerId: p.id,
+        lap: p.laps,
+        lapMs: p.lastLapMs,
+        penaltyMs: p.lapPenaltyMs,
+        sectors: [],
+        best: false,
+        valid: true,
+        outLap: false,
+      });
+      p.lapStartMs = t;
+      p.sectorStartMs = t;
+      p.sectors = [];
+      p.lapPenaltyMs = 0;
+      if (p.laps >= this.laps || (this.firstFinishMs !== null && t >= this.firstFinishMs)) this.finish(p, t, out);
+    }
   }
 
   private finish(p: PlayerRaceState, t: number, out: RaceEvent[]): void {
@@ -255,6 +287,7 @@ export class RaceTracker {
       progressS: 0,
       raceDist: -1e6,
     };
+    if (this.isRace) p.outLap = false;
     this.players.set(id, p);
     return p;
   }
@@ -409,7 +442,10 @@ export class RaceTracker {
         p.passed = 0;
         p.lapPenaltyMs = 0;
         p.outLap = false;
-        const lapsDone = this.laps > 0 && p.laps >= this.laps + 1;
+        // the race: the chequered flag is shown to the leader after `laps`; everyone else finishes the lap they are on
+        const lapsDone = this.isRace
+          ? p.laps >= this.laps || (this.firstFinishMs !== null && tc >= this.firstFinishMs)
+          : this.laps > 0 && p.laps >= this.laps + 1;
         const flagged = this.flagAt !== null && tc >= this.flagAt;
         if (lapsDone || flagged) this.finish(p, tc, out);
       } else {
@@ -508,15 +544,26 @@ export class RaceTracker {
    */
   standings(): Standing[] {
     const list = [...this.players.values()];
-    list.sort((a, b) => {
-      const at = a.bestLapMs !== null;
-      const bt = b.bestLapMs !== null;
-      if (at && bt) return (a.bestLapMs as number) - (b.bestLapMs as number);
-      if (at !== bt) return at ? -1 : 1;
-      if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
-      // fixed-lap race: by distance covered; timed session: untimed drivers keep join order
-      return this.flagAt === null ? b.raceDist - a.raceDist : 0;
-    });
+    if (this.isRace) {
+      // the race: finishers by race time + penalties, then the rest by distance covered; retirements last
+      list.sort((a, b) => {
+        if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
+        const af = a.finishedMs !== null;
+        const bf = b.finishedMs !== null;
+        if (af && bf) return b.laps - a.laps || (a.finishedMs as number) + a.penaltyMs - ((b.finishedMs as number) + b.penaltyMs);
+        if (af !== bf) return af ? -1 : 1;
+        return b.raceDist - a.raceDist;
+      });
+    } else
+      list.sort((a, b) => {
+        const at = a.bestLapMs !== null;
+        const bt = b.bestLapMs !== null;
+        if (at && bt) return (a.bestLapMs as number) - (b.bestLapMs as number);
+        if (at !== bt) return at ? -1 : 1;
+        if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
+        // fixed-lap test mode: by distance covered; timed session: untimed drivers keep join order
+        return this.flagAt === null ? b.raceDist - a.raceDist : 0;
+      });
     const leader = list[0];
     return list.map((p, i) => ({
       id: p.id,
@@ -528,13 +575,25 @@ export class RaceTracker {
       finishedMs: p.finishedMs,
       dnf: p.dnf,
       penaltyMs: p.penaltyMs,
-      gapMs: leader && leader.bestLapMs !== null && p.bestLapMs !== null ? p.bestLapMs - leader.bestLapMs : null,
+      gapMs: this.isRace ? this.raceGap(leader, p) : leader && leader.bestLapMs !== null && p.bestLapMs !== null ? p.bestLapMs - leader.bestLapMs : null,
       validLaps: p.validLaps,
       lapPenaltyMs: p.lapPenaltyMs,
       inPit: p.inPit,
       outLap: p.outLap,
       bestSectors: p.bestSectors.slice(),
     }));
+  }
+
+  /**
+   * Race gap to the leader (ms): finish time + penalties for finishers; on track, the distance behind at the
+   * leader's average speed, plus the penalty difference.
+   */
+  private raceGap(leader: PlayerRaceState | undefined, p: PlayerRaceState): number | null {
+    if (!leader || p === leader || p.dnf) return p === leader ? 0 : null;
+    if (leader.finishedMs !== null && p.finishedMs !== null) return p.finishedMs + p.penaltyMs - (leader.finishedMs + leader.penaltyMs);
+    const elapsed = Math.max(1, (leader.lt - this.startMs) / 1000);
+    const speed = Math.max(10, leader.raceDist / elapsed);
+    return Math.max(0, ((leader.raceDist - p.raceDist) / speed) * 1000) + p.penaltyMs - leader.penaltyMs;
   }
 
   allDone(): boolean {
