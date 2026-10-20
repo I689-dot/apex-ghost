@@ -2291,3 +2291,58 @@ button.pit-tyre.on {
   font-size: 12px;
   cursor: pointer;
 }
+
+/* menu fit: nothing may spill out of its card at 1280×720 and up, in English or Spanish */
+.menu {
+  overflow-y: auto;
+}
+.logo {
+  font-size: clamp(2.6rem, 4.6vw, 4.4rem);
+  flex-wrap: wrap;
+}
+.join-row > .code-input {
+  min-width: 0;
+  width: 0;
+  letter-spacing: 0.16em;
+}
+.join-row > button {
+  flex: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+.menu-card.rooms {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+  align-self: start;
+  width: min(400px, 100%);
+  margin-top: 0;
+  max-height: 46vh;
+}
+.menu-card.rooms h3 {
+  margin: 0 0 0.4rem;
+}
+.room-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.menu-foot {
+  flex-wrap: wrap;
+  row-gap: 0.6rem;
+  margin-top: 1rem;
+}
+@media (max-width: 900px) {
+  .menu {
+    grid-template-columns: 1fr;
+  }
+  .menu-card.rooms {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+    width: auto;
+    margin-top: 14px;
+  }
+  .menu-foot {
+    grid-column: 1;
+  }
+}
