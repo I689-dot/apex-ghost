@@ -64,7 +64,7 @@ await page.addInitScript(
 console.log(`▶ opening ${URL}`);
 // any "Malformed message" toast during the whole run (they only stay a few seconds)
 await page.addInitScript(() => {
-  new MutationObserver(() => {
+  new window.MutationObserver(() => {
     if (document.body?.innerText.includes('Malformed')) window.__malformed = true;
   }).observe(document, { subtree: true, childList: true, characterData: true });
 });
