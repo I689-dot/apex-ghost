@@ -10,6 +10,7 @@ import {
   BRIEFING_MS,
   DEFAULT_RACE_LAPS,
   QUALI_TO_RACE_MS,
+  MAX_SPECTATORS,
   MAX_CLOCK_SKEW_MS,
   MAX_PLAYERS,
   PROTOCOL_VERSION,
@@ -44,6 +45,7 @@ import {
   type Phase,
   type TrackRaceData,
   type RaceEvent,
+  type RoomSummary,
 } from '@apex/shared';
 
 export interface Conn {
@@ -59,6 +61,8 @@ export interface RoomEnv {
   schedule(at: number): void;
   /** Persist lobby-level state (survives hibernation). */
   persist(state: PersistedRoom): void;
+  /** Public room list: called with the room's summary when it changes (null: not listed any more). */
+  report?(summary: RoomSummary | null): void;
   /** Default layout. */
   track: TrackRaceData;
   /** All layouts by id (the default included); missing → only the default. */
@@ -88,6 +92,7 @@ export interface PersistedRoom {
   players: PersistedPlayer[];
   sessionMinutes?: number;
   raceLaps?: number;
+  isPublic?: boolean;
   conditions?: Conditions;
 }
 
@@ -138,6 +143,11 @@ export class RoomCore {
   sessionMinutes = DEFAULT_SESSION_MINUTES;
   /** Race after qualifying (0 = qualifying only). */
   raceLaps = DEFAULT_RACE_LAPS;
+  /** Listed in the public room list. */
+  isPublic = false;
+  /** Spectators: conn id → connection (they get every broadcast and the car states, have no car). */
+  readonly spectators = new Map<string, Conn>();
+  private lastReport = '';
   /** After qualifying: when the race loads, and its grid (qualifying order). */
   raceAt: number | null = null;
   private raceGrid: string[] = [];
@@ -166,6 +176,7 @@ export class RoomCore {
     this.raceId = s.raceId;
     this.sessionMinutes = s.sessionMinutes ?? DEFAULT_SESSION_MINUTES;
     this.raceLaps = s.raceLaps ?? DEFAULT_RACE_LAPS;
+    this.isPublic = !!s.isPublic;
     this.conditions = s.conditions ?? { trackId: this.env.track.id, weather: 'random', time: 'random', changes: 'random', seed: this.newSeed() };
     for (const p of s.players) {
       this.players.set(p.id, { ...p, bot: !!p.bot, conn: null, disconnectedAt: p.bot ? null : this.env.now(), slot: -1, lastDamageAt: 0, lastPacketAt: 0 });
@@ -191,6 +202,7 @@ export class RoomCore {
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
       raceLaps: this.raceLaps,
+      isPublic: this.isPublic,
       conditions: this.conditions,
       players: [...this.players.values()].map(({ id, nick, session, carId, ready, joinedAt, waiting, bot, tyre }) => ({
         id,
@@ -237,6 +249,8 @@ export class RoomCore {
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
       raceLaps: this.raceLaps,
+      isPublic: this.isPublic,
+      spectators: this.spectators.size,
       conditions: this.conditions,
       briefingUntil: this.phase === 'briefing' ? this.briefingUntil : null,
     };
@@ -253,10 +267,40 @@ export class RoomCore {
   private broadcast(msg: ServerMsg, except?: string): void {
     const s = JSON.stringify(msg);
     for (const p of this.players.values()) if (p.conn && p.id !== except) p.conn.send(s);
+    for (const c of this.spectators.values()) c.send(s);
   }
 
   private broadcastRoom(): void {
     this.broadcast({ t: 'room', room: this.snapshot() });
+    this.report();
+  }
+
+  /** Public room list entry (only when something listed changed: few directory requests). */
+  private report(): void {
+    if (!this.env.report) return;
+    const humans = [...this.players.values()].filter((p) => !p.bot);
+    const host = this.hostId ? this.players.get(this.hostId) : undefined;
+    const summary: RoomSummary | null =
+      this.created && this.isPublic && humans.length > 0
+        ? {
+            code: this.code,
+            host: host?.nick ?? '',
+            trackId: this.conditions.trackId,
+            phase: this.phase,
+            kind: this.race && this.phase !== 'lobby' ? this.race.kind : null,
+            drivers: this.players.size,
+            humans: humans.length,
+            spectators: this.spectators.size,
+            maxPlayers: MAX_PLAYERS,
+            sessionMinutes: this.sessionMinutes,
+            raceLaps: this.raceLaps,
+            updatedAt: 0,
+          }
+        : null;
+    const key = JSON.stringify(summary);
+    if (key === this.lastReport) return;
+    this.lastReport = key;
+    this.env.report(summary ? { ...summary, updatedAt: this.env.now() } : null);
   }
 
   private error(conn: Conn, code: ErrorCode, message: string, fatal: boolean): void {
@@ -292,6 +336,8 @@ export class RoomCore {
     const pid = this.connPlayer.get(conn.id);
     const p = pid ? this.players.get(pid) : undefined;
     if (!p) {
+      // spectators only ping (clock sync); anything else is ignored
+      if (this.spectators.has(conn.id)) return;
       this.error(conn, 'bad_message', 'Say hello first.', true);
       return;
     }
@@ -302,6 +348,7 @@ export class RoomCore {
     const now = this.env.now();
     if (!this.created) return this.error(conn, 'room_not_found', 'Room not found. Check the code.', true);
     if (msg.v !== PROTOCOL_VERSION) return this.error(conn, 'version_mismatch', 'Game version mismatch. Reload the page.', true);
+    if (msg.spectate) return this.addSpectator(conn);
 
     // reconnect with a session token
     if (msg.session) {
@@ -348,6 +395,27 @@ export class RoomCore {
     if (!this.hostId || !this.players.has(this.hostId)) this.hostId = p.id;
     this.persist();
     this.sendWelcome(p);
+    this.broadcastRoom();
+  }
+
+  /** A spectator: no car, no slot; sees the room, the session and every car. */
+  addSpectator(conn: Conn): void {
+    if (!this.spectators.has(conn.id) && this.spectators.size >= MAX_SPECTATORS)
+      return this.error(conn, 'too_many_spectators', 'Too many spectators in this room.', true);
+    this.spectators.set(conn.id, conn);
+    const live = this.race !== null && (this.phase === 'loading' || this.phase === 'countdown' || this.phase === 'racing');
+    conn.send(
+      JSON.stringify({
+        t: 'welcome',
+        you: `spectator:${conn.id}`,
+        session: '',
+        room: this.snapshot(),
+        serverTime: this.env.now(),
+        race: live ? this.race : null,
+        startAt: live ? this.startAt : null,
+        spectator: true,
+      } satisfies ServerMsg),
+    );
     this.broadcastRoom();
   }
 
@@ -417,6 +485,12 @@ export class RoomCore {
       case 'setTyre':
         if (this.phase !== 'lobby' && this.phase !== 'briefing' && !p.waiting) return;
         p.tyre = msg.tyre;
+        this.persist();
+        this.broadcastRoom();
+        return;
+      case 'setPublic':
+        if (p.id !== this.hostId) return;
+        this.isPublic = msg.isPublic;
         this.persist();
         this.broadcastRoom();
         return;
@@ -673,6 +747,7 @@ export class RoomCore {
     this.handleRaceEvents(ev, p, now);
     // relay to everybody else in the race (bot states go to everyone but the simulating host)
     for (const o of this.players.values()) if (o.conn && o.id !== p.id && o.id !== sender.id && !o.waiting) o.conn.send(relay);
+    for (const c of this.spectators.values()) c.send(relay);
 
     if (now - this.lastStandingsAt >= 500) {
       this.lastStandingsAt = now;
@@ -771,6 +846,10 @@ export class RoomCore {
   /* ---------------------------------------------------------- disconnects --- */
 
   onClose(conn: Conn): void {
+    if (this.spectators.delete(conn.id)) {
+      this.broadcastRoom();
+      return;
+    }
     const pid = this.connPlayer.get(conn.id);
     this.connPlayer.delete(conn.id);
     const p = pid ? this.players.get(pid) : undefined;

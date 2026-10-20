@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BRIEFING_MS, PROTOCOL_VERSION, QUALI_TO_RACE_MS, RECONNECT_GRACE_MS, mulberry32, type ServerMsg } from '@apex/shared';
+import { BRIEFING_MS, PROTOCOL_VERSION, QUALI_TO_RACE_MS, RECONNECT_GRACE_MS, mulberry32, type RoomSummary, type ServerMsg } from '@apex/shared';
 import { RoomCore, type Conn, type PersistedRoom } from '../src/room';
 import { ovalTrack } from '../../../packages/shared/test/helpers';
 
@@ -22,12 +22,14 @@ class FakeConn implements Conn {
 function makeRoom(cars = ['car_a', 'car_b', 'car_c'], autoBrief = true) {
   let now = 1_000_000;
   const persisted: PersistedRoom[] = [];
+  const reports: (RoomSummary | null)[] = [];
   const rand = mulberry32(99);
   const room = new RoomCore({
     now: () => now,
     random: rand,
     schedule: () => {},
     persist: (s) => persisted.push(structuredClone(s)),
+    report: (r) => reports.push(r),
     track: ovalTrack(),
     carIds: new Set(cars),
   });
@@ -47,7 +49,7 @@ function makeRoom(cars = ['car_a', 'car_b', 'car_c'], autoBrief = true) {
     if (autoBrief && (msg as { t: string }).t === 'start' && room.phase === 'briefing')
       for (const x of conns) room.onMessage(x, JSON.stringify({ t: 'briefed' }));
   };
-  return { room, join, send, advance: (ms: number) => (now += ms), persisted };
+  return { room, join, send, advance: (ms: number) => (now += ms), persisted, reports, conns };
 }
 
 describe('car lock (atomic, server-side)', () => {
@@ -412,5 +414,35 @@ describe('session setup', () => {
     expect(race?.weather.kind).toBe('heavy_rain');
     expect(race?.weather.startHour).toBe(6.5);
     expect(race?.trackId).toBe(room.conditions.trackId);
+  });
+});
+
+describe('public rooms and spectators', () => {
+  it('only public rooms are listed; spectators watch without taking a car or a slot', () => {
+    const { room, join, send, reports } = makeRoom();
+    const a = join('Ana');
+    expect(reports.filter((r) => r !== null)).toHaveLength(0); // private by default
+    send(a.conn, { t: 'setPublic', isPublic: true });
+    const listed = reports.filter((r): r is RoomSummary => r !== null).pop();
+    expect(listed).toMatchObject({ code: 'ABCDE', host: 'Ana', humans: 1, phase: 'lobby' });
+    // a spectator
+    const sc = new FakeConn('watcher');
+    room.onMessage(sc, JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, nick: 'Watcher', session: null, spectate: true }));
+    expect(sc.last('welcome')?.spectator).toBe(true);
+    expect(room.players.size).toBe(1);
+    expect(a.conn.last('room')?.room.spectators).toBe(1);
+    // gets the session
+    send(a.conn, { t: 'selectCar', carId: 'car_a' });
+    send(a.conn, { t: 'ready', ready: true });
+    send(a.conn, { t: 'start' });
+    expect(sc.last('raceSetup')?.race.grid).toEqual([a.id]);
+    // and can't drive or change anything
+    room.onMessage(sc, JSON.stringify({ t: 'selectCar', carId: 'car_b' }));
+    expect(room.carLocks.has('car_b')).toBe(false);
+    room.onClose(sc);
+    expect(room.spectators.size).toBe(0);
+    // back to private: not listed any more
+    send(a.conn, { t: 'setPublic', isPublic: false });
+    expect(reports[reports.length - 1]).toBeNull();
   });
 });

@@ -12,6 +12,7 @@ export const RACE_LAP_CHOICES = [0, 3, 5, 10, 15] as const;
 export const DEFAULT_RACE_LAPS = 5;
 /** Qualifying results on screen before the race loads. */
 export const QUALI_TO_RACE_MS = 20_000;
+export const MAX_SPECTATORS = 30;
 /** After the chequered flag, drivers may finish the lap they are on: at most this long. */
 export const FLAG_GRACE_MS = 240_000;
 

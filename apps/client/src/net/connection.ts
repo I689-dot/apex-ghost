@@ -6,6 +6,7 @@ import {
   makeSample,
   type ClientMsg,
   type ClockSample,
+  type RoomSummary,
   type ServerMsg,
 } from '@apex/shared';
 import { SERVER_URL } from '../config';
@@ -23,6 +24,17 @@ export class RoomError extends Error {
     message: string,
   ) {
     super(message);
+  }
+}
+
+/** The public room list (rooms whose host made them public). */
+export async function listPublicRooms(): Promise<RoomSummary[]> {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/rooms`);
+    if (!res.ok) return [];
+    return ((await res.json()) as { rooms?: RoomSummary[] }).rooms ?? [];
+  } catch {
+    return [];
   }
 }
 
@@ -68,6 +80,8 @@ export class Connection {
   constructor(
     readonly code: string,
     private nick: string,
+    /** Join as a spectator (watch only). */
+    readonly spectate = false,
   ) {}
 
   /** Resolves on the first `welcome`, rejects with RoomError on fatal errors. */
@@ -110,7 +124,7 @@ export class Connection {
     this.ws = ws;
     ws.onopen = () => {
       this.reconnectAttempt = 0;
-      this.sendJson({ t: 'hello', v: PROTOCOL_VERSION, nick: this.nick, session: getSession(this.code) });
+      this.sendJson({ t: 'hello', v: PROTOCOL_VERSION, nick: this.nick, session: this.spectate ? null : getSession(this.code), spectate: this.spectate });
     };
     ws.onmessage = (e) => {
       if (typeof e.data === 'string') {
@@ -144,7 +158,7 @@ export class Connection {
 
   private onJson(msg: ServerMsg): void {
     if (msg.t === 'welcome') {
-      setSession(this.code, msg.session);
+      if (!this.spectate) setSession(this.code, msg.session);
       this.flushBacklog();
       this.offset = msg.serverTime - Date.now();
       this.samples = [];

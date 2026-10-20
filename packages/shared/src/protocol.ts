@@ -52,6 +52,26 @@ export interface RoomSnapshot {
   briefingUntil: number | null;
   /** Race after qualifying: laps (0 = qualifying only). */
   raceLaps: number;
+  /** Listed in the public room list (anyone can join or watch without the code). */
+  isPublic: boolean;
+  spectators: number;
+}
+
+/** A public room as listed before joining (GET /api/rooms). */
+export interface RoomSummary {
+  code: string;
+  host: string;
+  trackId: string;
+  phase: Phase;
+  /** Session in progress: qualifying or race. */
+  kind: 'qualifying' | 'race' | null;
+  drivers: number;
+  humans: number;
+  spectators: number;
+  maxPlayers: number;
+  sessionMinutes: number;
+  raceLaps: number;
+  updatedAt: number;
 }
 
 export interface RaceSetup {
@@ -93,6 +113,7 @@ export type ErrorCode =
   | 'nick_taken'
   | 'nick_invalid'
   | 'car_taken'
+  | 'too_many_spectators'
   | 'not_host'
   | 'not_ready'
   | 'bad_message'
@@ -102,7 +123,7 @@ export type ErrorCode =
 /* ------------------------------------------------------ client → server --- */
 
 export type ClientMsg =
-  | { t: 'hello'; v: number; nick: string; session: string | null }
+  | { t: 'hello'; v: number; nick: string; session: string | null; spectate?: boolean }
   | { t: 'selectCar'; carId: string | null }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
@@ -115,6 +136,7 @@ export type ClientMsg =
   | { t: 'removeBot'; id: string }
   | { t: 'setSession'; minutes: number }
   | { t: 'setRaceLaps'; laps: number }
+  | { t: 'setPublic'; isPublic: boolean }
   /** Host: track, weather, time, changes; reroll = new forecast. */
   | { t: 'setConditions'; trackId?: string; weather?: WeatherChoice; time?: TimeChoice; changes?: ChangeChoice; reroll?: boolean }
   | { t: 'setTyre'; tyre: TyreChoice }
@@ -124,7 +146,17 @@ export type ClientMsg =
 /* ------------------------------------------------------ server → client --- */
 
 export type ServerMsg =
-  | { t: 'welcome'; you: string; session: string; room: RoomSnapshot; serverTime: number; race: RaceSetup | null; startAt: number | null }
+  | {
+      t: 'welcome';
+      you: string;
+      session: string;
+      room: RoomSnapshot;
+      serverTime: number;
+      race: RaceSetup | null;
+      startAt: number | null;
+      /** Joined as a spectator (no car, watches the session). */
+      spectator?: boolean;
+    }
   | { t: 'room'; room: RoomSnapshot }
   | { t: 'error'; code: ErrorCode; message: string; fatal: boolean }
   | { t: 'carLock'; ok: boolean; carId: string | null; owner: string | null }
@@ -164,7 +196,9 @@ export function parseClientMsg(raw: string): ClientMsg | null {
   if (!isRecord(v) || typeof v.t !== 'string') return null;
   switch (v.t) {
     case 'hello':
-      return num(v.v) && str(v.nick, 64) && (v.session === null || str(v.session, 64)) ? { t: 'hello', v: v.v, nick: v.nick, session: v.session } : null;
+      return num(v.v) && str(v.nick, 64) && (v.session === null || str(v.session, 64))
+        ? { t: 'hello', v: v.v, nick: v.nick, session: v.session, spectate: v.spectate === true }
+        : null;
     case 'selectCar':
       return v.carId === null || str(v.carId, 64) ? { t: 'selectCar', carId: v.carId } : null;
     case 'ready':
@@ -189,6 +223,8 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       return str(v.id, 32) ? { t: 'removeBot', id: v.id } : null;
     case 'setSession':
       return num(v.minutes) && Number.isInteger(v.minutes) && v.minutes >= 1 && v.minutes <= 60 ? { t: 'setSession', minutes: v.minutes } : null;
+    case 'setPublic':
+      return typeof v.isPublic === 'boolean' ? { t: 'setPublic', isPublic: v.isPublic } : null;
     case 'setRaceLaps':
       return num(v.laps) && Number.isInteger(v.laps) && v.laps >= 0 && v.laps <= 50 ? { t: 'setRaceLaps', laps: v.laps } : null;
     case 'pit':

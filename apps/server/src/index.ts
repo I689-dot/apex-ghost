@@ -1,12 +1,13 @@
 /**
  * Cloudflare Worker entry + Durable Object adapter.
  *   POST /api/rooms          → create a room, returns { code }
+ *   GET  /api/rooms          → public rooms (the room list before joining), from the DirectoryDO
  *   GET  /api/rooms/:code/ws → WebSocket into the room's Durable Object
  *   GET  /health
  * One Durable Object per room (idFromName(code)); WebSocket Hibernation API.
  */
 import { DurableObject } from 'cloudflare:workers';
-import { generateRoomCode, normalizeRoomCode, type TrackRaceData } from '@apex/shared';
+import { generateRoomCode, normalizeRoomCode, type RoomSummary, type TrackRaceData } from '@apex/shared';
 import trackRace from '@apex/shared/generated/track-race.json';
 import tracksRace from '@apex/shared/generated/tracks-race.json';
 import carIdList from '@apex/shared/generated/car-ids.json';
@@ -14,6 +15,7 @@ import { RoomCore, type Conn, type PersistedRoom } from './room';
 
 export interface Env {
   ROOMS: DurableObjectNamespace<RoomDO>;
+  DIRECTORY: DurableObjectNamespace<DirectoryDO>;
 }
 
 const TRACK = trackRace as unknown as TrackRaceData;
@@ -34,6 +36,11 @@ export default {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (url.pathname === '/health') return json({ ok: true });
+
+    if (url.pathname === '/api/rooms' && req.method === 'GET') {
+      const res = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).fetch('https://directory/list');
+      return json(await res.json());
+    }
 
     if (url.pathname === '/api/rooms' && req.method === 'POST') {
       for (let attempt = 0; attempt < 8; attempt++) {
@@ -67,6 +74,8 @@ export default {
 interface Attachment {
   cid: string;
   pid: string | null;
+  /** A spectator's socket (survives hibernation like a player's). */
+  spec?: boolean;
 }
 
 export class RoomDO extends DurableObject<Env> {
@@ -86,6 +95,7 @@ export class RoomDO extends DurableObject<Env> {
         const att = ws.deserializeAttachment() as Attachment | null;
         const conn = this.wrap(ws, att?.cid ?? `c${this.nextCid++}`);
         if (att?.pid) this.core.reattach(conn, att.pid);
+        else if (att?.spec) this.core.spectators.set(conn.id, conn);
       }
     });
   }
@@ -105,6 +115,17 @@ export class RoomDO extends DurableObject<Env> {
       },
       persist: (s) => {
         void this.ctx.storage.put('room', s);
+      },
+      report: (summary) => {
+        const code = this.core?.code;
+        if (!code) return;
+        const dir = this.env.DIRECTORY.get(this.env.DIRECTORY.idFromName('directory'));
+        this.ctx.waitUntil(
+          dir.fetch('https://directory/report', { method: 'POST', body: JSON.stringify({ code, summary }) }).then(
+            () => undefined,
+            () => undefined,
+          ),
+        );
       },
       track: TRACK,
       tracks: TRACKS,
@@ -161,7 +182,8 @@ export class RoomDO extends DurableObject<Env> {
     this.core.onMessage(conn, message);
     // remember which player owns this socket so it survives hibernation
     const att = ws.deserializeAttachment() as Attachment | null;
-    if (att && att.pid === null && typeof message === 'string') {
+    if (att && att.pid === null && !att.spec && typeof message === 'string') {
+      if (this.core.spectators.has(conn.id)) ws.serializeAttachment({ cid: att.cid, pid: null, spec: true } satisfies Attachment);
       for (const p of this.core.players.values()) {
         if (p.conn === conn) {
           ws.serializeAttachment({ cid: att.cid, pid: p.id } satisfies Attachment);
@@ -185,5 +207,37 @@ export class RoomDO extends DurableObject<Env> {
     const next = this.core.tick();
     if (next !== null) await this.ctx.storage.setAlarm(next);
     if (!this.core.created && this.core.players.size === 0) await this.ctx.storage.deleteAll();
+  }
+}
+
+/**
+ * The public room list: rooms report their summary when it changes (RoomCore.report); the menu reads it with
+ * GET /api/rooms. Entries silent for 6 h are dropped (a room that vanished without saying so).
+ */
+export class DirectoryDO extends DurableObject<Env> {
+  private rooms: Map<string, RoomSummary> | null = null;
+
+  private async load(): Promise<Map<string, RoomSummary>> {
+    if (!this.rooms) this.rooms = new Map(Object.entries((await this.ctx.storage.get<Record<string, RoomSummary>>('rooms')) ?? {}));
+    return this.rooms;
+  }
+
+  override async fetch(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const rooms = await this.load();
+    const now = Date.now();
+    for (const [code, r] of rooms) if (now - r.updatedAt > 6 * 3600_000) rooms.delete(code);
+    if (url.pathname === '/report' && req.method === 'POST') {
+      const { code, summary } = (await req.json()) as { code: string; summary: RoomSummary | null };
+      if (summary) rooms.set(code, summary);
+      else rooms.delete(code);
+      await this.ctx.storage.put('rooms', Object.fromEntries(rooms));
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === '/list') {
+      const list = [...rooms.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);
+      return new Response(JSON.stringify({ rooms: list }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('Not found', { status: 404 });
   }
 }

@@ -2235,3 +2235,59 @@ button.pit-tyre.on {
   margin: 10px 0 0;
   line-height: 1.35;
 }
+
+/* spectating: no instruments of our own */
+.spectating .hud-bc,
+.spectating .hud-bl,
+.spectating .hud-tr,
+.spectating .hud-delta,
+.spectating .hud-reset,
+.spectating .hud-wrong,
+.spectating .hud-draft {
+  display: none !important;
+}
+
+/* public room list (menu) */
+.menu-card.rooms {
+  margin-top: 14px;
+  max-height: 40vh;
+  overflow: auto;
+}
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.room-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas: 'name join watch' 'phase join watch' 'meta join watch';
+  gap: 2px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.room-row > b {
+  grid-area: name;
+}
+.room-row > span:nth-of-type(1) {
+  grid-area: phase;
+  font-size: 12px;
+}
+.room-row > span:nth-of-type(2) {
+  grid-area: meta;
+  font-size: 11px;
+}
+.room-row > button:not(.ghost) {
+  grid-area: join;
+}
+.room-row > button.ghost {
+  grid-area: watch;
+}
+.switch-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  cursor: pointer;
+}

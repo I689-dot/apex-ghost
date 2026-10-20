@@ -225,6 +225,8 @@ export class RaceSession {
     readonly me: string,
     private readonly cars: CarsFile,
     private readonly cb: SessionCallbacks,
+    /** Watching: no car of our own (a parked, hidden stand-in), a chase camera on any racer. */
+    readonly spectator = false,
   ) {
     this.kb = new Keyboard(settings.bindings);
     // dev only: force the visual weather from a fixed seed (localStorage 'apexghost.devWeatherSeed') for A/B tests
@@ -247,7 +249,9 @@ export class RaceSession {
     this.trackData = await loadTrackFile(this.race.trackId);
     const entries = new Map(this.cars.cars.map((c) => [c.id, c]));
     const racers = this.race.grid.map((id) => ({ id, player: this.room.players.find((p) => p.id === id) }));
-    const myCarId = this.room.players.find((p) => p.id === this.me)?.carId;
+    const myCarId = this.spectator
+      ? (racers.map((r) => r.player?.carId).find((c) => c && entries.has(c)) ?? this.cars.cars[0]?.id)
+      : this.room.players.find((p) => p.id === this.me)?.carId;
     const myEntry = myCarId ? entries.get(myCarId) : undefined;
     if (!myEntry) throw new Error(t('Your car is not available.'));
 
@@ -301,6 +305,12 @@ export class RaceSession {
     if (this.gfx.quality.ownHeadlightSpots) this.myVisual.addHeadlights(this.gfx.quality.ownHeadlightShadows);
     else this.myVisual.simplifyForCockpit();
     this.scene.add(this.myVisual.object);
+    if (this.spectator) {
+      this.myVisual.object.visible = false;
+      this.specTarget = this.race.grid[0] ?? '';
+      this.hud.el.classList.add('spectating');
+      window.addEventListener('keydown', this.onSpectatorKey);
+    }
     this.cockpit = new CockpitCamera(myEntry, this.myVisual.object, settings.fov);
     this.cockpit.autoSeat(this.myVisual.object);
     this.cockpit.camera.add(this.windshield.mesh, this.windshield.crack);
@@ -774,6 +784,7 @@ export class RaceSession {
         );
     } else if (raceT < 1500) this.updateCountdown(-1);
     else this.clearCountdown();
+    if (this.spectator) this.vehicle.frozen = true;
 
     // weather (deterministic from seed + race clock)
     this.weatherTimer -= dt;
@@ -805,7 +816,7 @@ export class RaceSession {
       // stamp each sample with the time of its own physics step, not the frame time
       if (this.stepCount % STEPS_PER_SAMPLE === 0) {
         const t = serverNow - this.acc * 1000;
-        this.sampleState(t);
+        if (!this.spectator) this.sampleState(t);
         this.sampleBots(t);
       }
     }
@@ -847,10 +858,15 @@ export class RaceSession {
         this.cinematic = null;
         this.env.fogScale = 1;
         this.env.hideRain = false;
-        this.gfx.setCamera(this.cockpit.camera);
+        this.gfx.setCamera(this.spectator ? this.specCam : this.cockpit.camera);
         this.hud.el.style.visibility = '';
         window.removeEventListener('keydown', this.onKeySkip, true);
       }
+    }
+    if (this.spectator && !this.cinematic) {
+      this.updateSpectatorCam(dt);
+      viewCam = this.specCam;
+      _camPos.copy(this.specCam.position);
     }
     cockpitGlass.value = viewCam === this.cockpit.camera ? 1 : 0;
 
@@ -863,15 +879,16 @@ export class RaceSession {
     // aerial shots see the whole circuit: distance culling (meant for the cockpit) would leave holes
     if (this.cinematic?.aerial) this.track.showAll();
     else this.track.updateVisibility(_camPos, this.gfx.quality);
-    this.windshield.update(
-      dt,
-      this.weather.rain,
-      v.telemetry.speed,
-      window.innerWidth / window.innerHeight,
-      1 - this.env.night * 0.8,
-      this.cockpit.lookingForward,
-    );
-    this.windshield.setCrack(this.damage.zones[0], this.cockpit.lookingForward);
+    if (!this.spectator)
+      this.windshield.update(
+        dt,
+        this.weather.rain,
+        v.telemetry.speed,
+        window.innerWidth / window.innerHeight,
+        1 - this.env.night * 0.8,
+        this.cockpit.lookingForward,
+      );
+    this.windshield.setCrack(this.spectator ? 0 : this.damage.zones[0], this.cockpit.lookingForward);
     this.updateAudio(dt, viewCam);
     this.updateWake();
     this.updateGhost(serverNow);
@@ -1454,7 +1471,7 @@ export class RaceSession {
     this.snd.update(dt, {
       listener: _lis,
       right: _right,
-      inCockpit: !this.cinematic,
+      inCockpit: !this.cinematic && !this.spectator,
       myPos: this.currPos,
       myVel: _carVel,
       vehicle: this.vehicle,
@@ -1464,7 +1481,109 @@ export class RaceSession {
     });
   }
 
+  /* ---------------------------------------------------------- spectator --- */
+
+  private specTarget = '';
+
+  private remoteById(id: string): Remote | undefined {
+    for (const r of this.remotes.values()) if (r.id === id) return r;
+    return undefined;
+  }
+  private readonly specCam = new THREE.PerspectiveCamera(62, 1, 0.1, 6000);
+  private specCamInit = false;
+
+  /** ←/→ change car; 1–9 the car in that position. */
+  private onSpectatorKey = (e: KeyboardEvent): void => {
+    const have = new Set([...this.remotes.values()].map((r) => r.id));
+    const ids = (this.standings.length ? this.standings.map((s) => s.id) : this.race.grid).filter((id) => have.has(id));
+    if (!ids.length) return;
+    let i = ids.indexOf(this.specTarget);
+    if (e.key === 'ArrowRight') i = (i + 1) % ids.length;
+    else if (e.key === 'ArrowLeft') i = (i - 1 + ids.length) % ids.length;
+    else if (/^[1-9]$/.test(e.key)) i = Math.min(ids.length - 1, Number(e.key) - 1);
+    else return;
+    this.specTarget = ids[i];
+    this.specCamInit = false;
+  };
+
+  /** Chase camera behind the watched car, smoothed. */
+  private updateSpectatorCam(dt: number): void {
+    const r = this.remoteById(this.specTarget) ?? [...this.remotes.values()][0];
+    if (!r) return;
+    const o = r.visual.object;
+    _v1.set(0, 0, 1).applyQuaternion(o.quaternion);
+    _v1.y = 0;
+    _v1.normalize();
+    _v2.copy(o.position).addScaledVector(_v1, -7.5);
+    _v2.y += 2.6;
+    const cam = this.specCam;
+    cam.aspect = window.innerWidth / window.innerHeight;
+    cam.updateProjectionMatrix();
+    if (!this.specCamInit) {
+      cam.position.copy(_v2);
+      this.specCamInit = true;
+    } else cam.position.lerp(_v2, 1 - Math.exp(-dt * 5));
+    cam.lookAt(o.position.x + _v1.x * 4, o.position.y + 1, o.position.z + _v1.z * 4);
+  }
+
+  /** The HUD while watching: the session clock, the board around the watched car, its name and the minimap. */
+  private updateSpectatorUi(serverNow: number, dt: number): void {
+    const r = this.remoteById(this.specTarget);
+    const st = this.standings.find((s) => s.id === this.specTarget);
+    const name = this.names.get(this.specTarget) ?? '';
+    if (this.standings.length) this.hud.setBoard(this.standings, this.specTarget, this.names);
+    const nowMs = performance.now();
+    if (nowMs > this.messageUntil) this.message = '';
+    this.hud.update({
+      speedMs: r ? r.vel.length() : 0,
+      rpm: 0,
+      redline: 1,
+      limiter: 1,
+      gear: 0,
+      manual: false,
+      lapLabel: st ? String(st.laps + 1) : '',
+      lapPenaltyMs: st?.lapPenaltyMs ?? 0,
+      liveDelta: null,
+      position: st?.position ?? 0,
+      total: this.race.grid.length,
+      currentLapMs: 0,
+      bestLapMs: st?.bestLapMs ?? null,
+      lastLapMs: st?.lastLapMs ?? null,
+      sectorDelta: null,
+      damage: 0,
+      wrongWay: false,
+      abs: false,
+      tc: false,
+      message: this.message,
+      sessionText: this.sessionText(serverNow),
+      pitText: t('WATCHING · {name} · ←/→ change car', { name }),
+      compound: 'medium',
+      tyreWear: [0, 0, 0, 0],
+      brakeTemps: [0, 0, 0, 0],
+      slipstream: 0,
+      resetHint: false,
+      tyreTemps: [0, 0, 0, 0],
+      damageZones: [0, 0, 0, 0, 0, 0],
+    });
+    this.mapTimer -= dt;
+    if (this.mapTimer <= 0 && r) {
+      this.mapTimer = 0.1;
+      const dots = MAP_DOTS;
+      dots.length = 0;
+      for (const o of this.remotes.values()) {
+        if (o === r || !o.visual.object.visible || (!o.bot && !o.buffer.hasData)) continue;
+        dots.push({ x: o.visual.object.position.x, z: o.visual.object.position.z, me: false, color: o.entry.color });
+      }
+      _v1.set(0, 0, 1).applyQuaternion(r.visual.object.quaternion);
+      this.hud.drawMap(dots, r.visual.object.position.x, r.visual.object.position.z, _v1.x, _v1.z);
+    }
+  }
+
   private updateRaceUi(serverNow: number, raceT: number, dt: number): void {
+    if (this.spectator) {
+      this.updateSpectatorUi(serverNow, dt);
+      return;
+    }
     const v = this.vehicle;
     const tel = v.telemetry;
     const p = this.currPos;
@@ -1542,6 +1661,7 @@ export class RaceSession {
     for (const off of this.offs) off();
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('keydown', this.onKeySkip, true);
+    window.removeEventListener('keydown', this.onSpectatorKey);
     this.snd?.dispose();
     this.closePitMenu();
     this.kb.dispose();

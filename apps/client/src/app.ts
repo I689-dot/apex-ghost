@@ -20,9 +20,10 @@ import {
   type CarsFile,
   type RaceSetup,
   type RoomSnapshot,
+  type RoomSummary,
   type ServerMsg,
 } from '@apex/shared';
-import { Connection, RoomError, createRoom } from './net/connection';
+import { Connection, RoomError, createRoom, listPublicRooms } from './net/connection';
 import { createLocalRoom, isLocalCode } from './net/localRoom';
 import { Graphics } from './game/graphics';
 import { Showroom } from './game/preview';
@@ -33,7 +34,7 @@ import { clear, fmtTime, h, toast } from './ui/dom';
 import { settingsPanel } from './ui/settingsPanel';
 import { getLang, t } from './i18n';
 
-type Screen = 'menu' | 'lobby' | 'briefing' | 'loading' | 'race' | 'results';
+type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 'results';
 
 const hp = (kw: number) => Math.round(kw * 1.341);
 
@@ -185,6 +186,29 @@ export class App {
         busy(false);
       }
     };
+    const watchIt = async (codeIn?: string) => {
+      const n = readNick();
+      if (!n) return;
+      const c = normalizeRoomCode(codeIn ?? code.value);
+      if (!c) {
+        err.textContent = t('Enter the 5-character room code.');
+        code.focus();
+        return;
+      }
+      busy(true);
+      err.textContent = '';
+      try {
+        await this.join(c, n, true);
+      } catch (e) {
+        err.textContent = t((e as Error).message);
+      } finally {
+        busy(false);
+      }
+    };
+    const joinCode = async (c: string) => {
+      code.value = c;
+      await joinIt();
+    };
     code.addEventListener('input', () => (code.value = code.value.toUpperCase()));
     code.addEventListener('keydown', (e) => e.key === 'Enter' && void joinIt());
     const form = h(
@@ -199,7 +223,13 @@ export class App {
         onclick: () => void solo(),
       }),
       h('div.or', { text: t('or join friends') }),
-      h('div.join-row', {}, code, h('button', { text: t('Join'), onclick: () => void joinIt() })),
+      h(
+        'div.join-row',
+        {},
+        code,
+        h('button', { text: t('Join'), onclick: () => void joinIt() }),
+        h('button.ghost', { text: t('Watch'), title: t('Spectate this room'), onclick: () => void watchIt() }),
+      ),
       err,
     );
     this.setUi(
@@ -213,6 +243,7 @@ export class App {
           h('p', { text: t('Online sim racing for friends · Nürburgring · Zandvoort') }),
         ),
         form,
+        this.roomList(joinCode, watchIt),
         h(
           'div.menu-foot',
           {},
@@ -224,8 +255,12 @@ export class App {
     if (!nick.value) nick.focus();
   }
 
-  private async join(code: string, nick: string): Promise<void> {
-    const conn = new Connection(code, nick);
+  /** Watching (spectator connection): no car, no lobby controls. */
+  private spectating = false;
+
+  private async join(code: string, nick: string, spectate = false): Promise<void> {
+    this.spectating = spectate;
+    const conn = new Connection(code, nick, spectate);
     this.conn = conn;
     this.offs.push(conn.on((m) => this.onMessage(m)));
     this.offs.push(
@@ -270,6 +305,7 @@ export class App {
           // reconnect into a running race
           if (!this.session || this.session.race.raceId !== m.race.raceId) void this.startLoading(m.race, m.startAt);
         } else if (this.screen !== 'results') this.showLobby();
+        if (this.spectating) toast(t('Watching this room: the next session will show here.'), 4000);
         if (m.room.players.find((p) => p.id === m.you)?.waiting) toast(t('A race is in progress. You will join the next one.'), 5000);
         break;
       case 'room':
@@ -277,6 +313,7 @@ export class App {
         if (m.room.phase === 'briefing' && (this.screen === 'lobby' || this.screen === 'briefing')) this.renderBriefing();
         else if (this.screen === 'briefing') this.showLobby();
         else if (this.screen === 'lobby') this.renderLobby();
+        else if (this.screen === 'watch') this.renderWatch();
         this.session?.updateRoom(m.room);
         break;
       case 'carLock':
@@ -305,6 +342,12 @@ export class App {
   /* ---------------------------------------------------------------- lobby --- */
 
   private showLobby(): void {
+    if (this.spectating) {
+      this.session?.dispose();
+      this.session = null;
+      this.renderWatch();
+      return;
+    }
     this.screen = 'lobby';
     this.session?.dispose();
     this.session = null;
@@ -444,6 +487,21 @@ export class App {
           SESSION_MINUTES.map((m) => [m, t('{m} min qualifying', { m })] as [number, string]),
           (v) => this.conn?.sendJson({ t: 'setSession', minutes: Number(v) }),
         ),
+      ),
+      row(
+        t('Room'),
+        edit
+          ? h(
+              'label.switch-row',
+              {},
+              h('input', {
+                type: 'checkbox',
+                checked: room.isPublic,
+                onchange: (e: Event) => this.conn?.sendJson({ t: 'setPublic', isPublic: (e.target as HTMLInputElement).checked }),
+              }),
+              h('span', { text: t('Public: listed, anyone can join or watch') }),
+            )
+          : h('b', { text: room.isPublic ? t('Public') : t('Private (code only)') }),
       ),
       row(
         t('Race'),
@@ -654,6 +712,91 @@ export class App {
     if (ng) ng.scrollTop = scroll;
   }
 
+  private roomsTimer = 0;
+
+  /** Public rooms, refreshed every 15 s while the menu is open (one small request each time). */
+  private roomList(join: (code: string) => Promise<void>, watch: (code: string) => Promise<void>): HTMLElement {
+    const list = h('div.room-list', {}, h('p.muted', { text: t('Looking for public sessions…') }));
+    const phaseText = (r: RoomSummary) =>
+      r.phase === 'lobby'
+        ? t('In the lobby')
+        : r.phase === 'briefing'
+          ? t('Briefing')
+          : r.kind === 'race'
+            ? t('Race · {n} laps', { n: r.raceLaps })
+            : t('Qualifying · {m} min', { m: r.sessionMinutes });
+    const refresh = async () => {
+      const rooms = await listPublicRooms();
+      if (this.screen !== 'menu') return;
+      list.replaceChildren(
+        ...(rooms.length
+          ? rooms.map((r) =>
+              h(
+                'div.room-row',
+                {},
+                h('b', { text: t(this.trackIndex.find((x) => x.id === r.trackId)?.name ?? r.trackId) }),
+                h('span', { text: phaseText(r) }),
+                h('span.muted', { text: `${t('Host')}: ${r.host} · ${t('Drivers {n}/{max}', { n: r.drivers, max: r.maxPlayers })}` }),
+                r.phase === 'lobby' && r.drivers < r.maxPlayers ? h('button.small', { text: t('Join'), onclick: () => void join(r.code) }) : null,
+                h('button.ghost.small', { text: t('Watch'), onclick: () => void watch(r.code) }),
+              ),
+            )
+          : [h('p.muted', { text: t('No public sessions right now. Create a room and make it public, or play solo.') })]),
+      );
+    };
+    clearInterval(this.roomsTimer);
+    void refresh();
+    this.roomsTimer = window.setInterval(() => (this.screen === 'menu' ? void refresh() : clearInterval(this.roomsTimer)), 15_000);
+    return h('div.menu-card.rooms', {}, h('h3', { text: t('Live sessions') }), list);
+  }
+
+  /** Waiting screen while watching a room between sessions. */
+  private renderWatch(): void {
+    const room = this.room;
+    if (!room) return;
+    this.screen = 'watch';
+    this.setBackdrop('aerial', room.conditions.trackId);
+    const cars = this.cars?.cars ?? [];
+    const track = this.trackIndex.find((x) => x.id === room.conditions.trackId);
+    const phase: Record<string, string> = {
+      lobby: t('In the lobby'),
+      briefing: t('Briefing'),
+      loading: t('Loading'),
+      countdown: t('Starting'),
+      racing: t('Session running'),
+      results: t('Results'),
+    };
+    this.setUi(
+      h(
+        'div.lobby.watch',
+        {},
+        h(
+          'aside.lobby-side',
+          {},
+          h('div.brief-head', {}, h('span.muted', { text: t('WATCHING') }), h('b', { text: room.code })),
+          h('h2', { text: t(track?.name ?? 'Nürburgring GP') }),
+          h('p.muted', { text: `${phase[room.phase] ?? room.phase} · ${t('Spectators: {n}', { n: room.spectators })}` }),
+          h('p.muted', { text: t('The next qualifying or race starts here automatically. ←/→ change the car you follow.') }),
+          h('h3', { text: t('Drivers') }),
+          h(
+            'ul.players',
+            {},
+            ...room.players.map((p) =>
+              h(
+                'li',
+                {},
+                h('span.nick', { text: p.nick }),
+                p.bot ? h('span.badge.bot', { text: t('BOT') }) : null,
+                h('span.car', { text: cars.find((c) => c.id === p.carId)?.name ?? '' }),
+              ),
+            ),
+          ),
+          h('button.ghost', { text: t('Leave'), onclick: () => this.showMenu() }),
+        ),
+      ),
+    );
+  }
+
   private briefTimer = 0;
 
   /**
@@ -781,13 +924,22 @@ export class App {
         ),
       ),
     );
-    const session = new RaceSession(this.gfx, this.conn, race, this.room, this.me, this.cars, {
-      onCountdownText: (text, sub) => this.setCountdown(text, sub),
-      onPauseToggle: (open) => this.setPause(open),
-      onResults: (m) => this.showResults(m),
-      onFatal: (msg) => this.showMenu(msg),
-      audio: () => this.audio,
-    });
+    const session = new RaceSession(
+      this.gfx,
+      this.conn,
+      race,
+      this.room,
+      this.me,
+      this.cars,
+      {
+        onCountdownText: (text, sub) => this.setCountdown(text, sub),
+        onPauseToggle: (open) => this.setPause(open),
+        onResults: (m) => this.showResults(m),
+        onFatal: (msg) => this.showMenu(msg),
+        audio: () => this.audio,
+      },
+      this.spectating,
+    );
     this.session = session;
     try {
       await session.load((l, t, lbl) => {
