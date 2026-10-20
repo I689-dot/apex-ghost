@@ -343,7 +343,7 @@ export class RaceSession {
     // ray casts only see colliders after the query structure is built (normally by the first step)
     this.world.updateSceneQueries();
     this.racingLine = new RacingLineFx(this.trackData, tuned.specs, this.track.groundQuery(this.world));
-    this.racingLine.setMode(settings.racingLine);
+    this.racingLine.setMode(this.spectator ? 'off' : settings.racingLine);
     this.scene.add(this.racingLine.object);
     if (this.trackData.pitLane) {
       this.pit = new PitLaneMonitor(this.trackData);
@@ -565,7 +565,7 @@ export class RaceSession {
     this.vehicle.drivetrain.manual = settings.manualGearbox;
     this.cockpit.setFov(settings.fov);
     this.cockpit.applySeat();
-    this.racingLine?.setMode(settings.racingLine);
+    this.racingLine?.setMode(this.spectator ? 'off' : settings.racingLine);
     this.gfx.quality = QUALITY[settings.quality];
     this.gfx.applyQuality();
     this.env.setQuality(this.gfx.quality);
@@ -770,7 +770,7 @@ export class RaceSession {
       this.vehicle.frozen = true;
       const left = this.startAt === null ? null : -raceT;
       this.updateCountdown(left);
-    } else if (serverNow >= this.freezeUntil && this.vehicle.frozen && raceT >= 0 && !this.pitHold) {
+    } else if (!this.spectator && serverNow >= this.freezeUntil && this.vehicle.frozen && raceT >= 0 && !this.pitHold) {
       this.vehicle.frozen = false;
       this.updateCountdown(-1);
       if (this.myLaps === 0 && raceT < 2000)
@@ -1271,7 +1271,7 @@ export class RaceSession {
     r.visual.updateSmoke(dt, (s.flags & FLAG_SMOKE) !== 0 ? Math.max(0.6, r.damage.zones[4]) : 0, this.scene);
     // ghost: fade out when very close to the camera so it never blocks the cockpit view
     const d = o.position.distanceTo(_camPos);
-    const fade = this.cinematic ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1);
+    const fade = this.cinematic || (this.spectator && r.id === this.specTarget) ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1);
     r.visual.setOpacity(s.staleMs > 5000 ? 0.35 : fade);
     o.updateMatrixWorld();
   }
