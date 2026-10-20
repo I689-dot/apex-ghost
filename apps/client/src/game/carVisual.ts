@@ -73,6 +73,7 @@ export class CarVisual {
   private fadeMats: THREE.Material[] = [];
   private bodyMeshes: THREE.Mesh[] = [];
   private originalPositions = new Map<THREE.BufferGeometry, Float32Array>();
+  private originalNormals = new Map<THREE.BufferGeometry, Float32Array>();
   private steerAxis = new THREE.Vector3(0, 0, 1);
   private steerRatio = 11; // steering-wheel angle : road-wheel angle
   private headlightPool: THREE.Mesh | null = null;
@@ -307,6 +308,19 @@ export class CarVisual {
           mesh.geometry.setAttribute('position', new THREE.BufferAttribute(f, 3));
         }
         this.originalPositions.set(mesh.geometry, Float32Array.from((mesh.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array));
+        // the authored normals too: recomputing them loses hard edges and seams (the interior went dark), and a
+        // repair must give the original shading back exactly
+        const nrm = mesh.geometry.getAttribute('normal') as THREE.BufferAttribute | undefined;
+        if (nrm) {
+          const fn = new Float32Array(nrm.count * 3);
+          for (let i = 0; i < nrm.count; i++) {
+            fn[i * 3] = nrm.getX(i);
+            fn[i * 3 + 1] = nrm.getY(i);
+            fn[i * 3 + 2] = nrm.getZ(i);
+          }
+          mesh.geometry.setAttribute('normal', new THREE.BufferAttribute(fn, 3));
+          this.originalNormals.set(mesh.geometry, Float32Array.from(fn));
+        }
       }
       const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
       const arr = pos.array as Float32Array;
@@ -344,7 +358,12 @@ export class CarVisual {
       const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
       (pos.array as Float32Array).set(orig);
       pos.needsUpdate = true;
-      mesh.geometry.computeVertexNormals();
+      const on = this.originalNormals.get(mesh.geometry);
+      const nrm = mesh.geometry.getAttribute('normal') as THREE.BufferAttribute | undefined;
+      if (on && nrm) {
+        (nrm.array as Float32Array).set(on);
+        nrm.needsUpdate = true;
+      } else mesh.geometry.computeVertexNormals();
     }
   }
 

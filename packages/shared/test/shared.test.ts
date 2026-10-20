@@ -366,7 +366,7 @@ describe('race logic (server-authoritative laps)', () => {
     expect(pen[2].ms).toBeGreaterThanOrEqual(PENALTY.limitsBaseMs);
     expect(pen[2].ms).toBeLessThanOrEqual(PENALTY.limitsMaxMs);
     expect(pen[3]).toMatchObject({ noAdvantage: true, ms: 0 });
-    let laps = ev.filter((e) => e.type === 'lap') as Extract<RaceEvent, { type: 'lap' }>[];
+    const laps = ev.filter((e) => e.type === 'lap') as Extract<RaceEvent, { type: 'lap' }>[];
     expect(laps[0]).toMatchObject({ valid: true, penaltyMs: pen[2].ms });
     // lap 3: a reset (+5 s), then a cut across the inside skipping checkpoints (+5 s + 0.05 s/m)
     t = drive(tr, 'x', t, 3 * L + 6, 3 * L + 400, 50, 0, 50, ev);

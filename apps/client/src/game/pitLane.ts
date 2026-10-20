@@ -65,12 +65,14 @@ export class PitLaneMonitor {
       this.inLane = false;
       return 'exit';
     }
-    const inBox = this.index >= this.lane.boxFrom && this.index <= this.lane.boxTo;
+    // the whole painted box counts (with a couple of points of grace at both ends), anywhere across the lane
+    const inBox = this.index >= this.lane.boxFrom - 2 && this.index <= this.lane.boxTo + 2 && this.dist < 7;
     if (inBox && speed < 0.8 && !this.inBoxStop) {
       this.inBoxStop = true;
       return 'box';
     }
-    if (!inBox || speed > 3) this.inBoxStop = false;
+    // moving again (even slowly, to find a better spot) re-arms it: the next stop opens the menu again
+    if (!inBox || speed > 1.2) this.inBoxStop = false;
     return null;
   }
 

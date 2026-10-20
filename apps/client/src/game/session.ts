@@ -337,9 +337,28 @@ export class RaceSession {
     this.scene.add(this.racingLine.object);
     if (this.trackData.pitLane) {
       this.pit = new PitLaneMonitor(this.trackData);
+      // painted on the *visible* road: the collision under painted layers is flattened a few cm lower, so markings
+      // placed on it disappeared under the asphalt
+      const roadMeshes: THREE.Object3D[] = [];
+      this.track.root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        const mat = m.isMesh ? ([m.material].flat()[0] as THREE.Material) : null;
+        if (mat && /^(asph|pits|conc_|pavement|tiles|lines|box_decal)/i.test(mat.name)) roadMeshes.push(m);
+      });
+      const rc = new THREE.Raycaster();
+      const down = new THREE.Vector3(0, -1, 0);
       const gq = this.track.groundQuery(this.world);
       const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' as const };
-      this.scene.add(this.pit.buildMarkings((x, z, y) => (gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y)));
+      this.track.root.updateMatrixWorld(true);
+      this.scene.add(
+        this.pit.buildMarkings((x, z, y) => {
+          rc.set(new THREE.Vector3(x, y + 2.5, z), down);
+          rc.far = 6;
+          const h = rc.intersectObjects(roadMeshes, false)[0];
+          if (h) return h.point.y;
+          return gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y;
+        }),
+      );
     }
 
     this.localTracker = this.makeTracker(0);
@@ -1321,8 +1340,9 @@ export class RaceSession {
       v.fitTyres(COMPOUNDS[plan.tyres], v.ambientC + 12);
       v.weatherGrip = compoundGrip(v.compound, this.weather.wetness, this.weather.rain);
     }
+    // dents are visual: reset them with any bodywork repair, even if the damage value had already reached zero
+    if (plan.body) this.myVisual.resetDamage();
     if (this.damage.repair({ body: plan.body, suspension: plan.suspension, engine: plan.engine })) {
-      if (plan.body) this.myVisual.resetDamage();
       v.drivetrain.powerScale = this.damage.powerScale;
       this.conn.sendJson({ t: 'damage', zones: Array.from(this.damage.zones, (z) => Math.round(z * 100) / 100) });
       this.damageVersionSent = this.damage.version;
