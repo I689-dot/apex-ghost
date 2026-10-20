@@ -22,6 +22,7 @@ import {
   type ServerMsg,
 } from '@apex/shared';
 import { Connection, RoomError, createRoom } from './net/connection';
+import { createLocalRoom, isLocalCode } from './net/localRoom';
 import { Graphics } from './game/graphics';
 import { Showroom } from './game/preview';
 import { RaceSession } from './game/session';
@@ -151,6 +152,19 @@ export class App {
         busy(false);
       }
     };
+    const solo = async () => {
+      const n = readNick();
+      if (!n) return;
+      busy(true);
+      err.textContent = '';
+      try {
+        await this.join(await createLocalRoom(), n);
+      } catch (e) {
+        err.textContent = t((e as Error).message);
+      } finally {
+        busy(false);
+      }
+    };
     const joinIt = async () => {
       const n = readNick();
       if (!n) return;
@@ -178,6 +192,11 @@ export class App {
       h('label', { text: t('Nickname') }),
       nick,
       h('button.primary', { text: t('Create room'), onclick: () => void create() }),
+      h('button.ghost.solo', {
+        text: t('Play solo (offline)'),
+        title: t('Alone or with AI cars, in this browser: nothing goes through the online server'),
+        onclick: () => void solo(),
+      }),
       h('div.or', { text: t('or join friends') }),
       h('div.join-row', {}, code, h('button', { text: t('Join'), onclick: () => void joinIt() })),
       err,
@@ -588,7 +607,15 @@ export class App {
       h(
         'aside.lobby-side',
         {},
-        h('div.room-code', {}, h('label', { text: t('ROOM CODE') }), h('div.code', { text: room.code }), h('button.ghost', { text: t('Copy'), onclick: copy })),
+        isLocalCode(room.code)
+          ? h('div.room-code', {}, h('label', { text: t('Solo · offline') }))
+          : h(
+              'div.room-code',
+              {},
+              h('label', { text: t('ROOM CODE') }),
+              h('div.code', { text: room.code }),
+              h('button.ghost', { text: t('Copy'), onclick: copy }),
+            ),
         h('h3', { text: t('Drivers {n}/{max}', { n: room.players.length, max: MAX_PLAYERS }) }),
         players,
         isHost && room.phase === 'lobby'

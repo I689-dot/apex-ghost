@@ -10,6 +10,7 @@ import {
 } from '@apex/shared';
 import { SERVER_URL } from '../config';
 import { getSession, setSession } from '../settings';
+import { LocalSocket, isLocalCode } from './localRoom';
 
 export type ConnState = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -103,7 +104,8 @@ export class Connection {
   }
 
   private open(): void {
-    const ws = new WebSocket(this.url());
+    // the offline room runs in this page (localRoom.ts): same protocol, no network
+    const ws = isLocalCode(this.code) ? (new LocalSocket() as unknown as WebSocket) : new WebSocket(this.url());
     ws.binaryType = 'arraybuffer';
     this.ws = ws;
     ws.onopen = () => {

@@ -66,11 +66,19 @@ await page.goto(URL);
 await page.waitForSelector('.menu-card', { timeout: 30_000 });
 await page.waitForTimeout(4000);
 await shot('01-menu');
-await page.click('button.primary:has-text("Create room")');
+let apiRequests = 0;
+page.on('request', (r) => {
+  if (/\/api\//.test(r.url())) apiRequests++;
+});
+page.on('websocket', (ws) => {
+  if (/\/api\//.test(ws.url())) apiRequests++;
+});
+if (args.includes('--solo')) await page.click('button.solo');
+else await page.click('button.primary:has-text("Create room")');
 await page.waitForSelector('.lobby', { timeout: 30_000 });
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.waitForTimeout(2500);
-const code = await page.textContent('.room-code .code');
+const code = args.includes('--solo') ? 'SOLO (offline)' : await page.textContent('.room-code .code');
 console.log(`  room ${code}`);
 if (TRACK) {
   await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);
@@ -236,5 +244,9 @@ const bad = errors.filter((e) => !/favicon|ERR_CONNECTION_REFUSED.*fonts|net::ER
 if (bad.length) {
   console.error('✘ console errors:\n' + bad.map((e) => '  ' + e).join('\n'));
   process.exit(1);
+}
+if (args.includes('--solo')) {
+  console.log(`  requests to the online server: ${apiRequests}`);
+  if (apiRequests > 0) throw new Error('solo mode talked to the online server');
 }
 console.log('✔ smoke test passed');
