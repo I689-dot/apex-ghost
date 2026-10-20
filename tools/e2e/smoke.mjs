@@ -62,6 +62,12 @@ await page.addInitScript(
   [QUALITY, SEED, LINE, NO_AUDIO],
 );
 console.log(`▶ opening ${URL}`);
+// any "Malformed message" toast during the whole run (they only stay a few seconds)
+await page.addInitScript(() => {
+  new MutationObserver(() => {
+    if (document.body?.innerText.includes('Malformed')) window.__malformed = true;
+  }).observe(document, { subtree: true, childList: true, characterData: true });
+});
 await page.goto(URL);
 await page.waitForSelector('.menu-card', { timeout: 30_000 });
 await page.waitForTimeout(4000);
@@ -239,6 +245,8 @@ if (args.includes('--pit')) {
 await page.keyboard.press('Escape');
 await page.waitForTimeout(800);
 await shot('07-pause');
+// solo: the in-browser room must not reject any client message
+if (args.includes('--solo') && (await page.evaluate(() => window.__malformed === true))) throw new Error('a Malformed message toast appeared');
 await browser.close();
 const bad = errors.filter((e) => !/favicon|ERR_CONNECTION_REFUSED.*fonts|net::ERR/i.test(e));
 if (bad.length) {
