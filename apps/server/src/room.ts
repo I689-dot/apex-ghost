@@ -663,7 +663,16 @@ export class RoomCore {
           valid: e.valid,
           outLap: e.outLap,
         });
-      else if (e.type === 'penalty' && !p.bot) this.send(p, { t: 'penalty', playerId: e.playerId, reason: e.reason, ms: e.ms, lapPenaltyMs: e.lapPenaltyMs });
+      else if (e.type === 'penalty' && !p.bot)
+        this.send(p, {
+          t: 'penalty',
+          playerId: e.playerId,
+          reason: e.reason,
+          ms: e.ms,
+          lapPenaltyMs: e.lapPenaltyMs,
+          warning: e.warning,
+          noAdvantage: e.noAdvantage,
+        });
       else if (e.type === 'sector' && !p.bot) this.send(p, { t: 'sector', playerId: e.playerId, sector: e.sector, ms: e.ms });
       else if (e.type === 'finish') {
         this.broadcast({ t: 'finished', playerId: e.playerId, totalMs: e.totalMs });

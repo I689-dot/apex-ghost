@@ -16,7 +16,18 @@ export type RaceEvent =
       valid: boolean;
       outLap: boolean;
     }
-  | { type: 'penalty'; playerId: string; reason: PenaltyReason; ms: number; lapPenaltyMs: number }
+  | {
+      type: 'penalty';
+      playerId: string;
+      reason: PenaltyReason;
+      /** Time added (0 for a warning or an excursion without advantage). */
+      ms: number;
+      lapPenaltyMs: number;
+      /** Track-limits warning number (1…PENALTY.limitsWarnings), when this excursion was only a warning. */
+      warning?: number;
+      /** Off but slower: no advantage gained, no penalty. */
+      noAdvantage?: boolean;
+    }
   | { type: 'sector'; playerId: string; sector: number; ms: number }
   | { type: 'finish'; playerId: string; totalMs: number }
   | { type: 'flag' }
@@ -26,15 +37,20 @@ export type PenaltyReason = 'track-limits' | 'reset' | 'shortcut';
 
 /**
  * Time penalties instead of deleted laps (a game choice: real GT3 qualifying cancels a lap beyond track limits).
- * Sized like the advantage they stop, after the F1 games and real penalty sizes (5 s, 10 s):
- *  - track limits (all four wheels beyond the white line, held 0.25 s): 1 s + 1.5 s per second off, ≤ 5 s;
+ * Sized like the advantage they stop, after real race practice and the F1 games:
+ *  - track limits (all four wheels beyond the painted white line, held 0.4 s): as in real races the first
+ *    excursions of a session are only warnings (limitsWarnings); after that 0.5 s + 1 s per second off, ≤ 3 s;
+ *    an excursion where the car lost more than a fifth of its speed gained nothing and costs nothing;
  *  - reset to the track: 5 s (on top of the time lost going back to the last checkpoint);
  *  - shortcut (checkpoints skipped): 5 s + 0.05 s per metre of track skipped (a 70 m chicane: ~8.5 s).
  */
 export const PENALTY = {
-  limitsBaseMs: 1000,
-  limitsPerSecMs: 1500,
-  limitsMaxMs: 5000,
+  limitsWarnings: 3,
+  limitsBaseMs: 500,
+  limitsPerSecMs: 1000,
+  limitsMaxMs: 3000,
+  /** Lost more than this share of the speed while off: no advantage. */
+  noAdvantageSlowdown: 0.2,
   resetMs: 5000,
   shortcutBaseMs: 5000,
   shortcutPerMeterMs: 50,
@@ -53,6 +69,13 @@ export interface PlayerRaceState {
   offSince: number | null;
   /** Last time an off-track sample was seen. */
   offLast: number;
+  /** Speed when the excursion began, and the lowest during it (m/s). */
+  offSpeed0: number;
+  offMinSpeed: number;
+  /** Track-limits warnings used this session. */
+  limitWarnings: number;
+  /** Speed from the last two samples (m/s). */
+  speed: number;
   /** The lap in progress is an out lap (from the grid or from the pits): never timed. */
   outLap: boolean;
   /** In the garage (pit stop). */
@@ -202,6 +225,10 @@ export class RaceTracker {
       lapPenaltyMs: 0,
       offSince: null,
       offLast: 0,
+      offSpeed0: 0,
+      offMinSpeed: 0,
+      limitWarnings: 0,
+      speed: 0,
       outLap: true,
       inPit: false,
       pitStops: 0,
@@ -246,10 +273,16 @@ export class RaceTracker {
     const p = this.players.get(id);
     if (!p || p.dnf || p.finishedMs !== null) return out;
     if (t < this.startMs - 10_000) return out;
+    if (p.hasPos && t > p.lt) p.speed = Math.hypot(x - p.lx, z - p.lz) / ((t - p.lt) / 1000);
     if (t >= this.startMs && !p.inPit) {
       if (offTrack) {
-        if (p.offSince === null) p.offSince = t;
+        if (p.offSince === null) {
+          p.offSince = t;
+          p.offSpeed0 = p.speed;
+          p.offMinSpeed = p.speed;
+        }
         p.offLast = t;
+        p.offMinSpeed = Math.min(p.offMinSpeed, p.speed);
       } else if (p.offSince !== null) this.closeExcursion(p, out);
     }
     const tr = this.track;
@@ -412,11 +445,25 @@ export class RaceTracker {
     out.push({ type: 'penalty', playerId: p.id, reason, ms, lapPenaltyMs: p.lapPenaltyMs });
   }
 
-  /** End of a track-limits excursion: 1 s + 1.5 s per second beyond the limits, at most 5 s. */
+  /**
+   * End of a track-limits excursion. No advantage (the car lost more than a fifth of its speed): nothing. The
+   * first ones of the session: a warning. Then 0.5 s + 1 s per second beyond the limits, at most 3 s.
+   */
   private closeExcursion(p: PlayerRaceState, out: RaceEvent[]): void {
     if (p.offSince === null) return;
     const dur = Math.max(0, p.offLast - p.offSince) / 1000;
     p.offSince = null;
+    if (p.outLap) return;
+    const base = { type: 'penalty' as const, playerId: p.id, reason: 'track-limits' as const, ms: 0, lapPenaltyMs: p.lapPenaltyMs };
+    if (p.offSpeed0 > 5 && p.offMinSpeed < p.offSpeed0 * (1 - PENALTY.noAdvantageSlowdown)) {
+      out.push({ ...base, noAdvantage: true });
+      return;
+    }
+    if (p.limitWarnings < PENALTY.limitsWarnings) {
+      p.limitWarnings++;
+      out.push({ ...base, warning: p.limitWarnings });
+      return;
+    }
     const ms = Math.min(PENALTY.limitsMaxMs, PENALTY.limitsBaseMs + PENALTY.limitsPerSecMs * dur);
     this.addPenalty(p, 'track-limits', Math.round(ms / 100) * 100, out);
   }

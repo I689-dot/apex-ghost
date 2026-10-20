@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { fillHoles, fillTerrain, groundPartsFromGlb, writeFillGlb } from './fill_holes.mjs';
 import { snapStackedLayers } from './flatten_layers.mjs';
+import { trackLimitsFromLines } from './track_limits.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -538,7 +539,7 @@ async function map() {
   await collision(mapOut, dstDir);
 
   const base = `assets/${MAP.assets}`;
-  writeTracks(mapOut, {
+  await writeTracks(mapOut, {
     chunks: chunks.map((c) => ({ file: `${base}/${files[c.kind]}${V}`, node: c.name, center: c.center, radius: c.radius, kind: c.kind })),
     files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, `${base}/${f}${V}`])),
     collision: { file: `${base}/collision.apxc${V}`, surfaces: ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'] },
@@ -554,7 +555,7 @@ const layoutFile = (id) => MAP.tracks?.[id]?.file ?? `tracks/${id}.json`;
  * and the server's validation data (shared/generated/tracks-race.json). The index and the validation data hold
  * every map: this run replaces the entries of its own map and keeps the others.
  */
-function writeTracks(mapOut, render) {
+async function writeTracks(mapOut, render) {
   const bases = [JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'))];
   for (const f of readdirSync(mapOut)
     .filter((x) => /^track_base_.+\.json$/.test(x))
@@ -563,6 +564,17 @@ function writeTracks(mapOut, render) {
   const surf = roadSurface(mapOut);
   if (MAP.fixPitEntry) fixPitEntry(bases);
   for (const b of bases) fixHeights(b, surf);
+  // track limits from the painted white lines (track_limits.mjs)
+  const rawTrack = path.join(mapOut, 'map_track.glb');
+  if (existsSync(rawTrack)) {
+    const doc = await io.read(rawTrack);
+    for (const b of bases) {
+      const lim = trackLimitsFromLines(doc, b);
+      b.limitL = lim.limitL;
+      b.limitR = lim.limitR;
+      log(`${b.id}: track limits from the white lines (${Math.round((lim.painted / (2 * lim.limitL.length)) * 100)} % painted)`);
+    }
+  }
   mkdirSync(path.join(pub, 'tracks'), { recursive: true });
   const index = [];
   const races = {};
@@ -827,10 +839,10 @@ function fixHeights(base, surf) {
 }
 
 /** Re-write the layout JSONs only (after a new track analysis), keeping the optimized meshes. */
-function tracksOnly() {
+async function tracksOnly() {
   const first = JSON.parse(readFileSync(path.join(out, MAP.out, 'track_base.json'), 'utf8')).id;
   const cur = JSON.parse(readFileSync(path.join(pub, layoutFile(first)), 'utf8'));
-  writeTracks(path.join(out, MAP.out), { chunks: cur.chunks, files: cur.files, collision: cur.collision });
+  await writeTracks(path.join(out, MAP.out), { chunks: cur.chunks, files: cur.files, collision: cur.collision });
 }
 
 /* ---------------------------------------------------------- collision --- */
@@ -963,10 +975,10 @@ try {
   // a run for one map (--map) leaves the cars alone
   if ((!only && !args.includes('--map')) || only === 'cars') await cars();
   if (!only || only === 'map') await map();
-  if (only === 'tracks') tracksOnly();
+  if (only === 'tracks') await tracksOnly();
   if (only === 'collision') {
     await collision(path.join(out, MAP.out), path.join(pub, MAP.assets));
-    tracksOnly();
+    await tracksOnly();
   }
 } finally {
   rmSync(tmpRoot, { recursive: true, force: true });

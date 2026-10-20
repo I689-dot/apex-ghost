@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {
+  PENALTY,
   WEATHER_LABEL,
   FLAG_BRAKE,
   FLAG_HANDBRAKE,
@@ -1178,6 +1179,13 @@ export class RaceSession {
         this.ghost.lapEnded(e.valid && e.best);
         if (e.valid && e.best) this.ensureGhostVisual();
         d.start();
+      } else if (e.type === 'penalty' && e.playerId === this.me && e.ms === 0) {
+        // a warning, or off without gaining anything
+        this.flash(
+          e.warning ? t('Track limits: warning {n} of {max}', { n: e.warning, max: PENALTY.limitsWarnings }) : t('Off track: no advantage, no penalty'),
+          2200,
+        );
+        if (e.warning) this.snd?.chime('invalid');
       } else if (e.type === 'penalty' && e.playerId === this.me) {
         const s = (e.ms / 1000).toFixed(1);
         this.flash(

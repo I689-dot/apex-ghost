@@ -48,6 +48,9 @@ export interface TrackData extends TrackRaceData {
   /** Half road width left/right of the centreline at each centreline point. */
   widthL: number[];
   widthR: number[];
+  /** Track limits: the painted white edge line, m from the centreline per point (track_limits.mjs). */
+  limitL?: number[];
+  limitR?: number[];
   /** Render chunks to load. */
   chunks: { file: string; node: string; center: Vec3; radius: number; kind: 'track' | 'scenery' | 'trees' | 'terrain' }[];
   /** Collision mesh file and the surface type of each sub-mesh in it. */

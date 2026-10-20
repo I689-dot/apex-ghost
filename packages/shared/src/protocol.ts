@@ -125,7 +125,7 @@ export type ServerMsg =
   | { t: 'countdown'; raceId: number; startAt: number }
   | { t: 'standings'; raceId: number; list: Standing[]; finishDeadline: number | null }
   | { t: 'lap'; playerId: string; lap: number; lapMs: number; penaltyMs: number; sectors: number[]; best: boolean; valid: boolean; outLap: boolean }
-  | { t: 'penalty'; playerId: string; reason: PenaltyReason; ms: number; lapPenaltyMs: number }
+  | { t: 'penalty'; playerId: string; reason: PenaltyReason; ms: number; lapPenaltyMs: number; warning?: number; noAdvantage?: boolean }
   | { t: 'flag'; raceId: number }
   | { t: 'pit'; playerId: string; in: boolean }
   | { t: 'sector'; playerId: string; sector: number; ms: number }

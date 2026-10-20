@@ -891,7 +891,9 @@ export class App {
                 );
               }),
           ),
-          h('p.muted', { text: t('Ranked by best lap. Time penalties are added to the lap: track limits (1–5 s), reset (5 s), shortcut (5 s and more).') }),
+          h('p.muted', {
+            text: t('Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).'),
+          }),
           h(
             'table',
             {},

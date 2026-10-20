@@ -210,8 +210,8 @@ const ES: Record<string, string> = {
   'Leave race': 'Abandonar carrera',
   'no time': 'sin tiempo',
   Classification: 'Clasificación',
-  'Ranked by best lap. Time penalties are added to the lap: track limits (1–5 s), reset (5 s), shortcut (5 s and more).':
-    'Ordenado por la mejor vuelta. Las penalizaciones se suman a la vuelta: límites de pista (1–5 s), volver a la pista (5 s), atajo (5 s o más).',
+  'Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).':
+    'Ordenado por la mejor vuelta. Las penalizaciones se suman a la vuelta: límites de pista tras 3 avisos (0,5–3 s), volver a la pista (5 s), atajo (5 s o más).',
   Pos: 'Pos',
   Driver: 'Piloto',
   Car: 'Coche',
@@ -233,6 +233,8 @@ const ES: Record<string, string> = {
   PEN: 'PEN',
   PENALTY: 'PENALIZACIÓN',
   'Track limits: +{s} s': 'Límites de pista: +{s} s',
+  'Track limits: warning {n} of {max}': 'Límites de pista: aviso {n} de {max}',
+  'Off track: no advantage, no penalty': 'Fuera de pista: sin ventaja, sin penalización',
   'Reset: +{s} s penalty': 'Vuelta a la pista: +{s} s de penalización',
   'Shortcut: +{s} s penalty': 'Atajo: +{s} s de penalización',
   '  ·  incl. +{s} s penalties': '  ·  incl. +{s} s de penalización',
