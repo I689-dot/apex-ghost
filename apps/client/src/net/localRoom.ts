@@ -88,6 +88,11 @@ export class LocalSocket {
 
   send(data: string | ArrayBuffer): void {
     if (this.readyState !== 1 || !room) return;
+    // keepalive: answered by Cloudflare before the room sees it online; here, the same
+    if (data === 'ka') {
+      this.conn.send('ka');
+      return;
+    }
     room.onMessage(this.conn, data);
   }
 
