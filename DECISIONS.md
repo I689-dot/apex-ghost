@@ -471,6 +471,50 @@ One lumped temperature per tyre (`TYRE_TEMP` in `vehicle.ts`):
 - **Air temperature:** follows the time of day, cloud and rain.
 - **HUD:** four small indicators: blue cold, green in the window, red overheating.
 
+## Track limits, second version (fairer)
+
+- **Report:** "too strict, sometimes not fair and not close to reality, specially on curves".
+- **Causes:**
+  - the limit came from the traced road widths, which in places stopped at an inner painted line, e.g. 2.3 m beside the pit-exit line at 500 m while the asphalt runs to 7 m;
+  - the test used the car's centre with fixed allowances;
+  - every excursion cost time.
+- **Now:**
+  - The limit is the **painted white edge line**, measured from the map's line meshes for every point and side (`tools/asset-pipeline/track_limits.mjs`): 99% painted at the Nürburgring, 96% at Zandvoort. It falls back to the paved edge + 0.5 m, with a ±40 m running median, and is never inside the old width.
+  - A car is off only when **all four wheels** (their contact points) are more than 0.5 m beyond the line, i.e. kerbs can be used, for 0.4 s.
+  - **No advantage, no penalty:** if the car loses more than 20% of its speed while off (grass, gravel), nothing is charged.
+  - **Warnings first:** as in real races, the first 3 excursions of a session are warnings; after that 0.5 s + 1 s per second off, at most 3 s. Resets (5 s) and shortcuts (skipped checkpoints) are unchanged.
+- AI laps on both circuits: no flags.
+
+## Repairs, pit box
+
+- **Dark cockpit:** dents recomputed the body's normals, which loses the authored hard edges and darkened the cabin; a repair restored the positions but recomputed the normals again. The original normals are now saved and restored exactly, and any bodywork repair resets the dents. Measured cockpit brightness: 60.1, dented 56.1, repaired 60.0.
+- **Box markings:** they took their height from the collision, which the paint flattening had lowered a few cm, so they sank under the visible road. They are now placed on the visible road meshes.
+- **Box detection:** the stop zone is the whole painted box plus 2 points of grace at each end, anywhere across the lane. After the menu is closed, moving even slowly (over 1.2 m/s) re-arms it.
+
+## Solo offline
+
+- "Play solo (offline)" runs the server's own room logic (`RoomCore`) in the browser (`apps/client/src/net/localRoom.ts`), behind a WebSocket look-alike: same protocol, rules, AI, briefing and race, with no network and no Cloudflare requests. Verified: 0 requests to the online server in a full session (`smoke.mjs --solo`).
+
+## Race weekend (qualifying, then the race)
+
+- The host picks the race in the lobby: qualifying only, or a race of 3, 5, 10 or 15 laps (default 5).
+- After the qualifying results (20 s on screen with a countdown), the race loads automatically, gridded in qualifying order: pole in front, no-time drivers at the back.
+- **Race rules** (`RaceTracker` race mode):
+  - standing start, laps counted from the green light;
+  - when the leader completes the distance, everyone finishes the lap they are on;
+  - classification by laps, then finish time + penalties, then distance;
+  - gaps on track estimated from the distance behind at the leader's average speed;
+  - a pit stop during the race counts the lap (the pit lane passes the line).
+- **HUD:** lap counter instead of the session clock; the board shows positions and gaps (+n LAP when lapped). AI cars all launch together; race results show race time, gap, best lap, laps and penalties.
+- Cars still pass through each other, as in qualifying.
+
+## Public rooms, live session list, spectators
+
+- The host chooses public (listed; anyone can join or watch without the code) or private (code only, the default).
+- Rooms report their summary to a small directory Durable Object only when something listed changes; the menu reads `GET /api/rooms` every 15 s while it is open.
+- **Spectators:** they connect with `spectate: true`, take no car or slot (up to 30 per room), receive every broadcast and the car states, and survive hibernation. In the game they get a chase camera on any racer (←/→, 1–9), the board around that car, the clock and the minimap. Between sessions they see a waiting screen and the next session starts for them automatically. Any room can be watched with its code (Watch button).
+- `node tools/e2e/spectate.mjs` checks it end to end.
+
 ## Time penalties instead of deleted laps
 
 - **Request:** "don't erase or not count a lap time; if someone resets, penalise him by adding more time, and if he gets off the road too", with real-world sizes.
