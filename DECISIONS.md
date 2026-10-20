@@ -929,6 +929,59 @@ Found with `ailap.ts` (now `--laps`, `--wet`, `--slot`, spins and wall contacts)
 
 Frame rate (`smoke.mjs --gpu --bots 5`, 1080p, this machine's iGPU, shared with another session): Medium 37.6 / 35.8 fps before, 36.0 / 33.3 after; High 13.5 / 13.1 before, 13.3 / 13.0 after: within run-to-run noise.
 
+## Mobile app (2026-10-20)
+
+The request: a real installable app for phones, while the website stays desktop-only, with an install button for phone visitors.
+
+### Shape: Capacitor around the same game
+
+- **One code base.** `apps/mobile` is a Capacitor 8 project (`app.apexghost.racing`, "APEX GHOST") that wraps the `apps/client` build. Everything app-specific in the client lives in `apps/client/src/mobile/*` and is switched on by `IS_APP` (`mobile/platform.ts`): the `app` Vite mode (`.env.app`: `VITE_APP=1`), the Capacitor bridge, or `?app=1` in dev (for Playwright).
+- **Website:** unchanged on desktop except a small "Get the mobile app" button in the menu footer (a dialog with a QR code of the APK link and a download button). On a phone the website still refuses to run the game: the "Desktop only" page now has a big **Install the app** button (the APK) and a line about iOS.
+- **Why Capacitor, not a PWA or a native rewrite:** the game is WebGL 2 + WASM (Rapier) + AudioWorklet, which the Android System WebView runs as Chrome does; a native port would be a second game. A PWA can't be "installed from a button" reliably on all Android browsers and still lives in the browser's chrome. Capacitor gives an APK with full-screen immersive mode, a locked landscape orientation, keep-screen-on and the back button.
+
+### Assets: loaded from the website, cached on the phone
+
+The `public/assets` folder is ~200 MB (cars 156 MB, maps 44 MB, sounds 5 MB). Bundling it would make a ~210 MB APK that can't be served from the Vercel site (the deploy is already near the limits) and that has to be re-downloaded for every code change.
+
+Decision: the APK holds only the code, the Basis transcoder and the menu photos (~6 MB of web files; **9.2 MB APK**). Cars, maps, layouts and engine banks come from `https://apex-ghost-liard.vercel.app/assets/…` (`VITE_ASSET_BASE`; Vercel already answers with `Access-Control-Allow-Origin: *`). A player downloads only the car and map they use (~25-40 MB for a first race).
+
+`mobile/assetCache.ts` keeps every downloaded file in Cache Storage: versioned files (`?v=` in the asset JSONs, i.e. models, collision, textures) are cache-first and old versions of the same file are pruned; the unversioned JSONs and engine banks are network-first with the cached copy as fallback. Result: after one race on a car and map, **solo offline** works without any network (the room logic already runs in the page, `net/localRoom.ts`). Trade-offs:
+
+- the first race on a map needs a connection (and mobile data);
+- the app reads the *live* website's car list and tracks. If the asset format changes, deploy the website first, then rebuild the APK (the same order as today for the server protocol);
+- Google Fonts are not bundled: offline, the UI falls back to system fonts.
+
+### Server
+
+Unchanged. The Worker already sends `Access-Control-Allow-Origin: *` on the HTTP API, and WebSocket upgrades don't check `Origin`, so the app's origin (`https://localhost`, Capacitor's `androidScheme: https`) works as is. The app build points at `https://apex-ghost-server.ilmas.workers.dev`.
+
+### Touch controls (`mobile/touchControls.ts`)
+
+- **Hooked into the existing input path, not into the session.** Steering, throttle and brake write `touchInput` in `physics/input.ts`; `InputSmoother` merges it with the keys (max of pedals, keys win for steering), with the same throttle/brake swap when reversing. The buttons press the bound keys with synthetic `KeyboardEvent`s (gear up/down, manual/auto, look back, reset, pause, timing screen, handbrake, and Enter to skip the intro), so `session.ts` and `app.ts` needed no changes for driving. The overlay shows itself when a `.race-ui` is on screen (polled every 200 ms) and hides the driving controls in the intro, the pit box menu and spectator mode (which gets ◀ ▶ to change the watched car).
+- **Safety at speed.** Touch values stay on the *keyboard* path (`Controls.digital = true`) but may be fractional: `KeyboardDriver.step` already treats its targets as numbers, so tilt and slide steering get the keyboard's rate limits, the speed-sensitive response (slower wheel and gamma 1.5 → 2.1 above 70 km/h) and, above all, the slip-based limit (±1 = ~82-95 % of the front tyres' peak slip, not full lock). The bots' analog path (`digital = false`, fraction of the mechanical lock) was not used: at 250 km/h a full tilt would be full lock, i.e. a spin.
+- **Steering modes** (Settings → Touch controls, replacing the key bindings in the app): *Arrow buttons* (one pad, the left and right halves; a thumb can slide across; same targets as A/D), *Slide* (analog: drag from where the thumb lands, a third of the pad is full lock), *Tilt the phone* (accelerometer). Tilt uses `devicemotion` gravity rotated into screen axes with `screen.orientation.angle`, then the lean of the screen's horizontal axis, `atan2(sx, hypot(sy, z))`, which stays stable whether the phone is upright or tipped back; a light low-pass, a 1.5° dead zone, and full lock at 28° (adjustable 12-50°, plus an invert switch). In tilt mode the brake moves under the left thumb.
+- **Layout:** pedals bottom-right (brake left of the tall throttle), steering bottom-left, gears (manual only) and handbrake above the pedals, a top bar with pause, timing (hold), look back (hold), reset and AUTO/MAN, arranged around the session clock. Button size and opacity are settings; short vibrations on taps (`VIBRATE` permission).
+- **HUD:** only CSS under `html.mobile-app` (`mobile/mobile.css`): smaller corners, the track map moved up on the right, the car status and the timing tower stacked on the left above the steering pad, safe-area insets everywhere (`viewport-fit=cover`, the activity draws under the notch). Menus, lobby and dialogs get a denser type scale and scroll in a 360-412 px tall landscape screen. The desktop stylesheet is untouched.
+- **Back button** (`@capacitor/app`): closes an open dialog, pauses a race, leaves a lobby or the results, and exits from the main menu.
+
+### Phone graphics
+
+The app replaces the *Low* preset in place (`mobile/appShell.ts`) and starts on it on first launch: render scale 0.9 of a 1.25 pixel-ratio cap (≈ 1050×470 on a 915×412 phone), car-only sun shadows on a 1024 map within 35 m, no AO, no bloom, no scenery PBR, the standard car model in the cockpit (`cockpitDetail: false`, not the high-detail interior: ~3-6 MB less to download and much less GPU memory), shorter tree/scenery/detail distances, 2× anisotropy, a 64 px reflection map, fewer rain drops, dynamic resolution on, TC high. *Medium* is retuned for flagship phones. Textures stay KTX2/Basis, which phones transcode to ASTC or ETC2, so they stay compressed in GPU memory.
+
+### Distribution
+
+- **APK on the website:** `apps/client/public/downloads/apex-ghost.apk`, served at `https://apex-ghost-liard.vercel.app/downloads/apex-ghost.apk` with the APK MIME type, `Content-Disposition: attachment` and no long-term caching (`vercel.json`). A GitHub release was not used: the repository is private, so its download links need a GitHub login. The APK is committed (9 MB) so a deploy from any checkout carries it.
+- **Signing:** a 4096-bit RSA key in `~/.android-keys/apex-ghost-release.jks`, its passwords in `~/.android-keys/apex-ghost-release.properties` (both mode 600, outside the repository, never committed). `android/app/build.gradle` reads the properties file (or `APEX_KEYSTORE_PROPS`). **Back it up**: an update signed with another key can't be installed over the old app. `versionCode` is the UTC build hour (`yymmddHH`) so every build installs over the previous one.
+- **minSdk 24 (Android 7)**, target/compile SDK 36. Requires OpenGL ES 3 (WebGL 2) and an up-to-date Android System WebView.
+- **iOS:** `apps/mobile/ios` is generated (Swift Package Manager, icons and splash) but can't be built on this Linux machine: it needs a Mac with Xcode and an Apple developer account (and TestFlight or the App Store to distribute; sideloading isn't practical). The website says so.
+- **Icon and splash:** generated from the favicon's red "A" chevron with a translucent ghost copy behind it, and the in-engine photo of the grid with the word mark (`apps/mobile/scripts/make-icons.mjs`).
+
+### Not done / limits
+
+- Not tested on a real phone. Tested in Playwright on a Pixel 7 landscape profile with touch events (`tools/e2e/mobile.mjs`), the built app bundle against the live website's assets, and the APK in an Android 14 emulator (software rendering).
+- No gamepad support yet (the Gamepad API would work in the WebView).
+- Pre-existing, not from this change: in a solo race the local room logs one "Malformed message." toast right after the countdown, on desktop as well (seen at 7c488cc).
+
 ## Known limitations
 
 - Frame rate was measured only on this machine's integrated Radeon: 90 fps on Low and 77 fps on Medium at native 1080p. Medium's 1% lows (~17 fps) show occasional GPU stalls in heavy views on an iGPU, which is why integrated GPUs default to Low. The figures for GTX 1650 and RX 570 are extrapolated. Please check with the perf overlay (Settings → Performance overlay) on your machines; dynamic resolution keeps fps up if a GPU is slower than expected.

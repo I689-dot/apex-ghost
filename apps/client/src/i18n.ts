@@ -434,4 +434,41 @@ const ES: Record<string, string> = {
   'Look back': 'Mirar atrás',
   'Timing screen (hold)': 'Pantalla de tiempos (mantener)',
   'Pause menu': 'Menú de pausa',
+  // mobile app, install page
+  'The website is made for a keyboard. On your phone, race with the APEX GHOST app: touch or tilt steering, the same rooms as your friends.':
+    'La web está pensada para teclado. En el móvil, corre con la app de APEX GHOST: dirección táctil o por inclinación, las mismas salas que tus amigos.',
+  'Install the app': 'Instalar la app',
+  'Android 7 or newer · APK': 'Android 7 o posterior · APK',
+  'After the download, open the file and allow your browser to install apps when Android asks.':
+    'Tras la descarga, abre el archivo y permite que el navegador instale apps cuando Android lo pida.',
+  'iPhone and iPad: the iOS app is not available yet. Play on a computer meanwhile.':
+    'iPhone y iPad: la app de iOS aún no está disponible. Mientras tanto, juega en un ordenador.',
+  'iPhone and iPad: the iOS app is not available yet.': 'iPhone y iPad: la app de iOS aún no está disponible.',
+  'Get the mobile app': 'App para móvil',
+  'APEX GHOST on your phone': 'APEX GHOST en tu móvil',
+  'Scan the code with your Android phone, or open this website on it and tap “Install the app”.':
+    'Escanea el código con tu Android, o abre esta web en él y toca «Instalar la app».',
+  'Download the APK': 'Descargar el APK',
+  'Touch or tilt steering, phone graphics, the same rooms and solo races. Android 7 or newer.':
+    'Dirección táctil o por inclinación, gráficos para móvil, las mismas salas y carreras en solitario. Android 7 o posterior.',
+  'Touch controls': 'Controles táctiles',
+  'Arrow buttons': 'Botones de flecha',
+  Slide: 'Deslizar',
+  'Tilt the phone': 'Inclinar el móvil',
+  Steering: 'Dirección',
+  'Tilt: hold the phone like a wheel. Steering is speed-sensitive in every mode.':
+    'Inclinación: sujeta el móvil como un volante. La dirección depende de la velocidad en todos los modos.',
+  'Tilt for full lock': 'Inclinación para giro máximo',
+  'Smaller = more sensitive': 'Menos = más sensible',
+  'Invert tilt': 'Invertir inclinación',
+  'Button size': 'Tamaño de los botones',
+  'Button opacity': 'Opacidad de los botones',
+  Vibration: 'Vibración',
+  BRAKE: 'FRENO',
+  GAS: 'GAS',
+  TIMES: 'TIEMPOS',
+  BACK: 'ATRÁS',
+  TILT: 'INCLINACIÓN',
+  HB: 'FM',
+  'Skip intro ▸': 'Saltar intro ▸',
 };

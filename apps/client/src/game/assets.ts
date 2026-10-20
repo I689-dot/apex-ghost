@@ -4,6 +4,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import type { CarEntry, CarsFile, Surface, TrackData } from '@apex/shared';
 import { ASSET_BASE } from '../config';
+import { assetFetch } from '../mobile/assetCache';
 
 export type Progress = (loaded: number, total: number, label: string) => void;
 
@@ -12,7 +13,7 @@ let ktx2: KTX2Loader | null = null;
 
 export function initLoaders(renderer: THREE.WebGLRenderer): GLTFLoader {
   if (loader) return loader;
-  ktx2 = new KTX2Loader().setTranscoderPath(`${ASSET_BASE}libs/basis/`).detectSupport(renderer);
+  ktx2 = new KTX2Loader().setTranscoderPath(`${import.meta.env.BASE_URL}libs/basis/`).detectSupport(renderer);
   loader = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
   return loader;
 }
@@ -23,7 +24,7 @@ export function url(p: string): string {
 
 /** fetch with byte progress (used for the loading bar). */
 export async function fetchWithProgress(path: string, onBytes: (n: number) => void): Promise<ArrayBuffer> {
-  const res = await fetch(url(path));
+  const res = await assetFetch(url(path));
   if (!res.ok || !res.body) throw new Error(`Failed to load ${path} (${res.status})`);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -51,10 +52,16 @@ export async function parseGltf(buf: ArrayBuffer): Promise<GLTF> {
 
 let carsCache: Promise<CarsFile> | null = null;
 export function loadCarsFile(): Promise<CarsFile> {
-  carsCache ??= fetch(url('assets/cars.json')).then((r) => {
-    if (!r.ok) throw new Error('Could not load the car list (assets/cars.json). Did you run `pnpm assets`?');
-    return r.json() as Promise<CarsFile>;
-  });
+  carsCache ??= assetFetch(url('assets/cars.json'))
+    .then((r) => {
+      if (!r.ok) throw new Error('Could not load the car list (assets/cars.json). Did you run `pnpm assets`?');
+      return r.json() as Promise<CarsFile>;
+    })
+    .then((f) => {
+      // thumbnails are page-relative paths: point them at the asset host when it is elsewhere (mobile app)
+      if (ASSET_BASE !== import.meta.env.BASE_URL) for (const c of f.cars) if (c.thumbnail && !/^[a-z]+:/i.test(c.thumbnail)) c.thumbnail = url(c.thumbnail);
+      return f;
+    });
   return carsCache;
 }
 
@@ -72,7 +79,7 @@ export interface TrackIndexEntry {
 let indexCache: Promise<TrackIndexEntry[]> | null = null;
 /** The layouts the host can choose (assets/tracks.json). */
 export function loadTrackIndex(): Promise<TrackIndexEntry[]> {
-  indexCache ??= fetch(url('assets/tracks.json'))
+  indexCache ??= assetFetch(url('assets/tracks.json'))
     .then((r) => (r.ok ? (r.json() as Promise<{ tracks: TrackIndexEntry[] }>) : { tracks: [] }))
     .then((j) => j.tracks)
     .catch(() => []);
@@ -87,7 +94,7 @@ export async function loadTrackFile(trackId?: string): Promise<TrackData> {
   const file = entry?.file ?? 'assets/track.json';
   let p = trackFiles.get(file);
   if (!p) {
-    p = fetch(url(file))
+    p = assetFetch(url(file))
       .then((r) => {
         if (!r.ok) throw new Error(`Could not load the track (${file}).`);
         return r.json() as Promise<TrackData>;

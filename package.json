@@ -16,7 +16,10 @@
     "deploy:client": "pnpm --filter @apex/client build && vercel deploy apps/client/dist/apex-ghost --prod --yes",
     "sim": "tsx tools/sim/simtest.ts",
     "e2e": "node tools/e2e/smoke.mjs",
-    "setup:tools": "bash tools/asset-pipeline/setup-tools.sh"
+    "setup:tools": "bash tools/asset-pipeline/setup-tools.sh",
+    "app:web": "pnpm --filter @apex/shared build && pnpm --filter @apex/client build:app",
+    "app:android": "bash apps/mobile/scripts/build-android.sh",
+    "setup:android": "bash tools/mobile/setup-android.sh"
   },
   "devDependencies": {
     "@dimforge/rapier3d-compat": "0.14.0",

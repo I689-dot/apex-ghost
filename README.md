@@ -125,11 +125,40 @@ pnpm deploy:client
 
 `apps/client/public/vercel.json` sets long-term caching for the hashed and immutable assets. The build is about 90 MB, under the Hobby plan's 100 MB upload limit.
 
+## 7. Mobile app (Android)
+
+The phone version is a Capacitor app in `apps/mobile` that wraps the same game (see DECISIONS.md, "Mobile app"). The website stays desktop-only; on a phone it shows an **Install the app** button that downloads `apps/client/public/downloads/apex-ghost.apk`.
+
+Once per machine (no sudo; installs JDK 21 and the Android SDK in `~/Android`):
+
+```bash
+pnpm setup:android
+```
+
+Build the signed APK (web bundle in app mode → `cap sync` → Gradle release build → copied to `apps/client/public/downloads/apex-ghost.apk`):
+
+```bash
+pnpm app:android
+```
+
+Then deploy the website (`pnpm deploy:client`) so the download button serves the new APK.
+
+- The first build creates the release key in `~/.android-keys/` (`apex-ghost-release.jks` + `apex-ghost-release.properties`). Keep these files and back them up; they are kept out of the repository, and updates must be signed with the same key. Set `APEX_KEYSTORE_PROPS` to use another location.
+- The app loads cars, maps and sounds from the website (`apps/client/.env.app`: `VITE_ASSET_BASE`, `VITE_SERVER_URL`). Deploy asset changes to the website before shipping an APK that needs them.
+- `pnpm app:web` builds only the app's web bundle (`apps/client/dist/app`); `pnpm --filter @apex/mobile assets` regenerates the icons and splash screens.
+- Try it: `bash tools/mobile/emulator.sh` (needs `/dev/kvm`) installs an Android 14 emulator, boots it and installs the APK. On a phone: open the website, tap **Install the app**, allow the browser to install apps.
+- Preview the app UI in a desktop browser with `http://localhost:5173/?app=1` (dev only; `?app=0` to leave). `node tools/e2e/mobile.mjs --gpu` tests the install page, the menu link and the app's touch controls in Playwright (needs `pnpm dev`).
+- **iOS:** `apps/mobile/ios` is prepared, but building it needs a Mac with Xcode: `pnpm app:web && cd apps/mobile && npx cap sync ios && npx cap open ios`, then sign with an Apple developer account.
+
+Touch controls: arrow buttons, slide or tilt steering (Settings → Touch controls), throttle and brake pedals, and buttons for gears (manual mode), handbrake, pause, timing screen (hold), look back (hold), reset and manual/automatic. The Android back button pauses the race.
+
 ## Environment variables
 
 | Variable | Where | Default | Purpose |
 |---|---|---|---|
 | `VITE_SERVER_URL` | client build (`apps/client/.env.production.local` or shell) | `http://<page-host>:8787` | Realtime server base URL (`https://…workers.dev`); the client derives `wss://` from it. |
+| `VITE_APP`, `VITE_ASSET_BASE`, `VITE_WEB_URL` | mobile app build (`apps/client/.env.app`) | unset | App mode, where cars/maps/sounds are fetched from, and the website (APK link). |
+| `JAVA_HOME`, `ANDROID_HOME`, `APEX_KEYSTORE_PROPS` | `pnpm app:android` | `~/Android/jdk/current`, `~/Android/Sdk`, `~/.android-keys/apex-ghost-release.properties` | Android build tools and the release key. |
 | `BLENDER`, `USD_PYTHON`, `KTX_DIR` | asset pipeline | `~/.local/opt/...` | Tool locations. |
 | `SERVER_URL` | load test | `http://localhost:8787` | Same as `--url`. |
 
@@ -170,6 +199,7 @@ Bots: the room host can add AI drivers in the lobby (**+ Add bot**, ✕ to remov
 ```
 apps/client            Vite + Three.js game (static, Vercel)
 apps/server            Cloudflare Worker + Durable Object rooms (RoomCore is host-agnostic)
+apps/mobile            Capacitor shell: Android project (signed APK) and the prepared iOS project
 packages/shared        protocol, binary codec, race tracker, weather, validation, types
 tools/asset-pipeline   USDC → GLB pipeline (Blender, usd-core, gltf-transform, toktx)
 tools/loadtest         12-client race load test

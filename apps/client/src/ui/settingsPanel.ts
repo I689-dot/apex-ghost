@@ -1,6 +1,8 @@
 import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, saveSettings, settings, type ControlAction, type QualityPreset } from '../settings';
 import { h } from './dom';
 import { LANGUAGES, setLang, t } from '../i18n';
+import { IS_APP } from '../mobile/platform';
+import { touchSettingsSection } from '../mobile/touchSettings';
 
 const KEY_NAMES: Record<string, string> = {
   Space: 'Space',
@@ -341,7 +343,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       'div.modal-card.settings',
       {},
       h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { text: '✕', title: t('Close'), onclick: onClose })),
-      h('div.settings-grid', {}, graphics, assists, sound, controls),
+      h('div.settings-grid', {}, graphics, assists, sound, IS_APP ? touchSettingsSection() : controls),
     ),
   );
   return panel;

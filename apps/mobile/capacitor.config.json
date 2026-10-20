@@ -1,0 +1,18 @@
+{
+  "appId": "app.apexghost.racing",
+  "appName": "APEX GHOST",
+  "webDir": "../client/dist/app",
+  "backgroundColor": "#0d0e11",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "preferredContentMode": "mobile"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
