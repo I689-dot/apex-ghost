@@ -69,6 +69,13 @@ export interface Controls {
 }
 
 /**
+ * Touch / tilt controls of the mobile app (src/mobile/touchControls.ts). Values are targets like the keys'
+ * (0…1 pedals, −1…+1 steering, + = left) but may be fractional: they go through the same physics-step filters
+ * (keyboardDriver.ts: rate limits, speed-sensitive steering, slip-based limit), so tilt is as safe at speed as the keys.
+ */
+export const touchInput = { active: false, throttle: 0, brake: 0, steer: 0, handbrake: 0 };
+
+/**
  * Reads the keys into digital targets. All smoothing happens inside the physics step
  * (see keyboardDriver.ts), never per render frame.
  */
@@ -85,6 +92,15 @@ export class InputSmoother {
     const left = kb.held('steerLeft');
     const right = kb.held('steerRight');
     this.out.steer = left === right ? 0 : left ? 1 : -1;
+    if (touchInput.active) {
+      const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+      const thr = clamp01(touchInput.throttle);
+      const brk = clamp01(touchInput.brake);
+      this.out.throttle = Math.max(this.out.throttle, reverse ? brk : thr);
+      this.out.brake = Math.max(this.out.brake, reverse ? thr : brk);
+      this.out.handbrake = Math.max(this.out.handbrake, clamp01(touchInput.handbrake));
+      if (this.out.steer === 0) this.out.steer = Math.min(1, Math.max(-1, touchInput.steer));
+    }
     return this.out;
   }
 

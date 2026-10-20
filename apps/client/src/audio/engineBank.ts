@@ -1,4 +1,5 @@
 import type { EngineBank } from './engine-worklet.js';
+import { assetFetch } from '../mobile/assetCache';
 
 /** engine_<name>.json as written by tools/asset-pipeline/engine_bank.py */
 export interface EngineBankMeta {
@@ -51,8 +52,8 @@ export function loadBank(name: string, sampleRate: number, base: string): Promis
   let p = cache.get(key);
   if (!p) {
     p = Promise.all([
-      fetch(`${base}assets/audio/engine_${name}.json`).then((r) => r.json()),
-      fetch(`${base}assets/audio/engine_${name}.bin`).then((r) => r.arrayBuffer()),
+      assetFetch(`${base}assets/audio/engine_${name}.json`).then((r) => r.json()),
+      assetFetch(`${base}assets/audio/engine_${name}.bin`).then((r) => r.arrayBuffer()),
     ])
       .then(([meta, pcm]) => decodeBank(meta as EngineBankMeta, pcm, sampleRate))
       .catch((e) => {

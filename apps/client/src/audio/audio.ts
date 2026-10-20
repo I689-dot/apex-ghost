@@ -1,6 +1,7 @@
 import type { EngineProfile } from './engineProfiles';
 import { EngineDSP, SampleEngine, mixEngine } from './engine-worklet.js';
 import { loadBank } from './engineBank';
+import { ASSET_BASE } from '../config';
 
 /** Mixer levels (0..1), saved with the settings. */
 export interface AudioLevels {
@@ -265,13 +266,13 @@ export class EngineVoice {
       node.connect(this.out);
       this.node = node;
       // the recording takes over once its bank is in (procedural engine until then, and if it fails)
-      void loadBank(profile.bank, ctx.sampleRate, import.meta.env.BASE_URL).then((bank) => {
+      void loadBank(profile.bank, ctx.sampleRate, ASSET_BASE).then((bank) => {
         if (bank && !this.stopped) node.port.postMessage({ bank });
       });
     } else {
       const dsp = new EngineDSP(ctx.sampleRate, profile);
       let rec: SampleEngine | null = null;
-      void loadBank(profile.bank, ctx.sampleRate, import.meta.env.BASE_URL).then((b) => {
+      void loadBank(profile.bank, ctx.sampleRate, ASSET_BASE).then((b) => {
         if (b) rec = new SampleEngine(ctx.sampleRate, b, profile.cyl);
       });
       const fb = this.fb;

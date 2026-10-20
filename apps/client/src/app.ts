@@ -33,6 +33,8 @@ import { saveSettings, settings } from './settings';
 import { clear, fmtTime, h, toast } from './ui/dom';
 import { settingsPanel } from './ui/settingsPanel';
 import { getLang, t } from './i18n';
+import { IS_APP } from './mobile/platform';
+import { mobileAppLink } from './mobile/installScreen';
 
 type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 'results';
 
@@ -249,6 +251,7 @@ export class App {
           {},
           h('button.ghost', { text: t('Settings'), onclick: () => this.openSettings() }),
           h('span.muted', { text: t('Keyboard: W/S throttle & brake · A/D steer · Space handbrake · Esc menu') }),
+          IS_APP ? null : mobileAppLink(),
         ),
       ),
     );

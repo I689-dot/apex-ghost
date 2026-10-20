@@ -8,3 +8,5 @@ pnpm-lock.yaml
 *.md
 packages/shared/src/generated
 .claude
+apps/mobile/android
+apps/mobile/ios

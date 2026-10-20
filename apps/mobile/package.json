@@ -1,0 +1,20 @@
+{
+  "name": "@apex/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "APEX GHOST mobile app: Capacitor shell around the apps/client game (Android; iOS project prepared).",
+  "scripts": {
+    "sync": "cap sync",
+    "android": "bash scripts/build-android.sh",
+    "assets": "node scripts/make-icons.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
