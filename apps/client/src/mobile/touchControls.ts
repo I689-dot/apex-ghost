@@ -53,6 +53,7 @@ export class TouchControls {
       this.hold('tc-timing', t('TIMES'), 'timing'),
       this.hold('tc-look', t('BACK'), 'lookBack', t('Look back')),
       this.tap('tc-reset', '↺', 'resetCar', t('Reset to track')),
+      this.tap('tc-cam', 'CAM', 'camera', t('Change camera')),
       this.gearboxBtn,
     );
     const gears = h(

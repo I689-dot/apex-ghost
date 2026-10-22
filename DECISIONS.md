@@ -1010,3 +1010,11 @@ The app replaces the *Low* preset in place (`mobile/appShell.ts`) and starts on 
   browser's standard layout, then a built-in Switch Pro-on-Linux layout, then raw indices. The live view in the same
   section shows what the browser reads. The pad in use is the plausible one (sticks + ≥ 6 buttons) touched last, so
   a keyboard's "joystick" interface (listed by browsers on Linux) never steals the input.
+
+## Outside driving cameras
+
+- "Change camera" (V, rebindable; pad L3 or D-pad →; CAM in the app) cycles cockpit → chase → far chase; the choice
+  is saved. The chase camera trails the car's heading with a short lag (5.4 m / 1.85 m up; far 8.2 m / 2.7 m), leans
+  35 % towards the direction of travel in a slide, pulls back up to 0.7–1 m and widens the FOV by 7° towards
+  250 km/h, smooths its height against kerbs, and looks back from ahead of the car while Look back is held.
+  The windscreen rain/crack overlay and the drawn dash (cars without an interior) are cockpit-only.

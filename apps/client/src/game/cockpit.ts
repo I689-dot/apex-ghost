@@ -21,6 +21,8 @@ export class CockpitCamera {
   private dash: THREE.Group | null = null;
   private dashWheel: THREE.Object3D | null = null;
   lookingForward = true;
+  /** True while an outside camera is in use: the drawn dash (cars without an interior) is hidden. */
+  hidden = false;
 
   constructor(
     private readonly entry: CarEntry,
@@ -195,7 +197,7 @@ export class CockpitCamera {
     this.camera.rotation.set(PITCH, Math.PI + this.lookYaw + this.cornerYaw, 0);
     this.lookingForward = Math.abs(this.lookYaw) < 0.4;
     if (this.dashWheel) this.dashWheel.rotation.z = steer * 11;
-    if (this.dash) this.dash.visible = this.lookingForward;
+    if (this.dash) this.dash.visible = this.lookingForward && !this.hidden;
   }
 
   /** World position of the camera (for culling, ghosts and audio-less effects). */

@@ -32,6 +32,8 @@ const TAP: [number, ControlAction][] = [
   [BTN.UP, 'resetCar'],
   [BTN.DOWN, 'toggleGearbox'],
   [BTN.MENU, 'pause'],
+  [BTN.LS, 'camera'],
+  [BTN.RIGHT, 'camera'],
 ];
 
 const FOCUSABLE =

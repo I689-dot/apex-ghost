@@ -522,4 +522,9 @@ const ES: Record<string, string> = {
   'raw buttons': 'botones',
   axes: 'ejes',
   Brake: 'Freno',
+  'Change camera': 'Cambiar cámara',
+  'L3 / D-pad →': 'L3 / cruceta →',
+  'Cockpit camera': 'Cámara de cabina',
+  'Chase camera': 'Cámara exterior',
+  'Far chase camera': 'Cámara exterior lejana',
 };

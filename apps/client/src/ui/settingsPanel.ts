@@ -439,6 +439,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       padRow('Y / R3', t('Look back')),
       padRow(t('Right stick'), t('Look left / right')),
       padRow(t('D-pad ↑ / ↓'), t('Reset to track / manual-automatic')),
+      padRow(t('L3 / D-pad →'), t('Change camera')),
       padRow('View', t('Timing screen (hold)')),
       padRow('Menu', t('Pause menu')),
     ),

@@ -17,7 +17,11 @@ export const CONTROL_ACTIONS = [
   'lookBack',
   'timing',
   'pause',
+  'camera',
 ] as const;
+export type CameraMode = 'cockpit' | 'chase' | 'far';
+export const CAMERA_MODES: CameraMode[] = ['cockpit', 'chase', 'far'];
+
 export type ControlAction = (typeof CONTROL_ACTIONS)[number];
 export type KeyBindings = Record<ControlAction, string[]>;
 
@@ -36,6 +40,7 @@ export const ACTION_LABEL: Record<ControlAction, string> = {
   lookBack: 'Look back',
   timing: 'Timing screen (hold)',
   pause: 'Pause menu',
+  camera: 'Change camera',
 };
 
 export const DEFAULT_BINDINGS: KeyBindings = {
@@ -53,6 +58,7 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   lookBack: ['KeyX'],
   timing: ['Tab'],
   pause: ['Escape'],
+  camera: ['KeyV'],
 };
 
 export interface Assists {
@@ -86,6 +92,8 @@ export interface Settings {
   seatForward: number;
   assists: Assists;
   manualGearbox: boolean;
+  /** Driving view: from the seat, or chase cameras behind the car. */
+  camera: CameraMode;
   units: 'kmh' | 'mph';
   /** Racing-line assist: off, braking zones and corners only, or the whole lap. */
   racingLine: 'off' | 'corners' | 'full';
@@ -128,6 +136,7 @@ export const DEFAULT_SETTINGS: Settings = {
   seatForward: 0,
   assists: { abs: true, tc: 1, stability: false, steering: false },
   manualGearbox: false,
+  camera: 'cockpit',
   units: 'kmh',
   racingLine: 'corners',
   showPerf: false,

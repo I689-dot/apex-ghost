@@ -40,7 +40,7 @@ import { RemoteCarBuffer } from '../net/remote';
 import { DamageState } from '../physics/damage';
 import { InputSmoother, Keyboard } from '../physics/input';
 import { Vehicle } from '../physics/vehicle';
-import { QUALITY, settings } from '../settings';
+import { CAMERA_MODES, QUALITY, saveSettings, settings } from '../settings';
 import { Hud } from '../ui/hud';
 import { loadCarModel, loadTrackFile, type Progress } from './assets';
 import { AiDriver, BOT_ASSISTS } from './ai';
@@ -378,7 +378,7 @@ export class RaceSession {
     this.hud.setTrack(this.trackData);
     this.hud.raceLaps = this.race.kind === 'race' ? this.race.laps : 0;
     this.hud.el.append(this.timing.el);
-    this.gfx.setScene(this.scene, this.cockpit.camera);
+    this.gfx.setScene(this.scene, this.spectator ? this.cockpit.camera : this.driveCamera());
     this.gfx.resize();
     this.env.update(0, this.weather, this.cockpit.camera, this.currPos, _carVel.set(0, 0, 0), this.gfx.renderer);
     this.env.updateEnvMap(this.gfx.renderer, this.weather.hour, true);
@@ -846,8 +846,14 @@ export class RaceSession {
       yawRate,
     );
     this.cockpit.worldPosition(_camPos);
+    const outside = !this.spectator && settings.camera !== 'cockpit';
+    this.cockpit.hidden = outside;
+    if (outside) {
+      this.updateChaseCam(dt, this.kb.held('lookBack'));
+      _camPos.copy(this.chaseCam.position);
+    }
     // pre-race cinematic owns the camera until shortly before the start lights
-    let viewCam: THREE.Camera = this.cockpit.camera;
+    let viewCam: THREE.Camera = outside ? this.chaseCam : this.cockpit.camera;
     const cine = this.cinematic;
     if (cine) {
       if (cine.update(dt, this.startAt === null ? null : this.startAt - serverNow)) {
@@ -859,7 +865,7 @@ export class RaceSession {
         this.cinematic = null;
         this.env.fogScale = 1;
         this.env.hideRain = false;
-        this.gfx.setCamera(this.spectator ? this.specCam : this.cockpit.camera);
+        this.gfx.setCamera(this.spectator ? this.specCam : this.driveCamera());
         this.hud.el.style.visibility = '';
         window.removeEventListener('keydown', this.onKeySkip, true);
       }
@@ -887,9 +893,9 @@ export class RaceSession {
         v.telemetry.speed,
         window.innerWidth / window.innerHeight,
         1 - this.env.night * 0.8,
-        this.cockpit.lookingForward,
+        this.cockpit.lookingForward && !outside,
       );
-    this.windshield.setCrack(this.spectator ? 0 : this.damage.zones[0], this.cockpit.lookingForward);
+    this.windshield.setCrack(this.spectator ? 0 : this.damage.zones[0], this.cockpit.lookingForward && !outside);
     this.updateAudio(dt, viewCam);
     this.updateWake();
     this.updateGhost(serverNow);
@@ -929,6 +935,7 @@ export class RaceSession {
     if (this.paused) return;
     if (kb.tapped('shiftUp')) this.vehicle.shift(1);
     if (kb.tapped('shiftDown')) this.vehicle.shift(-1);
+    if (kb.tapped('camera') && !this.spectator) this.cycleCamera();
     if (kb.tapped('toggleGearbox')) {
       settings.manualGearbox = !settings.manualGearbox;
       this.vehicle.drivetrain.manual = settings.manualGearbox;
@@ -1492,6 +1499,71 @@ export class RaceSession {
     return undefined;
   }
   private readonly specCam = new THREE.PerspectiveCamera(62, 1, 0.1, 6000);
+
+  /* ------------------------------------------------- outside driving camera --- */
+  private readonly chaseCam = new THREE.PerspectiveCamera(60, 1, 0.1, 9000);
+  private chaseYaw = 0;
+  private chaseY = 0;
+  private chaseInit = false;
+
+  /** The camera you drive with: the seat or a chase camera (V / L3 / D-pad → / CAM cycle them). */
+  private driveCamera(): THREE.PerspectiveCamera {
+    return settings.camera === 'cockpit' ? this.cockpit.camera : this.chaseCam;
+  }
+
+  private cycleCamera(): void {
+    const i = CAMERA_MODES.indexOf(settings.camera);
+    settings.camera = CAMERA_MODES[(i + 1) % CAMERA_MODES.length];
+    saveSettings(settings);
+    this.chaseInit = false;
+    if (!this.cinematic) this.gfx.setCamera(this.driveCamera());
+    this.flash(t({ cockpit: 'Cockpit camera', chase: 'Chase camera', far: 'Far chase camera' }[settings.camera]), 1200);
+  }
+
+  /**
+   * Chase camera, as in GT / ACC: it trails the car's heading with a short lag (you see the car rotate into a
+   * corner or step out in a slide), leans a little towards the direction of travel when sliding, pulls back and
+   * widens slightly with speed, and smooths the height so kerbs and bumps don't shake the picture.
+   * Look back puts it ahead of the car, looking back.
+   */
+  private updateChaseCam(dt: number, back: boolean): void {
+    const o = this.myVisual.object;
+    _v1.set(0, 0, 1).applyQuaternion(o.quaternion);
+    const heading = Math.atan2(_v1.x, _v1.z);
+    const speed = Math.hypot(_carVel.x, _carVel.z);
+    let target = heading;
+    if (speed > 8) {
+      // in a slide, look partly along the path the car is really taking
+      const travel = Math.atan2(_carVel.x, _carVel.z);
+      const slip = Math.atan2(Math.sin(travel - heading), Math.cos(travel - heading));
+      target = heading + THREE.MathUtils.clamp(slip, -0.6, 0.6) * 0.35;
+    }
+    const far = settings.camera === 'far';
+    const cam = this.chaseCam;
+    if (!this.chaseInit) {
+      this.chaseYaw = target;
+      this.chaseY = o.position.y;
+      this.chaseInit = true;
+    }
+    const dYaw = Math.atan2(Math.sin(target - this.chaseYaw), Math.cos(target - this.chaseYaw));
+    this.chaseYaw += dYaw * (1 - Math.exp(-dt * (far ? 4.5 : 6)));
+    this.chaseY += (o.position.y - this.chaseY) * (1 - Math.exp(-dt * 7));
+    const kmh = speed * 3.6;
+    const dist = (far ? 8.2 : 5.4) + Math.min(1, kmh / 250) * (far ? 1.0 : 0.7);
+    const height = far ? 2.7 : 1.85;
+    const yaw = back ? this.chaseYaw + Math.PI : this.chaseYaw;
+    const fx = Math.sin(yaw);
+    const fz = Math.cos(yaw);
+    cam.position.set(o.position.x - fx * dist, this.chaseY + height, o.position.z - fz * dist);
+    const ahead = far ? 3 : 4;
+    cam.lookAt(o.position.x + fx * ahead, this.chaseY + (far ? 0.55 : 0.6), o.position.z + fz * ahead);
+    const fov = (far ? 55 : 60) + Math.min(1, kmh / 250) * 7;
+    if (Math.abs(cam.fov - fov) > 0.05 || cam.aspect !== window.innerWidth / window.innerHeight) {
+      cam.fov = fov;
+      cam.aspect = window.innerWidth / window.innerHeight;
+      cam.updateProjectionMatrix();
+    }
+  }
   private specCamInit = false;
 
   /** ←/→ change car; 1–9 the car in that position. */
