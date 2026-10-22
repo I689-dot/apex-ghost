@@ -1004,3 +1004,9 @@ The app replaces the *Low* preset in place (`mobile/appShell.ts`) and starts on 
 - Steering uses a separate analog profile in the physics-step filter (fast rate limit, slip-based limit, no double
   curve, near-direct triggers). Research and numbers: docs/CONTROLLER_STEERING_RESEARCH.md. Tunable in
   Settings → Controller (curve, steering speed, speed sensitivity, dead zone, brake curve, vibration).
+- Controllers the browser reports without the standard layout (e.g. Switch Pro clones on Linux: 14 buttons in kernel
+  order, D-pad on a hat, digital ZL/ZR) go through input/padMap.ts: the player's own layout from Settings →
+  Controller → "Set up buttons…" (learned per pad, buttons or axes, triggers resting at −1 included) wins, then the
+  browser's standard layout, then a built-in Switch Pro-on-Linux layout, then raw indices. The live view in the same
+  section shows what the browser reads. The pad in use is the plausible one (sticks + ≥ 6 buttons) touched last, so
+  a keyboard's "joystick" interface (listed by browsers on Linux) never steals the input.

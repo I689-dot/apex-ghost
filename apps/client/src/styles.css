@@ -2368,3 +2368,32 @@ button.pit-tyre.on {
   font-family: var(--display);
   letter-spacing: 0.05em;
 }
+.pad-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0.8rem;
+  padding: 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+.pad-status {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.pad-live {
+  margin: 0;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.pad-prompt {
+  margin: 0;
+  font-family: var(--display);
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+.pad-wizard-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

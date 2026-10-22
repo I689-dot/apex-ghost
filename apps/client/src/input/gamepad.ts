@@ -3,6 +3,7 @@ import { padInput } from '../physics/input';
 import { PAD } from '../physics/keyboardDriver';
 import { toast } from '../ui/dom';
 import { t } from '../i18n';
+import { isPlausiblePad, readPad, type VirtualPad } from './padMap';
 
 /**
  * Game controller support (Gamepad API, "standard" mapping: Xbox, PlayStation, Switch Pro and most USB pads).
@@ -46,6 +47,7 @@ let connected = false;
 export function initGamepad(): void {
   if (typeof navigator.getGamepads !== 'function') return;
   window.addEventListener('gamepadconnected', (e) => {
+    if (!isPlausiblePad(e.gamepad)) return; // e.g. a keyboard's media-key interface
     connected = true;
     toast(t('Controller connected: {name}', { name: shortName(e.gamepad.id) }));
   });
@@ -72,15 +74,26 @@ export function rumble(strength: number): void {
   void pad.vibrationActuator?.playEffect?.('dual-rumble', { duration: 90 + 160 * s, strongMagnitude: s, weakMagnitude: Math.min(1, s * 0.7) }).catch(() => {});
 }
 
-function activePad(): Gamepad | null {
-  const pads = navigator.getGamepads?.() ?? [];
-  let any: Gamepad | null = null;
-  for (const p of pads) {
-    if (!p || !p.connected) continue;
-    if (p.mapping === 'standard') return p;
-    any ??= p;
-  }
-  return any;
+let lastPad = -1;
+let paused = false;
+
+/** While the button setup in Settings listens to the pad, the game must not act on it. */
+export function pausePad(on: boolean): void {
+  paused = on;
+  if (on) release();
+}
+
+/**
+ * The controller in use: the plausible pad (sticks and enough buttons: not a keyboard's "joystick" interface)
+ * touched most recently, so a second pad or a stray device never steals the input.
+ */
+export function activePad(): Gamepad | null {
+  const pads = [...(navigator.getGamepads?.() ?? [])].filter(isPlausiblePad);
+  if (!pads.length) return null;
+  let best = pads.find((p) => p.index === lastPad) ?? pads[0];
+  for (const p of pads) if (p.timestamp > best.timestamp + 50 && p.buttons.some((b) => b.pressed)) best = p;
+  lastPad = best.index;
+  return best;
 }
 
 function shortName(id: string): string {
@@ -94,12 +107,13 @@ function shortName(id: string): string {
 
 function loop(): void {
   requestAnimationFrame(loop);
-  const pad = activePad();
-  if (!pad) {
+  const raw = paused ? null : activePad();
+  if (!raw) {
     if (padInput.active) release();
     return;
   }
   connected = true;
+  const pad = readPad(raw);
   const now = pad.buttons.map((b) => b.pressed);
   const pressed = (i: number) => !!now[i] && !prev[i];
   const race = document.querySelector('.race-ui');
@@ -119,7 +133,7 @@ function loop(): void {
 
 /* ------------------------------------------------------------- driving --- */
 
-function drive(pad: Gamepad, now: boolean[], pressed: (i: number) => boolean, spectating: boolean): void {
+function drive(pad: VirtualPad, now: boolean[], pressed: (i: number) => boolean, spectating: boolean): void {
   const val = (i: number) => pad.buttons[i]?.value ?? 0;
   padInput.active = true;
   PAD.rateScale = settings.pad.steerSpeed;
@@ -176,7 +190,7 @@ function release(): void {
 
 /* --------------------------------------------------------------- menus --- */
 
-function menu(pad: Gamepad, pressed: (i: number) => boolean): void {
+function menu(pad: VirtualPad, pressed: (i: number) => boolean): void {
   const ax = pad.axes[0] ?? 0;
   const ay = pad.axes[1] ?? 0;
   const b = pad.buttons;

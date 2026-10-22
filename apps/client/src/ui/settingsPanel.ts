@@ -2,6 +2,7 @@ import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, DEFAULT_SETTINGS, save
 import { h } from './dom';
 import { LANGUAGES, setLang, t } from '../i18n';
 import { IS_APP } from '../mobile/platform';
+import { padSetupBox } from '../input/padSetup';
 import { touchSettingsSection } from '../mobile/touchSettings';
 
 const KEY_NAMES: Record<string, string> = {
@@ -344,6 +345,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     h('p.muted', {
       text: t('Plug in or connect a gamepad (Xbox, PlayStation…) and press any button. Menus: D-pad or stick to move, A to select, B to go back.'),
     }),
+    padSetupBox(),
     row(
       t('Steering curve'),
       range(
@@ -443,7 +445,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     h('button.ghost', {
       text: t('Reset controller settings'),
       onclick: () => {
-        settings.pad = structuredClone(DEFAULT_SETTINGS.pad);
+        settings.pad = { ...structuredClone(DEFAULT_SETTINGS.pad), layouts: settings.pad.layouts };
         changed();
         pad.querySelectorAll<HTMLInputElement>('input[type=range]').forEach((r, i) => {
           r.value = String([settings.pad.steerCurve, settings.pad.steerSpeed, settings.pad.speedSens, settings.pad.deadzone, settings.pad.brakeCurve][i]);

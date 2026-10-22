@@ -1,3 +1,4 @@
+import type { PadLayout } from './input/padMap';
 import { defaultLang, type Lang } from './i18n';
 export type QualityPreset = 'low' | 'medium' | 'high' | 'ultra';
 
@@ -101,7 +102,16 @@ export interface Settings {
    * steering speed (× the rate limit), speed sensitivity (0 = same speed at any speed … 1 = much calmer at speed),
    * brake curve exponent, rumble.
    */
-  pad: { deadzone: number; steerCurve: number; steerSpeed: number; speedSens: number; brakeCurve: number; vibration: boolean };
+  pad: {
+    deadzone: number;
+    steerCurve: number;
+    steerSpeed: number;
+    speedSens: number;
+    brakeCurve: number;
+    vibration: boolean;
+    /** Button layouts set up by the player, per controller (input/padMap.ts). */
+    layouts: Record<string, PadLayout>;
+  };
 }
 
 const KEY = 'apexghost.settings.v1';
@@ -125,7 +135,7 @@ export const DEFAULT_SETTINGS: Settings = {
   carSetup: { tyre: 'medium', wing: 'medium', brakeBias: 0.6 },
   ghost: true,
   bindings: DEFAULT_BINDINGS,
-  pad: { deadzone: 0.06, steerCurve: 1.7, steerSpeed: 1, speedSens: 0.5, brakeCurve: 1.4, vibration: true },
+  pad: { deadzone: 0.06, steerCurve: 1.7, steerSpeed: 1, speedSens: 0.5, brakeCurve: 1.4, vibration: true, layouts: {} },
 };
 
 function safeGet(key: string): string | null {
