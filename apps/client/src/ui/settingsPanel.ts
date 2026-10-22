@@ -1,4 +1,4 @@
-import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, saveSettings, settings, type ControlAction, type QualityPreset } from '../settings';
+import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, DEFAULT_SETTINGS, saveSettings, settings, type ControlAction, type QualityPreset } from '../settings';
 import { h } from './dom';
 import { LANGUAGES, setLang, t } from '../i18n';
 import { IS_APP } from '../mobile/platform';
@@ -336,6 +336,123 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   });
   controls.append(resetBtn);
 
+  const padRow = (btn: string, what: string) => h('div.pad-map-row', {}, h('b', { text: btn }), h('span', { text: what }));
+  const pad = h(
+    'section',
+    {},
+    h('h3', { text: t('Controller') }),
+    h('p.muted', {
+      text: t('Plug in or connect a gamepad (Xbox, PlayStation…) and press any button. Menus: D-pad or stick to move, A to select, B to go back.'),
+    }),
+    row(
+      t('Steering curve'),
+      range(
+        settings.pad.steerCurve,
+        1,
+        3,
+        0.1,
+        (v) => v.toFixed(1),
+        (v) => {
+          settings.pad.steerCurve = v;
+          changed();
+        },
+      ),
+      t('Higher = finer near the centre, same full lock'),
+    ),
+    row(
+      t('Steering speed'),
+      range(
+        settings.pad.steerSpeed,
+        0.5,
+        1.6,
+        0.05,
+        (v) => `${Math.round(v * 100)} %`,
+        (v) => {
+          settings.pad.steerSpeed = v;
+          changed();
+        },
+      ),
+      t('How fast the front wheels follow the stick'),
+    ),
+    row(
+      t('Speed sensitivity'),
+      range(
+        settings.pad.speedSens,
+        0,
+        1,
+        0.05,
+        (v) => `${Math.round(v * 100)} %`,
+        (v) => {
+          settings.pad.speedSens = v;
+          changed();
+        },
+      ),
+      t('Calmer steering at high speed'),
+    ),
+    row(
+      t('Stick dead zone'),
+      range(
+        settings.pad.deadzone,
+        0,
+        0.25,
+        0.01,
+        (v) => `${Math.round(v * 100)} %`,
+        (v) => {
+          settings.pad.deadzone = v;
+          changed();
+        },
+      ),
+      t('Raise it if the car drifts with the stick centred'),
+    ),
+    row(
+      t('Brake curve'),
+      range(
+        settings.pad.brakeCurve,
+        1,
+        2.5,
+        0.1,
+        (v) => v.toFixed(1),
+        (v) => {
+          settings.pad.brakeCurve = v;
+          changed();
+        },
+      ),
+      t('Higher = more trigger travel near the locking point'),
+    ),
+    row(
+      t('Vibration'),
+      toggle(settings.pad.vibration, (v) => {
+        settings.pad.vibration = v;
+        changed();
+      }),
+    ),
+    h(
+      'div.pad-map',
+      {},
+      padRow('RT / LT', t('Throttle / brake')),
+      padRow(t('Left stick'), t('Steer')),
+      padRow('A', t('Handbrake · skip intro')),
+      padRow('RB / B', t('Shift up')),
+      padRow('LB / X', t('Shift down')),
+      padRow('Y / R3', t('Look back')),
+      padRow(t('Right stick'), t('Look left / right')),
+      padRow(t('D-pad ↑ / ↓'), t('Reset to track / manual-automatic')),
+      padRow('View', t('Timing screen (hold)')),
+      padRow('Menu', t('Pause menu')),
+    ),
+    h('button.ghost', {
+      text: t('Reset controller settings'),
+      onclick: () => {
+        settings.pad = structuredClone(DEFAULT_SETTINGS.pad);
+        changed();
+        pad.querySelectorAll<HTMLInputElement>('input[type=range]').forEach((r, i) => {
+          r.value = String([settings.pad.steerCurve, settings.pad.steerSpeed, settings.pad.speedSens, settings.pad.deadzone, settings.pad.brakeCurve][i]);
+          r.dispatchEvent(new Event('input'));
+        });
+      },
+    }),
+  );
+
   const panel: HTMLElement = h(
     'div.modal',
     { onclick: (e: Event) => e.target === panel && onClose() },
@@ -343,7 +460,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       'div.modal-card.settings',
       {},
       h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { text: '✕', title: t('Close'), onclick: onClose })),
-      h('div.settings-grid', {}, graphics, assists, sound, IS_APP ? touchSettingsSection() : controls),
+      h('div.settings-grid', {}, graphics, assists, sound, IS_APP ? touchSettingsSection() : controls, pad),
     ),
   );
   return panel;

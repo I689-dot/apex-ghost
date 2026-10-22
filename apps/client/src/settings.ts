@@ -96,6 +96,12 @@ export interface Settings {
   /** Mixer levels 0..1 */
   audio: { master: number; engine: number; effects: number; ambience: number };
   bindings: KeyBindings;
+  /**
+   * Game controller: stick dead zone (0…0.25), steering curve exponent (1 = linear, higher = finer near centre),
+   * steering speed (× the rate limit), speed sensitivity (0 = same speed at any speed … 1 = much calmer at speed),
+   * brake curve exponent, rumble.
+   */
+  pad: { deadzone: number; steerCurve: number; steerSpeed: number; speedSens: number; brakeCurve: number; vibration: boolean };
 }
 
 const KEY = 'apexghost.settings.v1';
@@ -119,6 +125,7 @@ export const DEFAULT_SETTINGS: Settings = {
   carSetup: { tyre: 'medium', wing: 'medium', brakeBias: 0.6 },
   ghost: true,
   bindings: DEFAULT_BINDINGS,
+  pad: { deadzone: 0.06, steerCurve: 1.7, steerSpeed: 1, speedSens: 0.5, brakeCurve: 1.4, vibration: true },
 };
 
 function safeGet(key: string): string | null {
@@ -146,6 +153,7 @@ export function loadSettings(): Settings {
     merged.assists = { ...DEFAULT_SETTINGS.assists, ...(s.assists ?? {}) };
     merged.bindings = { ...DEFAULT_BINDINGS, ...(s.bindings ?? {}) };
     merged.audio = { ...DEFAULT_SETTINGS.audio, ...(s.audio ?? {}) };
+    merged.pad = { ...DEFAULT_SETTINGS.pad, ...(s.pad ?? {}) };
     merged.carSetup = { ...DEFAULT_SETTINGS.carSetup, ...(s.carSetup ?? {}) };
     return merged;
   } catch {

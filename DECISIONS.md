@@ -990,3 +990,17 @@ The app replaces the *Low* preset in place (`mobile/appShell.ts`) and starts on 
 - Some source cars have no separate steering-wheel mesh: 8 of 18 keep a static modelled wheel in the interior.
 - A start after 21:00 is a dusk/night race. Lighting was raised so the track stays readable, and headlights and track lamps help.
 - Bots run on the host's computer, so a slow host makes for slower bot updates for everyone (about 0.1 ms of CPU per bot per physics step).
+
+## Game controller support (website)
+
+- Gamepad API, "standard" mapping (Xbox, PlayStation, Switch Pro, most USB pads). It plugs into the existing
+  input path like the touch controls: analog values in `padInput`, buttons as synthetic key presses of the bound
+  keys, so rebinding the keys also moves the pad's buttons to the new keys.
+- Layout: RT/LT throttle/brake, left stick steer, A handbrake (and skip intro), RB/B shift up, LB/X shift down,
+  Y/R3 look back, right stick look left/right, D-pad ↑ reset / ↓ gearbox, View timing, Menu pause. While
+  spectating, LB/RB or ←/→ change car.
+- Menus are driven with the pad too: D-pad / stick moves the focus spatially, A presses, B = Esc, ←/→ change a
+  dropdown or slider.
+- Steering uses a separate analog profile in the physics-step filter (fast rate limit, slip-based limit, no double
+  curve, near-direct triggers). Research and numbers: docs/CONTROLLER_STEERING_RESEARCH.md. Tunable in
+  Settings → Controller (curve, steering speed, speed sensitivity, dead zone, brake curve, vibration).

@@ -2346,3 +2346,25 @@ button.pit-tyre.on {
     grid-column: 1;
   }
 }
+
+/* game controller: a clear focus ring while the menus are driven with the D-pad */
+.pad-nav :focus {
+  outline: 3px solid var(--accent) !important;
+  outline-offset: 2px;
+}
+.pad-map {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+}
+.pad-map-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.6rem;
+}
+.pad-map-row b {
+  font-family: var(--display);
+  letter-spacing: 0.05em;
+}

@@ -66,6 +66,7 @@ import { PerfOverlay } from './perf';
 import { TrackEditor } from './trackEditor';
 import { IS_DEV } from '../config';
 import { t } from '../i18n';
+import { rumble } from '../input/gamepad';
 
 const FIXED_DT = 1 / PHYSICS_HZ;
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
@@ -1169,6 +1170,7 @@ export class RaceSession {
       const res = this.damage.impact(impulse, -_v1.x, -_v1.z, this.vehicle.mass);
       if (res) {
         this.snd?.impact(Math.min(1, impulse / (this.vehicle.mass * 7)));
+        rumble(impulse / (this.vehicle.mass * 5));
         const local = _v2.set(-_v1.x, 0, -_v1.z).normalize();
         const p = boxPoint(local, this.vehicle.car, _v1);
         this.myVisual.dent(p, local.clone().negate(), res.amount * 2);

@@ -6,6 +6,7 @@ import { settings } from './settings';
 import { IS_APP, isMobileDevice } from './mobile/platform';
 import { installScreen } from './mobile/installScreen';
 import { initAppShell } from './mobile/appShell';
+import { initGamepad } from './input/gamepad';
 
 setLang(settings.language === 'es' ? 'es' : 'en');
 const root = document.getElementById('app') as HTMLElement;
@@ -17,6 +18,7 @@ if (!IS_APP && isMobileDevice()) {
   try {
     if (IS_APP) initAppShell();
     const app = new App(root);
+    initGamepad();
     app.showMenu();
     if (import.meta.env.DEV) (window as unknown as { __app?: App }).__app = app; // e2e tools
   } catch (e) {

@@ -66,6 +66,8 @@ export interface Controls {
   handbrake: number;
   /** Keyboard targets (0/±1): the vehicle filters them every physics step. Bots send analog values. */
   digital?: boolean;
+  /** Steering and pedals come from a game controller this frame (proportional): the filters use the PAD profile. */
+  analog?: boolean;
 }
 
 /**
@@ -74,6 +76,9 @@ export interface Controls {
  * (keyboardDriver.ts: rate limits, speed-sensitive steering, slip-based limit), so tilt is as safe at speed as the keys.
  */
 export const touchInput = { active: false, throttle: 0, brake: 0, steer: 0, handbrake: 0 };
+
+/** Game controller (src/input/gamepad.ts): analog triggers and stick, same meaning and filters as touchInput. */
+export const padInput = { active: false, throttle: 0, brake: 0, steer: 0, handbrake: 0 };
 
 /**
  * Reads the keys into digital targets. All smoothing happens inside the physics step
@@ -92,15 +97,18 @@ export class InputSmoother {
     const left = kb.held('steerLeft');
     const right = kb.held('steerRight');
     this.out.steer = left === right ? 0 : left ? 1 : -1;
-    if (touchInput.active) {
+    for (const src of [touchInput, padInput]) {
+      if (!src.active) continue;
       const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-      const thr = clamp01(touchInput.throttle);
-      const brk = clamp01(touchInput.brake);
+      const thr = clamp01(src.throttle);
+      const brk = clamp01(src.brake);
       this.out.throttle = Math.max(this.out.throttle, reverse ? brk : thr);
       this.out.brake = Math.max(this.out.brake, reverse ? thr : brk);
-      this.out.handbrake = Math.max(this.out.handbrake, clamp01(touchInput.handbrake));
-      if (this.out.steer === 0) this.out.steer = Math.min(1, Math.max(-1, touchInput.steer));
+      this.out.handbrake = Math.max(this.out.handbrake, clamp01(src.handbrake));
+      if (this.out.steer === 0) this.out.steer = Math.min(1, Math.max(-1, src.steer));
     }
+    // a key held for steering wins; otherwise a connected controller makes the filters proportional
+    this.out.analog = padInput.active && !left && !right && !(touchInput.active && touchInput.steer !== 0);
     return this.out;
   }
 

@@ -47,6 +47,36 @@ export const KB = {
   hbFadeMin: 0.25,
 };
 
+/**
+ * Game controller (analog stick and triggers) profile: see docs/CONTROLLER_STEERING_RESEARCH.md. The stick has
+ * already been dead-zoned and curved (src/input/gamepad.ts); here it gets the parts that need the car's motion:
+ *  - a steering-speed rate limit, much faster than the keys' (the thumb already moves progressively) and lower
+ *    at speed ("speed sensitivity", as in ACC / RaceRoom), plus a short low-pass against stick jitter;
+ *  - the same slip-based limit as the keys, so full stick = front tyres at their grip peak at any speed
+ *    (Forza "normal" / GT steering), widened when counter-steering so slides can be caught;
+ *  - only a mild extra curve at high speed (the user's curve is applied once, in gamepad.ts);
+ *  - near-direct pedals: triggers are proportional, so just a short ramp to hide sensor steps.
+ * `rateScale` and `speedSens` are the player's "steering speed" and "speed sensitivity" settings.
+ */
+export const PAD = {
+  steerOutRate: 7.5,
+  steerReturnRate: 9,
+  steerReverseRate: 11,
+  hsOutRate: 3.2,
+  hsReturnRate: 4.5,
+  hsReverseRate: 5.5,
+  steerTau: 0.03,
+  hsGamma: 1.25,
+  targetSlipFrac: 0.97,
+  hsTargetSlipFrac: 0.9,
+  thrUp: 14,
+  thrDown: 20,
+  brkUp: 16,
+  brkDown: 22,
+  rateScale: 1,
+  speedSens: 0.5,
+};
+
 export interface KeyTargets {
   /** 0 or 1 */
   throttle: number;
@@ -54,6 +84,8 @@ export interface KeyTargets {
   /** -1 (right), 0, +1 (left) */
   steer: number;
   handbrake: number;
+  /** Proportional input (game controller): uses the PAD profile. */
+  analog?: boolean;
 }
 
 export interface MotionState {
@@ -96,24 +128,35 @@ export class KeyboardDriver {
   step(dt: number, keys: KeyTargets, m: MotionState): void {
     /* ---- steering input shaping ---- */
     const target = keys.steer;
+    const pad = !!keys.analog;
     const hs = smoothstep(KB.hsV0, KB.hsV1, m.vx);
     let rate: number;
     const reversing = target !== 0 && this.uRamp !== 0 && Math.sign(target) !== Math.sign(this.uRamp);
-    if (target === 0) rate = lerp(KB.steerReturnRate, KB.hsReturnRate, hs);
+    if (pad) {
+      // analog: the stick moves back and forth through any value, so "returning" = moving towards centre
+      const ret = Math.abs(target) < Math.abs(this.uRamp) && !reversing;
+      const hsP = hs * PAD.speedSens * 2; // 0.5 = the default fall-off; 0 = none; 1 = twice as strong
+      const k = Math.min(1, hsP);
+      if (reversing) rate = lerp(PAD.steerReverseRate, PAD.hsReverseRate, k);
+      else if (ret) rate = lerp(PAD.steerReturnRate, PAD.hsReturnRate, k);
+      else rate = lerp(PAD.steerOutRate, PAD.hsOutRate, k);
+      rate *= PAD.rateScale;
+    } else if (target === 0) rate = lerp(KB.steerReturnRate, KB.hsReturnRate, hs);
     else if (reversing) rate = lerp(KB.steerReverseRate, KB.hsReverseRate, hs);
     else rate = lerp(KB.steerOutRate, KB.hsOutRate, hs);
     const before = this.uRamp;
     this.uRamp = moveTowards(this.uRamp, target, rate * dt);
     // the fast reverse rate only applies until the wheel is back at centre
     if (reversing && Math.sign(this.uRamp) !== Math.sign(before) && this.uRamp !== 0) this.uRamp = 0;
-    this.uFilt += (this.uRamp - this.uFilt) * (1 - Math.exp(-dt / KB.steerTau));
-    const uShaped = Math.sign(this.uFilt) * Math.pow(Math.abs(this.uFilt), lerp(KB.steerGamma, KB.hsGamma, hs));
+    this.uFilt += (this.uRamp - this.uFilt) * (1 - Math.exp(-dt / (pad ? PAD.steerTau : KB.steerTau)));
+    const gamma = pad ? lerp(1, PAD.hsGamma, hs) : lerp(KB.steerGamma, KB.hsGamma, hs);
+    const uShaped = Math.sign(this.uFilt) * Math.pow(Math.abs(this.uFilt), gamma);
 
     /* ---- dynamic, slip-based steering limit ---- */
     const vxa = Math.max(Math.abs(m.vx), 0.5);
     const betaF = Math.atan2(m.vy + m.a * m.r, vxa); // front-axle velocity angle (+ = left)
     const betaR = Math.atan2(m.vy - m.b * m.r, vxa); // rear-axle velocity angle
-    const alphaT = lerp(KB.targetSlipFrac, KB.hsTargetSlipFrac, hs) * m.alphaPeak;
+    const alphaT = (pad ? lerp(PAD.targetSlipFrac, PAD.hsTargetSlipFrac, hs) : lerp(KB.targetSlipFrac, KB.hsTargetSlipFrac, hs)) * m.alphaPeak;
     const s = Math.sign(uShaped) || 1;
     const limInward = alphaT + Math.max(s * betaF, -KB.maxLimitReductionFrac * alphaT);
     // counter-steering = steering towards the rear's sliding direction
@@ -131,8 +174,9 @@ export class KeyboardDriver {
     this.steerAngle = clamp(uShaped * effLimit + self * (1 - Math.abs(this.uFilt)), -m.maxLockRad, m.maxLockRad);
 
     /* ---- pedals ---- */
-    this.throttle = moveTowards(this.throttle, keys.throttle, (keys.throttle > this.throttle ? KB.thrUp : KB.thrDown) * dt);
-    this.brake = moveTowards(this.brake, keys.brake, (keys.brake > this.brake ? KB.brkUp : KB.brkDown) * dt);
+    const P = pad ? PAD : KB;
+    this.throttle = moveTowards(this.throttle, keys.throttle, (keys.throttle > this.throttle ? P.thrUp : P.thrDown) * dt);
+    this.brake = moveTowards(this.brake, keys.brake, (keys.brake > this.brake ? P.brkUp : P.brkDown) * dt);
     this.handbrake = moveTowards(this.handbrake, keys.handbrake, (keys.handbrake > this.handbrake ? KB.hbUp : KB.hbDown) * dt);
   }
 
