@@ -21,6 +21,7 @@ import {
   packQuat,
   parseClientMsg,
   planWeather,
+  temperatures,
   sanitizeNickname,
   unpackQuat,
   validateClientPacket,
@@ -488,5 +489,41 @@ describe('race logic (server-authoritative laps)', () => {
     const far = ovalPos(R, 900);
     const ev = tr.ingest('r', t + 300, far[0], far[1], far[2], true);
     expect(ev.some((e) => e.type === 'rejected' && e.reason === 'reset-far-from-checkpoint')).toBe(true);
+  });
+});
+
+describe('temperature', () => {
+  const plan = (o: Partial<ReturnType<typeof planWeather>> = {}) => ({ ...planWeather(42, { weather: 'clear' }), ...o });
+  const state = (hour: number, clouds = 0, rain = 0, wetness = 0) => ({ hour, clouds, rain, fog: 0, wetness, grip: 1, visibility: 10000 });
+
+  it('is deterministic and stays within the circuit climate (± the day anomaly)', () => {
+    for (let s = 1; s < 60; s++) {
+      const p = planWeather(s * 104729);
+      const w = weatherAt(p, 0);
+      expect(temperatures(p, w, 'nurburgring')).toEqual(temperatures(p, w, 'nurburgring'));
+      const t = temperatures(p, w, 'nurburgring');
+      expect(t.airC).toBeGreaterThan(7 - 3.5 - 3);
+      expect(t.airC).toBeLessThan(22 + 3.5);
+      expect(t.trackC).toBeGreaterThanOrEqual(t.airC - 0.01);
+    }
+  });
+
+  it('heats a dry track in the sun, not a wet one, and cools at night', () => {
+    const p = plan({ dayOfYear: 190 });
+    const sunny = temperatures(p, state(14), 'nurburgring');
+    const wet = temperatures(p, state(14, 1, 1, 1), 'nurburgring');
+    const night = temperatures(p, state(4), 'nurburgring');
+    expect(sunny.trackC - sunny.airC).toBeGreaterThan(12);
+    expect(wet.trackC - wet.airC).toBeLessThan(1);
+    expect(night.airC).toBeLessThan(sunny.airC - 6);
+  });
+
+  it('has thinner air at the Nürburgring than at Zandvoort on the North Sea', () => {
+    const p = plan();
+    const ring = temperatures(p, state(14), 'nurburgring');
+    const zv = temperatures(p, state(14), 'zandvoort');
+    expect(ring.airDensity).toBeLessThan(zv.airDensity * 0.95);
+    expect(zv.airDensity).toBeGreaterThan(1.15);
+    expect(zv.airDensity).toBeLessThan(1.25);
   });
 });

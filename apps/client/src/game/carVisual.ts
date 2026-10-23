@@ -97,30 +97,56 @@ export class CarVisual {
       this.object.add(this.lod);
     }
     const matCache = new Map<THREE.Material, THREE.Material>();
+    const first = local ? 0 : model.firstLevel;
     levels.forEach((src, i) => {
       const root = src.clone(true);
       this.prepareMaterials(root, matCache);
       const rig = this.rig(root);
       this.levels.push(rig);
-      if (this.lod) this.lod.addLevel(root, LOD_DIST[i] ?? 200, 0.02);
+      if (this.lod) this.lod.addLevel(root, LOD_DIST[first + i] ?? 200, 0.02);
       else this.object.add(root);
-      if (i === 0) {
-        const body = root.getObjectByName('body');
-        body?.traverse((o) => {
-          if ((o as THREE.Mesh).isMesh) this.bodyMeshes.push(o as THREE.Mesh);
-        });
-      }
+      if (i === 0) this.setBody(root);
     });
-    this.object.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.castShadow = true;
-        m.receiveShadow = local;
-      }
-    });
+    this.object.traverse((o) => this.setShadows(o));
     this.staticComp = [0, 0, 0, 0];
     // remote cars always, and your own car when real spot lights are too expensive, get a projected light pool
     this.makeLightPool();
+  }
+
+  /** Dents go on the most detailed level. */
+  private setBody(root: THREE.Object3D): void {
+    this.bodyMeshes = [];
+    root.getObjectByName('body')?.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) this.bodyMeshes.push(o as THREE.Mesh);
+    });
+  }
+
+  private setShadows(o: THREE.Object3D): void {
+    const m = o as THREE.Mesh;
+    if (m.isMesh) {
+      m.castShadow = true;
+      m.receiveShadow = this.local;
+    }
+  }
+
+  /**
+   * A remote car loaded with its light levels only gets its full-detail level (LOD0, shown within LOD_DIST[1])
+   * once it has arrived: other cars' LOD0s are a third of a session's download. `warm` uploads its textures and
+   * compiles its shaders before it is shown. False when the car already has it.
+   */
+  async addDetailLevel(src: THREE.Group, warm: (level: THREE.Object3D) => Promise<void>): Promise<boolean> {
+    const lod = this.lod;
+    if (!lod || lod.levels[0]?.distance === 0) return false;
+    const root = src.clone(true);
+    this.prepareMaterials(root, new Map());
+    const rig = this.rig(root);
+    root.traverse((o) => this.setShadows(o));
+    for (const m of this.fadeMats) m.opacity = this.opacity * ((m as THREE.MeshStandardMaterial).transparent ? 0.5 : 1);
+    await warm(root);
+    this.levels.push(rig);
+    lod.addLevel(root, 0, 0.02);
+    this.setBody(root);
+    return true;
   }
 
   private prepareMaterials(root: THREE.Object3D, cache: Map<THREE.Material, THREE.Material>): void {

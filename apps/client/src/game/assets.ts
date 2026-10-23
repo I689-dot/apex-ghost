@@ -22,27 +22,69 @@ export function url(p: string): string {
   return `${ASSET_BASE}${p}`;
 }
 
-/** fetch with byte progress (used for the loading bar). */
+/** Attempts per file, and the wait before each retry (ms). */
+const FETCH_TRIES = 4;
+const RETRY_WAIT = [600, 1800, 4000];
+
+/**
+ * fetch with byte progress (used for the loading bar). A session downloads 50–75 MB in dozens of files (more
+ * cars, more files), so a dropped connection or a server hiccup on one of them is retried instead of failing
+ * the whole load; a missing file (4xx) fails at once.
+ */
 export async function fetchWithProgress(path: string, onBytes: (n: number) => void): Promise<ArrayBuffer> {
-  const res = await assetFetch(url(path));
-  if (!res.ok || !res.body) throw new Error(`Failed to load ${path} (${res.status})`);
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    size += value.byteLength;
-    onBytes(value.byteLength);
+  for (let attempt = 1; ; attempt++) {
+    let size = 0;
+    try {
+      const res = await assetFetch(url(path));
+      if (!res.ok || !res.body) {
+        const err = new Error(`Failed to load ${path} (${res.status})`);
+        if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) (err as { fatal?: boolean }).fatal = true;
+        throw err;
+      }
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        size += value.byteLength;
+        onBytes(value.byteLength);
+      }
+      const out = new Uint8Array(size);
+      let o = 0;
+      for (const c of chunks) {
+        out.set(c, o);
+        o += c.byteLength;
+      }
+      return out.buffer;
+    } catch (e) {
+      onBytes(-size); // the progress bar counts this file again on the next attempt
+      if ((e as { fatal?: boolean }).fatal || attempt >= FETCH_TRIES) throw e;
+      console.warn(`[assets] ${path}: ${(e as Error).message}, retrying (${attempt}/${FETCH_TRIES - 1})`);
+      await new Promise((r) => setTimeout(r, RETRY_WAIT[attempt - 1] ?? 4000));
+    }
   }
-  const out = new Uint8Array(size);
-  let o = 0;
-  for (const c of chunks) {
-    out.set(c, o);
-    o += c.byteLength;
+}
+
+/** A JSON asset, retried like the rest. */
+async function fetchJson<T>(path: string, failMessage: string): Promise<T> {
+  try {
+    return JSON.parse(new TextDecoder().decode(await fetchWithProgress(path, () => {}))) as T;
+  } catch (e) {
+    console.warn(`[assets] ${path}:`, e);
+    throw new Error(failMessage);
   }
-  return out.buffer;
+}
+
+/** Remember a load, but forget it when it fails, so the next session tries again instead of failing at once. */
+function cached<K, V>(map: Map<K, Promise<V>>, key: K, make: () => Promise<V>): Promise<V> {
+  let p = map.get(key);
+  if (!p) {
+    p = make();
+    map.set(key, p);
+    p.catch(() => map.get(key) === p && map.delete(key));
+  }
+  return p;
 }
 
 export async function parseGltf(buf: ArrayBuffer): Promise<GLTF> {
@@ -50,19 +92,15 @@ export async function parseGltf(buf: ArrayBuffer): Promise<GLTF> {
   return loader.parseAsync(buf, '');
 }
 
-let carsCache: Promise<CarsFile> | null = null;
+const carsCache = new Map<string, Promise<CarsFile>>();
 export function loadCarsFile(): Promise<CarsFile> {
-  carsCache ??= assetFetch(url('assets/cars.json'))
-    .then((r) => {
-      if (!r.ok) throw new Error('Could not load the car list (assets/cars.json). Did you run `pnpm assets`?');
-      return r.json() as Promise<CarsFile>;
-    })
-    .then((f) => {
+  return cached(carsCache, 'cars', () =>
+    fetchJson<CarsFile>('assets/cars.json', 'Could not load the car list (assets/cars.json). Did you run `pnpm assets`?').then((f) => {
       // thumbnails are page-relative paths: point them at the asset host when it is elsewhere (mobile app)
       if (ASSET_BASE !== import.meta.env.BASE_URL) for (const c of f.cars) if (c.thumbnail && !/^[a-z]+:/i.test(c.thumbnail)) c.thumbnail = url(c.thumbnail);
       return f;
-    });
-  return carsCache;
+    }),
+  );
 }
 
 export interface TrackIndexEntry {
@@ -76,33 +114,29 @@ export interface TrackIndexEntry {
   map?: string;
 }
 
-let indexCache: Promise<TrackIndexEntry[]> | null = null;
-/** The layouts the host can choose (assets/tracks.json). */
+const indexCache = new Map<string, Promise<TrackIndexEntry[]>>();
+/** The layouts the host can choose (assets/tracks.json); empty while it can't be loaded (asked again next time). */
 export function loadTrackIndex(): Promise<TrackIndexEntry[]> {
-  indexCache ??= assetFetch(url('assets/tracks.json'))
-    .then((r) => (r.ok ? (r.json() as Promise<{ tracks: TrackIndexEntry[] }>) : { tracks: [] }))
-    .then((j) => j.tracks)
-    .catch(() => []);
-  return indexCache;
+  return cached(indexCache, 'index', () =>
+    fetchJson<{ tracks: TrackIndexEntry[] }>('assets/tracks.json', 'Could not load the track list.').then((j) => j.tracks),
+  ).catch(() => []);
 }
 
 const trackFiles = new Map<string, Promise<TrackData>>();
 /** A layout by id (the default GP when the id is unknown). */
 export async function loadTrackFile(trackId?: string): Promise<TrackData> {
   const index = await loadTrackIndex();
+  // without the list a chosen layout can't be found: never fall back to another circuit than the session's
+  if (trackId && !index.length) throw new Error('Could not load the track list.');
   const entry = index.find((t) => t.id === trackId) ?? index.find((t) => t.default);
   const file = entry?.file ?? 'assets/track.json';
-  let p = trackFiles.get(file);
-  if (!p) {
-    p = assetFetch(url(file))
-      .then((r) => {
-        if (!r.ok) throw new Error(`Could not load the track (${file}).`);
-        return r.json() as Promise<TrackData>;
-      })
-      .then((d) => ({ ...d, turns: d.turns ?? entry?.turns ?? null }));
-    trackFiles.set(file, p);
-  }
-  return p;
+  return cached(trackFiles, file, () =>
+    fetchJson<TrackData>(file, `Could not load the track (${file}).`).then((d) => ({
+      ...d,
+      turns: d.turns ?? entry?.turns ?? null,
+      map: entry?.map ?? 'nurburgring',
+    })),
+  );
 }
 
 /* ------------------------------------------------------------- cars --- */
@@ -110,28 +144,28 @@ export async function loadTrackFile(trackId?: string): Promise<TrackData> {
 export interface CarModel {
   entry: CarEntry;
   lods: THREE.Group[];
+  /** LOD index of lods[0] (1: the light levels only, LOD0 added later). */
+  firstLevel: number;
 }
 
 const carModels = new Map<string, Promise<CarModel>>();
 
-/** Loads all LODs of a car once; instances are cloned from these. */
-/** `cockpit`: your own car with its high-detail interior model in place of LOD0 (when the car has one). */
-export function loadCarModel(entry: CarEntry, onBytes: (n: number) => void = () => {}, lodsWanted = 3, cockpit = false): Promise<CarModel> {
+/**
+ * Loads LODs `firstLevel` … `lodsWanted - 1` of a car once; instances are cloned from these.
+ * `cockpit`: your own car with its high-detail interior model in place of LOD0 (when the car has one).
+ */
+export function loadCarModel(entry: CarEntry, onBytes: (n: number) => void = () => {}, lodsWanted = 3, cockpit = false, firstLevel = 0): Promise<CarModel> {
   const files = cockpit && entry.cockpit ? [entry.cockpit, ...entry.lods.slice(1)] : entry.lods;
-  const key = `${entry.id}:${lodsWanted}:${cockpit && !!entry.cockpit}`;
-  let p = carModels.get(key);
-  if (!p) {
-    p = (async () => {
-      const lods: THREE.Group[] = [];
-      for (const f of files.slice(0, lodsWanted)) {
-        const g = await parseGltf(await fetchWithProgress(f, onBytes));
-        lods.push(g.scene);
-      }
-      return { entry, lods };
-    })();
-    carModels.set(key, p);
-  }
-  return p;
+  const first = Math.min(firstLevel, files.length - 1);
+  const key = `${entry.id}:${first}-${lodsWanted}:${cockpit && !!entry.cockpit}`;
+  return cached(carModels, key, async () => {
+    const lods: THREE.Group[] = [];
+    for (const f of files.slice(first, lodsWanted)) {
+      const g = await parseGltf(await fetchWithProgress(f, onBytes));
+      lods.push(g.scene);
+    }
+    return { entry, lods, firstLevel: first };
+  });
 }
 
 /* -------------------------------------------------------- collision --- */
@@ -143,7 +177,13 @@ export interface CollisionMesh {
 }
 
 export async function loadCollision(track: TrackData, onBytes: (n: number) => void): Promise<CollisionMesh[]> {
-  const raw = await fetchWithProgress(track.collision.file, onBytes);
+  const files = [track.collision.file, ...(track.collision.extra ?? [])];
+  const all = await Promise.all(files.map((f) => loadCollisionFile(f, track, onBytes)));
+  return all.flat();
+}
+
+async function loadCollisionFile(file: string, track: TrackData, onBytes: (n: number) => void): Promise<CollisionMesh[]> {
+  const raw = await fetchWithProgress(file, onBytes);
   const head = new Uint8Array(raw, 0, 2);
   // gzip magic → inflate here; otherwise the host already decoded it (Content-Encoding)
   const buf =

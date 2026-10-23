@@ -10,6 +10,10 @@
   },
   "fixPitEntry": false,
   "fillGrass": "grass_zv97",
+  "roadCollisionFromRender": {
+    "_why": "the road collision is rebuilt from the render chunks (road_collision.mjs): the raw collision has one mesh per surface, so layers stacked 1.5-3 cm apart could not be told apart (DECISIONS.md, 'Zandvoort ground')",
+    "overlay": "^(lines|asph_zv60|asph_zv61)"
+  },
   "analysis": {
     "id": "zandvoort",
     "name": "Circuit Zandvoort",
@@ -112,7 +116,7 @@
         [590, -7.5],
         [612, -5]
       ],
-      "box": [140, 240],
+      "box": [75, 230],
       "speedLimitKmh": 60
     },
     "layouts": []

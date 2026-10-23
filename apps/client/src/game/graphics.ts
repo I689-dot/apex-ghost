@@ -129,7 +129,10 @@ export class Graphics {
     composer.addPass(this.renderPass);
     composer.addPass(new ShaderPass(HdrClampShader));
     if (q.bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.28, 0.45, 0.92);
+      // the threshold is in linear HDR (before tone mapping): a clear sky is 1.5–3 there, so 0.92 bloomed the whole
+      // sky into a milky veil over the frame (brightness 205 vs 164 on Medium, half the contrast); only the sun,
+      // headlights and floodlights pass 4
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.45, 4);
       composer.addPass(this.bloom);
     } else this.bloom = null;
     // N8AO renders without hardware MSAA: smooth the edges with SMAA (its docs recommend it)

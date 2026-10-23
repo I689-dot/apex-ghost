@@ -225,11 +225,19 @@ export interface QualityConfig {
   sceneryDistance: number;
   /** Small trackside detail (posts, fences, signs) is hidden beyond this distance. */
   detailDistance: number;
+  /** Guard rails, tyre walls and the pit wall are hidden beyond this distance (sub-pixel there). */
+  barrierDistance: number;
   rainParticles: number;
   /** Real spot lights for your own headlights (costly on integrated GPUs: every lit pixel evaluates them). */
   ownHeadlightSpots: boolean;
   /** Your car uses its high-detail cockpit model (full interior detail, sharper textures). */
   cockpitDetail: boolean;
+  /** Other cars get their full-detail model up close, streamed in after loading (a third of a session's download). */
+  remoteDetail: boolean;
+  /** Spectators on the grandstands: share of the seats taken (0 = none). */
+  crowd: number;
+  /** 3D grass tufts beside the track within this many metres of the camera (0 = off). */
+  grassRadius: number;
   /** Screen-space ambient occlusion (N8AO): soft contact shadows in the cockpit and around cars. */
   ao: boolean;
   ownHeadlightShadows: boolean;
@@ -238,6 +246,12 @@ export interface QualityConfig {
   softShadows: boolean;
   anisotropy: number;
   envMapSize: number;
+  /** Procedural Eifel forest (forest.ts): 3D trees up to forestNear m, impostor cards up to forestFar m. */
+  forestNear: number;
+  forestFar: number;
+  /** Share of the scattered trees drawn as 3D trees / as far cards (0..1). */
+  forestNearDensity: number;
+  forestDensity: number;
 }
 
 export const QUALITY: Record<QualityPreset, QualityConfig> = {
@@ -254,15 +268,23 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     treeDistance: 180,
     sceneryDistance: 380,
     detailDistance: 140,
+    barrierDistance: 900,
     rainParticles: 3000,
     ao: false,
     cockpitDetail: false,
+    remoteDetail: false,
+    crowd: 0.5,
+    grassRadius: 0,
     ownHeadlightSpots: false,
     ownHeadlightShadows: false,
     treeShadows: false,
     softShadows: false,
     anisotropy: 1,
     envMapSize: 64,
+    forestNear: 0,
+    forestFar: 700,
+    forestNearDensity: 0.0,
+    forestDensity: 0.45,
   },
   medium: {
     shadowMapSize: 2048,
@@ -277,15 +299,23 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     treeDistance: 380,
     sceneryDistance: 800,
     detailDistance: 280,
+    barrierDistance: 1500,
     rainParticles: 6000,
     ao: false,
     cockpitDetail: true,
+    remoteDetail: true,
+    crowd: 1,
+    grassRadius: 26,
     ownHeadlightSpots: false,
     ownHeadlightShadows: false,
     treeShadows: false,
     softShadows: false,
     anisotropy: 4,
     envMapSize: 128,
+    forestNear: 110,
+    forestFar: 1100,
+    forestNearDensity: 0.8,
+    forestDensity: 0.6,
   },
   high: {
     shadowMapSize: 2048,
@@ -300,15 +330,23 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     treeDistance: 700,
     sceneryDistance: 1500,
     detailDistance: 450,
+    barrierDistance: 2200,
     rainParticles: 10000,
     ao: true,
     cockpitDetail: true,
+    remoteDetail: true,
+    crowd: 1,
+    grassRadius: 38,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
     softShadows: true,
     anisotropy: 8,
     envMapSize: 256,
+    forestNear: 170,
+    forestFar: 1400,
+    forestNearDensity: 1,
+    forestDensity: 0.7,
   },
   ultra: {
     shadowMapSize: 4096,
@@ -323,15 +361,23 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     treeDistance: 1200,
     sceneryDistance: 3000,
     detailDistance: 800,
+    barrierDistance: 3500,
     rainParticles: 14000,
     ao: true,
     cockpitDetail: true,
+    remoteDetail: true,
+    crowd: 1,
+    grassRadius: 50,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
     softShadows: true,
     anisotropy: 16,
     envMapSize: 256,
+    forestNear: 240,
+    forestFar: 2200,
+    forestNearDensity: 1,
+    forestDensity: 0.9,
   },
 };
 

@@ -54,7 +54,7 @@ export interface TrackData extends TrackRaceData {
   /** Render chunks to load. */
   chunks: { file: string; node: string; center: Vec3; radius: number; kind: 'track' | 'scenery' | 'trees' | 'terrain' }[];
   /** Collision mesh file and the surface type of each sub-mesh in it. */
-  collision: { file: string; surfaces: Surface[] };
+  collision: { file: string; surfaces: Surface[]; /** more collision files (a base map's), same surface list */ extra?: string[] };
   /** Static light sources found in the map. */
   lights: { p: Vec3; color: [number, number, number] }[];
   bounds: { min: Vec3; max: Vec3 };
@@ -64,6 +64,10 @@ export interface TrackData extends TrackRaceData {
   pitLane: PitLane | null;
   /** Number of corners (from the track index, for the TV intro); null/absent = not stated. */
   turns?: number | null;
+  /** Map the layout belongs to (from the track index): its climate and altitude (shared weather code). */
+  map?: string;
+  /** Procedural forest instances (tools/asset-pipeline/forest_scatter.mjs); absent = no forest. */
+  forest?: { file: string; meta: string };
 }
 
 export interface PitLane {

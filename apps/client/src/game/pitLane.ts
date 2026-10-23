@@ -1,8 +1,11 @@
 import * as THREE from 'three';
-import type { PitLane, TrackData } from '@apex/shared';
+import { MAX_PLAYERS, type PitLane, type TrackData } from '@apex/shared';
 import { t } from '../i18n';
 
 export type PitEvent = 'enter' | 'exit' | 'box' | null;
+
+/** Length of a garage's box along the lane (m). */
+const BOX_M = 12.5;
 
 /**
  * Where the car is relative to the pit lane (from track.json, traced from the map: entry on the inside of the
@@ -80,22 +83,46 @@ export class PitLaneMonitor {
     return this.lane.speedLimitKmh / 3.6;
   }
 
-  /** The service zone painted on the lane: a yellow box outline with a few lines, and a board above it. */
-  buildMarkings(ground: (x: number, z: number, y: number) => number): THREE.Object3D {
+  /** Boxes along the garage row (one per garage, ~12.5 m) as [first, last] lane points. */
+  boxes(): [number, number][] {
+    const { boxFrom: f, boxTo: to, points } = this.lane;
+    const step = Math.hypot(points[f + 1][0] - points[f][0], points[f + 1][2] - points[f][2]) || 2.5;
+    const per = Math.max(3, Math.round(BOX_M / step));
+    const out: [number, number][] = [];
+    for (let i = f; i + per - 1 <= to; i += per) out.push([i, i + per - 1]);
+    return out;
+  }
+
+  /** The box of a grid slot: drivers spread evenly along the row, as teams have garages along a real pit lane. */
+  boxOf(slot: number): number {
+    const n = this.boxes().length;
+    return Math.min(n - 1, Math.max(0, Math.floor(((slot + 0.5) * n) / MAX_PLAYERS)));
+  }
+
+  /**
+   * The pit boxes painted along the whole garage row: a white outline in front of every garage, the driver's own
+   * box in yellow with their name on a board above it, and a PIT SERVICE board where the row starts. Service works
+   * in any box (the whole row counts); the own box is where the crew waits.
+   */
+  buildMarkings(ground: (x: number, z: number, y: number) => number, mine: { slot: number; name: string } | null): THREE.Object3D {
     const g = new THREE.Group();
     g.name = 'pit-markings';
     const pts = this.lane.points;
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffd60a,
-      transparent: true,
-      opacity: 0.85,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-    });
+    const paint = (color: number, opacity: number) =>
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      });
+    const white = paint(0xf2f2f2, 0.8);
+    const yellow = paint(0xffd60a, 0.9);
+    const fill = paint(0xffd60a, 0.22);
     const half = 3;
-    const strip = (from: number, to: number, offset: number, width: number) => {
+    const strip = (from: number, to: number, offset: number, width: number, mat: THREE.Material) => {
       const pos: number[] = [];
       for (let i = from; i <= to; i++) {
         const a = pts[Math.max(0, i - 1)];
@@ -118,36 +145,44 @@ export class PitLaneMonitor {
       m.renderOrder = 2;
       g.add(m);
     };
-    const { boxFrom: f, boxTo: to } = this.lane;
-    strip(f, to, half, 0.25);
-    strip(f, to, -half, 0.25);
-    strip(f, f + 1, 0, half * 2);
-    strip(to - 1, to, 0, half * 2);
-    // chevrons every 20 m inside the box
-    for (let i = f + 6; i < to - 4; i += 8) strip(i, i + 1, 0, half * 1.6);
-    // board over the middle of the service zone
-    const c = document.createElement('canvas');
-    c.width = 512;
-    c.height = 128;
-    const cx = c.getContext('2d') as CanvasRenderingContext2D;
-    cx.fillStyle = '#111';
-    cx.fillRect(0, 0, 512, 128);
-    cx.fillStyle = '#ffd60a';
-    cx.font = 'bold 64px sans-serif';
-    cx.textAlign = 'center';
-    cx.fillText(t('PIT SERVICE'), 256, 66);
-    cx.font = 'bold 30px sans-serif';
-    cx.fillStyle = '#fff';
-    cx.fillText(t('STOP HERE · TYRES · REPAIRS'), 256, 108);
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mid = pts[Math.round((f + to) / 2)];
-    const board = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
-    const a = pts[Math.round((f + to) / 2) - 2];
-    const b = pts[Math.round((f + to) / 2) + 2];
-    board.position.set(mid[0], ground(mid[0], mid[2], mid[1]) + 5.2, mid[2]);
-    board.rotation.y = Math.atan2(b[0] - a[0], b[2] - a[2]) + Math.PI; // facing the cars coming down the lane
-    g.add(board);
+    const boxes = this.boxes();
+    const own = mine ? this.boxOf(mine.slot) : -1;
+    boxes.forEach(([a, b], k) => {
+      const mat = k === own ? yellow : white;
+      // a gap of a point between neighbouring boxes; front and back lines across, sides along the lane
+      strip(a, b - 1, half, 0.18, mat);
+      strip(a, b - 1, -half, 0.18, mat);
+      strip(a, a + 1, 0, half * 2, mat);
+      strip(b - 2, b - 1, 0, half * 2, mat);
+      if (k === own) strip(a + 1, b - 2, 0, half * 2 - 0.4, fill);
+    });
+    // where the row starts: what it is; over the own box: whose it is
+    const board = (at: number, title: string, sub: string, colour: string) => {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 128;
+      const cx = c.getContext('2d') as CanvasRenderingContext2D;
+      cx.fillStyle = '#111';
+      cx.fillRect(0, 0, 512, 128);
+      cx.fillStyle = colour;
+      cx.font = 'bold 60px sans-serif';
+      cx.textAlign = 'center';
+      cx.fillText(title, 256, 64, 490);
+      cx.font = 'bold 28px sans-serif';
+      cx.fillStyle = '#fff';
+      cx.fillText(sub, 256, 108, 490);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const p = pts[at];
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+      const a = pts[Math.max(0, at - 2)];
+      const b = pts[Math.min(pts.length - 1, at + 2)];
+      m.position.set(p[0], ground(p[0], p[2], p[1]) + 5.2, p[2]);
+      m.rotation.y = Math.atan2(b[0] - a[0], b[2] - a[2]) + Math.PI; // facing the cars coming down the lane
+      g.add(m);
+    };
+    if (boxes.length) board(boxes[0][0], t('PIT SERVICE'), t('STOP IN ANY BOX · TYRES · REPAIRS'), '#ffd60a');
+    if (own >= 0 && mine) board(Math.round((boxes[own][0] + boxes[own][1]) / 2), mine.name.toUpperCase(), t('YOUR BOX'), '#ffd60a');
     return g;
   }
 }

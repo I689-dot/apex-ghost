@@ -4,6 +4,7 @@ import { nearestCenterlineIndex, progressAt, type Surface, type TrackData } from
 import { fetchWithProgress, loadCollision, parseGltf, type CollisionMesh } from './assets';
 import { RAY_GROUPS, TRACK_GROUPS, type GroundHit, type GroundQuery } from '../physics/vehicle';
 import type { QualityConfig } from '../settings';
+import type { Forest } from './forest';
 
 type R = typeof RAPIER;
 
@@ -69,13 +70,112 @@ function pavedDetail(): THREE.DataTexture {
 }
 
 /**
+ * Mown grass seen from the cockpit: the source grass texture is a 256 px tile that turns to green mush within a few
+ * metres. A procedural detail tile (~0.9 m) adds blades and clover-like clumps: short random strokes over a soft
+ * noise, modulating the colour by ±20 %.
+ */
+/**
+ * Gravel traps and sand: the source textures are flat tan tiles. A pebble tile (~0.3 m) of rounded stones with a
+ * light top and a dark gap around each, so the trap reads as loose stones from the cockpit.
+ */
+let gravelTex: THREE.DataTexture | null = null;
+function gravelDetail(): THREE.DataTexture {
+  if (gravelTex) return gravelTex;
+  const N = 256;
+  const v = new Float32Array(N * N).fill(0.36);
+  let seed = 8675309;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (let k = 0; k < 1400; k++) {
+    const cx = rnd() * N;
+    const cy = rnd() * N;
+    const rad = 2.5 + rnd() * 6;
+    const tone = 0.45 + rnd() * 0.4;
+    for (let y = Math.floor(cy - rad - 1); y <= cy + rad + 1; y++)
+      for (let x = Math.floor(cx - rad - 1); x <= cx + rad + 1; x++) {
+        const dd = Math.hypot(x - cx, (y - cy) * 1.25) / rad;
+        const i = ((y + N) % N) * N + ((x + N) % N);
+        // lit from above: brighter towards the top of each stone, a dark rim where it meets the next
+        if (dd < 1) v[i] = Math.max(v[i], tone + 0.18 * (1 - dd) - 0.12 * ((y - cy) / rad));
+        else if (dd < 1.25) v[i] = Math.min(v[i], 0.22);
+      }
+  }
+  const d = new Uint8Array(N * N * 4);
+  for (let i = 0; i < N * N; i++) {
+    const c = Math.max(0, Math.min(255, Math.round(v[i] * 255)));
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = c;
+    d[i * 4 + 3] = 255;
+  }
+  gravelTex = new THREE.DataTexture(d, N, N);
+  gravelTex.wrapS = gravelTex.wrapT = THREE.RepeatWrapping;
+  gravelTex.magFilter = THREE.LinearFilter;
+  gravelTex.minFilter = THREE.LinearMipmapLinearFilter;
+  gravelTex.generateMipmaps = true;
+  gravelTex.anisotropy = 8;
+  gravelTex.needsUpdate = true;
+  return gravelTex;
+}
+
+let grassTex: THREE.DataTexture | null = null;
+function grassDetail(): THREE.DataTexture {
+  if (grassTex) return grassTex;
+  const N = 256;
+  const v = new Float32Array(N * N).fill(0.5);
+  let seed = 7654321;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  // clumps
+  for (let k = 0; k < 140; k++) {
+    const cx = rnd() * N;
+    const cy = rnd() * N;
+    const r = 6 + rnd() * 18;
+    const b = (rnd() - 0.5) * 0.25;
+    for (let y = Math.floor(cy - r); y <= cy + r; y++)
+      for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+        const d = Math.hypot(x - cx, y - cy) / r;
+        if (d < 1) v[((y + N) % N) * N + ((x + N) % N)] += b * (1 - d * d);
+      }
+  }
+  // blades: short strokes, lighter tips over darker gaps
+  for (let k = 0; k < 9000; k++) {
+    let x = rnd() * N;
+    let y = rnd() * N;
+    const a = rnd() * Math.PI * 2;
+    const len = 2 + rnd() * 5;
+    const b = rnd() < 0.55 ? 0.22 : -0.2;
+    for (let t = 0; t < len; t++) {
+      const i = ((Math.round(y) % N) + N) % N;
+      const j = ((Math.round(x) % N) + N) % N;
+      v[i * N + j] += b * (1 - t / len);
+      x += Math.cos(a);
+      y += Math.sin(a);
+    }
+  }
+  const d = new Uint8Array(N * N * 4);
+  for (let i = 0; i < N * N; i++) {
+    const c = Math.max(0, Math.min(255, Math.round(v[i] * 255)));
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = c;
+    d[i * 4 + 3] = 255;
+  }
+  grassTex = new THREE.DataTexture(d, N, N);
+  grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+  grassTex.magFilter = THREE.LinearFilter;
+  grassTex.minFilter = THREE.LinearMipmapLinearFilter;
+  grassTex.generateMipmaps = true;
+  grassTex.anisotropy = 8;
+  grassTex.needsUpdate = true;
+  return grassTex;
+}
+
+/**
  * Macro variation (as racing games break texture tiling): the colour is modulated by two octaves of smooth
  * value noise in world space, metres to tens of metres across, plus a slight dry/lush hue drift on grass. Paved
  * surfaces get a weaker, greyer version (patches of newer and older asphalt).
  */
-function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean, detail = 0): void {
+function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean, detail = 0, kind: 'grass' | 'gravel' | 'paved' = 'paved'): void {
+  const grass = kind === 'grass';
+  // detail tile sizes (m): fine and coarse
+  const [fine, coarse] = grass ? [0.9, 3.7] : kind === 'gravel' ? [0.32, 1.25] : [1.6, 7.3];
   m.onBeforeCompile = (sh) => {
-    if (detail > 0) sh.uniforms.apxDetail = { value: pavedDetail() };
+    if (detail > 0) sh.uniforms.apxDetail = { value: grass ? grassDetail() : kind === 'gravel' ? gravelDetail() : pavedDetail() };
     sh.vertexShader = sh.vertexShader
       .replace('void main() {', 'varying vec3 vApxW;\nvoid main() {')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvApxW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -99,11 +199,11 @@ void main() {`,
   float n = apxNoise(wp / 37.0) * 0.65 + apxNoise(wp / 9.0) * 0.35;
   diffuseColor.rgb *= 1.0 + (n - 0.5) * ${(strength * 2).toFixed(2)};
   ${hue ? 'float d = apxNoise(wp / 61.0 + 7.3); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.04, 0.78), smoothstep(0.55, 0.9, d) * 0.6);' : ''}
-  ${detail > 0 ? `float g = texture2D(apxDetail, wp / 1.6).r * 0.6 + texture2D(apxDetail, wp / 7.3 + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};` : ''}
+  ${detail > 0 ? `float g = texture2D(apxDetail, wp / ${fine.toFixed(2)}).r * 0.6 + texture2D(apxDetail, wp / ${coarse.toFixed(2)} + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};` : ''}
 }`,
       );
   };
-  m.customProgramCacheKey = () => `macro-${strength}-${hue}-${detail}`;
+  m.customProgramCacheKey = () => `macro-${strength}-${hue}-${detail}-${kind}`;
 }
 
 const ROAD_MAT_RE = /^(asph|curb|lines|redline|pits|conc_|travert_0|box_decal|pavement)/i;
@@ -116,6 +216,11 @@ const DETAIL_MAT_RE =
  * no ground under them, so when distance culling hid them the sky showed through as white strips along the
  * track ("missing textures"): they always draw, like the road (tools/e2e/trackscan.mjs).
  */
+/**
+ * Low vertical barriers along the road (guard rails, tyre walls, pit wall): under a pixel tall beyond ~1.5 km, but
+ * on the 24 km layout the whole GP is in view from the Nordschleife, so they're culled per mesh at barrierDistance.
+ */
+const BARRIER_MAT_RE = /^(grail|tyrewall|walls_new|wall_pitlane)/i;
 const GROUND_PIECE_RE = /^(grille|curb_misc)/i;
 
 interface Chunk {
@@ -130,6 +235,7 @@ export class Track {
   readonly root = new THREE.Group();
   readonly chunks: Chunk[] = [];
   private details: { mesh: THREE.Mesh; center: THREE.Vector3; radius: number }[] = [];
+  private barriers: { mesh: THREE.Mesh; center: THREE.Vector3; radius: number }[] = [];
   readonly roadMaterials: { mat: THREE.MeshStandardMaterial; color: THREE.Color; roughness: number }[] = [];
   readonly lightMaterials: THREE.MeshStandardMaterial[] = [];
   readonly startLights: { red: THREE.MeshStandardMaterial[]; green: THREE.MeshStandardMaterial[] } = { red: [], green: [] };
@@ -137,6 +243,13 @@ export class Track {
   private ray: RAPIER.Ray | null = null;
   /** The local car body, excluded from wheel ray casts. */
   excludeBody: RAPIER.RigidBody | undefined;
+  /** Procedural forest around the circuit (null when the map has none or it failed to load). */
+  forest: Forest | null = null;
+
+  setForest(f: Forest): void {
+    this.forest = f;
+    this.root.add(f.root);
+  }
 
   constructor(readonly data: TrackData) {
     this.root.name = 'track';
@@ -147,7 +260,11 @@ export class Track {
     const files = [...new Set(data.chunks.map((c) => c.file))];
     const scenes = await Promise.all(files.map(async (f) => ({ f, g: await parseGltf(await fetchWithProgress(f, onBytes)) })));
     const collision = await loadCollision(data, onBytes);
-    for (const { g } of scenes) {
+    for (const { f, g } of scenes) {
+      // a layout can take some chunks of a file and replace others (the Nordschleife layout swaps the GP's terrain
+      // and its junction walls for its own copies): drop the chunk nodes this layout does not list from that file
+      const listed = new Set(data.chunks.filter((c) => c.file === f).map((c) => c.node));
+      for (const child of [...g.scene.children]) if (child.name.startsWith('chunk_') && !listed.has(child.name)) g.scene.remove(child);
       g.scene.updateMatrixWorld(true);
       t.root.add(g.scene);
     }
@@ -190,15 +307,21 @@ export class Track {
         if (/^red_lights/i.test(sm.name)) t.startLights.red.push(sm);
         if (/^green_lights/i.test(sm.name)) t.startLights.green.push(sm);
         sm.side = sm.alphaTest > 0 || sm.transparent ? THREE.DoubleSide : THREE.FrontSide;
-        if (GROUND_MAT_RE.test(sm.name) || sm.name === 'grass_fill') addMacroVariation(sm, 0.22, /grass|top2|fill|turf/i.test(sm.name));
-        else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : 0.22);
+        if (GROUND_MAT_RE.test(sm.name) || sm.name === 'grass_fill') {
+          const isGrass = /grass|fill|turf/i.test(sm.name);
+          const isGravel = /^(gravel|sand)/i.test(sm.name);
+          // the satellite terrain (top2) is only seen from afar: no close-up detail there; stones need contrast
+          const det = /^top2/i.test(sm.name) ? 0 : isGrass ? 0.28 : isGravel ? 0.42 : 0.16;
+          addMacroVariation(sm, 0.22, isGrass || /top2/i.test(sm.name), det, isGrass ? 'grass' : isGravel ? 'gravel' : 'paved');
+        } else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : 0.22);
       }
       const first = mats[0] as THREE.MeshStandardMaterial | undefined;
-      if (first && DETAIL_MAT_RE.test(first.name)) {
+      const culled = first && DETAIL_MAT_RE.test(first.name) ? t.details : first && BARRIER_MAT_RE.test(first.name) ? t.barriers : null;
+      if (culled) {
         mesh.geometry.computeBoundingSphere();
         const bs = mesh.geometry.boundingSphere as THREE.Sphere;
         const center = bs.center.clone().applyMatrix4(mesh.matrixWorld);
-        t.details.push({ mesh, center, radius: bs.radius });
+        culled.push({ mesh, center, radius: bs.radius });
       }
     });
     return { track: t, collision };
@@ -300,6 +423,11 @@ export class Track {
         side: sm.side,
         vertexColors: sm.vertexColors,
       });
+      // keep the world-space macro variation / detail on the cheap path (grass is most of the screen on Low/Medium)
+      if (sm.customProgramCacheKey !== THREE.Material.prototype.customProgramCacheKey) {
+        l.onBeforeCompile = sm.onBeforeCompile;
+        l.customProgramCacheKey = sm.customProgramCacheKey;
+      }
       this.lambert.set(m, l);
       // keep night lamps / start lights working with the cheap material too
       if (this.lightMaterials.includes(sm)) this.lightLambert.push(l);
@@ -331,12 +459,15 @@ export class Track {
       c.object.visible = c.center.distanceTo(camPos) - c.radius < max;
     }
     for (const d of this.details) d.mesh.visible = d.center.distanceTo(camPos) - d.radius < q.detailDistance;
+    for (const d of this.barriers) d.mesh.visible = d.center.distanceTo(camPos) - d.radius < q.barrierDistance;
+    this.forest?.update(camPos, q);
   }
 
   /** Make every chunk visible (shader/texture warm-up). */
   showAll(): void {
     for (const c of this.chunks) c.object.visible = true;
     for (const d of this.details) d.mesh.visible = true;
+    for (const d of this.barriers) d.mesh.visible = true;
   }
 
   /** Darker, glossier asphalt as the track gets wet. */

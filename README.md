@@ -42,9 +42,10 @@ The pipeline converts everything in `3D MODELS/` (USDC) into optimised GLB/KTX2 
 2. `cars`: Blender normalises each car, splits the wheels, finds the cockpit anchor and renders a thumbnail.
 3. `map`: traces the centreline, places gates, sectors and grid, builds collision and render chunks.
 4. `optimize`: LODs, Meshopt and KTX2.
-5. `report` updates `ASSET_REPORT.md`.
+5. `forest`: scatters the procedural Eifel forest on maps with `"forest": true` (headless Chromium; set `CHROMIUM_PATH` if Playwright's browser isn't installed).
+6. `report` updates `ASSET_REPORT.md`.
 
-Run one step with `pnpm assets --only cars` (or `map`, `optimize`, `report`). Run one car with `--car <id>`; add `--force` to rebuild.
+Run one step with `pnpm assets --only cars` (or `map`, `optimize`, `forest`, `report`). Run one car with `--car <id>`; add `--force` to rebuild.
 
 **Maps.** Each map is configured in `tools/asset-pipeline/maps/<id>.json` (`nurburgring`, `zandvoort`): source model, output folder (`tools/asset-pipeline/out/map`, `out/map_zandvoort`), runtime asset folder (`public/assets/track`, `public/assets/maps/zandvoort`), layouts and turn counts, and for maps whose source has generic material names (Zandvoort) the material renames, surface rules, pit lane and other analysis settings. Rebuild one map:
 
@@ -56,6 +57,19 @@ node tools/asset-pipeline/optimize.mjs --map zandvoort --only collision   # coll
 ```
 
 Set `MODELS_DIR=/path/to/3D MODELS` when the sources are elsewhere (for example in a git worktree). Each run updates its own map's entries in `public/assets/tracks.json` (the lobby list) and `packages/shared/src/generated/tracks-race.json` (server lap validation) and keeps the other maps'. Check a rebuilt map with `pnpm tsx tools/sim/holes.ts --track zandvoort`, `node tools/sim/pitlat.mjs 0 640 --track zandvoort`, `pnpm tsx tools/sim/ailap.ts --track zandvoort --laps 3` and `node tools/e2e/tour.mjs --track zandvoort --aerial`; debug plots are in the map's output folder (`debug_track.png`, `debug_grid.png`).
+
+**Nordschleife.** `maps/nordschleife.json` has no source model: it is built around the GP map (`"baseMap": "nurburgring"`) and adds the 24h layout (`nurburgring_24h`, GP + Nordschleife, 24.3 km). The centreline is traced from the channel the GP map's satellite terrain leaves for it (`trace_nordschleife.mjs`, offline) or, with `"source": "osm"`, taken from OpenStreetMap and EU-DEM heights. Build the GP map first, then:
+
+```bash
+pnpm assets --only map --map nordschleife                                # trace (~1 min) + Blender: road, verges, armco, corridor, terrain
+node tools/asset-pipeline/optimize.mjs --map nordschleife --only map     # KTX2/meshopt, junction cuts, merged collision, layout JSON
+node tools/asset-pipeline/forest_scatter.mjs --map nordschleife          # forest within 450 m of the lap
+node tools/asset-pipeline/optimize.mjs --map nurburgring --only fill     # re-encode an older map_fill.glb's textures to KTX2
+node tools/asset-pipeline/signage.mjs --map nurburgring                  # real logos → generic boards on an already built map
+node tools/asset-pipeline/road_collision.mjs --map zandvoort             # road + kerb collision from the render chunks (maps with "roadCollisionFromRender")
+```
+
+See `docs/TRACK_REALISM.md` for what was changed, the performance budget and what is still missing.
 
 Car physics live in `tools/asset-pipeline/cars.config.json` and are meant to be edited by hand. After editing, run `pnpm assets --only optimize` to regenerate `cars.json`.
 
@@ -123,7 +137,7 @@ pnpm deploy:client
 
 `deploy:client` builds the static site into `apps/client/dist/apex-ghost` and uploads it with `vercel deploy --prod`. The first deploy creates a Vercel project called `apex-ghost` automatically. Vercel shows the `*.vercel.app` URL at the end; share that with your friends.
 
-`apps/client/public/vercel.json` sets long-term caching for the hashed and immutable assets. The build is about 90 MB, under the Hobby plan's 100 MB upload limit.
+`apps/client/public/vercel.json` sets long-term caching for the hashed and immutable assets. The build is about 240 MB, mostly car models (`public/assets/cars` is 156 MB; the maps are ~65 MB, of which the Nordschleife is 17 MB). Check it against your Vercel plan's upload limit; if it's too big, serve `public/assets` from a bucket (R2, S3) and point the client at it.
 
 ## 7. Mobile app (Android)
 

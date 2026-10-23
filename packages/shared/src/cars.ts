@@ -43,6 +43,11 @@ export interface CarSpecs {
   suspTravelM: number;
   /** Rough top speed for UI (km/h). */
   topSpeedKmh: number;
+  /** How the engine breathes: power in thin or hot air (altitude, summer) falls fully when naturally aspirated,
+   * partly with a turbo or a hybrid (absent: turbo). */
+  aspiration?: 'na' | 'turbo' | 'hybrid';
+  /** Carbon-ceramic brake discs: they fade far hotter (~1,000 °C) than the steel discs GT3 cars race on. */
+  carbonBrakes?: boolean;
 }
 
 export interface CarWheelGeom {
@@ -77,6 +82,8 @@ export interface CarEntry {
   cockpitCamera: { position: Vec3; driverSide: 'left' | 'right'; tuned?: boolean };
   hasInterior: boolean;
   lights: { head: string[]; tail: string[] };
+  /** The real car: engine, gearbox and the team or livery (shown in the lobby; translated where shown). */
+  info?: { engine: string; gearbox: string; team: string } | null;
   /** Wheels that use the generic fallback model. */
   genericWheels: string[];
   specs: CarSpecs;

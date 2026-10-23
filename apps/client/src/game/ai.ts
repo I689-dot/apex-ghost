@@ -114,10 +114,13 @@ export interface CarLimits {
   /** Wheel power (W) for the acceleration pass. */
   powerW: number;
   vMax: number;
+  /** Air density (kg/m³): downforce and drag at this circuit's altitude and temperature. */
+  airDensity: number;
 }
 
-export function carLimits(specs: CarSpecs, skill = 1): CarLimits {
+export function carLimits(specs: CarSpecs, skill = 1, airDensity = RHO): CarLimits {
   return {
+    airDensity,
     massKg: specs.massKg,
     mu: specs.tyreGrip * 0.8 * skill,
     muBrake: specs.tyreGrip * 0.86 * skill,
@@ -137,8 +140,8 @@ export function carLimits(specs: CarSpecs, skill = 1): CarLimits {
 export function speedProfile(line: RacingLine, car: CarLimits, weatherGrip = 1, forward = false): Float32Array {
   const n = line.ds.length;
   const v = new Float32Array(n);
-  const k = (0.5 * RHO * car.downforceArea) / car.massKg;
-  const kd = (0.5 * RHO * car.dragArea) / car.massKg;
+  const k = (0.5 * car.airDensity * car.downforceArea) / car.massKg;
+  const kd = (0.5 * car.airDensity * car.dragArea) / car.massKg;
   const mu = car.mu * weatherGrip;
   const muB = car.muBrake * weatherGrip;
   for (let i = 0; i < n; i++) {
@@ -223,7 +226,7 @@ export class AiDriver {
     private readonly lane: number,
   ) {
     this.line = racingLineFor(track);
-    this.limits = carLimits(vehicle.specs, skill);
+    this.limits = carLimits(vehicle.specs, skill, vehicle.airDensity);
     this.profile = speedProfile(this.line, this.limits);
   }
 

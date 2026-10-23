@@ -1,14 +1,146 @@
 {
   "id": "nurburgring",
-  "name": "Nürburgring",
-  "source": "MAP/Nürburgring_GP_2022_layout/scene.usdc",
+  "name": "N\u00fcrburgring",
+  "source": "MAP/N\u00fcrburgring_GP_2022_layout/scene.usdc",
   "out": "map",
   "assets": "track",
   "default": true,
   "tracks": {
-    "nurburgring_gp_2022": { "turns": 15, "file": "track.json" },
-    "nurburgring_short": { "turns": null }
+    "nurburgring_gp_2022": {
+      "turns": 15,
+      "file": "track.json"
+    },
+    "nurburgring_short": {
+      "turns": null
+    }
   },
   "fixPitEntry": true,
-  "analysis": null
+  "forest": true,
+  "analysis": null,
+  "signage": [
+    {
+      "match": "^adv2",
+      "grid": [2, 8],
+      "labels": [
+        "APEX FUEL",
+        "GHOST TYRES",
+        "RACE LAB",
+        "EIFEL MOTOR OIL",
+        "LATE APEX",
+        "SLIPSTREAM",
+        "PITBOX",
+        "FULL THROTTLE",
+        "GHOST RACING",
+        "HAIRPIN",
+        "TRACK DAY",
+        "TORQUE WORKS",
+        "APEX GHOST",
+        "NORTH LOOP",
+        "KERB & CO",
+        "GRIP+"
+      ]
+    },
+    {
+      "match": "^garage_spons",
+      "scrub": "all"
+    },
+    {
+      "match": "^logos_wall",
+      "grid": [3, 2],
+      "labels": ["APEX GHOST", "APEX RING", "GHOST RACING"]
+    },
+    {
+      "match": "^timetower",
+      "size": [256, 256],
+      "panels": [
+        {
+          "rect": [166, 24, 240, 134],
+          "label": "EIFEL MOTOR OIL",
+          "rotate": -90
+        }
+      ],
+      "fill": [[118, 6, 178, 20]]
+    },
+    {
+      "match": "^marshal_boxes",
+      "size": [256, 256],
+      "panels": [
+        {
+          "rect": [146, 190, 256, 256],
+          "bg": "#1c2a6e",
+          "label": "GHOST TYRES"
+        }
+      ]
+    },
+    {
+      "match": "^tuv",
+      "size": [256, 128],
+      "fill": [
+        [28, 3, 82, 20],
+        [158, 3, 216, 17],
+        [134, 86, 214, 112]
+      ]
+    },
+    {
+      "match": "^building",
+      "size": [256, 256],
+      "panels": [
+        {
+          "rect": [129, 37, 256, 143],
+          "label": "APEX RING"
+        }
+      ]
+    },
+    {
+      "match": "^box_decal",
+      "grid": [1, 1],
+      "labels": ["APEX ENERGY"]
+    },
+    {
+      "match": "^dorint_spons",
+      "size": [256, 128],
+      "panels": [
+        {
+          "rect": [0, 0, 128, 76],
+          "bg": "#000000",
+          "label": "GRAND HOTEL"
+        }
+      ]
+    },
+    {
+      "match": "^spons_we_make",
+      "grid": [1, 1],
+      "labels": ["APEX GHOST - RACE ON"]
+    },
+    {
+      "match": "^schumacher_s",
+      "size": [256, 64],
+      "scrub": [
+        [0, 0, 34, 30],
+        [218, 0, 256, 30],
+        [28, 32, 104, 61]
+      ]
+    },
+    {
+      "match": "^(details_at|glass_railing)",
+      "size": [128, 256],
+      "fill": [[0, 234, 22, 256]]
+    },
+    {
+      "match": "^details\\.",
+      "size": [128, 256],
+      "fill": [
+        [20, 3, 60, 12],
+        [0, 50, 25, 76],
+        [22, 47, 56, 57],
+        [33, 114, 128, 131],
+        [23, 137, 62, 146],
+        [15, 173, 68, 184],
+        [64, 90, 73, 100],
+        [73, 215, 82, 225],
+        [69, 100, 126, 107],
+        [42, 57, 76, 76]
+      ]
+    }
+  ]
 }

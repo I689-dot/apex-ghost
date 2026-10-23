@@ -8,6 +8,7 @@ import {
   TIME_LABEL,
   WEATHER_KINDS,
   planWeather,
+  temperatures,
   type ClientMsg,
   GAME_NAME,
   MAX_PLAYERS,
@@ -384,6 +385,7 @@ export class App {
     const row = (label: string, ctrl: HTMLElement) => h('div.prep-row', {}, h('span', { text: label }), ctrl);
     const plan = planWeather(c.seed, c);
     const w0 = weatherAt(plan, 0);
+    const temp0 = temperatures(plan, w0, this.trackIndex.find((tr) => tr.id === c.trackId)?.map);
     const state = w0.wetness > 0.3 ? 'wet' : w0.wetness > 0.05 ? 'damp' : 'dry';
     const change = plan.change
       ? t('{weather} from about minute {min}', { weather: t(WEATHER_LABEL[plan.change.to]), min: Math.max(1, Math.round(plan.change.atSec / 60)) })
@@ -525,6 +527,7 @@ export class App {
           }),
         }),
         h('span', { text: change }),
+        h('span', { text: t('Air {air} °C · track {track} °C at the start', { air: Math.round(temp0.airC), track: Math.round(temp0.trackC) }) }),
         edit ? h('button.ghost.small', { text: t('New forecast'), onclick: () => send({ reroll: true }) }) : null,
       ),
       withCar
@@ -645,7 +648,7 @@ export class App {
             {},
             h('dt', { text: t('Power') }),
             h('dd', { text: t('{n} hp', { n: hp(browsing.specs.powerKw) }) }),
-            h('dt', { text: t('Weight') }),
+            h('dt', { text: t('Weight (with driver)') }),
             h('dd', { text: `${browsing.specs.massKg} kg` }),
             h('dt', { text: t('Drivetrain') }),
             h('dd', { text: browsing.specs.drivetrain }),
@@ -653,6 +656,16 @@ export class App {
             h('dd', { text: `${browsing.specs.topSpeedKmh} km/h` }),
             h('dt', { text: t('Gears') }),
             h('dd', { text: String(browsing.specs.gears.length) }),
+            ...(browsing.info
+              ? [
+                  h('dt', { text: t('Engine') }),
+                  h('dd', { text: t(browsing.info.engine) }),
+                  h('dt', { text: t('Gearbox') }),
+                  h('dd', { text: t(browsing.info.gearbox) }),
+                  h('dt', { text: t('Team') }),
+                  h('dd', { text: t(browsing.info.team) }),
+                ]
+              : []),
           ),
         )
       : h('div.spec', {}, h('h2', { text: t('Pick a car') }));
@@ -894,6 +907,7 @@ export class App {
     this.setBackdrop('aerial', race.trackId);
     this.session?.dispose();
     const w0 = weatherAt(race.weather, 0);
+    const temp0 = temperatures(race.weather, w0, this.trackIndex.find((tr) => tr.id === race.trackId)?.map);
     const slot = (race.slots[this.me] ?? 0) + 1;
     const bar = h('div.bar-fill');
     const label = h('div.load-label', { text: t('Preparing…') });
@@ -921,6 +935,7 @@ export class App {
             fact(t('Weather'), weatherTxt),
             fact(t('Time'), formatHour(w0.hour)),
             fact(t('Track'), w0.wetness > 0.3 ? t('Wet') : w0.wetness > 0.05 ? t('Damp') : t('Dry')),
+            fact(t('Air / track'), `${Math.round(temp0.airC)} / ${Math.round(temp0.trackC)} °C`),
           ),
           h('div.bar', {}, bar),
           label,

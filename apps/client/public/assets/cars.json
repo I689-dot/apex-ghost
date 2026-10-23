@@ -95,11 +95,11 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1290,
-    "powerKw": 380,
+    "massKg": 1415,
+    "powerKw": 390,
     "idleRpm": 1100,
-    "redlineRpm": 7200,
-    "limiterRpm": 7400,
+    "redlineRpm": 7000,
+    "limiterRpm": 7250,
     "torqueCurve": [
      [
       1000,
@@ -107,27 +107,31 @@
      ],
      [
       2500,
-      600
+      620
      ],
      [
-      4000,
-      660
+      3500,
+      680
      ],
      [
-      5500,
-      650
+      5000,
+      680
      ],
      [
-      6500,
-      600
+      6000,
+      620
+     ],
+     [
+      6800,
+      540
      ],
      [
       7200,
-      520
+      480
      ],
      [
-      7500,
-      300
+      7400,
+      260
      ]
     ],
     "gears": [
@@ -148,8 +152,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8400,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.05,
-    "downforceArea": 2.23,
+    "dragArea": 0.96,
+    "downforceArea": 3.01,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
     "maxSteerDeg": 25,
@@ -158,7 +162,13 @@
     "antiRollFront": 45000,
     "antiRollRear": 28000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "4.0 L twin-turbo V8 (Mercedes-AMG M177)",
+    "gearbox": "6-speed Xtrac sequential",
+    "team": "Heart of Racing (IMSA GTD, WEC LMGT3)"
    }
   },
   {
@@ -252,8 +262,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1235,
-    "powerKw": 375,
+    "massKg": 1420,
+    "powerKw": 401,
     "idleRpm": 1300,
     "redlineRpm": 8400,
     "limiterRpm": 8600,
@@ -305,8 +315,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8000,
     "brakeBiasFront": 0.6,
-    "dragArea": 1.07,
-    "downforceArea": 2.29,
+    "dragArea": 1.04,
+    "downforceArea": 3.09,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -315,7 +325,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "5.2 L V10, naturally aspirated",
+    "gearbox": "6-speed sequential (paddles)",
+    "team": "Audi Sport customer racing"
    }
   },
   {
@@ -412,11 +428,11 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1420,
-    "powerKw": 405,
+    "massKg": 1440,
+    "powerKw": 403,
     "idleRpm": 1000,
-    "redlineRpm": 7100,
-    "limiterRpm": 7300,
+    "redlineRpm": 7300,
+    "limiterRpm": 7500,
     "torqueCurve": [
      [
       1000,
@@ -439,12 +455,16 @@
       620
      ],
      [
-      7100,
-      520
+      7000,
+      540
      ],
      [
-      7400,
-      300
+      7300,
+      500
+     ],
+     [
+      7600,
+      280
      ]
     ],
     "gears": [
@@ -461,12 +481,12 @@
     "drivetrain": "RWD",
     "frontTorqueSplit": 0,
     "weightFront": 0.5,
-    "comHeightM": 0.46,
-    "tyreGrip": 1.77,
+    "comHeightM": 0.45,
+    "tyreGrip": 1.95,
     "brakeTorqueNm": 8600,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.18,
-    "downforceArea": 1.56,
+    "dragArea": 1.11,
+    "downforceArea": 2.92,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
     "maxSteerDeg": 25,
@@ -475,7 +495,13 @@
     "antiRollFront": 46000,
     "antiRollRear": 28000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 272
+    "topSpeedKmh": 274,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "3.0 L twin-turbo straight-six (P58)",
+    "gearbox": "6-speed Xtrac sequential",
+    "team": "BMW M Motorsport · Nürburgring 24h 2024 (SPX class)"
    }
   },
   {
@@ -573,11 +599,11 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1310,
-    "powerKw": 395,
+    "massKg": 1420,
+    "powerKw": 403,
     "idleRpm": 1000,
-    "redlineRpm": 7100,
-    "limiterRpm": 7300,
+    "redlineRpm": 7300,
+    "limiterRpm": 7500,
     "torqueCurve": [
      [
       1000,
@@ -600,12 +626,16 @@
       620
      ],
      [
-      7100,
-      520
+      7000,
+      540
      ],
      [
-      7400,
-      300
+      7300,
+      500
+     ],
+     [
+      7600,
+      280
      ]
     ],
     "gears": [
@@ -626,8 +656,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8600,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.07,
-    "downforceArea": 2.23,
+    "dragArea": 1.06,
+    "downforceArea": 3.01,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
     "maxSteerDeg": 25,
@@ -636,7 +666,13 @@
     "antiRollFront": 46000,
     "antiRollRear": 28000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 278
+    "topSpeedKmh": 278,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "3.0 L twin-turbo straight-six (P58)",
+    "gearbox": "6-speed Xtrac sequential",
+    "team": "BMW M Motorsport customer racing"
    }
   },
   {
@@ -732,61 +768,70 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1300,
+    "massKg": 1440,
     "powerKw": 515,
     "idleRpm": 1200,
-    "redlineRpm": 8000,
-    "limiterRpm": 8200,
+    "redlineRpm": 8200,
+    "limiterRpm": 8500,
     "torqueCurve": [
      [
       1000,
-      300
+      380
      ],
      [
       2500,
-      560
+      620
      ],
      [
       3500,
-      680
+      740
      ],
      [
-      5500,
-      690
+      6000,
+      740
      ],
      [
       7000,
-      610
+      690
+     ],
+     [
+      7500,
+      656
      ],
      [
       8000,
+      590
+     ],
+     [
+      8500,
       520
      ],
      [
-      8300,
-      280
+      8700,
+      250
      ]
     ],
     "gears": [
-     3.1,
-     2.3,
-     1.84,
-     1.52,
-     1.29,
-     1.1
+     3.28,
+     2.36,
+     1.8,
+     1.45,
+     1.2,
+     1.02,
+     0.88
     ],
     "reverseRatio": 3.2,
-    "finalDrive": 3.3,
-    "shiftTimeMs": 55,
+    "finalDrive": 3.9,
+    "shiftTimeMs": 30,
     "drivetrain": "RWD",
     "frontTorqueSplit": 0,
-    "weightFront": 0.42,
+    "weightFront": 0.41,
     "comHeightM": 0.39,
-    "tyreGrip": 1.71,
+    "tyreGrip": 1.68,
     "brakeTorqueNm": 8200,
     "brakeBiasFront": 0.6,
-    "dragArea": 0.9,
-    "downforceArea": 1.38,
+    "dragArea": 1.07,
+    "downforceArea": 2.9,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -795,7 +840,14 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 296
+    "topSpeedKmh": 300,
+    "aspiration": "turbo",
+    "carbonBrakes": true
+   },
+   "info": {
+    "engine": "3.0 L twin-turbo 120° V6, 700 cv",
+    "gearbox": "7-speed F1 dual-clutch",
+    "team": "Ferrari Challenge (one-make series)"
    }
   },
   {
@@ -884,8 +936,8 @@
     "RR"
    ],
    "specs": {
-    "massKg": 1235,
-    "powerKw": 370,
+    "massKg": 1440,
+    "powerKw": 401,
     "idleRpm": 1300,
     "redlineRpm": 8400,
     "limiterRpm": 8600,
@@ -938,7 +990,7 @@
     "brakeTorqueNm": 8000,
     "brakeBiasFront": 0.6,
     "dragArea": 1.11,
-    "downforceArea": 2.29,
+    "downforceArea": 3.09,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -947,7 +999,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "5.2 L V10, naturally aspirated",
+    "gearbox": "6-speed Xtrac sequential",
+    "team": "Lamborghini Squadra Corse customer racing"
    }
   },
   {
@@ -1048,8 +1106,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1235,
-    "powerKw": 380,
+    "massKg": 1440,
+    "powerKw": 401,
     "idleRpm": 1300,
     "redlineRpm": 8400,
     "limiterRpm": 8600,
@@ -1101,8 +1159,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8000,
     "brakeBiasFront": 0.6,
-    "dragArea": 1.06,
-    "downforceArea": 2.29,
+    "dragArea": 1.04,
+    "downforceArea": 3.09,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -1111,7 +1169,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "5.2 L V10, naturally aspirated",
+    "gearbox": "6-speed Xtrac sequential",
+    "team": "Lamborghini Squadra Corse customer racing"
    }
   },
   {
@@ -1196,8 +1260,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1235,
-    "powerKw": 380,
+    "massKg": 1440,
+    "powerKw": 401,
     "idleRpm": 1300,
     "redlineRpm": 8400,
     "limiterRpm": 8600,
@@ -1249,8 +1313,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8000,
     "brakeBiasFront": 0.6,
-    "dragArea": 1.03,
-    "downforceArea": 2.29,
+    "dragArea": 0.99,
+    "downforceArea": 3.09,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -1259,7 +1323,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "5.2 L V10, naturally aspirated",
+    "gearbox": "6-speed Xtrac sequential",
+    "team": "Iron Lynx"
    }
   },
   {
@@ -1346,39 +1416,43 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1270,
-    "powerKw": 370,
+    "massKg": 1400,
+    "powerKw": 375,
     "idleRpm": 1200,
     "redlineRpm": 7500,
     "limiterRpm": 7700,
     "torqueCurve": [
      [
       1000,
-      330
+      320
      ],
      [
       2500,
-      560
+      540
      ],
      [
       3500,
-      640
-     ],
-     [
-      5000,
-      650
-     ],
-     [
-      6500,
       610
      ],
      [
+      5000,
+      620
+     ],
+     [
+      6000,
+      595
+     ],
+     [
+      7000,
+      505
+     ],
+     [
       7500,
-      520
+      460
      ],
      [
       7800,
-      300
+      250
      ]
     ],
     "gears": [
@@ -1399,8 +1473,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8200,
     "brakeBiasFront": 0.6,
-    "dragArea": 0.82,
-    "downforceArea": 2.16,
+    "dragArea": 0.7,
+    "downforceArea": 2.92,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -1409,7 +1483,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 285
+    "topSpeedKmh": 285,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "3.8 L twin-turbo V8 (M838T)",
+    "gearbox": "6-speed sequential",
+    "team": "McLaren GT customer racing"
    }
   },
   {
@@ -1518,8 +1598,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1250,
-    "powerKw": 382,
+    "massKg": 1410,
+    "powerKw": 391,
     "idleRpm": 1200,
     "redlineRpm": 7500,
     "limiterRpm": 7700,
@@ -1541,16 +1621,20 @@
       650
      ],
      [
-      6500,
-      610
+      6000,
+      620
+     ],
+     [
+      7000,
+      530
      ],
      [
       7500,
-      520
+      480
      ],
      [
       7800,
-      300
+      260
      ]
     ],
     "gears": [
@@ -1571,8 +1655,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8200,
     "brakeBiasFront": 0.6,
-    "dragArea": 1,
-    "downforceArea": 2.36,
+    "dragArea": 0.89,
+    "downforceArea": 3.19,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -1581,7 +1665,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 285
+    "topSpeedKmh": 285,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "4.0 L twin-turbo V8 (M840T)",
+    "gearbox": "6-speed sequential",
+    "team": "McLaren customer racing"
    }
   },
   {
@@ -1675,8 +1765,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1250,
-    "powerKw": 382,
+    "massKg": 1410,
+    "powerKw": 391,
     "idleRpm": 1200,
     "redlineRpm": 7500,
     "limiterRpm": 7700,
@@ -1698,16 +1788,20 @@
       650
      ],
      [
-      6500,
-      610
+      6000,
+      620
+     ],
+     [
+      7000,
+      530
      ],
      [
       7500,
-      520
+      480
      ],
      [
       7800,
-      300
+      260
      ]
     ],
     "gears": [
@@ -1728,8 +1822,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8200,
     "brakeBiasFront": 0.6,
-    "dragArea": 1.03,
-    "downforceArea": 2.43,
+    "dragArea": 0.93,
+    "downforceArea": 3.28,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -1738,7 +1832,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 285
+    "topSpeedKmh": 285,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "4.0 L twin-turbo V8 (M840T)",
+    "gearbox": "6-speed sequential",
+    "team": "Inception Racing (GT World Challenge Europe)"
    }
   },
   {
@@ -1822,8 +1922,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1265,
-    "powerKw": 382,
+    "massKg": 1430,
+    "powerKw": 391,
     "idleRpm": 1200,
     "redlineRpm": 7500,
     "limiterRpm": 7700,
@@ -1845,16 +1945,20 @@
       650
      ],
      [
-      6500,
-      610
+      6000,
+      620
+     ],
+     [
+      7000,
+      530
      ],
      [
       7500,
-      520
+      480
      ],
      [
       7800,
-      300
+      260
      ]
     ],
     "gears": [
@@ -1875,8 +1979,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8200,
     "brakeBiasFront": 0.6,
-    "dragArea": 1.06,
-    "downforceArea": 2.43,
+    "dragArea": 0.98,
+    "downforceArea": 3.28,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -1885,7 +1989,13 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 285
+    "topSpeedKmh": 285,
+    "aspiration": "turbo"
+   },
+   "info": {
+    "engine": "4.0 L twin-turbo V8 (M840T)",
+    "gearbox": "6-speed sequential",
+    "team": "WEC LMGT3 specification (2024)"
    }
   },
   {
@@ -1987,39 +2097,39 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1300,
-    "powerKw": 380,
+    "massKg": 1430,
+    "powerKw": 374,
     "idleRpm": 1100,
     "redlineRpm": 7200,
     "limiterRpm": 7400,
     "torqueCurve": [
      [
       1000,
-      400
+      380
      ],
      [
       2500,
-      600
+      560
      ],
      [
       4000,
-      660
+      620
      ],
      [
       5500,
-      650
-     ],
-     [
-      6500,
       600
      ],
      [
+      6500,
+      550
+     ],
+     [
       7200,
-      520
+      480
      ],
      [
       7500,
-      300
+      260
      ]
     ],
     "gears": [
@@ -2040,8 +2150,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8400,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.06,
-    "downforceArea": 2.09,
+    "dragArea": 0.96,
+    "downforceArea": 2.82,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
     "maxSteerDeg": 25,
@@ -2050,7 +2160,13 @@
     "antiRollFront": 45000,
     "antiRollRear": 28000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "6.2 L V8, naturally aspirated (M159)",
+    "gearbox": "6-speed sequential transaxle",
+    "team": "Anime-style (\"itasha\") livery"
    }
   },
   {
@@ -2144,39 +2260,39 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1285,
-    "powerKw": 380,
+    "massKg": 1465,
+    "powerKw": 374,
     "idleRpm": 1100,
     "redlineRpm": 7200,
     "limiterRpm": 7400,
     "torqueCurve": [
      [
       1000,
-      400
+      380
      ],
      [
       2500,
-      600
+      560
      ],
      [
       4000,
-      660
+      620
      ],
      [
       5500,
-      650
-     ],
-     [
-      6500,
       600
      ],
      [
+      6500,
+      550
+     ],
+     [
       7200,
-      520
+      480
      ],
      [
       7500,
-      300
+      260
      ]
     ],
     "gears": [
@@ -2197,8 +2313,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8400,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.06,
-    "downforceArea": 2.23,
+    "dragArea": 0.96,
+    "downforceArea": 3.01,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
     "maxSteerDeg": 25,
@@ -2207,7 +2323,13 @@
     "antiRollFront": 45000,
     "antiRollRear": 28000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "6.2 L V8, naturally aspirated (M159)",
+    "gearbox": "6-speed sequential transaxle",
+    "team": "Mercedes-AMG customer racing"
    }
   },
   {
@@ -2307,39 +2429,39 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1285,
-    "powerKw": 380,
+    "massKg": 1465,
+    "powerKw": 374,
     "idleRpm": 1100,
     "redlineRpm": 7200,
     "limiterRpm": 7400,
     "torqueCurve": [
      [
       1000,
-      400
+      380
      ],
      [
       2500,
-      600
+      560
      ],
      [
       4000,
-      660
+      620
      ],
      [
       5500,
-      650
-     ],
-     [
-      6500,
       600
      ],
      [
+      6500,
+      550
+     ],
+     [
       7200,
-      520
+      480
      ],
      [
       7500,
-      300
+      260
      ]
     ],
     "gears": [
@@ -2360,8 +2482,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8400,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.06,
-    "downforceArea": 2.32,
+    "dragArea": 0.95,
+    "downforceArea": 3.13,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
     "maxSteerDeg": 25,
@@ -2370,7 +2492,13 @@
     "antiRollFront": 45000,
     "antiRollRear": 28000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 280
+    "topSpeedKmh": 280,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "6.2 L V8, naturally aspirated (M159)",
+    "gearbox": "6-speed sequential transaxle",
+    "team": "Red Bull livery"
    }
   },
   {
@@ -2470,39 +2598,43 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1695,
-    "powerKw": 560,
+    "massKg": 1775,
+    "powerKw": 783,
     "idleRpm": 1200,
     "redlineRpm": 11000,
     "limiterRpm": 11200,
     "torqueCurve": [
      [
       1000,
-      500
+      900
      ],
      [
       3000,
-      640
+      1000
      ],
      [
-      5000,
-      640
+      6000,
+      950
      ],
      [
-      7500,
-      560
+      8000,
+      880
      ],
      [
-      9500,
-      470
+      9000,
+      830
+     ],
+     [
+      10500,
+      700
      ],
      [
       11000,
-      400
+      640
      ],
      [
       11300,
-      200
+      300
      ]
     ],
     "gears": [
@@ -2521,11 +2653,11 @@
     "frontTorqueSplit": 0.3,
     "weightFront": 0.42,
     "comHeightM": 0.4,
-    "tyreGrip": 1.56,
+    "tyreGrip": 1.72,
     "brakeTorqueNm": 9200,
     "brakeBiasFront": 0.6,
-    "dragArea": 0.81,
-    "downforceArea": 1.05,
+    "dragArea": 1.04,
+    "downforceArea": 2.6,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
     "maxSteerDeg": 24,
@@ -2534,7 +2666,14 @@
     "antiRollFront": 40000,
     "antiRollRear": 30000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 330
+    "topSpeedKmh": 352,
+    "aspiration": "hybrid",
+    "carbonBrakes": true
+   },
+   "info": {
+    "engine": "1.6 L V6 turbo (F1-derived) + 4 electric motors, 1,063 hp",
+    "gearbox": "7-speed automated manual",
+    "team": "Road-legal hypercar · Nordschleife record 6:29.090 (2024)"
    }
   },
   {
@@ -2638,8 +2777,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1250,
-    "powerKw": 375,
+    "massKg": 1405,
+    "powerKw": 387,
     "idleRpm": 1300,
     "redlineRpm": 9200,
     "limiterRpm": 9400,
@@ -2691,8 +2830,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8000,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.01,
-    "downforceArea": 2.32,
+    "dragArea": 0.99,
+    "downforceArea": 3.13,
     "aeroBalanceFront": 0.4,
     "diffLock": 0.4,
     "maxSteerDeg": 24,
@@ -2701,7 +2840,13 @@
     "antiRollFront": 42000,
     "antiRollRear": 26000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 282
+    "topSpeedKmh": 282,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "4.2 L flat-six, naturally aspirated",
+    "gearbox": "6-speed sequential",
+    "team": "Porsche Motorsport customer racing"
    }
   },
   {
@@ -2805,8 +2950,8 @@
    },
    "genericWheels": [],
    "specs": {
-    "massKg": 1250,
-    "powerKw": 375,
+    "massKg": 1405,
+    "powerKw": 387,
     "idleRpm": 1300,
     "redlineRpm": 9200,
     "limiterRpm": 9400,
@@ -2858,8 +3003,8 @@
     "tyreGrip": 1.95,
     "brakeTorqueNm": 8000,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.01,
-    "downforceArea": 2.32,
+    "dragArea": 0.99,
+    "downforceArea": 3.13,
     "aeroBalanceFront": 0.4,
     "diffLock": 0.4,
     "maxSteerDeg": 24,
@@ -2868,7 +3013,13 @@
     "antiRollFront": 42000,
     "antiRollRear": 26000,
     "suspTravelM": 0.14,
-    "topSpeedKmh": 282
+    "topSpeedKmh": 282,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "4.2 L flat-six, naturally aspirated",
+    "gearbox": "6-speed sequential",
+    "team": "Porsche Motorsport customer racing"
    }
   }
  ]

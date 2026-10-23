@@ -24,10 +24,10 @@ export interface Compound {
 }
 
 export const COMPOUNDS: Record<CompoundId, Compound> = {
-  soft: { id: 'soft', name: 'Soft', letter: 'S', colour: '#ff3b30', grip: 1.035, wetGrip: 0.52, wear: 1.9, optimumC: 85, heatCap: 0.85 },
-  medium: { id: 'medium', name: 'Medium', letter: 'M', colour: '#ffd60a', grip: 1.0, wetGrip: 0.52, wear: 1.0, optimumC: 90, heatCap: 1.0 },
-  hard: { id: 'hard', name: 'Hard', letter: 'H', colour: '#f2f2f2', grip: 0.965, wetGrip: 0.5, wear: 0.55, optimumC: 97, heatCap: 1.15 },
-  wet: { id: 'wet', name: 'Wet', letter: 'W', colour: '#3a86ff', grip: 0.86, wetGrip: 0.8, wear: 0.7, optimumC: 65, heatCap: 0.9 },
+  soft: { id: 'soft', name: 'Soft', letter: 'S', colour: '#ff3b30', grip: 1.035, wetGrip: 0.52, wear: 1.9, optimumC: 80, heatCap: 0.85 },
+  medium: { id: 'medium', name: 'Medium', letter: 'M', colour: '#ffd60a', grip: 1.0, wetGrip: 0.52, wear: 1.0, optimumC: 85, heatCap: 1.0 },
+  hard: { id: 'hard', name: 'Hard', letter: 'H', colour: '#f2f2f2', grip: 0.965, wetGrip: 0.5, wear: 0.55, optimumC: 92, heatCap: 1.15 },
+  wet: { id: 'wet', name: 'Wet', letter: 'W', colour: '#3a86ff', grip: 0.86, wetGrip: 0.8, wear: 0.7, optimumC: 60, heatCap: 0.9 },
 };
 
 /** Grip of a compound for the track's water (wetness 0..1) and the rain falling now (standing water). */

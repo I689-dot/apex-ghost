@@ -9,19 +9,22 @@
  * Budgets: car LOD0 ≤ 100k triangles, textures ≤ 2048 px (colour) / 1024 px (data); LOD1 ≈ 28k; LOD2 ≈ 7k.
  */
 import { NodeIO } from '@gltf-transform/core';
-import { ALL_EXTENSIONS, KHRTextureBasisu, EXTTextureWebP } from '@gltf-transform/extensions';
-import { dedup, prune, weld, simplify, simplifyPrimitive, meshopt, listTextureSlots, compactPrimitive, normals } from '@gltf-transform/functions';
+import { ALL_EXTENSIONS, KHRTextureBasisu, EXTTextureWebP, EXTMeshoptCompression } from '@gltf-transform/extensions';
+import { dedup, prune, weld, simplify, simplifyPrimitive, meshopt, reorder, listTextureSlots, compactPrimitive, normals } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { execFile } from 'node:child_process';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync, readdirSync } from 'node:fs';
 import { homedir, tmpdir, cpus } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { fillHoles, fillTerrain, groundPartsFromGlb, writeFillGlb } from './fill_holes.mjs';
+import { applySignage } from './signage.mjs';
 import { snapStackedLayers } from './flatten_layers.mjs';
+import { roadPartsFromGlbs, weldPositions } from './road_collision.mjs';
+import { carSpecs } from './car_specs.mjs';
 import { trackLimitsFromLines } from './track_limits.mjs';
 
 const run = promisify(execFile);
@@ -343,16 +346,19 @@ async function finish(doc, file) {
   return statSync(file).size;
 }
 
-/* --------------------------------------------------------------- cars --- */
-
-function deepMerge(a, b) {
-  const o = { ...a };
-  for (const [k, v] of Object.entries(b ?? {})) {
-    if (k.startsWith('_')) continue;
-    o[k] = v;
-  }
-  return o;
+/**
+ * Like finish(), but without quantisation (14-bit positions are ~12 cm steps over a 2 km hole-fill mesh, enough to
+ * poke the fill through the road): float attributes, still meshopt-compressed.
+ */
+async function finishFloat(doc, file) {
+  await doc.transform(prune(), reorder({ encoder: MeshoptEncoder }));
+  doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
+  mkdirSync(path.dirname(file), { recursive: true });
+  await io.write(file, doc);
+  return statSync(file).size;
 }
+
+/* --------------------------------------------------------------- cars --- */
 
 async function cars() {
   const cfg = JSON.parse(readFileSync(path.join(here, 'cars.config.json'), 'utf8'));
@@ -426,8 +432,7 @@ async function cars() {
         .toFile(path.join(dst, 'thumb.webp'));
     }
     for (const f of lodFiles) if (existsSync(path.join(dst, f))) bytes += statSync(path.join(dst, f)).size;
-    const prof = c.profile ? cfg.profiles[c.profile] : {};
-    const specs = deepMerge(prof, c.specs);
+    const specs = carSpecs(cfg, c);
     if (meta.genericWheels.length) fallbackReport.push({ id, wheels: meta.genericWheels });
     entries.push({
       id,
@@ -456,6 +461,7 @@ async function cars() {
       lights: meta.lights,
       genericWheels: meta.genericWheels,
       specs,
+      info: c.info ?? null,
     });
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -530,6 +536,11 @@ async function map() {
       }
     }
     // the terrain is one image over several km²: keep its full 2048 px (seen from the cinematic's aerial shots)
+    // real sponsor logos and advertising → invented generic boards (maps/<id>.json "signage", signage.mjs)
+    if (MAP.signage) {
+      const changed = await applySignage(doc, MAP.signage);
+      if (changed.length) log(`generic signage (${kind}): ${changed.length} textures`);
+    }
     await compressTextures(doc, { maxColor: kind === 'terrain' ? 2048 : 512, maxData: 256, tag: `map-${kind}` });
     const file = `map_${kind}.glb`;
     const size = await finish(doc, path.join(dstDir, file));
@@ -539,11 +550,119 @@ async function map() {
   await collision(mapOut, dstDir);
 
   const base = `assets/${MAP.assets}`;
-  await writeTracks(mapOut, {
+  let render = {
     chunks: chunks.map((c) => ({ file: `${base}/${files[c.kind]}${V}`, node: c.name, center: c.center, radius: c.radius, kind: c.kind })),
     files: Object.fromEntries(Object.entries(files).map(([k, f]) => [k, `${base}/${f}${V}`])),
     collision: { file: `${base}/collision.apxc${V}`, surfaces: ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'] },
-  });
+  };
+  // a map built around another (the Nordschleife around the GP): reference the base map's chunks and collision
+  // instead of copying them (download and Vercel size stay the same for the GP)
+  if (MAP.baseMap) {
+    const baseLayout = baseLayoutOf(MAP.baseMap);
+    // the base map's hole fill also closed the Nordschleife channel with flat 'terrain_fill' ground: cut it along
+    // the new road and ship the trimmed copy (it replaces the base chunk_fill on this map's layouts)
+    const fillChunk = baseLayout.chunks.find((c) => c.node === 'chunk_fill');
+    if (fillChunk) {
+      const doc = await io.read(path.join(pub, '..', fillChunk.file.replace(/\?.*$/, '')));
+      const own = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
+      const near = newRoadTest(baseLayout, own, (MAP.nordschleife?.corridorM ?? 90) + 10);
+      let cut = 0;
+      for (const node of doc.getRoot().listNodes()) {
+        const mesh = node.getMesh();
+        if (!mesh) continue;
+        const m = node.getWorldMatrix();
+        for (const prim of mesh.listPrimitives()) {
+          if (!/^terrain_fill/i.test(prim.getMaterial()?.getName() ?? '')) continue;
+          const pos = prim.getAttribute('POSITION');
+          const ind = prim.getIndices();
+          const keep = [];
+          const v = [0, 0, 0];
+          const w = (i) => {
+            pos.getElement(i, v);
+            return [m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14]];
+          };
+          for (let t = 0; t < ind.getCount(); t += 3) {
+            const a = w(ind.getScalar(t));
+            const b = w(ind.getScalar(t + 1));
+            const c = w(ind.getScalar(t + 2));
+            if (near((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3)) cut++;
+            else keep.push(ind.getScalar(t), ind.getScalar(t + 1), ind.getScalar(t + 2));
+          }
+          ind.setArray(pos.getCount() > 65535 ? new Uint32Array(keep) : new Uint16Array(keep));
+        }
+      }
+      await compressTextures(doc, { maxColor: 2048, maxData: 256, tag: 'map-fill' }); // no-op when the base fill is KTX2 already
+      await finishFloat(doc, path.join(dstDir, 'map_fill.glb'));
+      render.chunks.push({ file: `${base}/map_fill.glb${V}`, node: 'chunk_fill', center: fillChunk.center, radius: fillChunk.radius, kind: 'track' });
+      render.files.fill = `${base}/map_fill.glb${V}`;
+      log(`base hole fill: ${cut} terrain-fill triangles cut along the new road`);
+    }
+    // the base map closes its link roads to the Nordschleife with walls/fences: cut them where the new lap passes
+    // (copies of just the affected base chunks; the client drops the base originals for this layout)
+    {
+      const own = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
+      const crossing = connectorTest(baseLayout, own, 7.5);
+      const BARRIER_RE = /^(walls_new|wall_|metal_wall|grail|fence|fences_b|box_fence|tyrewall|sound_barriers|galvanized|glass_railing|rockwall|net)/i;
+      const byFile = new Map();
+      for (const c of baseLayout.chunks) if (c.kind === 'track' || c.kind === 'scenery') byFile.set(c.file, [...(byFile.get(c.file) ?? []), c]);
+      let cutTris = 0;
+      const copied = [];
+      for (const [file, list] of byFile) {
+        const doc = await io.read(path.join(pub, '..', file.replace(/\?.*$/, '')));
+        const names = new Set(list.map((c) => c.node));
+        const hit = new Set();
+        for (const node of doc.getRoot().listNodes()) {
+          if (!names.has(node.getName())) continue;
+          let cutHere = 0;
+          node.traverse((nd) => {
+            const mesh = nd.getMesh();
+            if (!mesh) return;
+            const m = nd.getWorldMatrix();
+            for (const prim of mesh.listPrimitives()) {
+              if (!BARRIER_RE.test(prim.getMaterial()?.getName() ?? '') || !prim.getIndices()) continue;
+              const pos = prim.getAttribute('POSITION');
+              const ind = prim.getIndices();
+              const v = [0, 0, 0];
+              const keep = [];
+              for (let t = 0; t < ind.getCount(); t += 3) {
+                const w = [];
+                for (let q = 0; q < 3; q++) {
+                  pos.getElement(ind.getScalar(t + q), v);
+                  w.push(m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14]);
+                }
+                if (crossing.tri(...w)) cutHere++;
+                else keep.push(ind.getScalar(t), ind.getScalar(t + 1), ind.getScalar(t + 2));
+              }
+              if (keep.length !== ind.getCount()) ind.setArray(pos.getCount() > 65535 ? new Uint32Array(keep) : new Uint16Array(keep));
+            }
+          });
+          if (cutHere) {
+            hit.add(node.getName());
+            cutTris += cutHere;
+          }
+        }
+        if (!hit.size) continue;
+        // keep only the touched chunks of this file
+        for (const node of doc.getRoot().listScenes()[0].listChildren()) if (!hit.has(node.getName())) node.dispose();
+        await doc.transform(prune());
+        const out = path.join(dstDir, `map_junction_${copied.length}.glb`);
+        await finish(doc, out);
+        for (const c of list) if (hit.has(c.node)) render.chunks.push({ ...c, file: `${base}/${path.basename(out)}${V}` });
+        copied.push(path.basename(out));
+      }
+      if (cutTris) log(`junctions: ${cutTris} wall/fence triangles of ${MAP.baseMap} cut where the new lap passes (${copied.join(', ')})`);
+    }
+    // chunks this map rebuilds (the conformed terrain, the trimmed fill, the cut walls) replace the base map's chunks of the same name
+    const own = new Set(render.chunks.map((c) => c.node));
+    const baseChunks = baseLayout.chunks.filter((c) => !own.has(c.node));
+    render = {
+      chunks: [...baseChunks, ...render.chunks],
+      files: { ...Object.fromEntries(Object.entries(baseLayout.files).map(([k, f]) => [`base_${k}`, f])), ...render.files },
+      collision: render.collision,
+    };
+    log(`base map ${MAP.baseMap}: ${baseChunks.length} chunks referenced, ${baseLayout.chunks.length - baseChunks.length} replaced`);
+  }
+  await writeTracks(mapOut, render);
 }
 
 /** Where a layout's JSON lives (public/assets/<file>): the map config can name it (the Nürburgring GP keeps track.json). */
@@ -563,7 +682,14 @@ async function writeTracks(mapOut, render) {
     bases.push(JSON.parse(readFileSync(path.join(mapOut, f), 'utf8')));
   const surf = roadSurface(mapOut);
   if (MAP.fixPitEntry) fixPitEntry(bases);
-  for (const b of bases) fixHeights(b, surf);
+  // on a map built around a base map, lap-line points on the base map's road keep the base map's data
+  const baseLayout = MAP.baseMap ? baseLayoutOf(MAP.baseMap) : null;
+  const baseIdx = new Map();
+  if (baseLayout)
+    for (let i = 0; i < baseLayout.centerline.length / 3; i++)
+      baseIdx.set(`${baseLayout.centerline[i * 3].toFixed(2)},${baseLayout.centerline[i * 3 + 2].toFixed(2)}`, i);
+  const onBase = (b, i) => baseIdx.get(`${b.centerline[i * 3].toFixed(2)},${b.centerline[i * 3 + 2].toFixed(2)}`);
+  for (const b of bases) fixHeights(b, surf, baseLayout ? (i) => onBase(b, i) !== undefined : null);
   // track limits from the painted white lines (track_limits.mjs)
   const rawTrack = path.join(mapOut, 'map_track.glb');
   if (existsSync(rawTrack)) {
@@ -572,6 +698,13 @@ async function writeTracks(mapOut, render) {
       const lim = trackLimitsFromLines(doc, b);
       b.limitL = lim.limitL;
       b.limitR = lim.limitR;
+      if (baseLayout?.limitL)
+        for (let i = 0; i < b.limitL.length; i++) {
+          const j = onBase(b, i);
+          if (j === undefined) continue;
+          b.limitL[i] = baseLayout.limitL[j];
+          b.limitR[i] = baseLayout.limitR[j];
+        }
       log(`${b.id}: track limits from the white lines (${Math.round((lim.painted / (2 * lim.limitL.length)) * 100)} % painted)`);
     }
   }
@@ -590,6 +723,12 @@ async function writeTracks(mapOut, render) {
       ],
       files: { ...render.files, fill: url },
     };
+  }
+  // the procedural forest (forest_scatter.mjs, run after this step) survives a re-run of optimize
+  const forestMeta = path.join(pub, MAP.assets, 'forest.json');
+  if (existsSync(forestMeta)) {
+    const v = `?v=${Math.round(statSync(forestMeta).mtimeMs).toString(36)}`;
+    render = { ...render, forest: { file: `assets/${MAP.assets}/forest.bin${v}`, meta: `assets/${MAP.assets}/forest.json${v}` } };
   }
   bases.forEach((base, i) => {
     const track = { ...base, ...render };
@@ -655,7 +794,7 @@ const PIT_ENTRY = [
   [5150, -16],
   [5190, -19.5],
 ];
-const PIT_BOX = [5190, 60];
+const PIT_BOX = [5, 300]; // the whole garage row (lap m), one box per garage painted by the client
 
 function fixPitEntry(bases) {
   const gp = bases[0];
@@ -803,7 +942,98 @@ function roadSurface(mapOut) {
 }
 
 /** Heights of the lap line and the pit lane from the road surface, continuous from point to point. */
-function fixHeights(base, surf) {
+/**
+ * (x, z) → true within `R` m of the parts of `own`'s lap line that are not on the base layout's lap line, and
+ * closer to them than to the base lap (so near the junctions the base map keeps its own ground).
+ */
+function newRoadTest(baseLayout, own, R) {
+  const onBase = new Set();
+  for (let i = 0; i < baseLayout.centerline.length / 3; i++)
+    onBase.add(`${baseLayout.centerline[i * 3].toFixed(2)},${baseLayout.centerline[i * 3 + 2].toFixed(2)}`);
+  const G = 50;
+  const bucket = (list) => {
+    const grid = new Map();
+    for (const [x, z] of list) {
+      const k = `${Math.floor(x / G)},${Math.floor(z / G)}`;
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push([x, z]);
+    }
+    return grid;
+  };
+  const dist = (grid, x, z, max) => {
+    const gx = Math.floor(x / G);
+    const gz = Math.floor(z / G);
+    const r = Math.ceil(max / G);
+    let d = Infinity;
+    for (let a = -r; a <= r; a++)
+      for (let c = -r; c <= r; c++) for (const [px, pz] of grid.get(`${gx + a},${gz + c}`) ?? []) d = Math.min(d, (px - x) ** 2 + (pz - z) ** 2);
+    return Math.sqrt(d);
+  };
+  const basePts = [];
+  for (let i = 0; i < baseLayout.centerline.length / 3; i++) basePts.push([baseLayout.centerline[i * 3], baseLayout.centerline[i * 3 + 2]]);
+  const newPts = [];
+  for (let i = 0; i < own.centerline.length / 3; i++) {
+    const x = own.centerline[i * 3];
+    const z = own.centerline[i * 3 + 2];
+    if (!onBase.has(`${x.toFixed(2)},${z.toFixed(2)}`)) newPts.push([x, z]);
+  }
+  const baseGrid = bucket(basePts);
+  const newGrid = bucket(newPts);
+  return (x, z) => {
+    const dn = dist(newGrid, x, z, R);
+    if (dn >= R) return false;
+    const db = dist(baseGrid, x, z, dn + 30);
+    return db > 25 && dn < db;
+  };
+}
+
+/** (x, z) → true within `R` m of the new lap where it runs near the base lap (the junction connectors). */
+function connectorTest(baseLayout, own, R) {
+  const bx = baseLayout.centerline.filter((_, i) => i % 3 === 0);
+  const bz = baseLayout.centerline.filter((_, i) => i % 3 === 2);
+  // base lap densified to 1 m: own points within 3.5 m of it are the base lap (also where the join was rounded off)
+  const dense = [];
+  for (let k = 0; k < bx.length; k++) {
+    const k2 = (k + 1) % bx.length;
+    for (let u = 0; u < 1; u += 0.2) dense.push([bx[k] + (bx[k2] - bx[k]) * u, bz[k] + (bz[k2] - bz[k]) * u]);
+  }
+  const pts = [];
+  const n = own.centerline.length / 3;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const x = own.centerline[i * 3];
+    const z = own.centerline[i * 3 + 2];
+    let dmin = Infinity;
+    for (const [px, pz] of dense) dmin = Math.min(dmin, (px - x) ** 2 + (pz - z) ** 2);
+    if (dmin < 3.5 * 3.5 || dmin > 400 * 400) continue;
+    const x2 = own.centerline[j * 3];
+    const z2 = own.centerline[j * 3 + 2];
+    for (let u = 0; u < 1; u += 0.2) pts.push([x + (x2 - x) * u, z + (z2 - z) * u]);
+  }
+  const test = (x, z) => pts.some(([px, pz]) => (px - x) ** 2 + (pz - z) ** 2 < R * R);
+  // long thin triangles (wall panels spanning tens of metres): any edge passing within R of the new lap
+  const segNear = (ax, az, bx, bz) => {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const l2 = dx * dx + dz * dz || 1e-9;
+    for (const [px, pz] of pts) {
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
+      if ((ax + t * dx - px) ** 2 + (az + t * dz - pz) ** 2 < R * R) return true;
+    }
+    return false;
+  };
+  test.tri = (ax, az, bx, bz, cx, cz) => segNear(ax, az, bx, bz) || segNear(bx, bz, cx, cz) || segNear(cx, cz, ax, az);
+  return test;
+}
+
+/** The default layout JSON of another map (for maps built around it). */
+function baseLayoutOf(mapId) {
+  const idx = JSON.parse(readFileSync(path.join(pub, 'tracks.json'), 'utf8')).tracks;
+  const entry = idx.find((t) => (t.map ?? 'nurburgring') === mapId && t.default) ?? idx.find((t) => (t.map ?? 'nurburgring') === mapId);
+  return JSON.parse(readFileSync(path.join(pub, '..', entry.file.replace(/\?.*$/, '')), 'utf8'));
+}
+
+function fixHeights(base, surf, keep = null) {
   const pick = (x, z, prev) => {
     const ys = surf(x, z);
     if (!ys.length) return prev;
@@ -816,6 +1046,10 @@ function fixHeights(base, surf) {
   let prev = cl[1];
   for (let pass = 0; pass < 2; pass++) {
     for (let i = 0; i < n; i++) {
+      if (keep?.(i)) {
+        prev = cl[i * 3 + 1]; // on the base map's road: its height is already right
+        continue;
+      }
       const y = pick(cl[i * 3], cl[i * 3 + 2], prev);
       if (pass === 1) {
         if (Math.abs(y - cl[i * 3 + 1]) > 1.5) fixed++;
@@ -828,7 +1062,7 @@ function fixHeights(base, surf) {
     const i = base.cumS.findIndex((s) => s >= g.s);
     if (i >= 0) g.p[1] = cl[i * 3 + 1];
   }
-  if (base.pitLane) {
+  if (base.pitLane && !keep) {
     let py = base.pitLane.points[0][1];
     for (const p of base.pitLane.points) {
       py = pick(p[0], p[2], py);
@@ -849,30 +1083,6 @@ async function tracksOnly() {
 
 const SURF = ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'];
 const SIMPLIFY_ERR = { asphalt: 0, curb: 0, grass: 0.00004, gravel: 0, sand: 0.00004, wall: 0.00012 };
-
-function weldPositions(pos, idx) {
-  const map = new Map();
-  const outPos = [];
-  const remap = new Uint32Array(pos.length / 3);
-  for (let i = 0; i < pos.length / 3; i++) {
-    const k = `${Math.round(pos[i * 3] * 500)},${Math.round(pos[i * 3 + 1] * 500)},${Math.round(pos[i * 3 + 2] * 500)}`;
-    let j = map.get(k);
-    if (j === undefined) {
-      j = outPos.length / 3;
-      map.set(k, j);
-      outPos.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]);
-    }
-    remap[i] = j;
-  }
-  const outIdx = [];
-  for (let t = 0; t < idx.length; t += 3) {
-    const a = remap[idx[t]];
-    const b = remap[idx[t + 1]];
-    const c = remap[idx[t + 2]];
-    if (a !== b && b !== c && a !== c) outIdx.push(a, b, c);
-  }
-  return { pos: new Float32Array(outPos), idx: new Uint32Array(outIdx) };
-}
 
 /**
  * collision.bin layout (little endian):
@@ -922,6 +1132,19 @@ async function collision(mapOut, dstDir) {
     total += ci.length / 3;
     log(`collision ${s}: ${before} → ${ci.length / 3} tris`);
   }
+  // maps whose stacked road layers the raw meshes can't tell apart: asphalt and kerbs from the render chunks
+  if (MAP.roadCollisionFromRender) {
+    const road = await roadPartsFromGlbs(
+      io,
+      ['track', 'scenery'].map((k) => path.join(mapOut, `map_${k}.glb`)),
+      MAP.analysis.surfaceRules,
+      MAP.roadCollisionFromRender.overlay,
+    );
+    for (const n of road.notes) log(`collision from the render: ${n}`);
+    for (let i = parts.length - 1; i >= 0; i--) if (SURF[parts[i].si] === 'asphalt' || SURF[parts[i].si] === 'curb') parts.splice(i, 1);
+    parts.unshift(...road.parts);
+    total = parts.reduce((n, p) => n + p.idx.length / 3, 0);
+  }
   // ground holes in the source model (sky showing through, cars falling out of the world): fill them with grass
   const base = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
   const GROUND_VIS_RE = /^(asph|curb|lines|redline|grass|sand|gravel|travert|conc_|pits|astroturf|box_decal|pavement|tiles|grille|top2)/i;
@@ -930,7 +1153,80 @@ async function collision(mapOut, dstDir) {
     const f = path.join(mapOut, `map_${k}.glb`);
     if (existsSync(f)) visual.push(...(await groundPartsFromGlb(io, f, GROUND_VIS_RE)));
   }
-  const fill = fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : [], visual);
+  // a map built around a base map carries the base's collision too, minus its terrain (rebuilt here, conformed)
+  if (MAP.baseMap) {
+    const bl = baseLayoutOf(MAP.baseMap);
+    const lim = Math.max(...bl.bounds.max.map(Math.abs), ...bl.bounds.min.map(Math.abs)) * 3;
+    const ownBase = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
+    const nearNew = newRoadTest(bl, ownBase, (MAP.nordschleife?.corridorM ?? 90) + 10);
+    const crossing = connectorTest(bl, ownBase, 7.5); // walls: the opening
+    const paved = connectorTest(bl, ownBase, 4.2); // ground: only where the new road's asphalt lies on top
+    let kept = 0;
+    for (const f of [bl.collision.file, ...(bl.collision.extra ?? [])]) {
+      let raw = readFileSync(path.join(pub, '..', f.replace(/\?.*$/, '')));
+      if (raw[0] === 0x1f && raw[1] === 0x8b) raw = gunzipSync(raw);
+      const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+      let o = 12;
+      for (let k = 0; k < dv.getUint32(8, true); k++) {
+        const si = dv.getUint32(o, true);
+        const nv = dv.getUint32(o + 4, true);
+        const ni = dv.getUint32(o + 8, true);
+        o += 12;
+        const pos = new Float32Array(raw.buffer.slice(raw.byteOffset + o, raw.byteOffset + o + nv * 12));
+        o += nv * 12;
+        const idx = new Uint32Array(raw.buffer.slice(raw.byteOffset + o, raw.byteOffset + o + ni * 4));
+        o += ni * 4;
+        let ext = 0;
+        for (let i = 0; i < pos.length; i += 3) ext = Math.max(ext, Math.abs(pos[i]), Math.abs(pos[i + 2]));
+        let keepIdx = idx;
+        {
+          // walls across the connectors, and any base ground under the new road there: the new road (laid on or
+          // above the base ground) is the only surface, so the wheels never catch a base layer's edge
+          const k = [];
+          const isWall = bl.collision.surfaces[si] === 'wall';
+          for (let t = 0; t < idx.length; t += 3) {
+            const a = idx[t] * 3;
+            const b = idx[t + 1] * 3;
+            const c = idx[t + 2] * 3;
+            const hit = isWall
+              ? crossing.tri(pos[a], pos[a + 2], pos[b], pos[b + 2], pos[c], pos[c + 2])
+              : paved((pos[a] + pos[b] + pos[c]) / 3, (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3);
+            if (!hit) k.push(idx[t], idx[t + 1], idx[t + 2]);
+          }
+          if (k.length !== idx.length)
+            log(`collision: ${(idx.length - k.length) / 3} ${bl.collision.surfaces[si]} triangles of ${MAP.baseMap} cut at the junctions`);
+          keepIdx = new Uint32Array(k);
+        }
+        if (!['asphalt', 'curb', 'wall'].includes(bl.collision.surfaces[si])) {
+          // ground: the satellite terrain is rebuilt here (conformed), and the base's hole fill closed the new road's
+          // channel: keep the base ground around the base circuit only, never over the new road
+          const b = bl.bounds;
+          const far = ext > lim;
+          const k = [];
+          for (let t = 0; t < keepIdx.length; t += 3) {
+            let cx = 0;
+            let cz = 0;
+            for (let q = 0; q < 3; q++) {
+              cx += pos[keepIdx[t + q] * 3] / 3;
+              cz += pos[keepIdx[t + q] * 3 + 2] / 3;
+            }
+            if (far && (cx < b.min[0] - 50 || cx > b.max[0] + 50 || cz < b.min[2] - 50 || cz > b.max[2] + 50)) continue;
+            if (nearNew(cx, cz)) continue;
+            k.push(keepIdx[t], keepIdx[t + 1], keepIdx[t + 2]);
+          }
+          if (k.length !== keepIdx.length)
+            log(`collision: ${(keepIdx.length - k.length) / 3} ${bl.collision.surfaces[si]} triangles of ${MAP.baseMap} dropped (terrain / over the new road)`);
+          keepIdx = new Uint32Array(k);
+        }
+        parts.push({ si: SURF.indexOf(bl.collision.surfaces[si]), pos, idx: keepIdx });
+        total += keepIdx.length / 3;
+        kept++;
+      }
+    }
+    log(`collision: ${kept} sub-meshes of ${MAP.baseMap} merged (its terrain left out)`);
+  }
+  // maps on top of a base map: the base's ground is in its own collision file, so "holes" here are not holes
+  const fill = MAP.baseMap ? { cells: 0 } : fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : [], visual);
   if (fill.cells) {
     const gi = SURF.indexOf('grass');
     parts.push({ si: gi, pos: fill.pos, idx: fill.idx });
@@ -939,7 +1235,12 @@ async function collision(mapOut, dstDir) {
     log(`terrain holes filled: ${terrain.cells} cells of 20 m`);
     // the grass texture for the fill: the map's main grass (maps/<id>.json "fillGrass"), else the first grass material
     const grassRe = MAP.fillGrass ? new RegExp(`^${MAP.fillGrass}$`) : undefined;
-    const bounds = await writeFillGlb(io, fill, path.join(mapOut, 'map_track.glb'), path.join(dstDir, 'map_fill.glb'), terrain, grassRe);
+    const fillFile = path.join(dstDir, 'map_fill.glb');
+    const bounds = await writeFillGlb(io, fill, path.join(mapOut, 'map_track.glb'), fillFile, terrain, grassRe);
+    // the terrain fill carries the full-size satellite photo: as JPEG it decodes to ~22 MB of GPU memory, as KTX2 ~3 MB
+    const fillDoc = await io.read(fillFile);
+    await compressTextures(fillDoc, { maxColor: 2048, maxData: 256, tag: 'map-fill' });
+    await io.write(fillFile, fillDoc);
     writeFileSync(path.join(mapOut, 'fill.json'), JSON.stringify({ file: 'map_fill.glb', cells: fill.cells, ...bounds }));
     log(`ground holes filled: ${fill.cells} cells of 2 m (${((fill.cells * 4) / 1e4).toFixed(2)} ha)`);
   }
@@ -976,6 +1277,15 @@ try {
   if ((!only && !args.includes('--map')) || only === 'cars') await cars();
   if (!only || only === 'map') await map();
   if (only === 'tracks') await tracksOnly();
+  if (only === 'fill') {
+    // re-encode an already built map_fill.glb's textures to KTX2 in place (maps built before the fill was compressed)
+    const file = path.join(pub, MAP.assets, 'map_fill.glb');
+    const before = statSync(file).size;
+    const doc = await io.read(file);
+    await compressTextures(doc, { maxColor: 2048, maxData: 256, tag: 'map-fill' });
+    const after = await finishFloat(doc, file);
+    log(`map_fill.glb: ${(before / 1e6).toFixed(2)} → ${(after / 1e6).toFixed(2)} MB (textures → KTX2)`);
+  }
   if (only === 'collision') {
     await collision(path.join(out, MAP.out), path.join(pub, MAP.assets));
     await tracksOnly();
