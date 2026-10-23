@@ -12,7 +12,7 @@ import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CarsFile, Surface, TrackData } from '../../packages/shared/src/index.ts';
-import { Vehicle, type GroundHit, type GroundQuery } from '../../apps/client/src/physics/vehicle.ts';
+import { TYRE_TEMP, Vehicle, type GroundHit, type GroundQuery } from '../../apps/client/src/physics/vehicle.ts';
 import { DamageState } from '../../apps/client/src/physics/damage.ts';
 import type { Controls } from '../../apps/client/src/physics/input.ts';
 import { AiDriver, BOT_ASSISTS, carLimits, profileLapTime, racingLineFor, speedProfile } from '../../apps/client/src/game/ai.ts';
@@ -28,7 +28,9 @@ const cars = JSON.parse(readFileSync(path.join(pub, 'cars.json'), 'utf8')) as Ca
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
 const optVals = new Set(
-  ['--collision', '--slot', '--skills', '--laps', '--wet', '--track'].flatMap((k) => (args.includes(k) ? [args[args.indexOf(k) + 1]] : [])),
+  ['--collision', '--slot', '--skills', '--laps', '--wet', '--track', '--air', '--track-temp', '--rho'].flatMap((k) =>
+    args.includes(k) ? [args[args.indexOf(k) + 1]] : [],
+  ),
 );
 const carId = args.find((a) => !a.startsWith('--') && !optVals.has(a)) ?? '2024_porsche_992_gt3_r';
 const loaded = loadTrack(trackArg(args));
@@ -40,8 +42,15 @@ const skills = opt('skills', '0.88,0.97').split(',').map(Number);
 const LAPS = Number(opt('laps', '1'));
 /** Track wetness 0…1 (rain falling as hard): wets on a wet track, as the game gives bots. */
 const WET = Number(opt('wet', '0'));
+const AIR_C = Number(opt('air', '20'));
+const TRACK_C = Number(opt('track-temp', '32'));
+const RHO_AIR = Number(opt('rho', '1.225'));
+// TYRE_TEMP_JSON='{"flex":0.002}': try tyre-model constants without editing vehicle.ts
+if (process.env.TYRE_TEMP_JSON) Object.assign(TYRE_TEMP, JSON.parse(process.env.TYRE_TEMP_JSON));
 const useTrack = true;
-const entry = cars.cars.find((c) => c.id === carId) ?? cars.cars[0];
+const found = cars.cars.find((c) => c.id === carId) ?? cars.cars[0];
+// CAR_SPECS_JSON='{"tyreGrip":1.7}': try spec values without regenerating cars.json
+const entry = process.env.CAR_SPECS_JSON ? { ...found, specs: { ...found.specs, ...JSON.parse(process.env.CAR_SPECS_JSON) } } : found;
 const DT = 1 / 120;
 
 await RAPIER.init();
@@ -121,11 +130,13 @@ const track = loaded.track as TrackData;
 let failed = false;
 {
   const line = racingLineFor(track);
-  const ideal = profileLapTime(line, speedProfile(line, carLimits(entry.specs), 1, true));
+  const ideal = profileLapTime(line, speedProfile(line, carLimits(entry.specs, 1, RHO_AIR), 1, true));
   console.log(`  quasi-steady-state lap on the racing line: ${fmt(ideal)} (real GT3 pole here: ${REAL_POLE[track.id] ?? 'n/a'})`);
 }
 for (const skill of skills) {
   const s = setup();
+  // the air of the session: --air °C, --track-temp °C (sunny asphalt ~15–20 °C above the air), --rho kg/m³
+  s.v.setAir(AIR_C, TRACK_C, RHO_AIR);
   // the lane the game gives a bot in this grid slot
   const ai = new AiDriver(track, s.v, skill, startSlot ? (((startSlot * 7) % 5) - 2) * 0.45 : 0);
   // ride: body heave acceleration, wheels losing the ground at speed, and the first 6 s from the grid
@@ -139,7 +150,7 @@ for (const skill of skills) {
   let prevVy = 0;
   const prevContact = [true, true, true, true];
   const bumpy: Record<number, number> = {};
-  s.v.fitTyres(COMPOUNDS[compoundForWeather(WET)], 30);
+  s.v.fitTyres(COMPOUNDS[compoundForWeather(WET)], AIR_C + 12);
   s.v.wetness = WET;
   s.v.weatherGrip = compoundGrip(s.v.compound, WET, WET);
   const tr = new RaceTracker(track, 0, LAPS);
@@ -159,8 +170,18 @@ for (const skill of skills) {
   let brakeN = 0;
   let violations = 0;
   let hint = -1;
+  // tyres: front/rear axle average at each lap end, average and peak over the flying laps, time to 80 °C
+  const tyreAtLap: string[] = [];
+  let tyreFSum = 0;
+  let tyreRSum = 0;
+  let tyreN = 0;
+  let tyrePeak = 0;
+  let warmAt = -1;
+  // HEATLOG=1: where each axle's tyre heat comes from on the flying laps (J): drive/brake slip, cornering slip, rolling
+  const heat = { long: [0, 0], lat: [0, 0], roll: [0, 0] };
   const limits = new TrackLimits();
-  for (let i = 0; i < 120 * 240 * LAPS && laps.length < LAPS; i++) {
+  // two minutes per GP-length lap; long layouts (the Nordschleife) get proportionally more
+  for (let i = 0; i < Math.max(120, track.length / 40) * 240 * LAPS && laps.length < LAPS; i++) {
     const pr0 = tr.players.get('ai');
     const cp = pr0 && pr0.passed >= 0 ? track.gates[(pr0.nextGate - 1 + track.gates.length) % track.gates.length].s : undefined;
     const c = ai.update(DT, true, s.v.weatherGrip * s.v.tyreGripAvg, cp);
@@ -228,6 +249,27 @@ for (const skill of skills) {
       }
     }
     maxV = Math.max(maxV, s.v.telemetry.speed * 3.6);
+    {
+      const w = s.v.wheels;
+      const f = (w[0].temp + w[1].temp) / 2;
+      const r = (w[2].temp + w[3].temp) / 2;
+      if (warmAt < 0 && Math.min(f, r) >= 80) warmAt = t;
+      if (laps.length >= 1 && process.env.HEATLOG) {
+        const sp = s.v.telemetry.speed;
+        w.forEach((x, k) => {
+          const a = k < 2 ? 0 : 1;
+          heat.long[a] += Math.abs(x.fx * x.slipRatio * sp) * DT;
+          heat.lat[a] += Math.abs(x.fy * Math.tan(x.slipAngle) * sp) * DT;
+          heat.roll[a] += 0.0075 * x.fz * sp * DT;
+        });
+      }
+      if (laps.length >= 1) {
+        tyreFSum += f;
+        tyreRSum += r;
+        tyreN++;
+        tyrePeak = Math.max(tyrePeak, w[0].temp, w[1].temp, w[2].temp, w[3].temp);
+      }
+    }
     brakeMax = Math.max(brakeMax, s.v.wheels[0].brakeTemp);
     brakeSum += s.v.wheels[0].brakeTemp;
     brakeN++;
@@ -261,6 +303,8 @@ for (const skill of skills) {
         if (e.type === 'lap') {
           nextSplit = 500;
           laps.push(e.lapMs);
+          const w = s.v.wheels;
+          tyreAtLap.push(`${((w[0].temp + w[1].temp) / 2).toFixed(0)}/${((w[2].temp + w[3].temp) / 2).toFixed(0)}`);
         }
     }
   }
@@ -276,6 +320,14 @@ for (const skill of skills) {
   console.log(
     `  ride: heave rms ${Math.sqrt(heaveSq / Math.max(1, heaveN)).toFixed(2)} m/s², max ${heaveMax.toFixed(0)} m/s² at ${heaveMaxAt.toFixed(0)} m, ` +
       `wheel lift-offs ${flicker}, first 6 s from the grid: max |vy| ${startVy.toFixed(2)} m/s, max heave ${startHeave.toFixed(1)} m/s²; steps >15 m/s² per 100 m: ${bumpList || 'none'}`,
+  );
+  if (process.env.HEATLOG)
+    console.log(
+      `  heat per axle (kJ, front/rear): drive+brake slip ${(heat.long[0] / 1e3).toFixed(0)}/${(heat.long[1] / 1e3).toFixed(0)}, cornering slip ${(heat.lat[0] / 1e3).toFixed(0)}/${(heat.lat[1] / 1e3).toFixed(0)}, rolling ${(heat.roll[0] / 1e3).toFixed(0)}/${(heat.roll[1] / 1e3).toFixed(0)}`,
+    );
+  console.log(
+    `  tyres (°C, front/rear axle): at each lap end ${tyreAtLap.join(' ') || '-'}; flying laps avg ${tyreN ? `${(tyreFSum / tyreN).toFixed(0)}/${(tyreRSum / tyreN).toFixed(0)}` : '-'}, ` +
+      `peak ${tyrePeak ? tyrePeak.toFixed(0) : '-'}; both axles ≥ 80 °C after ${warmAt >= 0 ? `${warmAt.toFixed(0)} s` : 'never'}`,
   );
   console.log(
     `skill ${skill}${WET ? ` wet ${WET}` : ''}: lap ${lap}, resets ${resets}, spins ${spins}, wall contacts ${wallHits}, top ${maxV.toFixed(0)} km/h, track-limit violations ${violations} (${offTime.toFixed(1)} s), tread used FL/FR/RL/RR ${wear} (${s.v.compound.name}), front brake ${Math.round(brakeSum / brakeN)} °C avg / ${Math.round(brakeMax)} °C peak`,

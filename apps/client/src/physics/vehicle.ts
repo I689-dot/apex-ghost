@@ -53,26 +53,48 @@ export const TRACK_GROUPS = (0x0001 << 16) | 0xffff;
 export const CAR_GROUPS = (0x0002 << 16) | 0x0001;
 /** Wheel rays only see the track. */
 export const RAY_GROUPS = (0xffff << 16) | 0x0001;
-const RHO = 1.225;
+/** Standard air (15 °C, sea level): the reference for drag, downforce and engine power. */
+export const RHO = 1.225;
 
 /**
  * Tyre temperature, a single lumped value per tyre (as a driver's display shows it).
- * Heat comes from sliding (force × slip speed) and rolling deformation; the airflow cools it.
- * GT3 slicks work best around 80–100 °C: cold tyres have ~7 % less grip (the out lap warms them up),
- * overheated ones lose grip again. Constants tuned so a race pace lap sits in the window.
+ * Heat comes from sliding (force × slip speed), from the carcass flexing under load (force × speed: what warms
+ * the front tyres in the corners, not only the driven rears) and rolling; the airflow cools it, and the track
+ * surface heats it on a sunny day or chills it on a cold one. Slicks have a working window: within a few degrees
+ * of the optimum there is no loss; a cold slick (out of the garage, after a safety car) slides clearly more, an
+ * overheated one loses grip again and wears faster. Constants tuned with tools/sim/ailap.ts (DECISIONS.md,
+ * "Tyre and air temperature").
  */
 export const TYRE_TEMP = {
-  optimumC: 90,
-  /** Half-width of the window (°C) at which the full penalty applies. */
-  spanC: 45,
-  maxPenalty: 0.07,
+  optimumC: 85,
+  /** No loss within ± this many °C of the optimum. */
+  windowC: 6,
+  /** Grip lost when this far (°C) below / above the window, and how far that is. */
+  coldPenalty: 0.12,
+  coldSpanC: 30,
+  hotPenalty: 0.1,
+  hotSpanC: 25,
   heatCapacity: 6000, // J/K
   coolBase: 13, // W/K
-  coolPerMs: 1.4, // W/K per m/s
+  coolPerMs: 1.2, // W/K per m/s
   rolling: 0.0075, // × Fz × speed
+  /** Carcass flex: × (|Fx| + |Fy|) × speed. */
+  flex: 0.006,
+  /** Conduction with the track surface while in contact (W/K). */
+  road: 50,
+  /** Front cornering heat (×): GT3 fronts run −3.5…−4° of camber and scrub as they steer, which heats them more
+   * than the same slip at the rear. */
+  frontScrub: 1.7,
   /** Extra cooling on a fully wet track (×). */
   wetCool: 1.5,
 };
+
+/** Engine power in air of this density, against standard air: a naturally aspirated engine loses it all; a turbo
+ * (GT3 boost limits are ratios of the ambient pressure, SRO BoP) or a hybrid about half. */
+export function engineAirScale(s: CarSpecs, rho: number): number {
+  const r = rho / RHO;
+  return s.aspiration === 'na' ? r : Math.sqrt(r);
+}
 
 /**
  * Brake discs (GT3 steel discs, ~8 kg front): braking power heats them, airflow cools them.
@@ -85,17 +107,27 @@ export const BRAKE_TEMP = {
   coolPerMs: 0.95, // W/K per m/s
   coldC: 200,
   fadeC: 700,
+  fadeCarbonC: 1000,
 };
 
-export function brakeTempFactor(t: number): number {
+export function brakeTempFactor(t: number, carbon = false): number {
+  // carbon-ceramic discs (Ferrari Challenge, the AMG ONE) work far hotter than GT3 steel before they fade
+  const fade = carbon ? BRAKE_TEMP.fadeCarbonC : BRAKE_TEMP.fadeC;
   if (t < BRAKE_TEMP.coldC) return 0.86 + 0.14 * (t / BRAKE_TEMP.coldC);
-  if (t <= BRAKE_TEMP.fadeC) return 1;
-  return Math.max(0.7, 1 - (t - BRAKE_TEMP.fadeC) / 600);
+  if (t <= fade) return 1;
+  return Math.max(0.7, 1 - (t - fade) / 600);
 }
 
 export function tyreTempGrip(t: number, optimumC = TYRE_TEMP.optimumC): number {
-  const x = (t - optimumC) / TYRE_TEMP.spanC;
-  return 1 - TYRE_TEMP.maxPenalty * Math.min(1, x * x);
+  const d = t - optimumC;
+  const T = TYRE_TEMP;
+  if (Math.abs(d) <= T.windowC) return 1;
+  if (d < 0) {
+    const x = (-d - T.windowC) / T.coldSpanC;
+    return 1 - T.coldPenalty * Math.min(1, x * x);
+  }
+  const x = (d - T.windowC) / T.hotSpanC;
+  return 1 - T.hotPenalty * Math.min(1, x * x);
 }
 
 export class Wheel {
@@ -218,8 +250,12 @@ export class Vehicle {
   readonly wake = { drag: 1, downforce: 1, strength: 0 };
   /** Pit lane speed limiter (m/s), null when off. */
   speedLimitMs: number | null = null;
-  /** Air temperature (°C), for the tyres. */
+  /** Air temperature (°C), for the tyres and brakes. */
   ambientC = 20;
+  /** Track surface temperature (°C): tyres in contact take heat from it or give heat to it. */
+  trackC = 25;
+  /** Air density (kg/m³): drag, downforce and engine power follow it (setAir). */
+  airDensity = RHO;
   assists: Assists;
   frozen = false;
   readonly telemetry: VehicleTelemetry = {
@@ -324,6 +360,14 @@ export class Vehicle {
   }
 
   /** Place the car (chassis origin at ground level) with a heading. */
+  /** The air of the session (temperatures() in the shared weather code). */
+  setAir(airC: number, trackC: number, density: number): void {
+    this.ambientC = airC;
+    this.trackC = trackC;
+    this.airDensity = density;
+    this.drivetrain.airScale = engineAirScale(this.specs, density);
+  }
+
   /** Tyres straight out of the garage: a little above air temperature. */
   setTyreTemps(c: number): void {
     for (const w of this.wheels) w.temp = c;
@@ -601,7 +645,7 @@ export class Vehicle {
     const brakeTotal = s.brakeTorqueNm * brake;
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i];
-      let bt = ((brakeTotal * (w.front ? s.brakeBiasFront : 1 - s.brakeBiasFront)) / 2) * brakeTempFactor(w.brakeTemp);
+      let bt = ((brakeTotal * (w.front ? s.brakeBiasFront : 1 - s.brakeBiasFront)) / 2) * brakeTempFactor(w.brakeTemp, s.carbonBrakes);
       if (this.assists.abs && bt > 0 && w.contact && Math.abs(vF) > 3 && w.slipRatio < -0.13) {
         bt *= 0.25;
         tel.absActive = true;
@@ -705,11 +749,13 @@ export class Vehicle {
       w.fy = fyT;
       w.angle += w.omega * dt;
       // tyre temperature
-      const slipPower = Math.abs((fxSum / SUB) * (w.omega * R - vx)) + Math.abs(fyT * vy);
-      const heat = slipPower + TYRE_TEMP.rolling * fz * Math.abs(vx);
+      const slipPower = Math.abs((fxSum / SUB) * (w.omega * R - vx)) + Math.abs(fyT * vy) * (w.front ? TYRE_TEMP.frontScrub : 1);
+      const heat = slipPower + (TYRE_TEMP.rolling * fz + TYRE_TEMP.flex * (Math.abs(fxT) + Math.abs(fyT))) * Math.abs(vx);
       // water on the track carries heat away (why slicks never reach their window in the rain, and why wets on
       // a wet track stay near their 65 °C instead of cooking: bots' rear wets ran away past 200 °C and spun)
-      const cool = (TYRE_TEMP.coolBase + TYRE_TEMP.coolPerMs * Math.abs(vx)) * (1 + TYRE_TEMP.wetCool * this.wetness) * (w.temp - this.ambientC);
+      const cool =
+        (TYRE_TEMP.coolBase + TYRE_TEMP.coolPerMs * Math.abs(vx)) * (1 + TYRE_TEMP.wetCool * this.wetness) * (w.temp - this.ambientC) +
+        (w.contact ? TYRE_TEMP.road : 0) * (w.temp - this.trackC);
       w.temp += ((heat - cool) / (TYRE_TEMP.heatCapacity * this.compound.heatCap)) * dt;
       // tread wear from sliding energy, faster when overheated
       const over = Math.max(0, w.temp - this.compound.optimumC - 15) / 30;
@@ -725,9 +771,9 @@ export class Vehicle {
     /* ---------------------------------------------------- aero -------- */
     // slipstream: the wake of a car ahead lowers drag (and some downforce): set by the session each frame
     const dragArea = s.dragArea * dmg.dragScale() * this.wake.drag;
-    const fd = 0.5 * RHO * dragArea * speed;
+    const fd = 0.5 * this.airDensity * dragArea * speed;
     body.addForce({ x: -fd * v.x, y: -fd * v.y, z: -fd * v.z }, true);
-    const df = 0.5 * RHO * s.downforceArea * dmg.downforceScale() * this.wake.downforce * vF * vF;
+    const df = 0.5 * this.airDensity * s.downforceArea * dmg.downforceScale() * this.wake.downforce * vF * vF;
     const dfF = df * s.aeroBalanceFront;
     const dfR = df - dfF;
     const zf = this.car.wheels.FL.position[2];

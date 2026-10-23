@@ -2,7 +2,7 @@
   "_comment": "Hand-editable. Keyed by car id (slug of the folder name). 'pipeline' holds conversion hints; 'specs' are the physics values copied into cars.json. Profiles are applied first, then per-car 'specs' overrides.",
   "profiles": {
     "gt3_mid_v8tt": {
-      "massKg": 1250,
+      "massKg": 1410,
       "powerKw": 382,
       "idleRpm": 1200,
       "redlineRpm": 7500,
@@ -12,9 +12,10 @@
         [2500, 560],
         [3500, 640],
         [5000, 650],
-        [6500, 610],
-        [7500, 520],
-        [7800, 300]
+        [6000, 620],
+        [7000, 530],
+        [7500, 480],
+        [7800, 260]
       ],
       "gears": [3.05, 2.28, 1.82, 1.5, 1.27, 1.09],
       "reverseRatio": 3.2,
@@ -28,7 +29,7 @@
       "brakeTorqueNm": 8200,
       "brakeBiasFront": 0.6,
       "dragArea": 0.78,
-      "downforceArea": 2.36,
+      "downforceArea": 3.19,
       "aeroBalanceFront": 0.42,
       "diffLock": 0.45,
       "maxSteerDeg": 24,
@@ -37,10 +38,11 @@
       "antiRollFront": 40000,
       "antiRollRear": 30000,
       "suspTravelM": 0.14,
-      "topSpeedKmh": 285
+      "topSpeedKmh": 285,
+      "aspiration": "turbo"
     },
     "gt3_v10_na": {
-      "massKg": 1235,
+      "massKg": 1420,
       "powerKw": 375,
       "idleRpm": 1300,
       "redlineRpm": 8400,
@@ -66,7 +68,7 @@
       "brakeTorqueNm": 8000,
       "brakeBiasFront": 0.6,
       "dragArea": 0.76,
-      "downforceArea": 2.29,
+      "downforceArea": 3.09,
       "aeroBalanceFront": 0.42,
       "diffLock": 0.45,
       "maxSteerDeg": 24,
@@ -75,22 +77,23 @@
       "antiRollFront": 40000,
       "antiRollRear": 30000,
       "suspTravelM": 0.14,
-      "topSpeedKmh": 280
+      "topSpeedKmh": 280,
+      "aspiration": "na"
     },
     "gt3_front_v8": {
-      "massKg": 1285,
+      "massKg": 1465,
       "powerKw": 380,
       "idleRpm": 1100,
       "redlineRpm": 7200,
       "limiterRpm": 7400,
       "torqueCurve": [
-        [1000, 400],
-        [2500, 600],
-        [4000, 660],
-        [5500, 650],
-        [6500, 600],
-        [7200, 520],
-        [7500, 300]
+        [1000, 380],
+        [2500, 560],
+        [4000, 620],
+        [5500, 600],
+        [6500, 550],
+        [7200, 480],
+        [7500, 260]
       ],
       "gears": [2.95, 2.2, 1.77, 1.47, 1.25, 1.08],
       "reverseRatio": 3.1,
@@ -104,7 +107,7 @@
       "brakeTorqueNm": 8400,
       "brakeBiasFront": 0.62,
       "dragArea": 0.8,
-      "downforceArea": 2.23,
+      "downforceArea": 3.01,
       "aeroBalanceFront": 0.44,
       "diffLock": 0.5,
       "maxSteerDeg": 25,
@@ -113,10 +116,11 @@
       "antiRollFront": 45000,
       "antiRollRear": 28000,
       "suspTravelM": 0.14,
-      "topSpeedKmh": 280
+      "topSpeedKmh": 280,
+      "aspiration": "na"
     },
     "gt3_rear_f6": {
-      "massKg": 1250,
+      "massKg": 1405,
       "powerKw": 375,
       "idleRpm": 1300,
       "redlineRpm": 9200,
@@ -142,7 +146,7 @@
       "brakeTorqueNm": 8000,
       "brakeBiasFront": 0.62,
       "dragArea": 0.77,
-      "downforceArea": 2.32,
+      "downforceArea": 3.13,
       "aeroBalanceFront": 0.4,
       "diffLock": 0.4,
       "maxSteerDeg": 24,
@@ -151,22 +155,24 @@
       "antiRollFront": 42000,
       "antiRollRear": 26000,
       "suspTravelM": 0.14,
-      "topSpeedKmh": 282
+      "topSpeedKmh": 282,
+      "aspiration": "na"
     },
     "gt3_front_i6tt": {
-      "massKg": 1310,
+      "massKg": 1420,
       "powerKw": 395,
       "idleRpm": 1000,
-      "redlineRpm": 7100,
-      "limiterRpm": 7300,
+      "redlineRpm": 7300,
+      "limiterRpm": 7500,
       "torqueCurve": [
         [1000, 420],
         [2200, 640],
         [3500, 700],
         [5000, 690],
         [6200, 620],
-        [7100, 520],
-        [7400, 300]
+        [7000, 540],
+        [7300, 500],
+        [7600, 280]
       ],
       "gears": [2.9, 2.17, 1.74, 1.44, 1.22, 1.06],
       "reverseRatio": 3.1,
@@ -180,7 +186,7 @@
       "brakeTorqueNm": 8600,
       "brakeBiasFront": 0.62,
       "dragArea": 0.82,
-      "downforceArea": 2.23,
+      "downforceArea": 3.01,
       "aeroBalanceFront": 0.44,
       "diffLock": 0.5,
       "maxSteerDeg": 25,
@@ -189,7 +195,8 @@
       "antiRollFront": 46000,
       "antiRollRear": 28000,
       "suspTravelM": 0.14,
-      "topSpeedKmh": 278
+      "topSpeedKmh": 278,
+      "aspiration": "turbo"
     },
     "gt3_mid_v6tt": {
       "massKg": 1260,
@@ -218,7 +225,7 @@
       "brakeTorqueNm": 8200,
       "brakeBiasFront": 0.6,
       "dragArea": 0.77,
-      "downforceArea": 2.32,
+      "downforceArea": 3.13,
       "aeroBalanceFront": 0.42,
       "diffLock": 0.45,
       "maxSteerDeg": 24,
@@ -227,8 +234,10 @@
       "antiRollFront": 40000,
       "antiRollRear": 30000,
       "suspTravelM": 0.14,
-      "topSpeedKmh": 284
-    }
+      "topSpeedKmh": 284,
+      "aspiration": "turbo"
+    },
+    "_comment_mass": "massKg includes an 80 kg driver and ~30 kg of fuel: SRO 2024 BoP race weight (without driver) + 110 kg."
   },
   "cars": {
     "2015_mclaren_650s_gt3": {
@@ -243,10 +252,25 @@
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
-        "massKg": 1270,
-        "powerKw": 370,
-        "downforceArea": 2.16,
-        "dragArea": 0.82
+        "massKg": 1400,
+        "powerKw": 373,
+        "downforceArea": 2.92,
+        "dragArea": 0.7,
+        "torqueCurve": [
+          [1000, 320],
+          [2500, 540],
+          [3500, 610],
+          [5000, 620],
+          [6000, 595],
+          [7000, 505],
+          [7500, 460],
+          [7800, 250]
+        ]
+      },
+      "info": {
+        "engine": "3.8 L twin-turbo V8 (M838T)",
+        "gearbox": "6-speed sequential",
+        "team": "McLaren GT customer racing"
       }
     },
     "2015_mercedes_amg_gt3_marin_kitagawa": {
@@ -261,9 +285,14 @@
       },
       "profile": "gt3_front_v8",
       "specs": {
-        "massKg": 1300,
-        "downforceArea": 2.09,
-        "dragArea": 1.06
+        "massKg": 1430,
+        "downforceArea": 2.82,
+        "dragArea": 0.96
+      },
+      "info": {
+        "engine": "6.2 L V8, naturally aspirated (M159)",
+        "gearbox": "6-speed sequential transaxle",
+        "team": "Anime-style (\"itasha\") livery"
       }
     },
     "2020_audi_r8_lms_evo": {
@@ -278,7 +307,13 @@
       },
       "profile": "gt3_v10_na",
       "specs": {
-        "dragArea": 1.07
+        "dragArea": 1.04,
+        "massKg": 1420
+      },
+      "info": {
+        "engine": "5.2 L V10, naturally aspirated",
+        "gearbox": "6-speed sequential (paddles)",
+        "team": "Audi Sport customer racing"
       }
     },
     "2020_mclaren_720s_gt3": {
@@ -293,7 +328,13 @@
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
-        "dragArea": 1
+        "dragArea": 0.89,
+        "massKg": 1410
+      },
+      "info": {
+        "engine": "4.0 L twin-turbo V8 (M840T)",
+        "gearbox": "6-speed sequential",
+        "team": "McLaren customer racing"
       }
     },
     "2022_mercedes_amg_project_one": {
@@ -308,19 +349,20 @@
       },
       "profile": "gt3_mid_v6tt",
       "specs": {
-        "_note": "Balanced against the GT3 field: power capped, road-legal tyres and much less aero, but AWD traction.",
-        "massKg": 1695,
-        "powerKw": 560,
+        "_note": "Mercedes-AMG: 1,695 kg (DIN) + driver, 782 kW system power, 4MATIC+ with two 120 kW front motors, Michelin Cup 2 R road tyres, top speed 352 km/h (capped). Grip of the road tyres and the downforce (\"about half the weight\", AMG) are estimates.",
+        "massKg": 1775,
+        "powerKw": 782,
         "redlineRpm": 11000,
         "limiterRpm": 11200,
         "torqueCurve": [
-          [1000, 500],
-          [3000, 640],
-          [5000, 640],
-          [7500, 560],
-          [9500, 470],
-          [11000, 400],
-          [11300, 200]
+          [1000, 900],
+          [3000, 1000],
+          [6000, 950],
+          [8000, 880],
+          [9000, 830],
+          [10500, 700],
+          [11000, 640],
+          [11300, 300]
         ],
         "gears": [3.4, 2.4, 1.85, 1.48, 1.22, 1.03, 0.88],
         "finalDrive": 3.2,
@@ -329,11 +371,18 @@
         "frontTorqueSplit": 0.3,
         "weightFront": 0.42,
         "comHeightM": 0.4,
-        "tyreGrip": 1.56,
-        "dragArea": 0.81,
-        "downforceArea": 1.05,
+        "tyreGrip": 1.72,
+        "dragArea": 1.04,
+        "downforceArea": 2.6,
         "brakeTorqueNm": 9200,
-        "topSpeedKmh": 330
+        "topSpeedKmh": 352,
+        "aspiration": "hybrid",
+        "carbonBrakes": true
+      },
+      "info": {
+        "engine": "1.6 L V6 turbo (F1-derived) + 4 electric motors, 1,063 hp",
+        "gearbox": "7-speed automated manual",
+        "team": "Road-legal hypercar · Nordschleife record 6:29.090 (2024)"
       }
     },
     "2023_lamborghini_huracan_gt3_evo2": {
@@ -349,7 +398,13 @@
       "profile": "gt3_v10_na",
       "specs": {
         "powerKw": 380,
-        "dragArea": 1.06
+        "dragArea": 1.04,
+        "massKg": 1440
+      },
+      "info": {
+        "engine": "5.2 L V10, naturally aspirated",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "Lamborghini Squadra Corse customer racing"
       }
     },
     "2024_porsche_992_gt3_r": {
@@ -364,7 +419,13 @@
       },
       "profile": "gt3_rear_f6",
       "specs": {
-        "dragArea": 1.01
+        "dragArea": 0.99,
+        "massKg": 1405
+      },
+      "info": {
+        "engine": "4.2 L flat-six, naturally aspirated",
+        "gearbox": "6-speed sequential",
+        "team": "Porsche Motorsport customer racing"
       }
     },
     "2025_bmw_m4_gt3_evo_g82": {
@@ -379,7 +440,13 @@
       },
       "profile": "gt3_front_i6tt",
       "specs": {
-        "dragArea": 1.07
+        "dragArea": 1.06,
+        "massKg": 1420
+      },
+      "info": {
+        "engine": "3.0 L twin-turbo straight-six (P58)",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "BMW M Motorsport customer racing"
       }
     },
     "bmw_m4_touring_nh_24h": {
@@ -395,13 +462,19 @@
       },
       "profile": "gt3_front_i6tt",
       "specs": {
-        "massKg": 1420,
+        "massKg": 1440,
         "powerKw": 405,
-        "tyreGrip": 1.77,
-        "downforceArea": 1.56,
-        "dragArea": 1.18,
-        "comHeightM": 0.46,
-        "topSpeedKmh": 272
+        "tyreGrip": 1.95,
+        "downforceArea": 2.92,
+        "dragArea": 1.11,
+        "comHeightM": 0.45,
+        "topSpeedKmh": 274,
+        "_note": "The M4 GT3 EVO package in an estate body (BMW): 200 mm longer, 32 mm taller, raced in the SPX class at the 2024 Nürburgring 24h. Weight and aero are estimates."
+      },
+      "info": {
+        "engine": "3.0 L twin-turbo straight-six (P58)",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "BMW M Motorsport · Nürburgring 24h 2024 (SPX class)"
       }
     },
     "ferrari_296_challenge_2024": {
@@ -416,13 +489,36 @@
       },
       "profile": "gt3_mid_v6tt",
       "specs": {
-        "massKg": 1300,
+        "massKg": 1440,
         "powerKw": 515,
-        "tyreGrip": 1.71,
-        "downforceArea": 1.38,
-        "dragArea": 0.9,
-        "topSpeedKmh": 296,
-        "_note_drag": "Gearing-limited at ~296 km/h; drag area kept at a realistic value (calibrate.ts would push it down)."
+        "tyreGrip": 1.68,
+        "downforceArea": 2.9,
+        "dragArea": 1.07,
+        "topSpeedKmh": 300,
+        "weightFront": 0.41,
+        "redlineRpm": 8200,
+        "limiterRpm": 8500,
+        "shiftTimeMs": 30,
+        "finalDrive": 3.9,
+        "gears": [3.28, 2.36, 1.8, 1.45, 1.2, 1.02, 0.88],
+        "torqueCurve": [
+          [1000, 380],
+          [2500, 620],
+          [3500, 740],
+          [6000, 740],
+          [7000, 690],
+          [7500, 656],
+          [8000, 590],
+          [8500, 520],
+          [8700, 250]
+        ],
+        "_note": "Ferrari / Motor Sport: 700 cv, 740 Nm, 1,330 kg dry, 7-speed F1 DCT, 870 kg of downforce at 250 km/h. Tyre grip calibrated with tools/sim/ailap.ts so it laps ~2 % slower than the GT3s, as Ferrari says the 296 GT3 (100 hp less) laps \"a handful of seconds\" faster; the top speed is an estimate.",
+        "carbonBrakes": true
+      },
+      "info": {
+        "engine": "3.0 L twin-turbo 120° V6, 700 cv",
+        "gearbox": "7-speed F1 dual-clutch",
+        "team": "Ferrari Challenge (one-make series)"
       }
     },
     "ferrari_296_gt3": {
@@ -450,7 +546,13 @@
       "profile": "gt3_v10_na",
       "specs": {
         "powerKw": 370,
-        "dragArea": 1.11
+        "dragArea": 1.11,
+        "massKg": 1440
+      },
+      "info": {
+        "engine": "5.2 L V10, naturally aspirated",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "Lamborghini Squadra Corse customer racing"
       }
     },
     "lamborghini_huracan_gt3_evo2": {
@@ -467,7 +569,13 @@
       "profile": "gt3_v10_na",
       "specs": {
         "powerKw": 380,
-        "dragArea": 1.03
+        "dragArea": 0.99,
+        "massKg": 1440
+      },
+      "info": {
+        "engine": "5.2 L V10, naturally aspirated",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "Iron Lynx"
       }
     },
     "mclaren_720s_gt3_inception_racing": {
@@ -482,8 +590,14 @@
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
-        "downforceArea": 2.43,
-        "dragArea": 1.03
+        "downforceArea": 3.28,
+        "dragArea": 0.93,
+        "massKg": 1410
+      },
+      "info": {
+        "engine": "4.0 L twin-turbo V8 (M840T)",
+        "gearbox": "6-speed sequential",
+        "team": "Inception Racing (GT World Challenge Europe)"
       }
     },
     "mclaren_720s_lmgt3_evo": {
@@ -499,9 +613,14 @@
       },
       "profile": "gt3_mid_v8tt",
       "specs": {
-        "massKg": 1265,
-        "downforceArea": 2.43,
-        "dragArea": 1.06
+        "massKg": 1430,
+        "downforceArea": 3.28,
+        "dragArea": 0.98
+      },
+      "info": {
+        "engine": "4.0 L twin-turbo V8 (M840T)",
+        "gearbox": "6-speed sequential",
+        "team": "WEC LMGT3 specification (2024)"
       }
     },
     "mercedes_amg_gt3_evo": {
@@ -516,7 +635,13 @@
       },
       "profile": "gt3_front_v8",
       "specs": {
-        "dragArea": 1.06
+        "dragArea": 0.96,
+        "massKg": 1465
+      },
+      "info": {
+        "engine": "6.2 L V8, naturally aspirated (M159)",
+        "gearbox": "6-speed sequential transaxle",
+        "team": "Mercedes-AMG customer racing"
       }
     },
     "mercedes_amg_gt3_red_bull_racing": {
@@ -531,8 +656,14 @@
       },
       "profile": "gt3_front_v8",
       "specs": {
-        "downforceArea": 2.32,
-        "dragArea": 1.06
+        "downforceArea": 3.13,
+        "dragArea": 0.95,
+        "massKg": 1465
+      },
+      "info": {
+        "engine": "6.2 L V8, naturally aspirated (M159)",
+        "gearbox": "6-speed sequential transaxle",
+        "team": "Red Bull livery"
       }
     },
     "porsche_992_gt3_r": {
@@ -547,7 +678,13 @@
       },
       "profile": "gt3_rear_f6",
       "specs": {
-        "dragArea": 1.01
+        "dragArea": 0.99,
+        "massKg": 1405
+      },
+      "info": {
+        "engine": "4.2 L flat-six, naturally aspirated",
+        "gearbox": "6-speed sequential",
+        "team": "Porsche Motorsport customer racing"
       }
     },
     "vantage_gt3_evo_heart_of_racing": {
@@ -567,9 +704,27 @@
       },
       "profile": "gt3_front_v8",
       "specs": {
-        "massKg": 1290,
+        "massKg": 1415,
         "weightFront": 0.48,
-        "dragArea": 1.05
+        "dragArea": 0.96,
+        "aspiration": "turbo",
+        "redlineRpm": 7000,
+        "limiterRpm": 7250,
+        "torqueCurve": [
+          [1000, 400],
+          [2500, 620],
+          [3500, 680],
+          [5000, 680],
+          [6000, 620],
+          [6800, 540],
+          [7200, 480],
+          [7400, 260]
+        ]
+      },
+      "info": {
+        "engine": "4.0 L twin-turbo V8 (Mercedes-AMG M177)",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "Heart of Racing (IMSA GTD, WEC LMGT3)"
       }
     }
   }

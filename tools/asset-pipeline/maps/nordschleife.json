@@ -1,0 +1,85 @@
+{
+  "id": "nordschleife",
+  "name": "Nürburgring Gesamtstrecke",
+  "builder": "nordschleife",
+  "baseMap": "nurburgring",
+  "out": "map_nordschleife",
+  "assets": "maps/nordschleife",
+  "default": false,
+  "layoutId": "nurburgring_24h",
+  "layoutName": "Nürburgring Gesamtstrecke (GP + Nordschleife)",
+  "tracks": {
+    "nurburgring_24h": {
+      "turns": null,
+      "file": "tracks/nurburgring_24h.json"
+    }
+  },
+  "chunkLenM": 1000,
+  "forest": true,
+  "forestBand": 450,
+  "nordschleife": {
+    "source": "terrain",
+    "traceFile": "ns_trace.json",
+    "_doc": "Built by blender/build_nordschleife.py. source 'terrain' (default): centreline traced from the channel in the GP map's terrain (trace_nordschleife.mjs, offline). source 'osm': OpenStreetMap + EU-DEM (downloads, cached). Distances in metres. exitS/returnS/reverse override the automatic junction detection. Features (banking, crests) take 'at' = share of the Nordschleife from the GP exit (approximate, from published corner distances), or lat/lon with the osm source (read off Google Earth).",
+    "bbox": [50.315, 6.905, 50.395, 7.035],
+    "refLatLon": [50.3356, 6.9475],
+    "gpCenterLatLon": [50.333, 6.9425],
+    "osmName": "nordschleife",
+    "demDataset": "eudem25m",
+    "alignScale": false,
+    "maxAlignErrorM": 6.0,
+    "gpMergeDistM": 14.0,
+    "exitS": null,
+    "returnS": null,
+    "reverse": null,
+    "baseOut": "map",
+    "stepM": 3.0,
+    "roadWidthM": 9.4,
+    "widths": [],
+    "vergeM": 4.5,
+    "armcoOffsetM": 0.6,
+    "corridorM": 90,
+    "kerbRadiusM": 140,
+    "elevationSmoothM": 30,
+    "junctionRampM": 160,
+    "gateStepM": 35,
+    "banking": [
+      {
+        "name": "Karussell",
+        "at": 0.596,
+        "lat": 50.37175,
+        "lon": 6.98555,
+        "radiusM": 45,
+        "bankDeg": 12
+      }
+    ],
+    "crests": [
+      {
+        "name": "Flugplatz",
+        "at": 0.168,
+        "lat": null,
+        "lon": null,
+        "heightM": 0.8,
+        "lengthM": 50
+      },
+      {
+        "name": "Pflanzgarten I",
+        "at": 0.75,
+        "lat": null,
+        "lon": null,
+        "heightM": 0.6,
+        "lengthM": 50
+      },
+      {
+        "name": "Pflanzgarten II (Sprunghügel)",
+        "at": 0.77,
+        "lat": null,
+        "lon": null,
+        "heightM": 0.6,
+        "lengthM": 50
+      }
+    ],
+    "maxGrade": 0.17,
+    "gpClearM": 120
+  }
+}

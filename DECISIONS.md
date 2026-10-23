@@ -982,6 +982,18 @@ The app replaces the *Low* preset in place (`mobile/appShell.ts`) and starts on 
 - No gamepad support yet (the Gamepad API would work in the WebView).
 - Pre-existing, not from this change: in a solo race the local room logs one "Malformed message." toast right after the countdown, on desktop as well (seen at 7c488cc).
 
+## Nürburgring realism pass (2026-10-23)
+
+Details, numbers and the remaining gaps are in `docs/TRACK_REALISM.md`.
+
+- **Procedural forest instead of more source trees.** The source's trees are 878k triangles of a few hand-placed species, and they stop a few hundred metres from the track. The forest is placed from the satellite photo (dark and green is forest), so stands, clearings and field edges sit where they really are. Near trees are instanced 3D meshes; far ones are impostor cards baked at load from the same meshes, so the two always match. Total cost is 4–8 draw calls.
+- **Road wear is one decal, not new textures.** A multiply-blend strip over the road follows the AI racing line and speed profile, so rubber and skid marks sit where cars really drive and brake. It costs 1 call and is tone-mapping neutral.
+- **Nordschleife traced from the GP terrain.** The GP model's satellite terrain has a channel cut where the Nordschleife runs, so the shape is exact and needs no download. Heights come from the channel banks, with a grade clamp. Crests and Karussell banking are set by lap fraction in `maps/nordschleife.json`. OpenStreetMap + EU-DEM remains as `"source": "osm"`.
+- **Base maps.** A map can extend another (`"baseMap"`). Its layouts reuse the base chunks, replace some (conformed terrain, trimmed hole fill, cut junction walls), and its collision includes the base's. The 24h layout is built this way rather than as a separate copy of the GP.
+- **Generic signage.** Real sponsor logos and advertising in the GP source textures are redrawn as invented boards (`signage.mjs`, rules in the map JSON) at build time. The circuit's corner names stay; logos next to them go.
+- **Hole-fill photo as KTX2.** It was a 2048² JPEG, which decodes to ~22 MB of GPU memory on every Nürburgring layout. Its geometry stays unquantised, because 14-bit steps over a 2 km mesh poke through the road.
+- **Far barriers culled** (guard rails, tyre walls, pit wall beyond 0.9–3.5 km by preset). They are sub-pixel there, and on the 24h layout the whole GP is in view from the end of the Nordschleife.
+
 ## Known limitations
 
 - Frame rate was measured only on this machine's integrated Radeon: 90 fps on Low and 77 fps on Medium at native 1080p. Medium's 1% lows (~17 fps) show occasional GPU stalls in heavy views on an iGPU, which is why integrated GPUs default to Low. The figures for GTX 1650 and RX 570 are extrapolated. Please check with the perf overlay (Settings → Performance overlay) on your machines; dynamic resolution keeps fps up if a GPU is slower than expected.
@@ -1018,3 +1030,72 @@ The app replaces the *Low* preset in place (`mobile/appShell.ts`) and starts on 
   35 % towards the direction of travel in a slide, pulls back up to 0.7–1 m and widens the FOV by 7° towards
   250 km/h, smooths its height against kerbs, and looks back from ahead of the car while Look back is held.
   The windscreen rain/crack overlay and the drawn dash (cars without an interior) are cockpit-only.
+
+## Zandvoort ground: bouncing and "crashes for no reason" (2026-10-23)
+
+- **Report:** "the cars bounce, the surface on many points is not flat and cars crash with no reason".
+- **Measured** (`tools/sim/ailap.ts --track zandvoort`, Porsche 992): heave 81–91 m/s² (8–9 g) at 884–957 m, 351–504 wheel lift-offs a lap (the Nürburgring: 2). A render-vs-collision scan found the collision 0.2–0.75 m under the visible road in 1,736 samples, almost all in the two banked corners (Hugenholtz 800–1,000 m, Arie Luyendyk 3,700–4,100 m), and 4–15 cm under it in 46k more. No invisible walls: the walls inside the track limits (Tarzan, pit entry and exit) are the drawn pit-lane barriers.
+- **Cause:** Zandvoort's road is stacked. The run-off and road base (`asph_zv96`) runs under everything; the racing surface (`zv61`), rubbered strips (`zv60`), edge lines and kerbs sit 1.5–3 cm above it (render offsets against z-fighting), and the banked new asphalt (`zv42`) crosses the racing surface ~1 cm apart. The raw collision has one mesh per surface, so `flatten_layers.mjs` had to guess which layer was paint. It snapped the racing surface down only where the base ran on under it (steps up to 15 cm), and where two layers crossed each one "floated over" the other and both were dropped: 1.5 m holes in the banking that a wheel fell into, and a car pitching into the edge of the road looks like a crash.
+- **Fix:**
+  - `flatten_layers.mjs` drops a triangle only where kept ground stays under all of it, one at a time, so it can never open a hole. It also takes an optional per-triangle overlay flag: only overlays move.
+  - `tools/asset-pipeline/road_collision.mjs` rebuilds the asphalt and kerb collision from the render chunks, where the materials are known (`maps/zandvoort.json → roadCollisionFromRender`). Pieces of one material overlapping a few cm (seams, kerbs laid over themselves) become one surface first; then the overlays (`lines`, `asph_zv60`, `asph_zv61`) are laid onto the road under them; real road layers (the banking over the old road) stay exactly as drawn. Grass, gravel, walls and the hole fill are unchanged. `optimize.mjs` does the same when the map is rebuilt; standalone it repairs the shipped `collision.apxc` and bumps its `?v=`.
+  - Only the lines as overlays (the racing surface kept 3 cm proud of the base) was tried too: no holes and the wheels exactly on the drawn road, but 1.5–3 cm lips at every layer edge (26 m/s² leaving the grid). Laying the racing surface's skin onto the base gives the smoother ride; the wheels then sit 2–4 cm under the drawn racing surface, as they already did before (0.4 % of road samples more than 8 cm).
+- **Result:**
+
+  | | before | after |
+  |---|---|---|
+  | Collision > 15 cm under the visible road | 1,736 samples | 10 |
+  | Heave max, Porsche (skill 0.88 / 0.97) | 81 / 91 m/s² | 26 / 29 m/s² |
+  | Heave rms | 3.3 / 3.5 m/s² | 2.5 / 2.6 m/s² |
+  | Wheel lift-offs a lap | 351 / 504 | 115 / 109 |
+  | Launch from the grid, max heave | 7.5 m/s² | 4.3 m/s² |
+
+  Porsche, Ferrari 296 Challenge and McLaren 720S LMGT3 Evo, 3 laps each, and the Porsche in the wet (0.8): no resets, wall contacts or track-limit violations. The Ferrari at skill 0.97 still spins on lap 3 with overheated rear tyres, as before on both circuits. Grid settle: every slot within 0.02 m, no bounce. `holes.ts`: the same five single-point hairline cracks as before.
+- **Left:** a 7–10 cm kink in the source mesh at the entry to Arie Luyendyk (3,764 m, also in the old collision) still gives a 3–5 g jolt there at ~80 km/h, and the crest at 1,284 m about 2.7 g at 184 km/h. Fixing those means reshaping the track model, not the collision.
+
+## Loading a full grid (2026-10-23)
+
+- **Report:** with 9 people in the same race, loading takes a long time and often never finishes or crashes. The game should take any number of players; in practice fewer than 10 at once.
+- **Measured** (`solo` with 8 bots, i.e. the same 9 cars every player loads; Medium, 25 Mbit/s and a 4× slower CPU in Chromium): a player downloads **74 MB** before the start: the map 27 MB, their own cockpit model 8 MB, and the other 8 cars 37 MB, of which **25 MB is the other cars' LOD0**, the cockpit-grade model drawn only within 18 m. 30 s to the start (the server starts the countdown without anyone not loaded after 45 s, so 10 Mbit/s is already too slow). With 3 cars: 44 MB, 21 s.
+- **Why it failed instead of just being slow:**
+  - no download was retried: one dropped connection or server hiccup in any of the ~30 files rejected the whole load ("Could not load the race"), and the more cars, the more files;
+  - every loader cached its promise before it finished and never forgot a failure, so after one, every later session in that tab (the race after qualifying, a rematch) failed at once until the page was reloaded. The track list even cached its failure as an empty list, so a layout could silently fall back to the GP.
+- **Fix:**
+  - downloads are retried 3 times (0.6 s, 1.8 s, 4 s apart) on network errors and 5xx/408/429; a 404 still fails at once. The progress bar winds back. JSON files (car list, track list, layouts) go through the same path. Failed loads are forgotten, so the next attempt really tries again; without the track list a chosen layout is an error, never another circuit.
+  - other cars load their two light levels only (LOD1 + LOD2, ~30 % of a car); their LOD0 streams in after the player has reported loaded, during the intro and countdown, nearest grid slots first, with textures uploaded and shaders compiled before it is shown (`CarVisual.addDetailLevel`). A car whose LOD0 fails stays on LOD1. Low quality and the phone app never load other cars' LOD0 (`QualityConfig.remoteDetail`), which also saves GPU memory.
+- **Result** (9 cars):
+
+  | | before | after |
+  |---|---|---|
+  | Downloaded before the start (Medium) | 74 MB | 48 MB |
+  | Time to the start (Medium, 25 Mbit/s, 4× CPU) | 29.6 s | 21.1 s |
+  | Low: download / JS heap / textures | 74 MB / 324 MB / 729 | 46 MB / 234 MB / 580 |
+  | Other cars with LOD0 25 s after the start (Medium) | 8 of 8 | 8 of 8 |
+  | Three car files reset mid-download | load fails | loads (retried) |
+
+- **Left:** the map (27 MB) and your own cockpit model are still loaded up front. Parsed car models stay cached for the tab's life (fast race after qualifying), so a long evening with many different cars grows memory. The 45 s load timeout is unchanged.
+
+## Car realism, temperature and tyres (2026-10-23)
+
+- **Report:** "some cars heat their tyres way too quickly or don't steer well, others are really nice; make everything as real as possible", including air temperature, tyre temperature and performance.
+- **Finding** (details, real data and sources: `docs/REALISM_RESEARCH.md` §6): partly true. The Ferrari 296 Challenge, the AMG ONE and the BMW M3 Touring had been handicapped with invented values (low tyre grip, little downforce, capped power, extra weight) and steered 13–24 % worse; the Ferrari cooked its rear tyres. Every car ran its fronts ~19 °C colder than its rears. The other GT3s were within ~5 % of each other.
+- **Cars** (`tools/asset-pipeline/cars.config.json`, applied with `node tools/asset-pipeline/car_specs.mjs`, drag from `calibrate.ts --write`):
+  - weights from SRO's 2024 BoP sheet + an 80 kg driver + 30 kg fuel; torque curves set to BoP-typical power, and the shown power is the curve's peak (`powerKw` used to be a number the physics never read); turbo or naturally aspirated per engine; rev limits from the BoP boost tables;
+  - GT3 downforce ×1.35 (≈ 3.0–3.3 m²) **[estimate]**, above the Ferrari 296 Challenge's published 2.9 m²;
+  - Ferrari 296 Challenge: its real 515 kW / 740 Nm, 7-speed dual-clutch, 2.9 m², carbon brakes; its tyre grip (1.68) is calibrated so it laps ~2 % slower than the GT3s, as Ferrari says the 296 GT3 is faster;
+  - AMG ONE: the real 782 kW hybrid, four-wheel drive, 1,695 kg + driver, road tyres (grip estimate 1.72), carbon brakes; it is now about as fast as the quickest GT3 at the GP;
+  - BMW M3 Touring: the M4 GT3 EVO's package (as BMW built it), slightly higher centre of gravity;
+  - the lobby shows engine, gearbox and team or livery (`info` in cars.json); weight is labelled as with the driver.
+- **Temperature** (`temperatures()`, shared, so every client agrees and the lobby shows it): air from each circuit's monthly climate, time of day, cloud, rain and a seeded day anomaly; track = air + up to ~20 °C of sun on dry asphalt; air density from altitude and temperature. It feeds drag, downforce, engine power (`engineAirScale`: NA fully, turbo/hybrid by √), tyres and brakes, and the bots' and the racing line's speed profiles. The forecast and the loading screen show air / track °C.
+- **Tyres** (`TYRE_TEMP` in `vehicle.ts`): carcass-flex heat (force × speed), extra front cornering heat for camber and scrub (×1.7), conduction with the track (50 W/K); a working window of ±6 °C with no loss, then up to −12 % when far too cold and −10 % when far too hot (was −7 % either way); the compound optima moved 5 °C down (Medium 85 °C; ACC's DHF reference is 80–90 °C). Swept with `ailap.ts` (`TYRE_TEMP_JSON`, `CAR_SPECS_JSON`, `--air`, `--track-temp`, `--rho`, `HEATLOG=1`).
+- **Brakes:** carbon-ceramic discs fade from 1,000 °C instead of 700 °C (`carbonBrakes`).
+- **Result:** GT3 tyres 79–90 °C front / 81–89 °C rear on flying laps, peaks ≤ 100 °C; ±12 °C between a cold and a hot day; a cold day costs 2.7 s on the out lap. Every car and both circuits, dry and wet, in real air: no spins, resets or track-limit violations.
+- **Left:** GT3 downforce, the ONE's tyre grip and aero, and the M3 Touring's weight are estimates; the game's laps are still ~15 % slower than real poles (track widths and bot margins, see §5 of the research notes).
+
+## Map look: haze, grass, gravel, crowd, pit boxes (2026-10-23)
+
+- **Milky High/Ultra:** the bloom threshold (0.92) is in linear HDR, where a clear sky is 1.5–3, so the whole sky bloomed into a veil (brightness 205 against 164 on Medium, half the contrast). Not the ambient occlusion. Threshold 4: only the sun, headlights and floodlights glow.
+- **Grass:** 3D tufts beside the track (`game/grassTufts.ts`): the ground is sampled with the wheels' ray casts on a 1 m grid 0.6–9 m past the edge, ~5 short tufts per m² (fewer on the 24 km layout, at most 600k), drawn within 26/38/50 m (Medium/High/Ultra; 18 m on phone Medium; off on Low) from one instanced mesh refilled every 3 m. Both windings, front faces only: with double-sided cards half of them went dark. The ground tile's blade detail is stronger too.
+- **Gravel and sand:** a pebble detail tile (0.3 m and 1.25 m) instead of the paving one.
+- **Crowd** (`game/crowd.ts`): ~24,000 spectators on the Nürburgring's stands and spectator banks (sloped faces of the seating materials that face the track, 68 % of the seats), one instanced draw call; half on Low, 30–60 % on phones. Zandvoort's model has no grandstand material to find, so it has none yet.
+- **Pit boxes:** the service zone covered only the first 75 m of a 300 m garage row (Zandvoort: partly past its garages). It now spans the whole row (Nürburgring lap 5–300 m, Zandvoort 75–230 m, measured from the garage meshes), with a box painted in front of every garage (12.5 m), the driver's own box in yellow with their name above it (grid slots spread along the row), and service in any box.

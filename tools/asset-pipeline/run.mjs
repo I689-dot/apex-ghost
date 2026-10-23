@@ -9,6 +9,7 @@
  * 2. cars       — Blender headless: USDC → normalised GLB + meta JSON + thumbnail (per car)
  * 3. map        — Blender headless: USDC → render chunks GLB + collision/surface data + track analysis
  * 4. optimize   — gltf-transform: LODs, meshopt, KTX2/WebP, cars.json, track.json → apps/client/public/assets
+ * 5. forest     — headless Chromium: scatter the procedural forest on maps with "forest": true (forest_scatter.mjs)
  *
  * Tool locations can be overridden with env vars: BLENDER, USD_PYTHON, TOKTX.
  */
@@ -38,7 +39,8 @@ const mapFilter = opt('map', null);
 const MAPS = readdirSync(path.join(here, 'maps'))
   .filter((f) => f.endsWith('.json'))
   .map((f) => ({ ...JSON.parse(readFileSync(path.join(here, 'maps', f), 'utf8')), config: path.join(here, 'maps', f) }))
-  .sort((a, b) => Number(b.default) - Number(a.default))
+  // maps built on top of another one (baseMap) come after it
+  .sort((a, b) => Number(b.default) - Number(a.default) || Number(!!a.baseMap) - Number(!!b.baseMap))
   .filter((m) => !mapFilter || m.id === mapFilter);
 const jobs = Number(opt('jobs', '2'));
 const force = args.includes('--force');
@@ -60,7 +62,7 @@ function run(cmd, argv, label) {
     const onData = (d) => {
       const s = d.toString();
       for (const line of s.split('\n')) {
-        if (/^\[(car|map)\]|Error|Traceback/.test(line)) console.log(`  ${label}: ${line}`);
+        if (/^\[(car|map|forest|trace)\]|Error|Traceback/.test(line)) console.log(`  ${label}: ${line}`);
       }
       tail = (tail + s).slice(-4000);
     };
@@ -144,6 +146,12 @@ async function map() {
     console.log(`▶ map ${m.id} (track analysis + Blender)`);
     const mapOut = path.join(outDir, m.out);
     mkdirSync(mapOut, { recursive: true });
+    if (m.builder === 'nordschleife') {
+      // no source model: traced from the GP map's terrain (or OpenStreetMap + EU-DEM), built around the GP map
+      if ((m.nordschleife?.source ?? 'osm') === 'terrain') await run(process.execPath, ['tools/asset-pipeline/trace_nordschleife.mjs'], 'trace');
+      await run(BLENDER, ['-b', '--factory-startup', '-P', 'tools/asset-pipeline/blender/build_nordschleife.py', '--', root, path.basename(m.config)], 'map');
+      continue;
+    }
     const usd = path.join(srcDir, m.source);
     // the Nürburgring analysis has no config section (its defaults are built in)
     const cfg = m.analysis ? [m.config] : [];
@@ -158,12 +166,19 @@ async function optimize() {
   for (const m of MAPS) await run(process.execPath, ['tools/asset-pipeline/optimize.mjs', '--map', m.id, '--only', 'map'], 'optimize');
 }
 
+async function forest() {
+  for (const m of MAPS.filter((x) => x.forest)) {
+    console.log(`▶ forest ${m.id}`);
+    await run(process.execPath, ['tools/asset-pipeline/forest_scatter.mjs', '--map', m.id], 'forest');
+  }
+}
+
 async function report() {
   console.log('▶ report');
   await run(process.execPath, ['tools/asset-pipeline/report.mjs'], 'report');
 }
 
-const steps = { inventory, cars, map, optimize, report };
+const steps = { inventory, cars, map, optimize, forest, report };
 const t0 = Date.now();
 if (only) {
   if (only === 'cars' || only === 'map') checkTools();

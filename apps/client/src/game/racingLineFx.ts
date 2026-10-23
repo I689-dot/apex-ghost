@@ -20,10 +20,10 @@ export class RacingLineFx {
   readonly object = new THREE.Group();
   private meshes: Record<'corners' | 'full', THREE.Mesh>;
 
-  constructor(track: TrackData, specs: CarSpecs, ground: GroundQuery) {
+  constructor(track: TrackData, specs: CarSpecs, ground: GroundQuery, airDensity?: number) {
     const line = racingLineFor(track);
     // a realistic target, not the absolute limit: what a good driver brakes for
-    const v = speedProfile(line, carLimits(specs, 0.94), 1, true);
+    const v = speedProfile(line, carLimits(specs, 0.94, airDensity), 1, true);
     const n = v.length;
     const kind = new Uint8Array(n); // 0 go, 1 lift, 2 brake
     for (let i = 0; i < n; i++) {

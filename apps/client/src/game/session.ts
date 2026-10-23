@@ -23,8 +23,10 @@ import {
   makeCarState,
   nearestCenterlineIndex,
   planWeather,
+  temperatures,
   weatherAt,
   type CarEntry,
+  type Temperatures,
   type CarState,
   type CarsFile,
   type RaceEvent,
@@ -62,6 +64,10 @@ import { CockpitCamera } from './cockpit';
 import { Environment, WindshieldFx } from './environment';
 import type { Graphics } from './graphics';
 import { Track } from './track';
+import { Forest } from './forest';
+import { RoadWear } from './roadWear';
+import { buildCrowd } from './crowd';
+import { GrassTufts } from './grassTufts';
 import { PerfOverlay } from './perf';
 import { TrackEditor } from './trackEditor';
 import { IS_DEV } from '../config';
@@ -191,6 +197,10 @@ export class RaceSession {
   private liveDelta: number | null = null;
   private trackerEvents: RaceEvent[] = [];
   private racingLine: RacingLineFx | null = null;
+  /** Air and track temperature and air density now (temperatures() in the shared weather code). */
+  air: Temperatures = { airC: 20, trackC: 25, airDensity: 1.2 };
+  private roadWear: RoadWear | null = null;
+  private grass: GrassTufts | null = null;
   private cinematic: Cinematic | null = null;
   private snd: SessionAudio | null = null;
   private pit: PitLaneMonitor | null = null;
@@ -261,7 +271,7 @@ export class RaceSession {
       .filter((r) => r.id !== this.me && r.player?.carId && entries.has(r.player.carId))
       .map((r) => ({ id: r.id, entry: entries.get(r.player?.carId as string) as CarEntry }));
     const trackBytes = 22_000_000;
-    const total = trackBytes + myEntry.bytes + remoteEntries.reduce((s, r) => s + r.entry.bytes, 0);
+    const total = trackBytes + myEntry.bytes + remoteEntries.reduce((s, r) => s + r.entry.bytes * REMOTE_LIGHT_SHARE, 0);
     let loaded = 0;
     const onBytes = (n: number) => {
       loaded += n;
@@ -271,11 +281,16 @@ export class RaceSession {
     const [trackRes, myModel, ...remoteModels] = await Promise.all([
       Track.load(this.trackData, onBytes),
       loadCarModel(myEntry, onBytes, 1, this.gfx.quality.cockpitDetail),
-      ...remoteEntries.map((r) => loadCarModel(r.entry, onBytes, 3)),
+      // other cars: the light levels now, their full-detail level after loading (streamRemoteDetail)
+      ...remoteEntries.map((r) => loadCarModel(r.entry, onBytes, 3, false, 1)),
     ]);
     progress(total, total, t('Building the world'));
     this.track = trackRes.track;
     this.scene.add(this.track.root);
+    if (this.trackData.forest) {
+      const forest = await Forest.load(this.trackData.forest, this.gfx.renderer, onBytes);
+      if (forest) this.track.setForest(forest);
+    }
 
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
@@ -283,6 +298,11 @@ export class RaceSession {
     this.track.buildColliders(RAPIER, this.world, trackRes.collision);
     // ray casts only see colliders once the query structure is built: placing the cars on the ground needs it
     this.world.updateSceneQueries();
+    // spectators on the stands, grass tufts beside the track (found with the same ray casts as the wheels)
+    const crowd = buildCrowd(this.track.root, this.trackData, this.gfx.quality.crowd);
+    if (crowd) this.scene.add(crowd);
+    this.grass = GrassTufts.build(this.trackData, this.track.groundQuery(this.world));
+    if (this.grass) this.scene.add(this.grass.mesh);
 
     // weather & environment
     this.weather = weatherAt(this.race.weather, 0);
@@ -300,7 +320,8 @@ export class RaceSession {
     this.vehicle.place(grid.p[0], grid.p[1], grid.p[2], grid.yaw);
     this.vehicle.frozen = true;
     // no tyre warmers: the tyres leave the pits a little above air temperature
-    this.vehicle.ambientC = ambientTemp(this.weather, this.race.weather.startHour);
+    this.air = temperatures(this.race.weather, this.weather, this.trackData.map);
+    this.vehicle.setAir(this.air.airC, this.air.trackC, this.air.airDensity);
     this.vehicle.fitTyres(COMPOUNDS[settings.carSetup.tyre] ?? COMPOUNDS[compoundForWeather(this.weather.wetness)], this.vehicle.ambientC + 12);
     this.myVisual = new CarVisual(myEntry, myModel, true);
     if (this.gfx.quality.ownHeadlightSpots) this.myVisual.addHeadlights(this.gfx.quality.ownHeadlightShadows);
@@ -343,7 +364,9 @@ export class RaceSession {
     this.createLocalBots(entries);
     // ray casts only see colliders after the query structure is built (normally by the first step)
     this.world.updateSceneQueries();
-    this.racingLine = new RacingLineFx(this.trackData, tuned.specs, this.track.groundQuery(this.world));
+    this.racingLine = new RacingLineFx(this.trackData, tuned.specs, this.track.groundQuery(this.world), this.air.airDensity);
+    this.roadWear = new RoadWear(this.trackData, tuned.specs, this.track.groundQuery(this.world), this.air.airDensity);
+    this.scene.add(this.roadWear.object);
     this.racingLine.setMode(this.spectator ? 'off' : settings.racingLine);
     this.scene.add(this.racingLine.object);
     if (this.trackData.pitLane) {
@@ -362,13 +385,16 @@ export class RaceSession {
       const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' as const };
       this.track.root.updateMatrixWorld(true);
       this.scene.add(
-        this.pit.buildMarkings((x, z, y) => {
-          rc.set(new THREE.Vector3(x, y + 2.5, z), down);
-          rc.far = 6;
-          const h = rc.intersectObjects(roadMeshes, false)[0];
-          if (h) return h.point.y;
-          return gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y;
-        }),
+        this.pit.buildMarkings(
+          (x, z, y) => {
+            rc.set(new THREE.Vector3(x, y + 2.5, z), down);
+            rc.far = 6;
+            const h = rc.intersectObjects(roadMeshes, false)[0];
+            if (h) return h.point.y;
+            return gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y;
+          },
+          this.spectator ? null : { slot: this.race.slots[this.me] ?? 0, name: this.names.get(this.me) ?? '' },
+        ),
       );
     }
 
@@ -449,7 +475,7 @@ export class RaceSession {
       const vehicle = new Vehicle(RAPIER, this.world, entry, this.track.groundQuery(this.world), { ...BOT_ASSISTS }, r.damage);
       vehicle.place(g.p[0], g.p[1], g.p[2], g.yaw);
       vehicle.frozen = true;
-      vehicle.ambientC = this.vehicle.ambientC;
+      vehicle.setAir(this.air.airC, this.air.trackC, this.air.airDensity);
       vehicle.fitTyres(COMPOUNDS[compoundForWeather(this.weather.wetness)], vehicle.ambientC + 12);
       // skill and racing line differ per bot so they spread out (deterministic per slot)
       const skill = 0.88 + ((r.slot * 37) % 10) / 100;
@@ -491,8 +517,24 @@ export class RaceSession {
     this.windshield.crack.visible = true;
     for (const rm of this.remotes.values()) rm.visual.updateSmoke(0.5, 1, this.scene);
     this.myVisual.updateSmoke(0.5, 1, this.scene);
+    this.uploadTextures(this.scene);
+    await r.compileAsync(this.scene, this.cockpit.camera);
+    this.gfx.render();
+    for (const { o, v, f } of restore) {
+      o.visible = v;
+      o.frustumCulled = f;
+    }
+    this.myVisual.updateSmoke(0, 0, this.scene);
+    for (const rm of this.remotes.values()) rm.visual.updateSmoke(0, 0, this.scene);
+    this.windshield.mesh.visible = false;
+    this.windshield.crack.visible = false;
+  }
+
+  /** Upload every texture under `root` now (not on first sight during the race). */
+  private uploadTextures(root: THREE.Object3D): void {
+    const r = this.gfx.renderer;
     const textures = new Set<THREE.Texture>();
-    this.scene.traverse((o) => {
+    root.traverse((o) => {
       const m = (o as THREE.Mesh).material;
       if (!m) return;
       for (const mat of Array.isArray(m) ? m : [m]) {
@@ -509,16 +551,29 @@ export class RaceSession {
       }
       r.initTexture(t);
     }
-    await r.compileAsync(this.scene, this.cockpit.camera);
-    this.gfx.render();
-    for (const { o, v, f } of restore) {
-      o.visible = v;
-      o.frustumCulled = f;
+  }
+
+  /**
+   * Other cars' full-detail models (LOD0, drawn within 18 m) after loading, while the intro and the countdown
+   * play: one car at a time, the nearest on the grid first. Loading them up front made a 9-car session download
+   * a third more and keep everyone waiting; a car whose model fails just stays on its lighter level.
+   */
+  private async streamRemoteDetail(): Promise<void> {
+    const mySlot = this.race.slots[this.me] ?? 0;
+    const order = [...this.remotes.values()].sort((a, b) => Math.abs(a.slot - mySlot) - Math.abs(b.slot - mySlot));
+    for (const r of order) {
+      if (!this.running) return;
+      try {
+        const model = await loadCarModel(r.entry, () => {}, 1);
+        if (!this.running) return;
+        await r.visual.addDetailLevel(model.lods[0], async (level) => {
+          this.uploadTextures(level);
+          await this.gfx.renderer.compileAsync(level, this.cockpit.camera, this.scene);
+        });
+      } catch (e) {
+        console.warn(`[assets] full-detail model of ${r.entry.id} not loaded`, e);
+      }
     }
-    this.myVisual.updateSmoke(0, 0, this.scene);
-    for (const rm of this.remotes.values()) rm.visual.updateSmoke(0, 0, this.scene);
-    this.windshield.mesh.visible = false;
-    this.windshield.crack.visible = false;
   }
 
   /* ------------------------------------------------------------ control --- */
@@ -533,6 +588,7 @@ export class RaceSession {
       window.addEventListener('keydown', this.onKeySkip, true);
     }
     this.raf = requestAnimationFrame(this.frame);
+    if (this.gfx.quality.remoteDetail) void this.streamRemoteDetail();
   }
 
   setStartAt(t: number): void {
@@ -884,8 +940,11 @@ export class RaceSession {
     const tEnv = performance.now();
     this.env.update(dt, this.weather, viewCam, this.currPos, _carVel, this.gfx.renderer);
     // aerial shots see the whole circuit: distance culling (meant for the cockpit) would leave holes
-    if (this.cinematic?.aerial) this.track.showAll();
-    else this.track.updateVisibility(_camPos, this.gfx.quality);
+    if (this.cinematic?.aerial) {
+      this.track.showAll();
+      this.track.forest?.update(_camPos, this.gfx.quality);
+    } else this.track.updateVisibility(_camPos, this.gfx.quality);
+    this.grass?.update(_camPos, this.cinematic?.aerial ? 0 : this.gfx.quality.grassRadius);
     if (!this.spectator)
       this.windshield.update(
         dt,
@@ -1014,13 +1073,15 @@ export class RaceSession {
     // grip of the fitted compound for the water on the track (slicks aquaplane, wets bite)
     this.vehicle.weatherGrip = compoundGrip(this.vehicle.compound, w.wetness, w.rain);
     this.vehicle.wetness = w.wetness;
-    this.vehicle.ambientC = ambientTemp(w, w.hour);
+    // air and track temperature, air density: the tyres, brakes, aero and engines (shared, so all clients agree)
+    const air = (this.air = temperatures(this.race.weather, w, this.trackData.map));
+    this.vehicle.setAir(air.airC, air.trackC, air.airDensity);
     for (const r of this.remotes.values()) {
       if (!r.bot) continue;
       const bv = r.bot.vehicle;
       bv.weatherGrip = compoundGrip(bv.compound, w.wetness, w.rain);
       bv.wetness = w.wetness;
-      bv.ambientC = this.vehicle.ambientC;
+      bv.setAir(air.airC, air.trackC, air.airDensity);
     }
     this.track.setNight(this.env.night);
     this.headlightsOn = this.env.night > 0.3 || w.fog > 0.45 || w.rain > 0.4 || (this.env.sunElevation < 0.08 && w.clouds > 0.6);
@@ -1028,6 +1089,7 @@ export class RaceSession {
     this.env.updateEnvMap(this.gfx.renderer, w.hour);
     this.applyEnv();
     this.track.applyWetness(w.wetness, this.env.envIntensity);
+    this.roadWear?.setWetness(w.wetness);
   }
 
   /**
@@ -1751,6 +1813,9 @@ export class RaceSession {
   }
 }
 
+/** Share of a car's download in its two light levels (LOD1 + LOD2 of the three; measured over the 18 cars: 0.29). */
+const REMOTE_LIGHT_SHARE = 0.3;
+
 const SUSP = new Float32Array(4);
 
 function safeFlag(key: string): boolean {
@@ -1759,12 +1824,6 @@ function safeFlag(key: string): boolean {
   } catch {
     return false;
   }
-}
-
-/** Air temperature (°C) for the tyre model: a summer day at the Eifel, cooler at night, in cloud and rain. */
-function ambientTemp(w: WeatherState, hour: number): number {
-  const day = Math.max(0, Math.sin(((hour - 7) / 14) * Math.PI));
-  return 13 + 11 * day - 3 * w.clouds - 5 * w.rain;
 }
 
 /** Signed distance from the centreline at index i (+ = left). */

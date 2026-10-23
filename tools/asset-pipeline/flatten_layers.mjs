@@ -11,6 +11,15 @@
  * the road), so the wheels see one continuous surface. Only same-surface layers are
  * touched (a kerb on asphalt or the road over the hole fill keep their real step), and a vertex with nothing
  * underneath stays where it is (lines bridging gaps in the asphalt still carry the wheel there).
+ *
+ * A triangle is only dropped where the ground left under it is kept: at Zandvoort the racing surface and the
+ * banked new asphalt cross each other about 1 cm apart, each "floated over" the other, and dropping both left
+ * 1.5 m holes in the banking (wheels fell 0.5–0.75 m, 8–9 g jolts in tools/sim/ailap.ts).
+ *
+ * `overlay` (per triangle, optional) marks the layers that may move: paint and decals, when the material names
+ * are known (maps/<id>.json "roadCollisionFromRender"). Without it every triangle may (raw collision meshes carry
+ * no material). With it, overlays snap onto and are dropped over the other triangles only, and a real road
+ * lying a few cm above another one (Zandvoort's racing surface over its run-off) stays exactly where it is.
  */
 
 const MIN_GAP = 0.003;
@@ -30,11 +39,15 @@ const AROUND = Array.from({ length: 8 }, (_, k) => [0.02 * Math.cos((k * Math.PI
 
 /**
  * @param {{ pos: Float32Array, idx: Uint32Array }} part one surface's mesh (welded); positions are changed in place
+ * @param {Uint8Array | null} overlay per triangle: 1 = may be snapped / dropped, 0 = stays (null: every triangle may)
  * @returns {{ snapped: number, maxGap: number, dropped: number, idx: Uint32Array }} idx: the triangles kept
  */
-export function snapStackedLayers(part) {
+export function snapStackedLayers(part, overlay = null) {
   const { pos, idx } = part;
   const nt = idx.length / 3;
+  // ground for the snap and the drop: with overlays known, only the real surfaces under them
+  const ground = (t) => !overlay || !overlay[t];
+  const gone = new Uint8Array(nt);
   const hash = new Map();
   const key = (ix, iz) => ix * 73856093 + iz * 19349663;
   for (let t = 0; t < nt; t++) {
@@ -54,12 +67,13 @@ export function snapStackedLayers(part) {
         l.push(t);
       }
   }
-  // the highest same-surface triangle (not using vertex v) under (x, z), 3 mm … 15 cm below y (null: none)
-  const lowerAt = (x, y, z, v) => {
+  // the highest same-surface triangle (not using vertex v, not dropped) under (x, z), minGap … 15 cm below y (null: none)
+  const lowerAt = (x, y, z, v, minGap = MIN_GAP) => {
     const l = hash.get(key(Math.floor(x / CELL), Math.floor(z / CELL)));
     if (!l) return null;
     let best = null;
     for (const t of l) {
+      if (gone[t] || !ground(t)) continue;
       const ia = idx[t * 3];
       const ib = idx[t * 3 + 1];
       const ic = idx[t * 3 + 2];
@@ -75,7 +89,7 @@ export function snapStackedLayers(part) {
       if (w0 < -1e-5 || w1 < -1e-5 || w2 < -1e-5) continue;
       const h = w0 * pos[a + 1] + w1 * pos[b + 1] + w2 * pos[c + 1];
       const gap = y - h;
-      if (gap > MIN_GAP && gap <= MAX_GAP && (best === null || h > best)) best = h;
+      if (gap > minGap && gap <= MAX_GAP && (best === null || h > best)) best = h;
     }
     return best;
   };
@@ -94,10 +108,14 @@ export function snapStackedLayers(part) {
   };
   // decide on the original heights first, then move (a moved vertex must not become someone's "ground")
   const nv = pos.length / 3;
+  // a vertex shared with a real surface stays with it
+  const fixed = new Uint8Array(nv);
+  if (overlay) for (let t = 0; t < nt; t++) if (!overlay[t]) fixed[idx[t * 3]] = fixed[idx[t * 3 + 1]] = fixed[idx[t * 3 + 2]] = 1;
   const target = new Float32Array(nv).fill(NaN);
   let snapped = 0;
   let maxGap = 0;
   for (let v = 0; v < nv; v++) {
+    if (fixed[v]) continue;
     const h = below(v);
     if (h === null) continue;
     target[v] = h;
@@ -109,22 +127,28 @@ export function snapStackedLayers(part) {
     snapped++;
   }
   // Long slivers (a painted line crossing a crest at an angle) have their corners on the road but float above it
-  // in between: drop a triangle when most of it lies 3 mm … 15 cm above another triangle of the same surface.
-  const keep = [];
+  // in between: drop a triangle when most of it lies 3 mm … 15 cm above another triangle of the same surface, and
+  // all of it has kept ground at most 15 cm under it. One at a time, so two layers never both go.
   let dropped = 0;
   for (let t = 0; t < nt; t++) {
+    if (overlay && !overlay[t]) continue;
     const a = idx[t * 3] * 3;
     const b = idx[t * 3 + 1] * 3;
     const c = idx[t * 3 + 2] * 3;
     let over = 0;
+    let covered = 0;
     for (const [wa, wb, wc] of SAMPLES) {
       const x = wa * pos[a] + wb * pos[b] + wc * pos[c];
       const y = wa * pos[a + 1] + wb * pos[b + 1] + wc * pos[c + 1];
       const z = wa * pos[a + 2] + wb * pos[b + 2] + wc * pos[c + 2];
       if (lowerAt(x, y, z, -1) !== null) over++;
+      if (lowerAt(x, y, z, -1, -MIN_GAP) !== null) covered++;
     }
-    if (over >= SAMPLES.length - 2) dropped++;
-    else keep.push(idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]);
+    gone[t] = over >= SAMPLES.length - 2 && covered === SAMPLES.length ? 1 : 0;
+    dropped += gone[t];
   }
-  return { snapped, maxGap, dropped, idx: dropped ? new Uint32Array(keep) : idx };
+  if (!dropped) return { snapped, maxGap, dropped, idx };
+  const keep = [];
+  for (let t = 0; t < nt; t++) if (!gone[t]) keep.push(idx[t * 3], idx[t * 3 + 1], idx[t * 3 + 2]);
+  return { snapped, maxGap, dropped, idx: new Uint32Array(keep) };
 }

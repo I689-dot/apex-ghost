@@ -207,3 +207,67 @@ export function formatHour(hour: number): string {
   const m = Math.floor((hour - Math.floor(hour)) * 60);
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
+
+/* ---------------------------------------------------------- temperature --- */
+
+/**
+ * Climate of each circuit: altitude, and the monthly average daily high / low (°C) from May to September
+ * (climate normals as published for Nürburg and Zandvoort; approximate, see DECISIONS.md "Temperature").
+ */
+export const CLIMATE: Record<string, { altitudeM: number; highLow: [number, number][] }> = {
+  // the GP circuit lies at ~620 m in the Eifel
+  nurburgring: {
+    altitudeM: 620,
+    highLow: [
+      [16, 7],
+      [20, 11],
+      [22, 12],
+      [21, 13],
+      [18, 10],
+    ],
+  },
+  // in the dunes on the North Sea: milder nights, cooler days
+  zandvoort: {
+    altitudeM: 5,
+    highLow: [
+      [14, 10],
+      [18, 13],
+      [20, 16],
+      [20, 16],
+      [18, 14],
+    ],
+  },
+};
+
+export interface Temperatures {
+  /** Air (°C). */
+  airC: number;
+  /** Track surface (°C): the air plus what the sun puts into dark asphalt; water keeps it near the air. */
+  trackC: number;
+  /** Air density (kg/m³) from the circuit's altitude and the air temperature (drag, downforce, engine power). */
+  airDensity: number;
+}
+
+/**
+ * Air and track temperature for the forecast at this moment: the month's climate, the time of day (coolest at
+ * 05:00, warmest at 15:00), cloud and rain, and a day-to-day anomaly of ±3.5 °C from the seed (a cool or a hot
+ * day). Pure, so every client agrees and the lobby can show it. Sunny asphalt runs ~15–20 °C above the air.
+ */
+export function temperatures(plan: WeatherPlan, w: WeatherState, map = 'nurburgring'): Temperatures {
+  const c = CLIMATE[map] ?? CLIMATE.nurburgring;
+  const month = Math.min(4, Math.max(0, Math.floor((plan.dayOfYear - 121) / 30.5)));
+  const [high, low] = c.highLow[month];
+  const anomaly = (mulberry32(plan.seed ^ 0x51ed270b)() - 0.5) * 7;
+  const h = ((w.hour % 24) + 24) % 24;
+  // 0 at 05:00, 1 at 15:00, back down overnight
+  const day = h >= 5 && h <= 15 ? 0.5 - 0.5 * Math.cos((Math.PI * (h - 5)) / 10) : 0.5 + 0.5 * Math.cos(Math.PI * (((h - 15 + 24) % 24) / 14));
+  // cloud flattens the day (less sun by day, less cooling at night); rain cools
+  const mean = (high + low) / 2;
+  const amp = ((high - low) / 2) * (1 - 0.5 * w.clouds);
+  const airC = mean + anomaly + amp * (2 * day - 1) - 2.5 * w.rain;
+  const sun = Math.max(0, Math.sin(sunPosition(plan.dayOfYear, h).elevation));
+  const dry = 1 - w.wetness;
+  const trackC = airC + dry * (2 + 20 * Math.pow(sun, 0.8) * (1 - 0.8 * w.clouds));
+  const pressure = 101325 * Math.exp(-c.altitudeM / 8434);
+  return { airC, trackC, airDensity: pressure / (287.05 * (airC + 273.15)) };
+}
