@@ -1,6 +1,6 @@
 """Blender headless car converter.
 
-blender -b --factory-startup -P convert_car.py -- <in.usdc> <out.glb> <out_meta.json> [thumb.png]
+blender -b --factory-startup -P convert_car.py -- <in.usdc|.glb|.obj> <out.glb> <out_meta.json> [thumb.png]
 
 Output conventions (glTF space): metres, +Y up, +Z forward, +X = driver's LEFT.
 Origin: lateral centre, midpoint between the axles, ground (tyre contact) at y = 0.
@@ -61,7 +61,62 @@ def log(*a: object) -> None:
 
 # ---------------------------------------------------------------- import ---
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.wm.usd_import(filepath=IN_USD, import_cameras=False, import_lights=False, import_materials=True)
+# USD (the Sketchfab exports in 3D MODELS/CARS), glTF/GLB and OBJ (the downloads in CARS-MODELS)
+_ext = Path(IN_USD).suffix.lower()
+if _ext in (".glb", ".gltf"):
+    bpy.ops.import_scene.gltf(filepath=IN_USD)
+elif _ext == ".obj":
+    bpy.ops.wm.obj_import(filepath=IN_USD)
+else:
+    bpy.ops.wm.usd_import(filepath=IN_USD, import_cameras=False, import_lights=False, import_materials=True)
+
+
+def _hex(c: str) -> tuple[float, float, float, float]:
+    # sRGB hex → linear (Blender's colour sockets are linear)
+    v = [int(c.lstrip("#")[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+    return (*[x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in v], 1.0)
+
+
+def apply_material_overrides(rules: dict) -> None:
+    """pipeline.materials in cars.config.json: {"<material name regex>": {color, texture, metallic, roughness}}.
+    For downloads whose livery is a loose file (not linked to the paint) or with no material library at all (OBJ)."""
+    for pattern, r in rules.items():
+        rx = re.compile(pattern, re.I)
+        for m in bpy.data.materials:
+            if not rx.search(m.name):
+                continue
+            m.use_nodes = True
+            nt = m.node_tree
+            bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+            if bsdf is None:
+                bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
+                out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None) or nt.nodes.new("ShaderNodeOutputMaterial")
+                nt.links.new(bsdf.outputs[0], out.inputs[0])
+            base = bsdf.inputs["Base Color"]
+            if "texture" in r:
+                # relative to the download's folder (the nearest parent of the model that has it)
+                src = next(a / r["texture"] for a in Path(IN_USD).resolve().parents if (a / r["texture"]).exists())
+                img = bpy.data.images.load(str(src), check_existing=True)
+                tex = nt.nodes.new("ShaderNodeTexImage")
+                tex.image = img
+                for link in list(base.links):
+                    nt.links.remove(link)
+                nt.links.new(tex.outputs["Color"], base)
+            elif "color" in r:
+                for link in list(base.links):
+                    nt.links.remove(link)
+                base.default_value = _hex(r["color"])
+            if "metallic" in r:
+                bsdf.inputs["Metallic"].default_value = r["metallic"]
+            if "roughness" in r:
+                for link in list(bsdf.inputs["Roughness"].links):
+                    nt.links.remove(link)
+                bsdf.inputs["Roughness"].default_value = r["roughness"]
+            log("material override", m.name, "<-", pattern)
+
+
+if CFG.get("materials"):
+    apply_material_overrides(CFG["materials"])
 
 meshes = [o for o in bpy.data.objects if o.type == "MESH"]
 # The semantic names (WHEEL_LF, FRONT_BUMPER, Tire_RR …) live on parent Xforms: keep them as hints.

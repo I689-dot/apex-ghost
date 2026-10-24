@@ -1,4 +1,4 @@
-import { nearestCenterlineIndex, progressAt, type CarSpecs, type TrackData } from '@apex/shared';
+import { nearestCenterlineIndex, progressAt, wrapDelta, type CarSpecs, type TrackData } from '@apex/shared';
 import type { Controls } from '../physics/input';
 import type { Vehicle } from '../physics/vehicle';
 
@@ -14,6 +14,8 @@ const THROTTLE_RISE = 4;
 const BLEND_M = 260;
 /** How fast a bot moves sideways to pass (m per second of lateral target shift). */
 const PASS_RATE = 2.5;
+/** Speed into the pit lane entry (m/s, ~30 km/h). */
+const ENTRY_MS = 8.3;
 
 /**
  * A racing line: lateral offset of the centreline at every centreline point, found by minimising
@@ -216,6 +218,17 @@ export class AiDriver {
   private passOff = 0;
   private laneNow = 0;
   private roomy = 1;
+  /**
+   * Pit stop asked for by the session: stop in the box, or straight through (a drive-through). The bot brakes for
+   * the entry, follows the lane's centre line at the limiter, stops at `pitBox` (a lane point) until pitServed(),
+   * and merges back onto its racing line after the exit.
+   */
+  pitRequest: 'stop' | 'through' | null = null;
+  pitBox = 0;
+  inPitLane = false;
+  private boxDone = false;
+  private laneIdx = 0;
+  private laneStuck = 0;
 
   constructor(
     private readonly track: TrackData,
@@ -237,6 +250,78 @@ export class AiDriver {
     const v = this.vehicle.telemetry.speed;
     for (let d = 0; d <= 150; d += 10) if (this.profile[indexAt(this.track, this.lastS + d)] < Math.max(v, 20) * 0.92) return false;
     return true;
+  }
+
+  /** Stopped at its box, waiting for the crew. */
+  get atBox(): boolean {
+    return this.inPitLane && this.pitRequest === 'stop' && !this.boxDone && this.vehicle.telemetry.speed < 0.5 && this.laneIdx >= this.pitBox - 4;
+  }
+
+  /** The crew is done: drive on to the pit exit. */
+  pitServed(): void {
+    this.boxDone = true;
+  }
+
+  /** Pit lane target point and speed, or null when not pitting (`follow` false: still on track, braking for the entry). */
+  private pitPath(dt: number, x: number, z: number, s: number, speed: number): { follow: boolean; x: number; z: number; v: number } | null {
+    const lane = this.track.pitLane;
+    if (!lane || (!this.pitRequest && !this.inPitLane)) return null;
+    const pts = lane.points;
+    const n = pts.length;
+    const limit = lane.speedLimitKmh / 3.6 - 0.8;
+    if (!this.inPitLane) {
+      // slow for the entry, aiming for the lane from 150 m. The traced lane is only roughly where the real one is
+      // (the Nürburgring's jumps 6 m sideways in 2 m where it leaves the track, right at the end of the pit wall),
+      // so in the lane the car's body ignores the circuit's walls: following the trace, the bots clipped a wall's
+      // end, ran on the wrong side of it and stuck; now they may brush through a corner of one instead.
+      const d = wrapDelta(s, lane.entryS, this.track.length);
+      if (d < 0 || d > 600) return null;
+      const v = Math.sqrt(ENTRY_MS * ENTRY_MS + 2 * 6 * Math.max(0, d - 10));
+      if (d > 150) return { follow: false, x: 0, z: 0, v };
+      this.inPitLane = true;
+      this.laneIdx = 0;
+      this.boxDone = false;
+      this.laneStuck = 0;
+      this.vehicle.setWalls(false);
+    }
+    // where along the lane (only once on it: from the approach a point far into the lane can be the nearest)
+    let best = Infinity;
+    let bi = this.laneIdx;
+    for (let i = Math.max(0, this.laneIdx - 3); i < Math.min(n, this.laneIdx + 30); i++) {
+      const d = (pts[i][0] - x) ** 2 + (pts[i][2] - z) ** 2;
+      if (d < best) {
+        best = d;
+        bi = i;
+      }
+    }
+    if (best < 15 * 15) this.laneIdx = bi;
+    if (this.laneIdx >= n - 3) {
+      // back on the circuit: onto the racing line again
+      this.inPitLane = false;
+      this.pitRequest = null;
+      this.needBlend = true;
+      this.vehicle.setWalls(true);
+      return null;
+    }
+    const step = lane.length / (n - 1) || 2.5;
+    const k = Math.min(n - 1, this.laneIdx + Math.max(2, Math.round((3 + 0.12 * speed) / step)));
+    // through the entry jink slowly, then at the limiter
+    let v = this.laneIdx < 8 ? ENTRY_MS : limit;
+    if (this.pitRequest === 'stop' && !this.boxDone) {
+      const d = (this.pitBox - this.laneIdx) * step;
+      v = d <= 0.5 ? 0 : Math.min(v, Math.sqrt(2 * 3.5 * (d - 0.5)));
+    }
+    // safety net: held up against something in the lane (not waiting at the box) → back onto the lane's line, a
+    // few metres on (the traced entries are rough: a bot can still catch a kerb or ledge at the Nürburgring's)
+    this.laneStuck = v > 0 && speed < 1 ? this.laneStuck + dt : 0;
+    if (this.laneStuck > 2.5) {
+      const j = Math.min(n - 2, this.laneIdx + 2);
+      const yaw = Math.atan2(pts[j + 1][0] - pts[j][0], pts[j + 1][2] - pts[j][2]);
+      this.vehicle.place(pts[j][0], pts[j][1] + 0.3, pts[j][2], yaw);
+      this.laneStuck = 0;
+      this.resetRequested = true;
+    }
+    return { follow: true, x: pts[k][0], z: pts[k][2], v };
   }
 
   /** The side (+1 left, −1 right) with more track beside the line here. */
@@ -303,8 +388,13 @@ export class AiDriver {
     const lane = this.laneNow;
     const extra = clamp(lineOff + lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2) - lineOff;
     this.roomy = t.widthL[j] - lineOff > t.widthR[j] + lineOff ? 1 : -1;
-    const px = L.x[j] + (L.x[j2] - L.x[j]) * f + tz * extra;
-    const pz = L.z[j] + (L.z[j2] - L.z[j]) * f - tx * extra;
+    let px = L.x[j] + (L.x[j2] - L.x[j]) * f + tz * extra;
+    let pz = L.z[j] + (L.z[j2] - L.z[j]) * f - tx * extra;
+    const pit = this.pitPath(dt, p.x, p.z, s, speed);
+    if (pit?.follow) {
+      px = pit.x;
+      pz = pit.z;
+    }
 
     // into the car frame (+X left, +Z forward)
     const q = v.body.rotation();
@@ -349,6 +439,7 @@ export class AiDriver {
     // in a car's dirty air (less downforce: Vehicle.wake) corners must be taken slower; straights keep the tow
     if (vt < this.limits.vMax * 0.9) vt *= 1 - 0.35 * (1 - v.wake.downforce);
     vt = Math.min(vt, speedCap);
+    if (pit) vt = Math.min(vt, pit.v);
     this.lastS = s;
     this.dbgVt = vt;
     const err = vt - speed;
@@ -378,12 +469,17 @@ export class AiDriver {
     if (!raceStarted) {
       c.throttle = 0;
       c.brake = 0;
+    } else if (pit && pit.v === 0 && speed < 1.5) {
+      // standing in the box (not on full brake: held at a standstill, that engages reverse)
+      c.throttle = 0;
+      c.brake = 0.6;
     }
 
     // recovery: stuck against something, or far off the circuit
     const lateral = Math.abs((p.x - cl[i * 3]) * tz - (p.z - cl[i * 3 + 2]) * tx);
-    this.stuck = raceStarted && speed < 2 ? this.stuck + dt : 0;
-    this.offTrack = lateral > 22 ? this.offTrack + dt : 0;
+    // (standing in the box and the lane beside the circuit are no trouble)
+    this.stuck = raceStarted && speed < 2 && !this.inPitLane ? this.stuck + dt : 0;
+    this.offTrack = lateral > 22 && !this.inPitLane ? this.offTrack + dt : 0;
     // spun and facing the wrong way: a three-point turn on track is slow and puts it in everyone's path
     this.wrongWay = raceStarted && fx * tx + fz * tz < -0.2 && speed < 12 ? this.wrongWay + dt : 0;
     if (this.stuck > 4 || this.offTrack > 3 || this.wrongWay > 3) {

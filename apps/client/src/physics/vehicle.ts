@@ -48,11 +48,13 @@ export interface GroundQuery {
 const KEYS = ['FL', 'FR', 'RL', 'RR'] as const;
 export type WheelKey = (typeof KEYS)[number];
 const G = 9.81;
-/** Rapier interaction groups: (membership << 16) | filter. Track = bit 0, cars = bit 1. */
+/** Rapier interaction groups: (membership << 16) | filter. Track = bit 0, cars = bit 1, the track's walls = bit 2
+ * (a bot in the pit lane ignores those: AiDriver.pitPath). */
 export const TRACK_GROUPS = (0x0001 << 16) | 0xffff;
-export const CAR_GROUPS = (0x0002 << 16) | 0x0001;
+export const WALL_GROUPS = (0x0004 << 16) | 0xffff;
+export const CAR_GROUPS = (0x0002 << 16) | 0x0005;
 /** Wheel rays only see the track. */
-export const RAY_GROUPS = (0xffff << 16) | 0x0001;
+export const RAY_GROUPS = (0xffff << 16) | 0x0005;
 /** Standard air (15 °C, sea level): the reference for drag, downforce and engine power. */
 export const RHO = 1.225;
 
@@ -118,6 +120,71 @@ export function brakeTempFactor(t: number, carbon = false): number {
   return Math.max(0.7, 1 - (t - fade) / 600);
 }
 
+/**
+ * Tyre pressure. Set cold in the garage; the air inside heats with the tyre (gas law), so the hot pressure is
+ * what the driver gets: P_hot = (P_cold + 1 atm) · T_hot / T_set − 1 atm (absolute temperatures). Pirelli's GT3
+ * tyres are built for 2.00 bar (29 psi) hot, with at least 1.40 bar cold (SRO technical bulletins). Off target:
+ *  - under-inflated: the carcass flexes more (more heat, a softer, slower-responding tyre);
+ *  - over-inflated: a smaller contact patch (less grip) and a stiffer, peakier tyre that heats less.
+ * Measured in tools/sim/setup.ts (DECISIONS.md, "Car setup depth").
+ */
+export const TYRE_PRESSURE = {
+  targetPsi: 29,
+  atmPsi: 14.7,
+  /** Grip lost (share) at gripSpanPsi off the target (quadratic), at most maxLoss. */
+  gripLoss: 0.05,
+  gripSpanPsi: 3,
+  maxLoss: 0.1,
+  /** Flex heat × (target / p)^flexExp; cornering stiffness × (p / target)^stiffExp. */
+  flexExp: 1.5,
+  stiffExp: 0.35,
+  /** Cold pressure range a crew would set (psi): 1.40 bar minimum (Pirelli) … 2.1 bar. */
+  minColdPsi: 20.3,
+  maxColdPsi: 30.5,
+};
+
+/** Cold pressure (psi) that reaches the hot target at the compound's working temperature. */
+export function idealColdPsi(optimumC: number, setC: number): number {
+  const P = TYRE_PRESSURE;
+  return Math.round(((P.targetPsi + P.atmPsi) * ((setC + 273.15) / (optimumC + 273.15)) - P.atmPsi) * 10) / 10;
+}
+
+export function pressureGrip(psi: number): number {
+  const P = TYRE_PRESSURE;
+  const d = (psi - P.targetPsi) / P.gripSpanPsi;
+  return 1 - Math.min(P.maxLoss, P.gripLoss * d * d);
+}
+
+/**
+ * Fuel (the host's fuel rule): what the engine burns is the work it does over its efficiency (a modern GT3 engine
+ * ~31 %, petrol 32 MJ/l), plus idling. Calibrated on a Nürburgring GP lap (~3 l, tools/sim/setup.ts): a 120 l
+ * tank lasts ~35 laps, as real GT3 stints last about an hour. The fuel's weight comes off as it burns.
+ */
+export const FUEL = {
+  kgPerL: 0.745,
+  jPerL: 32e6,
+  efficiency: 0.31,
+  idleLps: 0.0006,
+  tankL: 120,
+  /** The cars' listed race weight includes this much fuel. */
+  refL: 50,
+  /** What a lap burns before one has been measured: litres per km of lap (3.3 l on the 5.2 km GP). */
+  perKm: 0.64,
+};
+
+/** Garage setup applied to the physics (the rest of the setup changes the specs: carSetup.ts). */
+export interface VehicleSetup {
+  /** Cold pressures (psi), front / rear; null: the crew sets them for the hot target. */
+  pressure: [number, number] | null;
+  /** Ride height change from the car's baseline (m, − = lower), front / rear. */
+  ride: [number, number];
+  /** Damper multipliers (bump, rebound), front / rear. */
+  bump: [number, number];
+  rebound: [number, number];
+}
+
+export const NEUTRAL_SETUP: VehicleSetup = { pressure: null, ride: [0, 0], bump: [1, 1], rebound: [1, 1] };
+
 export function tyreTempGrip(t: number, optimumC = TYRE_TEMP.optimumC): number {
   const d = t - optimumC;
   const T = TYRE_TEMP;
@@ -138,11 +205,16 @@ export class Wheel {
   readonly hy: number;
   readonly hz: number;
   readonly radius: number;
-  readonly restLen: number;
-  readonly travel: number;
+  /** Spring length at full extension and the travel to the bump stop (ride height changes both). */
+  restLen: number;
+  travel: number;
+  readonly restLen0: number;
+  readonly travel0: number;
   readonly k: number;
-  readonly cBump: number;
-  readonly cRebound: number;
+  cBump: number;
+  cRebound: number;
+  readonly cBump0: number;
+  readonly cRebound0: number;
   readonly inertia: number;
   readonly fz0: number;
   driven = false;
@@ -177,6 +249,10 @@ export class Wheel {
   wear = 0;
   /** Brake disc temperature (°C): see BRAKE_TEMP. */
   brakeTemp = 60;
+  /** Cold pressure (psi) and the tyre temperature it was set at; the hot pressure now (TYRE_PRESSURE). */
+  coldPsi = 22.5;
+  setC = 32;
+  pressure = 22.5;
 
   constructor(
     readonly key: WheelKey,
@@ -191,11 +267,12 @@ export class Wheel {
     this.k = this.front ? s.springRateFront : s.springRateRear;
     const quarterMass = staticLoad / G;
     const crit = 2 * Math.sqrt(this.k * quarterMass);
-    this.cBump = crit * 0.32;
-    this.cRebound = crit * 0.55;
+    this.cBump = this.cBump0 = crit * 0.32;
+    this.cRebound = this.cRebound0 = crit * 0.55;
     this.fz0 = staticLoad;
     const staticComp = staticLoad / this.k;
-    this.restLen = this.travel * 0.55 + staticComp;
+    this.restLen = this.restLen0 = this.travel * 0.55 + staticComp;
+    this.travel0 = this.travel;
     // hardpoint so that at static compression the wheel sits where the model has it
     this.hx = geom.position[0];
     this.hy = geom.position[1] + (this.restLen - staticComp);
@@ -234,6 +311,7 @@ export class Vehicle {
   readonly wheelbase: number;
   readonly trackWidth: number;
   readonly maxSteer: number;
+  private readonly baseInertia: { x: number; y: number; z: number };
   steerAngle = 0;
   /** Keyboard filters (rate limiters, slip-based steering limit, self-steer, ramped pedals). */
   readonly kbd = new KeyboardDriver();
@@ -250,6 +328,13 @@ export class Vehicle {
   readonly wake = { drag: 1, downforce: 1, strength: 0 };
   /** Pit lane speed limiter (m/s), null when off. */
   speedLimitMs: number | null = null;
+  /** Fuel on board (l), or null without the fuel rule. */
+  fuelL: number | null = null;
+  /** Fuel burnt so far (l), for the average per lap. */
+  fuelUsedL = 0;
+  private massTimer = 0;
+  /** Garage setup (pressures, ride height, dampers). */
+  setup: VehicleSetup = NEUTRAL_SETUP;
   /** Air temperature (°C), for the tyres and brakes. */
   ambientC = 20;
   /** Track surface temperature (°C): tyres in contact take heat from it or give heat to it. */
@@ -338,6 +423,7 @@ export class Vehicle {
     const ix = (m / 12) * (H * H + L * L) * 0.75;
     const iy = (m / 12) * (W * W + L * L) * 0.8;
     const iz = (m / 12) * (W * W + H * H) * 0.7;
+    this.baseInertia = { x: ix, y: iy, z: iz };
     this.body.setAdditionalMassProperties(m, { x: 0, y: this.comY, z: this.comZ }, { x: ix, y: iy, z: iz }, { x: 0, y: 0, z: 0, w: 1 }, true);
 
     const frontLoad = (m * G * s.weightFront) / 2;
@@ -373,13 +459,63 @@ export class Vehicle {
     for (const w of this.wheels) w.temp = c;
   }
 
-  /** A new set of tyres (pit stop): new tread, garage temperature. */
+  /** A new set of tyres (pit stop): new tread, garage temperature, pressures set now. */
   fitTyres(compound: Compound, tempC: number): void {
     this.compound = compound;
     for (const w of this.wheels) {
       w.wear = 0;
       w.temp = tempC;
+      w.setC = tempC;
+      const set = this.setup.pressure;
+      w.coldPsi = set ? set[w.front ? 0 : 1] : idealColdPsi(compound.optimumC, tempC);
+      w.pressure = w.coldPsi;
     }
+  }
+
+  /** The garage setup: ride height (spring length and travel to the bump stop) and dampers. Before place(). */
+  applySetup(setup: VehicleSetup): void {
+    this.setup = setup;
+    for (const w of this.wheels) {
+      const a = w.front ? 0 : 1;
+      w.restLen = w.restLen0 + setup.ride[a];
+      w.travel = Math.max(0.02, w.travel0 + setup.ride[a]);
+      w.cBump = w.cBump0 * setup.bump[a];
+      w.cRebound = w.cRebound0 * setup.rebound[a];
+    }
+  }
+
+  /** Fuel load (the fuel rule): the car's mass follows it. */
+  setFuel(litres: number | null): void {
+    this.fuelL = litres === null ? null : Math.max(0, Math.min(FUEL.tankL, litres));
+    this.updateMass();
+  }
+
+  private updateMass(): void {
+    const m = this.mass + (this.fuelL === null ? 0 : (this.fuelL - FUEL.refL) * FUEL.kgPerL);
+    const k = m / this.mass;
+    const i = this.baseInertia;
+    this.body.setAdditionalMassProperties(m, { x: 0, y: this.comY, z: this.comZ }, { x: i.x * k, y: i.y * k, z: i.z * k }, { x: 0, y: 0, z: 0, w: 1 }, true);
+  }
+
+  private contactOn = false;
+  private wallsOn = true;
+
+  /** Cars collide with each other (the contact rule) or pass through (ghosts). */
+  setContact(on: boolean): void {
+    this.contactOn = on;
+    this.applyGroups();
+  }
+
+  /** The body against the circuit's walls and barriers (not its ground); off for a bot in the pit lane
+   * (AiDriver.pitPath). */
+  setWalls(on: boolean): void {
+    this.wallsOn = on;
+    this.applyGroups();
+  }
+
+  private applyGroups(): void {
+    const filter = 0x0001 | (this.wallsOn ? 0x0004 : 0) | (this.contactOn ? 0x0002 : 0);
+    this.collider.setCollisionGroups((0x0002 << 16) | filter);
   }
 
   /** Average grip factor left from wear (for the AI's speed profile). */
@@ -633,7 +769,19 @@ export class Vehicle {
         nDriven++;
       }
     drivenOmega /= Math.max(1, nDriven);
+    dt2.starved = this.fuelL !== null && this.fuelL <= 0;
     const axleTorque = dt2.update(dt, throttle, drivenOmega, speed);
+    if (this.fuelL !== null && !this.frozen) {
+      const power = Math.max(0, dt2.engineTorque) * dt2.rpm * RPM_TO_RADS;
+      const used = (power / (FUEL.efficiency * FUEL.jPerL) + FUEL.idleLps) * dt;
+      this.fuelL = Math.max(0, this.fuelL - used);
+      this.fuelUsedL += used;
+      // the car gets lighter as it burns (a full tank is ~90 kg): updated once a second
+      if ((this.massTimer -= dt) <= 0) {
+        this.massTimer = 1;
+        this.updateMass();
+      }
+    }
     tel.rpm = dt2.rpm;
     tel.gear = dt2.gear;
     const front = s.drivetrain === 'AWD' ? s.frontTorqueSplit : s.drivetrain === 'FWD' ? 1 : 0;
@@ -706,7 +854,13 @@ export class Vehicle {
       const vx = cvx * wfx + cvy * wfy + cvz * wfz;
       const vy = cvx * wlx + cvy * wly + cvz * wlz;
       const surf = SURFACE_PROPS[w.surface];
-      const mu = muBase * surf.grip * dmg.gripScale(w.key) * tyreTempGrip(w.temp, this.compound.optimumC) * wearGrip(w.wear);
+      // hot pressure from the cold setting (gas law), and what it does to the contact patch and the carcass
+      const TP = TYRE_PRESSURE;
+      w.pressure = (w.coldPsi + TP.atmPsi) * ((w.temp + 273.15) / (w.setC + 273.15)) - TP.atmPsi;
+      const pr = Math.max(0.5, w.pressure / TP.targetPsi);
+      const stiff = pr ** TP.stiffExp;
+      const flexK = Math.min(1.8, pr ** -TP.flexExp);
+      const mu = muBase * surf.grip * dmg.gripScale(w.key) * tyreTempGrip(w.temp, this.compound.optimumC) * wearGrip(w.wear) * pressureGrip(w.pressure);
       const fz = w.fz;
       const R = w.radius;
       const den = Math.max(Math.abs(vx), 2.5);
@@ -725,7 +879,7 @@ export class Vehicle {
         let kappa = (om * R - vx) / den;
         if (Math.abs(kappa) > this.tire.p.kappaPeak * 0.7) {
           // saturated: explicit step with the actual (flat) force
-          this.tire.force(kappa, w.slipAngle, fz, w.fz0, mu, tmpF);
+          this.tire.force(kappa, w.slipAngle * stiff, fz, w.fz0, mu, tmpF);
           om = w.omega + ((tq - tmpF[0] * R) / w.inertia) * h;
           kappa = (om * R - vx) / den;
         }
@@ -735,7 +889,7 @@ export class Vehicle {
         else om -= Math.sign(om) * bd;
         w.omega = om;
         kappa = (om * R - vx) / den;
-        this.tire.force(kappa, w.slipAngle, fz, w.fz0, mu, tmpF);
+        this.tire.force(kappa, w.slipAngle * stiff, fz, w.fz0, mu, tmpF);
         fxSum += tmpF[0];
         fySum += tmpF[1];
         w.slipRatio = kappa;
@@ -750,7 +904,7 @@ export class Vehicle {
       w.angle += w.omega * dt;
       // tyre temperature
       const slipPower = Math.abs((fxSum / SUB) * (w.omega * R - vx)) + Math.abs(fyT * vy) * (w.front ? TYRE_TEMP.frontScrub : 1);
-      const heat = slipPower + (TYRE_TEMP.rolling * fz + TYRE_TEMP.flex * (Math.abs(fxT) + Math.abs(fyT))) * Math.abs(vx);
+      const heat = slipPower + (TYRE_TEMP.rolling * fz + TYRE_TEMP.flex * flexK * (Math.abs(fxT) + Math.abs(fyT))) * Math.abs(vx);
       // water on the track carries heat away (why slicks never reach their window in the rain, and why wets on
       // a wet track stay near their 65 °C instead of cooking: bots' rear wets ran away past 200 °C and spun)
       const cool =

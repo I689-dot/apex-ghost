@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { nearestCenterlineIndex, progressAt, type Surface, type TrackData } from '@apex/shared';
 import { fetchWithProgress, loadCollision, parseGltf, type CollisionMesh } from './assets';
-import { RAY_GROUPS, TRACK_GROUPS, type GroundHit, type GroundQuery } from '../physics/vehicle';
+import { RAY_GROUPS, TRACK_GROUPS, WALL_GROUPS, type GroundHit, type GroundQuery } from '../physics/vehicle';
 import type { QualityConfig } from '../settings';
 import type { Forest } from './forest';
 
@@ -331,7 +331,7 @@ export class Track {
   buildColliders(R: R, world: RAPIER.World, meshes: CollisionMesh[]): void {
     for (const m of meshes) {
       const desc = R.ColliderDesc.trimesh(m.positions, m.indices)
-        .setCollisionGroups(TRACK_GROUPS)
+        .setCollisionGroups(m.surface === 'wall' ? WALL_GROUPS : TRACK_GROUPS)
         .setFriction(m.surface === 'wall' ? 0.25 : 0.8)
         .setRestitution(m.surface === 'wall' ? 0.15 : 0.0);
       const col = world.createCollider(desc);

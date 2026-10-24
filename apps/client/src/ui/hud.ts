@@ -45,6 +45,13 @@ export interface HudState {
   resetHint: boolean;
   /** FL, FR, RL, RR (°C) */
   tyreTemps: number[];
+  /** Race control's flag for you ('sc', 'fcy', 'yellow', 'blue', 'green', 'dt' for a drive-through to serve, '' none) and its text. */
+  flag: string;
+  flagText: string;
+  /** "FUEL 42.1 L · 12.6 LAPS" with the fuel rule, else "". */
+  fuelText: string;
+  /** Less than two laps of fuel left. */
+  fuelLow: boolean;
 }
 
 interface MapDot {
@@ -69,6 +76,9 @@ export class Hud {
   private msg: LazyText;
   private fin: LazyText;
   private pitBanner: LazyText;
+  private flag: LazyText;
+  private flagKind = '';
+  private fuel: LazyText;
   private draft: HTMLElement = h('div.hud-draft', { text: t('SLIPSTREAM') });
   private rpmFill: HTMLElement;
   private rpmLeds: HTMLElement[] = [];
@@ -104,6 +114,8 @@ export class Hud {
     this.msg = new LazyText(h('div.hud-msg'));
     this.fin = new LazyText(h('div.hud-finish'));
     this.pitBanner = new LazyText(h('div.hud-pit'));
+    this.flag = new LazyText(h('div.hud-flag'));
+    this.fuel = new LazyText(h('div.hud-fuel'));
     this.wrong = h('div.hud-wrong', { text: t('WRONG WAY') });
     this.resetEl = h('div.hud-reset', { text: t('Press R to reset to the track') });
     this.board = h('div.hud-board');
@@ -126,13 +138,21 @@ export class Hud {
         h('div.hud-times', {}, this.lapTag, this.cur.el, h('label', { text: t('BEST') }), this.best.el, h('label', { text: t('LAST') }), this.last.el),
         this.delta.el,
       ),
-      h('div.hud-bc', {}, leds, h('div.hud-rpm', {}, this.rpmFill), h('div.hud-speedo', {}, this.gear.el, h('div.hud-sp', {}, this.speed.el, this.unit.el))),
+      h(
+        'div.hud-bc',
+        {},
+        leds,
+        h('div.hud-rpm', {}, this.rpmFill),
+        h('div.hud-speedo', {}, this.gear.el, h('div.hud-sp', {}, this.speed.el, this.unit.el)),
+        this.fuel.el,
+      ),
       h('div.hud-br', {}, this.map),
       h('div.hud-bl', {}, this.status.el),
       this.wrong,
       this.msg.el,
       this.fin.el,
       this.pitBanner.el,
+      this.flag.el,
       this.draft,
       this.resetEl,
     );
@@ -271,6 +291,13 @@ export class Hud {
     this.fin.set(s.sessionText);
     this.fin.el.classList.toggle('flag', s.sessionText === t('CHEQUERED FLAG · LAST LAP'));
     this.pitBanner.set(s.pitText);
+    this.flag.set(s.flagText);
+    if (s.flag !== this.flagKind) {
+      this.flagKind = s.flag;
+      this.flag.el.className = `hud-flag${s.flag ? ` ${s.flag}` : ''}`;
+    }
+    this.fuel.set(s.fuelText);
+    this.fuel.el.classList.toggle('low', s.fuelLow);
     this.resetEl.classList.toggle('show', s.resetHint);
   }
 

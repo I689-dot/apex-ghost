@@ -493,7 +493,7 @@
         "powerKw": 515,
         "tyreGrip": 1.68,
         "downforceArea": 2.9,
-        "dragArea": 1.07,
+        "dragArea": 1.06,
         "topSpeedKmh": 300,
         "weightFront": 0.41,
         "redlineRpm": 8200,
@@ -635,7 +635,7 @@
       },
       "profile": "gt3_front_v8",
       "specs": {
-        "dragArea": 0.96,
+        "dragArea": 0.95,
         "massKg": 1465
       },
       "info": {
@@ -725,6 +725,286 @@
         "engine": "4.0 L twin-turbo V8 (Mercedes-AMG M177)",
         "gearbox": "6-speed Xtrac sequential",
         "team": "Heart of Racing (IMSA GTD, WEC LMGT3)"
+      }
+    },
+    "lexus_rc_f_gt3": {
+      "name": "Lexus RC F GT3",
+      "manufacturer": "Lexus",
+      "year": 2018,
+      "category": "GT3",
+      "color": "#e6e6e6",
+      "profile": "gt3_front_v8",
+      "specs": {
+        "massKg": 1430,
+        "weightFront": 0.5,
+        "topSpeedKmh": 278,
+        "_note": "Lexus: 5.4 L V8 (enlarged RC F unit), 500+ hp, six-speed sequential, ~1,300 kg; race weight estimated like the BoP cars (+ driver and fuel).",
+        "dragArea": 0.81
+      },
+      "info": {
+        "engine": "5.4 L V8, naturally aspirated",
+        "gearbox": "6-speed sequential",
+        "team": "Lexus customer racing (IMSA GTD, WEC LMGT3)"
+      },
+      "pipeline": {
+        "realLengthM": 4.845
+      }
+    },
+    "corvette_z06_gt3r": {
+      "name": "Chevrolet Corvette Z06 GT3.R",
+      "manufacturer": "Chevrolet",
+      "year": 2024,
+      "category": "GT3",
+      "color": "#f5a800",
+      "profile": "gt3_mid_v8tt",
+      "specs": {
+        "massKg": 1410,
+        "aspiration": "na",
+        "weightFront": 0.42,
+        "redlineRpm": 7800,
+        "limiterRpm": 8000,
+        "torqueCurve": [
+          [1000, 330],
+          [3000, 520],
+          [5000, 600],
+          [6000, 610],
+          [7000, 560],
+          [7400, 520],
+          [8000, 440],
+          [8300, 240]
+        ],
+        "_note": "Chevrolet: 5.5 L flat-plane V8 (LT6.R) mid-engined, 500 hp (WEC) to 600 hp (IMSA) at 7,400 rpm, 624 Nm, Xtrac P529 6-speed, 4,630 mm. Race weight estimated.",
+        "dragArea": 0.96
+      },
+      "info": {
+        "engine": "5.5 L flat-plane V8, naturally aspirated (LT6.R)",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "AWA #13 (IMSA GTD Pro, WEC LMGT3): Orlando livery"
+      },
+      "pipeline": {
+        "realLengthM": 4.63,
+        "materials": {
+          "^EXT_CARPAINT": {
+            "texture": "textures/ext_skin.png",
+            "metallic": 0.25,
+            "roughness": 0.3
+          }
+        }
+      }
+    },
+    "ferrari_296_gt3_verstappen": {
+      "name": "Ferrari 296 GT3 (Verstappen.com Racing)",
+      "manufacturer": "Ferrari",
+      "year": 2024,
+      "category": "GT3",
+      "color": "#1c2f6b",
+      "profile": "gt3_mid_v6tt",
+      "specs": {
+        "massKg": 1415,
+        "weightFront": 0.42,
+        "redlineRpm": 8000,
+        "limiterRpm": 8100,
+        "torqueCurve": [
+          [1000, 330],
+          [2500, 570],
+          [3500, 640],
+          [5500, 640],
+          [6500, 580],
+          [7500, 500],
+          [8000, 450],
+          [8300, 240]
+        ],
+        "_note": "Ferrari: 3.0 L twin-turbo 120° V6, 600 hp and 710 Nm before BoP, 6-speed sequential, 1,250 kg; SRO 2024 BoP 1,305 kg, boost table to 8,100 rpm.",
+        "dragArea": 0.97
+      },
+      "info": {
+        "engine": "3.0 L twin-turbo 120° V6",
+        "gearbox": "6-speed sequential",
+        "team": "Verstappen.com Racing (GT World Challenge Europe)"
+      },
+      "pipeline": {
+        "realLengthM": 4.69
+      }
+    },
+    "ford_mustang_gt3": {
+      "name": "Ford Mustang GT3",
+      "manufacturer": "Ford",
+      "year": 2024,
+      "category": "GT3",
+      "color": "#2b5fb3",
+      "profile": "gt3_front_v8",
+      "specs": {
+        "massKg": 1430,
+        "weightFront": 0.49,
+        "redlineRpm": 7400,
+        "limiterRpm": 7600,
+        "torqueCurve": [
+          [1000, 380],
+          [2500, 520],
+          [4000, 580],
+          [5500, 590],
+          [6500, 560],
+          [7200, 500],
+          [7500, 450],
+          [7800, 240]
+        ],
+        "_note": "Ford / Multimatic: 5.4 L Coyote V8 (dry sump, M-Sport), 550 hp, rear Xtrac transaxle, 1,289 kg. Race weight and length (4.95 m with wing) estimated.",
+        "dragArea": 0.97
+      },
+      "info": {
+        "engine": "5.4 L V8, naturally aspirated (Coyote)",
+        "gearbox": "6-speed Xtrac transaxle",
+        "team": "Ford Performance (IMSA GTD Pro, WEC LMGT3, GT World Challenge)"
+      },
+      "pipeline": {
+        "realLengthM": 4.95
+      }
+    },
+    "lamborghini_temerario_gt3": {
+      "name": "Lamborghini Temerario GT3",
+      "manufacturer": "Lamborghini",
+      "year": 2026,
+      "category": "GT3",
+      "color": "#8fd14f",
+      "profile": "gt3_mid_v8tt",
+      "specs": {
+        "massKg": 1420,
+        "weightFront": 0.42,
+        "redlineRpm": 8000,
+        "limiterRpm": 8300,
+        "torqueCurve": [
+          [1000, 380],
+          [2500, 600],
+          [3500, 660],
+          [5500, 660],
+          [6500, 590],
+          [7500, 500],
+          [8000, 460],
+          [8500, 250]
+        ],
+        "_note": "Lamborghini: the road car's 4.0 L twin-turbo V8 without the hybrid, race turbos, longer wheelbase and wider track than the Huracán GT3; debut at the 2026 Sebring 12 Hours (Pfaff). Weight, gearbox and length are estimates.",
+        "dragArea": 0.96
+      },
+      "info": {
+        "engine": "4.0 L twin-turbo V8",
+        "gearbox": "6-speed sequential",
+        "team": "Lamborghini Squadra Corse (2026 debut with Pfaff Motorsports)"
+      },
+      "pipeline": {
+        "realLengthM": 4.8
+      }
+    },
+    "bmw_m4_gt3_evo_2026": {
+      "name": "BMW M4 GT3 EVO (2026)",
+      "manufacturer": "BMW",
+      "year": 2026,
+      "category": "GT3 Evo",
+      "color": "#1e5bd6",
+      "profile": "gt3_front_i6tt",
+      "specs": {
+        "massKg": 1420,
+        "dragArea": 1.05
+      },
+      "info": {
+        "engine": "3.0 L twin-turbo straight-six (P58)",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "BMW M Motorsport customer racing"
+      },
+      "pipeline": {
+        "realLengthM": 5.02
+      }
+    },
+    "bmw_m4_gt3_vecarz": {
+      "name": "BMW M4 GT3",
+      "manufacturer": "BMW",
+      "year": 2022,
+      "category": "GT3",
+      "color": "#0a0a0a",
+      "profile": "gt3_front_i6tt",
+      "specs": {
+        "massKg": 1420,
+        "dragArea": 1.06
+      },
+      "info": {
+        "engine": "3.0 L twin-turbo straight-six (P58)",
+        "gearbox": "6-speed Xtrac sequential",
+        "team": "BMW M Motorsport customer racing"
+      },
+      "pipeline": {
+        "realLengthM": 5.02
+      }
+    },
+    "aston_martin_vantage_safety_car": {
+      "name": "Aston Martin Vantage Safety Car",
+      "manufacturer": "Aston Martin",
+      "year": 2021,
+      "category": "Safety Car",
+      "color": "#0b5d3b",
+      "profile": "gt3_front_v8",
+      "role": "safety",
+      "specs": {
+        "massKg": 1610,
+        "aspiration": "turbo",
+        "tyreGrip": 1.5,
+        "downforceArea": 0.5,
+        "topSpeedKmh": 300,
+        "torqueCurve": [
+          [1000, 450],
+          [2000, 685],
+          [5000, 685],
+          [6000, 620],
+          [6800, 560],
+          [7200, 300]
+        ],
+        "_note": "Road Vantage (2018) as the 2021 F1 safety car: 4.0 L twin-turbo V8 (M177), 528 hp, 685 Nm, ~1,530 kg + driver. Drives the race-control script, not physics.",
+        "dragArea": 0.4
+      },
+      "info": {
+        "engine": "4.0 L twin-turbo V8 (Mercedes-AMG M177)",
+        "gearbox": "8-speed automatic",
+        "team": "Race control"
+      },
+      "pipeline": {
+        "realLengthM": 4.465,
+        "materials": {
+          "Coloured_Material|^body2?$": {
+            "color": "#0d4a3a",
+            "metallic": 0.55,
+            "roughness": 0.22
+          },
+          "rim_black|metal_black|^black$|safety_black_plastic|Grille|mirrors": {
+            "color": "#141414",
+            "roughness": 0.45
+          },
+          "^Tyre$": {
+            "color": "#1b1b1b",
+            "roughness": 0.92
+          },
+          "rim_spoke|center_blur": {
+            "color": "#2c2c2c",
+            "metallic": 0.8,
+            "roughness": 0.35
+          },
+          "carbon": {
+            "color": "#1d1f22",
+            "roughness": 0.35
+          },
+          "safety_light": {
+            "color": "#ff8c00"
+          },
+          "light_red": {
+            "color": "#b0000a"
+          },
+          "EXT_Disc": {
+            "color": "#5a5a5a",
+            "metallic": 0.9,
+            "roughness": 0.5
+          },
+          "Interior|carpet|SeatBelt|int_metal": {
+            "color": "#2b2b2b",
+            "roughness": 0.7
+          }
+        }
       }
     }
   }

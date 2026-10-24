@@ -15,6 +15,8 @@ export class Drivetrain {
   powerScale = 1;
   /** Power multiplier from the air the engine breathes (Vehicle.setAir). */
   airScale = 1;
+  /** Out of fuel: the engine gets none (it idles on what is left in the lines, no drive). */
+  starved = false;
   /** Torque delivered to the driveline input last step (Nm, before gear). */
   engineTorque = 0;
   private autoCooldown = 0;
@@ -100,7 +102,7 @@ export class Drivetrain {
 
     // rev limiter: cut fuel
     this.limiterCut = this.rpm >= s.limiterRpm - 30 ? true : this.rpm < s.limiterRpm - 250 ? false : this.limiterCut;
-    const thr = this.limiterCut ? 0 : throttle;
+    const thr = this.limiterCut || this.starved ? 0 : throttle;
     const full = this.torqueAt(this.rpm) * this.powerScale * this.airScale;
     // engine braking grows with rpm when off throttle
     const drag = (0.06 + 0.12 * (this.rpm / s.redlineRpm)) * full;

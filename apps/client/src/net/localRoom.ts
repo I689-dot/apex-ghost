@@ -33,6 +33,8 @@ export async function createLocalRoom(): Promise<string> {
       firstGate: t.firstGate,
       minLapMs: t.minLapMs,
       pitExitS: t.pitLane?.exitS ?? null,
+      pitEntryS: t.pitLane?.entryS ?? null,
+      pitLaneM: t.pitLane?.length ?? null,
     };
   }
   const def = index.find((e) => e.default)?.id ?? Object.keys(tracks)[0];
@@ -48,7 +50,7 @@ export async function createLocalRoom(): Promise<string> {
     persist: () => {},
     track: tracks[def],
     tracks,
-    carIds: new Set(cars.cars.map((c) => c.id)),
+    carIds: new Set(cars.cars.filter((c) => c.role !== 'safety').map((c) => c.id)),
   });
   r.init(LOCAL_CODE);
   room = r;

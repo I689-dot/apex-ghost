@@ -12,6 +12,10 @@ export interface PitMenuInfo {
   zones: Zones;
   wetness: number;
   plan: ServicePlan;
+  /** With the fuel rule: litres on board, the tank, burnt per lap, and what the rest of the race needs. */
+  fuel: { litres: number; tank: number; perLap: number; need: number | null } | null;
+  /** Pit-window rule: the mandatory stop (driver change) is due now, or already made. */
+  driverChange: 'due' | 'done' | 'closed' | null;
 }
 
 const pct = (v: number) => `${Math.round(v * 100)} %`;
@@ -126,6 +130,8 @@ export class PitMenu {
         repair(t('Bodywork & aero'), Math.max(z[0], z[1], z[2], z[3]), 'body'),
         repair(t('Suspension'), z[5], 'suspension'),
         repair(t('Engine'), z[4], 'engine'),
+        this.fuelRow(),
+        this.driverRow(),
         this.breakdownEl,
         this.totalEl,
         h(
@@ -151,6 +157,72 @@ export class PitMenu {
     e.stopImmediatePropagation();
   };
 
+  /** Fuel to add: a slider up to a full tank, with the laps it gives and a button for what the race still needs. */
+  private fuelRow(): HTMLElement | null {
+    const f = this.info.fuel;
+    if (!f) return null;
+    const room = Math.max(0, f.tank - f.litres);
+    const out = h('output');
+    const show = () => {
+      const laps = (f.litres + this.plan.fuelL) / Math.max(0.1, f.perLap);
+      out.textContent = t('+{add} l → {l} l, ~{laps} laps', {
+        add: Math.round(this.plan.fuelL),
+        l: Math.round(f.litres + this.plan.fuelL),
+        laps: laps.toFixed(1),
+      });
+    };
+    const slider = h('input', {
+      type: 'range',
+      min: 0,
+      max: Math.floor(room),
+      step: 1,
+      value: Math.min(room, this.plan.fuelL),
+      oninput: () => {
+        this.plan.fuelL = Number(slider.value);
+        show();
+        this.refresh();
+      },
+    });
+    show();
+    return h(
+      'div.pit-fuel',
+      {},
+      h('h3', { text: t('Fuel · {l} l on board, {per} l a lap', { l: f.litres.toFixed(1), per: f.perLap.toFixed(2) }) }),
+      h('div.range', {}, slider, out),
+      f.need !== null
+        ? h('button.ghost.small', {
+            text: t('To the finish: +{l} l', { l: Math.ceil(Math.min(room, Math.max(0, f.need - f.litres))) }),
+            onclick: () => {
+              this.plan.fuelL = Math.ceil(Math.min(room, Math.max(0, (f.need ?? 0) - f.litres)));
+              slider.value = String(this.plan.fuelL);
+              show();
+              this.refresh();
+            },
+          })
+        : null,
+    );
+  }
+
+  private driverRow(): HTMLElement | null {
+    const d = this.info.driverChange;
+    if (!d) return null;
+    const box = h('input', {
+      type: 'checkbox',
+      checked: this.plan.driverChange,
+      onchange: () => {
+        this.plan.driverChange = box.checked;
+        this.refresh();
+      },
+    });
+    const note =
+      d === 'due'
+        ? t('Pit window open: the mandatory stop needs a driver change')
+        : d === 'done'
+          ? t('Mandatory stop already made')
+          : t('Outside the pit window: this stop does not count as the mandatory one');
+    return h('label.pit-repair', {}, box, h('span', { text: t('Driver change') }), h(`em.${d === 'due' ? 'warn' : 'none'}`, { text: note }));
+  }
+
   private setTyres(id: CompoundId | null): void {
     this.plan.tyres = id;
     this.refresh();
@@ -161,7 +233,11 @@ export class PitMenu {
     const st = serviceTime(this.plan, this.info.zones);
     this.breakdownEl.replaceChildren(...st.parts.map((p) => h('div', {}, h('span', { text: p.label }), h('b', { text: `${p.seconds.toFixed(1)} s` }))));
     this.totalEl.textContent =
-      st.total > 0 ? t('Stop: {s} s (tyres change while the mechanics repair)', { s: st.total.toFixed(1) }) : t('Nothing to do: drive on');
+      st.total > 0
+        ? this.plan.fuelL > 0
+          ? t('Stop: {s} s (refuelling first, then tyres and repairs)', { s: st.total.toFixed(1) })
+          : t('Stop: {s} s (tyres change while the mechanics repair)', { s: st.total.toFixed(1) })
+        : t('Nothing to do: drive on');
   }
 
   /** Remaining session time, shown in the box. */

@@ -462,12 +462,31 @@ async function cars() {
       genericWheels: meta.genericWheels,
       specs,
       info: c.info ?? null,
+      role: c.role ?? null,
+    });
+  }
+  // cars converted on another machine (their intermediates aren't here) keep their shipped entry, with the specs
+  // and info of today's cars.config.json: new cars can be added without the sources of the others
+  const shipped = existsSync(path.join(pub, 'cars.json')) ? JSON.parse(readFileSync(path.join(pub, 'cars.json'), 'utf8')).cars : [];
+  for (const e of shipped) {
+    const c = cfg.cars[e.id];
+    if (ids.includes(e.id) || !c || c.exclude || !existsSync(path.join(pub, 'cars', e.id, 'lod0.glb'))) continue;
+    entries.push({
+      ...e,
+      name: c.name,
+      manufacturer: c.manufacturer,
+      year: c.year ?? null,
+      category: c.category,
+      specs: carSpecs(cfg, c),
+      info: c.info ?? null,
+      role: c.role ?? null,
     });
   }
   entries.sort((a, b) => a.name.localeCompare(b.name));
   writeFileSync(path.join(pub, 'cars.json'), JSON.stringify({ version: 1, forward: '+Z', up: '+Y', units: 'm', cars: entries }, null, 1));
   mkdirSync(sharedGen, { recursive: true });
-  writeFileSync(path.join(sharedGen, 'car-ids.json'), JSON.stringify(entries.map((e) => e.id)));
+  // the safety car is nobody's car: the server never locks it
+  writeFileSync(path.join(sharedGen, 'car-ids.json'), JSON.stringify(entries.filter((e) => e.role !== 'safety').map((e) => e.id)));
   writeFileSync(path.join(out, 'cars_report.json'), JSON.stringify({ fallbackReport, excluded }, null, 1));
   log(
     `cars.json: ${entries.length} cars; generic-wheel fallback: ${fallbackReport.map((f) => f.id).join(', ') || 'none'}; excluded: ${excluded.map((e) => e.id).join(', ') || 'none'}`,
@@ -754,6 +773,8 @@ async function writeTracks(mapOut, render) {
       firstGate: base.firstGate,
       minLapMs: base.minLapMs,
       pitExitS: base.pitLane ? base.pitLane.exitS : null,
+      pitEntryS: base.pitLane ? base.pitLane.entryS : null,
+      pitLaneM: base.pitLane ? Math.round(base.pitLane.length * 10) / 10 : null,
     };
   });
   // merge with the other maps' layouts (entries without a map field are the Nürburgring's, from before maps/)

@@ -12,3 +12,6 @@ tools/sim/out/
 3D MODELS/
 tools/e2e/out/
 .claude/
+
+# car model downloads (third-party licences, ~0.5 GB): converted into apps/client/public/assets/cars by the pipeline
+CARS-MODELS/

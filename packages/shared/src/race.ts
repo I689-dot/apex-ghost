@@ -1,4 +1,4 @@
-import { MAX_PLAUSIBLE_SPEED_MS, RACE_LAPS } from './constants';
+import { FINISH_TIMEOUT_MS, MAX_PLAUSIBLE_SPEED_MS, RACE_LAPS } from './constants';
 import { crossesGate, nearestCenterlineIndex, progressAt, wrapDelta, type TrackRaceData } from './track';
 
 export type RaceEvent =
@@ -27,13 +27,32 @@ export type RaceEvent =
       warning?: number;
       /** Off but slower: no advantage gained, no penalty. */
       noAdvantage?: boolean;
+      /** Race control: a drive-through to serve (ms is 0 until it is converted into time). */
+      driveThrough?: boolean;
     }
   | { type: 'sector'; playerId: string; sector: number; ms: number }
   | { type: 'finish'; playerId: string; totalMs: number }
+  /** A drive-through served, or the mandatory stop (with the driver change) made inside the pit window. */
+  | { type: 'served'; playerId: string; what: 'drive-through' | 'stop' }
   | { type: 'flag' }
   | { type: 'rejected'; playerId: string; reason: string };
 
-export type PenaltyReason = 'track-limits' | 'reset' | 'shortcut';
+export type PenaltyReason =
+  | 'track-limits'
+  | 'reset'
+  | 'shortcut'
+  /** Race control (raceControl.ts): overtaking under the safety car, a full-course yellow or a yellow flag. */
+  | 'overtake-sc'
+  | 'overtake-fcy'
+  | 'overtake-yellow'
+  /** Overtook the safety car itself. */
+  | 'passed-sc'
+  /** Held up the cars lapping it for too long under blue flags. */
+  | 'blue-flags'
+  /** No mandatory stop in the pit window (race with the pit-window rule). */
+  | 'missed-stop'
+  /** A drive-through not served within PENALTY.serveLaps laps (or given too late to serve): converted into time. */
+  | 'unserved';
 
 /**
  * Time penalties instead of deleted laps (a game choice: real GT3 qualifying cancels a lap beyond track limits).
@@ -57,7 +76,51 @@ export const PENALTY = {
   /** A checkpoint up to this far ahead (m of track) is accepted, the ones in between count as skipped; a bigger
    * jump is not a shortcut but a teleport/cheat and gets no credit at all. */
   maxSkipM: 300,
+  /** Drive-throughs must be served within this many laps (SRO and FIA practice: three); later or in the last laps
+   * of the race they become time: the drive-through's cost (driveThroughCostMs), plus this when left unserved. */
+  serveLaps: 3,
+  unservedExtraMs: 10_000,
+  /** No stop in the pit window: more than any stop costs (the real rule disqualifies). */
+  missedStopMs: 90_000,
+  /** A pit-lane pass that stops longer than this is a stop, not a drive-through. */
+  driveThroughMaxStopMs: 1500,
 };
+
+/**
+ * The mandatory stop of the pit-window rule, after GT World Challenge Sprint: one stop with a driver change, in a
+ * window around mid-race (there 25–35 min of a 60 min race). Here by laps: the stop must start on a lap from `open`
+ * to `close` (the lap in progress, 1-based), never on the last lap. `minStopMs`: how long the car has to stand in
+ * its box (the driver change; the crew changes tyres meanwhile).
+ */
+export const PIT_WINDOW = {
+  openShare: 0.4,
+  closeShare: 0.6,
+  minStopMs: 20_000,
+  /** Position samples are 50 ms apart and the car rolls into its box: a 20 s driver change measures a little short. */
+  toleranceMs: 1500,
+};
+
+export function pitWindowLaps(laps: number): { open: number; close: number } {
+  const open = Math.max(1, Math.floor(laps * PIT_WINDOW.openShare));
+  return { open, close: Math.max(open, Math.min(laps - 1, Math.ceil(laps * PIT_WINDOW.closeShare))) };
+}
+
+/**
+ * After the winner of a lap-count race finishes, the others finish the lap they are on: they get 1.3 of the winner's
+ * average lap, and FINISH_TIMEOUT_MS at least (a flat minute cut off a car one pit stop behind at the Nürburgring).
+ */
+export function finishGraceMs(winnerMs: number, laps: number): number {
+  return Math.max(FINISH_TIMEOUT_MS, laps > 0 ? (winnerMs / laps) * 1.3 : 0);
+}
+
+/** Time a drive-through costs (ms): the pit lane at the limiter instead of the track at racing speed, plus slowing
+ * down and accelerating again. Nürburgring GP (770 m lane, 60 km/h): ~33 s. */
+export function driveThroughCostMs(track: TrackRaceData): number {
+  const lane = track.pitLaneM ?? 0;
+  if (lane <= 0) return 30_000;
+  const s = lane / (60 / 3.6) - lane / 50 + 2;
+  return Math.round(Math.min(45, Math.max(15, s))) * 1000;
+}
 
 export interface PlayerRaceState {
   id: string;
@@ -81,6 +144,15 @@ export interface PlayerRaceState {
   /** In the garage (pit stop). */
   inPit: boolean;
   pitStops: number;
+  /** Lap in progress (1-based) when the car entered the pit lane, and how long it has stood still in it (ms). */
+  pitLap: number;
+  stoppedMs: number;
+  /** Pit-window rule: the mandatory stop is done. */
+  stopDone: boolean;
+  /** Drive-throughs to serve, with the lap count when each was given. */
+  driveThroughs: { reason: PenaltyReason; lap: number }[];
+  /** In the pit lane to serve one. */
+  servingDt: boolean;
   validLaps: number;
   nextGate: number;
   /** Non-zero gates passed in the current lap (-1 before the first line crossing). */
@@ -128,6 +200,10 @@ export interface Standing {
   outLap: boolean;
   /** Sector times of the best lap (ms). */
   bestSectors: number[];
+  /** Drive-throughs still to serve. */
+  driveThroughs: number;
+  /** Pit-window rule: the mandatory stop is done. */
+  stopDone: boolean;
 }
 
 /**
@@ -152,12 +228,16 @@ export class RaceTracker {
   flagShown = false;
   /** Race (after qualifying): no out lap, finish after `laps`, everyone finishes on the lap the leader does. */
   readonly isRace: boolean = false;
+  /** Race with the pit-window rule: its laps, or null. */
+  readonly pitWindow: { open: number; close: number } | null = null;
+  readonly driveThroughMs: number;
 
   constructor(
     readonly track: TrackRaceData,
     readonly startMs: number,
-    mode: number | { sessionMs: number } | { raceLaps: number } = RACE_LAPS,
+    mode: number | { sessionMs: number } | { raceLaps: number; pitWindow?: boolean } = RACE_LAPS,
   ) {
+    this.driveThroughMs = driveThroughCostMs(track);
     if (typeof mode === 'number') {
       this.laps = mode;
       this.flagAt = null;
@@ -166,6 +246,7 @@ export class RaceTracker {
       this.laps = mode.raceLaps;
       this.flagAt = null;
       this.isRace = true;
+      if (mode.pitWindow && mode.raceLaps >= 2) this.pitWindow = pitWindowLaps(mode.raceLaps);
     } else {
       this.laps = 0;
       this.flagAt = startMs + mode.sessionMs;
@@ -179,8 +260,14 @@ export class RaceTracker {
   pitIn(id: string, t: number, out: RaceEvent[] = []): RaceEvent[] {
     const p = this.players.get(id);
     if (!p || p.dnf || p.finishedMs !== null || p.inPit) return out;
+    // only where the lane leaves the track (pit in / out anywhere else would be free laps: each pass of the lane
+    // completes a race lap)
+    if (!this.near(p, this.track.pitEntryS, -60, 450)) return out;
     p.inPit = true;
     p.pitStops++;
+    p.pitLap = p.laps + 1;
+    p.stoppedMs = 0;
+    p.servingDt = this.isRace && p.driveThroughs.length > 0;
     if (!this.isRace) {
       // qualifying: the lap in progress is lost, the next one is an out lap
       p.outLap = true;
@@ -197,6 +284,12 @@ export class RaceTracker {
   pitOut(id: string, exitS: number, t?: number, out: RaceEvent[] = []): void {
     const p = this.players.get(id);
     if (!p || !p.inPit) return;
+    if (!this.near(p, exitS, -450, 60)) {
+      // left the lane before its end (back onto the track): no lap through the pits, the gates go on from here
+      p.inPit = false;
+      p.servingDt = false;
+      return;
+    }
     const gates = this.track.gates;
     let gi = gates.findIndex((g, i) => i > 0 && g.s > exitS + 5);
     if (gi < 0) gi = 0;
@@ -204,6 +297,18 @@ export class RaceTracker {
     p.nextGate = gi;
     p.passed = gi === 0 ? gates.length - 1 : gi - 1;
     p.hasPos = false;
+    // straight through the lane serves a drive-through; a stop in the window (long enough to change drivers) is
+    // the mandatory stop (both judged from the car's own positions: it has to stand still in its box)
+    if (p.servingDt && p.stoppedMs < PENALTY.driveThroughMaxStopMs) {
+      p.driveThroughs.shift();
+      out.push({ type: 'served', playerId: p.id, what: 'drive-through' });
+    }
+    p.servingDt = false;
+    const w = this.pitWindow;
+    if (w && !p.stopDone && p.pitLap >= w.open && p.pitLap <= w.close && p.stoppedMs >= PIT_WINDOW.minStopMs - PIT_WINDOW.toleranceMs) {
+      p.stopDone = true;
+      out.push({ type: 'served', playerId: p.id, what: 'stop' });
+    }
     // the race: the pit lane runs past the line, so the lap of the stop ends here
     if (this.isRace && t !== undefined && p.finishedMs === null) {
       const lapMs = t - p.lapStartMs;
@@ -228,9 +333,22 @@ export class RaceTracker {
     }
   }
 
+  /** The car's last known lap distance is from `before` to `after` metres around s (true without s or a position). */
+  private near(p: PlayerRaceState, s: number | null | undefined, before: number, after: number): boolean {
+    if (s === null || s === undefined || !p.hasPos) return true;
+    const d = wrapDelta(s, p.progressS, this.track.length);
+    return d >= before && d <= after;
+  }
+
   private finish(p: PlayerRaceState, t: number, out: RaceEvent[]): void {
     if (p.finishedMs !== null) return;
     p.finishedMs = t - this.startMs;
+    if (this.isRace) {
+      // drive-throughs that could not be served any more become their cost in time; no mandatory stop: a big one
+      for (const d of p.driveThroughs) this.addPenalty(p, d.reason, this.driveThroughMs, out);
+      p.driveThroughs = [];
+      if (this.pitWindow && !p.stopDone) this.addPenalty(p, 'missed-stop', PENALTY.missedStopMs, out);
+    }
     if (this.firstFinishMs === null) this.firstFinishMs = t;
     out.push({ type: 'finish', playerId: p.id, totalMs: p.finishedMs });
   }
@@ -264,6 +382,11 @@ export class RaceTracker {
       outLap: true,
       inPit: false,
       pitStops: 0,
+      pitLap: 0,
+      stoppedMs: 0,
+      stopDone: false,
+      driveThroughs: [],
+      servingDt: false,
       validLaps: 0,
       nextGate: g,
       passed: g === 0 ? -1 : g - 1,
@@ -306,7 +429,10 @@ export class RaceTracker {
     const p = this.players.get(id);
     if (!p || p.dnf || p.finishedMs !== null) return out;
     if (t < this.startMs - 10_000) return out;
-    if (p.hasPos && t > p.lt) p.speed = Math.hypot(x - p.lx, z - p.lz) / ((t - p.lt) / 1000);
+    if (p.hasPos && t > p.lt) {
+      p.speed = Math.hypot(x - p.lx, z - p.lz) / ((t - p.lt) / 1000);
+      if (p.inPit && p.speed < 1) p.stoppedMs += t - p.lt;
+    }
     if (t >= this.startMs && !p.inPit) {
       if (offTrack) {
         if (p.offSince === null) {
@@ -442,6 +568,11 @@ export class RaceTracker {
         p.passed = 0;
         p.lapPenaltyMs = 0;
         p.outLap = false;
+        // drive-throughs not served in time become time (with a surcharge)
+        while (p.driveThroughs.length && p.laps - p.driveThroughs[0].lap >= PENALTY.serveLaps) {
+          p.driveThroughs.shift();
+          this.addPenalty(p, 'unserved', this.driveThroughMs + PENALTY.unservedExtraMs, out);
+        }
         // the race: the chequered flag is shown to the leader after `laps`; everyone else finishes the lap they are on
         const lapsDone = this.isRace
           ? p.laps >= this.laps || (this.firstFinishMs !== null && tc >= this.firstFinishMs)
@@ -479,6 +610,22 @@ export class RaceTracker {
     p.lapPenaltyMs += ms;
     p.penaltyMs += ms;
     out.push({ type: 'penalty', playerId: p.id, reason, ms, lapPenaltyMs: p.lapPenaltyMs });
+  }
+
+  /**
+   * Race control's drive-through (the race only). Given with fewer than PENALTY.serveLaps laps to go it could not
+   * be served: it becomes its cost in time at once, as series do in the closing laps.
+   */
+  addDriveThrough(id: string, reason: PenaltyReason, out: RaceEvent[] = []): RaceEvent[] {
+    const p = this.players.get(id);
+    if (!this.isRace || !p || p.dnf || p.finishedMs !== null) return out;
+    if (this.laps - p.laps <= PENALTY.serveLaps) {
+      this.addPenalty(p, reason, this.driveThroughMs, out);
+      return out;
+    }
+    p.driveThroughs.push({ reason, lap: p.laps });
+    out.push({ type: 'penalty', playerId: p.id, reason, ms: 0, lapPenaltyMs: p.lapPenaltyMs, driveThrough: true });
+    return out;
   }
 
   /**
@@ -581,6 +728,8 @@ export class RaceTracker {
       inPit: p.inPit,
       outLap: p.outLap,
       bestSectors: p.bestSectors.slice(),
+      driveThroughs: p.driveThroughs.length,
+      stopDone: p.stopDone,
     }));
   }
 

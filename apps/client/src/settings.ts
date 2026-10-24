@@ -69,13 +69,23 @@ export interface Assists {
   steering: boolean;
 }
 
-/** Before the session, as in GT3 practice: tyres, rear wing, brake balance. */
+/** Before the session, as in GT3 practice: tyres, rear wing, brake balance, and the deeper setup (carSetup.ts). */
 export interface CarSetup {
   tyre: 'soft' | 'medium' | 'hard' | 'wet';
   /** Wing angle: low = top speed, high = cornering grip (and drag). */
   wing: 'low' | 'medium' | 'high';
   /** Front share of brake force, 0.54 … 0.66. */
   brakeBias: number;
+  /** Cold tyre pressures (psi), front / rear; null: the crew sets them for the hot target. */
+  pressure: [number, number] | null;
+  /** Ride height from the car's baseline (mm, − = lower), front / rear. */
+  ride: [number, number];
+  /** Anti-roll bars, dampers (bump, rebound): clicks 1 (soft) … 7 (stiff), 4 = baseline; front / rear. */
+  arb: [number, number];
+  bump: [number, number];
+  rebound: [number, number];
+  /** Fuel load at the start (l), with the host's fuel rule. */
+  fuelL: number;
 }
 
 export interface Settings {
@@ -141,7 +151,17 @@ export const DEFAULT_SETTINGS: Settings = {
   racingLine: 'corners',
   showPerf: false,
   audio: { master: 0.8, engine: 0.9, effects: 0.8, ambience: 0.6 },
-  carSetup: { tyre: 'medium', wing: 'medium', brakeBias: 0.6 },
+  carSetup: {
+    tyre: 'medium',
+    wing: 'medium',
+    brakeBias: 0.6,
+    pressure: null,
+    ride: [0, 0],
+    arb: [4, 4],
+    bump: [4, 4],
+    rebound: [4, 4],
+    fuelL: 60,
+  },
   ghost: true,
   bindings: DEFAULT_BINDINGS,
   pad: { deadzone: 0.06, steerCurve: 1.7, steerSpeed: 1, speedSens: 0.5, brakeCurve: 1.4, vibration: true, layouts: {} },
