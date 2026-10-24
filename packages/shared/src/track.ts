@@ -32,6 +32,9 @@ export interface TrackRaceData {
   firstGate: number;
   /** Lap distance where the pit lane rejoins the circuit (null: no pit lane). */
   pitExitS?: number | null;
+  /** Lap distance where the pit lane leaves the circuit, and its length (m): the safety car's way in, drive-throughs. */
+  pitEntryS?: number | null;
+  pitLaneM?: number | null;
   /** Fastest plausible lap (ms). */
   minLapMs: number;
 }

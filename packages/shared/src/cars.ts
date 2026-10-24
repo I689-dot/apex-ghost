@@ -1,7 +1,7 @@
 import type { Vec3 } from './track';
 
 export type Drivetrain = 'RWD' | 'AWD' | 'FWD';
-export type CarCategory = 'GT3' | 'GT3 Evo' | 'Cup' | 'Hypercar' | 'Touring';
+export type CarCategory = 'GT3' | 'GT3 Evo' | 'Cup' | 'Hypercar' | 'Touring' | 'Safety Car';
 
 /** Hand-editable physical specification of a car (cars.json → specs). */
 export interface CarSpecs {
@@ -82,6 +82,8 @@ export interface CarEntry {
   cockpitCamera: { position: Vec3; driverSide: 'left' | 'right'; tuned?: boolean };
   hasInterior: boolean;
   lights: { head: string[]; tail: string[] };
+  /** 'safety': the race-control car (not in the car list, not a player's car). */
+  role?: 'safety' | null;
   /** The real car: engine, gearbox and the team or livery (shown in the lobby; translated where shown). */
   info?: { engine: string; gearbox: string; team: string } | null;
   /** Wheels that use the generic fallback model. */

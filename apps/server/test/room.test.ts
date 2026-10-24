@@ -21,13 +21,14 @@ class FakeConn implements Conn {
 
 function makeRoom(cars = ['car_a', 'car_b', 'car_c'], autoBrief = true) {
   let now = 1_000_000;
+  const scheduled: number[] = [];
   const persisted: PersistedRoom[] = [];
   const reports: (RoomSummary | null)[] = [];
   const rand = mulberry32(99);
   const room = new RoomCore({
     now: () => now,
     random: rand,
-    schedule: () => {},
+    schedule: (at) => scheduled.push(at),
     persist: (s) => persisted.push(structuredClone(s)),
     report: (r) => reports.push(r),
     track: ovalTrack(),
@@ -49,7 +50,7 @@ function makeRoom(cars = ['car_a', 'car_b', 'car_c'], autoBrief = true) {
     if (autoBrief && (msg as { t: string }).t === 'start' && room.phase === 'briefing')
       for (const x of conns) room.onMessage(x, JSON.stringify({ t: 'briefed' }));
   };
-  return { room, join, send, advance: (ms: number) => (now += ms), persisted, reports, conns };
+  return { room, join, send, advance: (ms: number) => (now += ms), persisted, reports, conns, scheduled };
 }
 
 describe('car lock (atomic, server-side)', () => {
@@ -371,6 +372,29 @@ describe('qualifying sessions', () => {
     expect(race?.grid).toEqual(res?.rows.map((r) => r.id).filter((id) => race?.grid.includes(id)));
   });
 
+  it('a session that ends on a message (not a tick) still schedules the race after it', () => {
+    const { room, join, send, advance, scheduled } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    for (const [p, car] of [
+      [a, 'car_a'],
+      [b, 'car_b'],
+    ] as const) {
+      send(p.conn, { t: 'selectCar', carId: car });
+      send(p.conn, { t: 'ready', ready: true });
+    }
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded', raceId: room.raceId });
+    send(b.conn, { t: 'loaded', raceId: room.raceId });
+    advance((room.startAt as number) - 1_000_000 + 10 * 60_000 + 1000);
+    room.tick();
+    // after the flag both drive into the pits: the last one ends the session
+    send(a.conn, { t: 'pit', in: true });
+    send(b.conn, { t: 'pit', in: true });
+    expect(room.phase).toBe('results');
+    expect(scheduled[scheduled.length - 1]).toBe(room.raceAt);
+  });
+
   it('qualifying only: back to the lobby after the results', () => {
     const { room, join, send, advance } = makeRoom(['car_a']);
     const a = join('Ana');
@@ -414,6 +438,59 @@ describe('session setup', () => {
     expect(race?.weather.kind).toBe('heavy_rain');
     expect(race?.weather.startHour).toBe(6.5);
     expect(race?.trackId).toBe(room.conditions.trackId);
+  });
+});
+
+describe('race rules', () => {
+  it('only the host sets the rules, in the lobby; they persist and go with the session', () => {
+    const { room, join, send, persisted } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    expect(a.conn.last('room')?.room.rules).toEqual({ contact: false, pitWindow: false, fuel: false, raceControl: false });
+    send(b.conn, { t: 'setRules', rules: { contact: true } });
+    expect(room.rules.contact).toBe(false);
+    send(a.conn, { t: 'setRules', rules: { contact: true, raceControl: true } });
+    send(a.conn, { t: 'setRules', rules: { fuel: true } });
+    expect(room.rules).toEqual({ contact: true, pitWindow: false, fuel: true, raceControl: true });
+    expect(b.conn.last('room')?.room.rules.fuel).toBe(true);
+    expect(persisted[persisted.length - 1].rules?.contact).toBe(true);
+    send(a.conn, { t: 'selectCar', carId: 'car_a' });
+    send(b.conn, { t: 'selectCar', carId: 'car_b' });
+    send(a.conn, { t: 'ready', ready: true });
+    send(b.conn, { t: 'ready', ready: true });
+    send(a.conn, { t: 'start' });
+    expect(b.conn.last('raceSetup')?.race.rules).toEqual(room.rules);
+    // fixed once the session runs
+    send(a.conn, { t: 'setRules', rules: { contact: false } });
+    expect(room.rules.contact).toBe(true);
+    // race control runs with the session
+    send(a.conn, { t: 'loaded', raceId: room.raceId });
+    send(b.conn, { t: 'loaded', raceId: room.raceId });
+    expect(room.rc).not.toBeNull();
+  });
+
+  it("a bot's pit stop is reported by the host only", () => {
+    const { room, join, send, advance } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    send(a.conn, { t: 'selectCar', carId: 'car_a' });
+    send(b.conn, { t: 'selectCar', carId: 'car_b' });
+    send(a.conn, { t: 'ready', ready: true });
+    send(b.conn, { t: 'ready', ready: true });
+    send(a.conn, { t: 'addBot' });
+    const bot = [...room.players.values()].find((p) => p.bot);
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded', raceId: room.raceId });
+    send(b.conn, { t: 'loaded', raceId: room.raceId });
+    advance((room.startAt as number) - 1_000_000 + 5000);
+    room.tick();
+    send(b.conn, { t: 'pit', in: true, id: bot?.id });
+    expect(room.tracker?.players.get(bot?.id as string)?.inPit).toBe(false);
+    send(a.conn, { t: 'pit', in: true, id: b.id }); // not a bot
+    expect(room.tracker?.players.get(b.id)?.inPit).toBe(false);
+    send(a.conn, { t: 'pit', in: true, id: bot?.id });
+    expect(room.tracker?.players.get(bot?.id as string)?.inPit).toBe(true);
+    expect(b.conn.last('pit')).toMatchObject({ playerId: bot?.id, in: true });
   });
 });
 

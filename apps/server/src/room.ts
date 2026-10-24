@@ -5,7 +5,6 @@
  */
 import {
   COUNTDOWN_MS,
-  FINISH_TIMEOUT_MS,
   LOAD_TIMEOUT_MS,
   BRIEFING_MS,
   DEFAULT_RACE_LAPS,
@@ -19,7 +18,10 @@ import {
   RECONNECT_GRACE_MS,
   FLAG_OFF_TRACK,
   FLAG_RESET,
+  DEFAULT_RULES,
+  RaceControl,
   RaceTracker,
+  finishGraceMs,
   decodeClientStates,
   decodeBotStates,
   botToRelay,
@@ -46,6 +48,7 @@ import {
   type TrackRaceData,
   type RaceEvent,
   type RoomSummary,
+  type RaceRules,
 } from '@apex/shared';
 
 export interface Conn {
@@ -94,6 +97,7 @@ export interface PersistedRoom {
   raceLaps?: number;
   isPublic?: boolean;
   conditions?: Conditions;
+  rules?: RaceRules;
 }
 
 interface Player extends PersistedPlayer {
@@ -145,6 +149,12 @@ export class RoomCore {
   raceLaps = DEFAULT_RACE_LAPS;
   /** Listed in the public room list. */
   isPublic = false;
+  /** The host's rules (contact, pit window, fuel, race control). */
+  rules: RaceRules = { ...DEFAULT_RULES };
+  /** Race control for the session running (rules.raceControl), or null. */
+  rc: RaceControl | null = null;
+  private rcSent = -1;
+  private lastRcAt = 0;
   /** Spectators: conn id → connection (they get every broadcast and the car states, have no car). */
   readonly spectators = new Map<string, Conn>();
   private lastReport = '';
@@ -177,6 +187,7 @@ export class RoomCore {
     this.sessionMinutes = s.sessionMinutes ?? DEFAULT_SESSION_MINUTES;
     this.raceLaps = s.raceLaps ?? DEFAULT_RACE_LAPS;
     this.isPublic = !!s.isPublic;
+    this.rules = { ...DEFAULT_RULES, ...(s.rules ?? {}) };
     this.conditions = s.conditions ?? { trackId: this.env.track.id, weather: 'random', time: 'random', changes: 'random', seed: this.newSeed() };
     for (const p of s.players) {
       this.players.set(p.id, { ...p, bot: !!p.bot, conn: null, disconnectedAt: p.bot ? null : this.env.now(), slot: -1, lastDamageAt: 0, lastPacketAt: 0 });
@@ -204,6 +215,7 @@ export class RoomCore {
       raceLaps: this.raceLaps,
       isPublic: this.isPublic,
       conditions: this.conditions,
+      rules: this.rules,
       players: [...this.players.values()].map(({ id, nick, session, carId, ready, joinedAt, waiting, bot, tyre }) => ({
         id,
         nick,
@@ -253,6 +265,7 @@ export class RoomCore {
       spectators: this.spectators.size,
       conditions: this.conditions,
       briefingUntil: this.phase === 'briefing' ? this.briefingUntil : null,
+      rules: this.rules,
     };
   }
 
@@ -430,6 +443,7 @@ export class RoomCore {
       race: inRace ? this.race : null,
       startAt: inRace ? this.startAt : null,
     });
+    if (inRace && this.rc && this.race) this.send(p, { t: 'raceControl', raceId: this.race.raceId, state: this.rc.state });
   }
 
   private handle(p: Player, msg: ClientMsg): void {
@@ -460,6 +474,7 @@ export class RoomCore {
         const now = this.env.now();
         if (now - p.lastDamageAt < 400) return;
         p.lastDamageAt = now;
+        this.rc?.setDamage(p.id, Math.max(...msg.zones));
         return this.broadcast({ t: 'damage', playerId: p.id, zones: msg.zones }, p.id);
       }
       case 'leave':
@@ -488,6 +503,12 @@ export class RoomCore {
         this.persist();
         this.broadcastRoom();
         return;
+      case 'setRules':
+        if (p.id !== this.hostId || this.phase !== 'lobby') return;
+        this.rules = { ...this.rules, ...msg.rules };
+        this.persist();
+        this.broadcastRoom();
+        return;
       case 'setPublic':
         if (p.id !== this.hostId) return;
         this.isPublic = msg.isPublic;
@@ -507,14 +528,18 @@ export class RoomCore {
         this.broadcastRoom();
         return;
       case 'pit': {
-        if (!this.tracker || !this.race || this.race.slots[p.id] === undefined) return;
+        // a bot's stop is reported by the host, who simulates it
+        const who = msg.id !== undefined ? (p.id === this.hostId ? this.players.get(msg.id) : undefined) : p;
+        if (!who || (msg.id !== undefined && !who.bot)) return;
+        if (!this.tracker || !this.race || this.race.slots[who.id] === undefined) return;
         if (this.phase !== 'racing' && this.phase !== 'countdown') return;
         const ev = this.events;
         ev.length = 0;
-        if (msg.in) this.tracker.pitIn(p.id, this.env.now(), ev);
-        else this.tracker.pitOut(p.id, this.tracker.track.pitExitS ?? 0);
-        this.broadcast({ t: 'pit', playerId: p.id, in: msg.in });
-        this.handleRaceEvents(ev, p, this.env.now());
+        const now = this.env.now();
+        if (msg.in) this.tracker.pitIn(who.id, now, ev);
+        else this.tracker.pitOut(who.id, this.tracker.track.pitExitS ?? 0, now, ev);
+        this.broadcast({ t: 'pit', playerId: who.id, in: msg.in });
+        this.handleRaceEvents(ev, who, now);
         if (this.tracker?.allDone()) this.endRace();
         return;
       }
@@ -675,6 +700,7 @@ export class RoomCore {
       trackId: this.tracks()[cond.trackId] ? cond.trackId : this.env.track.id,
       kind: raceGrid ? 'race' : 'qualifying',
       laps: this.raceLaps,
+      rules: { ...this.rules },
     };
     this.phase = 'loading';
     this.loaded = new Set();
@@ -697,9 +723,12 @@ export class RoomCore {
     this.tracker = new RaceTracker(
       this.tracks()[this.race.trackId] ?? this.env.track,
       this.startAt,
-      this.race.kind === 'race' ? { raceLaps: this.race.laps } : { sessionMs: this.race.sessionMs },
+      this.race.kind === 'race' ? { raceLaps: this.race.laps, pitWindow: this.race.rules.pitWindow } : { sessionMs: this.race.sessionMs },
     );
     for (const id of this.race.grid) this.tracker.addPlayer(id);
+    // race control: flags in qualifying, the full procedures (FCY, safety car, penalties) in the race
+    this.rc = this.race.rules.raceControl ? new RaceControl(this.tracker, true) : null;
+    this.rcSent = -1;
     this.phase = 'countdown';
     this.broadcast({ t: 'countdown', raceId: this.race.raceId, startAt: this.startAt });
     this.broadcastRoom();
@@ -744,6 +773,14 @@ export class RoomCore {
       if (s.t > now + MAX_CLOCK_SKEW_MS || s.t < now - RECONNECT_GRACE_MS - 10_000) continue;
       this.tracker.ingest(p.id, s.t, s.px, s.py, s.pz, (s.flags & FLAG_RESET) !== 0, ev, (s.flags & FLAG_OFF_TRACK) !== 0);
     }
+    if (this.rc && now - this.lastRcAt >= 200) {
+      this.lastRcAt = now;
+      this.rc.update(now, ev);
+      if (this.rc.version !== this.rcSent) {
+        this.rcSent = this.rc.version;
+        this.broadcast({ t: 'raceControl', raceId: this.race.raceId, state: this.rc.state });
+      }
+    }
     this.handleRaceEvents(ev, p, now);
     // relay to everybody else in the race (bot states go to everyone but the simulating host)
     for (const o of this.players.values()) if (o.conn && o.id !== p.id && o.id !== sender.id && !o.waiting) o.conn.send(relay);
@@ -757,8 +794,10 @@ export class RoomCore {
   }
 
   /** Broadcast what the lap logic decided (laps, sectors, penalties, finishes, the flag). */
-  private handleRaceEvents(ev: RaceEvent[], p: Player, now: number): void {
+  private handleRaceEvents(ev: RaceEvent[], sender: Player, now: number): void {
     for (const e of ev) {
+      // race control's events can be about any car, not just the one whose packet was processed
+      const p = this.players.get(e.type === 'flag' ? sender.id : e.playerId) ?? sender;
       if (e.type === 'lap' || e.type === 'penalty') this.lastStandingsAt = 0; // the timing screen updates at once
       if (e.type === 'lap')
         this.broadcast({
@@ -772,6 +811,16 @@ export class RoomCore {
           valid: e.valid,
           outLap: e.outLap,
         });
+      else if (e.type === 'penalty' && e.reason !== 'track-limits' && e.reason !== 'reset' && e.reason !== 'shortcut')
+        // race control's decisions are public (timing screens show them)
+        this.broadcast({
+          t: 'penalty',
+          playerId: e.playerId,
+          reason: e.reason,
+          ms: e.ms,
+          lapPenaltyMs: e.lapPenaltyMs,
+          driveThrough: e.driveThrough,
+        });
       else if (e.type === 'penalty' && !p.bot)
         this.send(p, {
           t: 'penalty',
@@ -783,11 +832,15 @@ export class RoomCore {
           noAdvantage: e.noAdvantage,
         });
       else if (e.type === 'sector' && !p.bot) this.send(p, { t: 'sector', playerId: e.playerId, sector: e.sector, ms: e.ms });
-      else if (e.type === 'finish') {
+      else if (e.type === 'served') {
+        this.lastStandingsAt = 0;
+        this.broadcast({ t: 'served', playerId: e.playerId, what: e.what });
+      } else if (e.type === 'finish') {
         this.broadcast({ t: 'finished', playerId: e.playerId, totalMs: e.totalMs });
-        // lap-count sessions only: the others get a minute after the first finisher
+        // lap-count sessions only: the others finish the lap they are on, with a minute's margin at least (a lap
+        // takes over two minutes at the Nürburgring: a car one pit stop behind was cut off by a flat minute)
         if (this.finishDeadline === null && this.tracker?.flagAt === null) {
-          this.finishDeadline = now + FINISH_TIMEOUT_MS;
+          this.finishDeadline = now + finishGraceMs(e.totalMs, this.tracker.players.get(e.playerId)?.laps ?? 0);
           this.scheduleNext();
         }
       } else if (e.type === 'flag' && this.race) {
@@ -831,6 +884,7 @@ export class RoomCore {
     this.phase = raceNext ? 'results' : 'lobby';
     this.race = null;
     this.tracker = null;
+    this.rc = null;
     this.startAt = null;
     this.finishDeadline = null;
     this.loadDeadline = null;
@@ -841,6 +895,9 @@ export class RoomCore {
     }
     this.persist();
     this.broadcastRoom();
+    // the race after qualifying loads at raceAt: without this, a session that ended on the last car's packet
+    // (not on a tick) waited for whatever was scheduled before, up to the 4 min flag grace
+    this.scheduleNext();
   }
 
   /* ---------------------------------------------------------- disconnects --- */

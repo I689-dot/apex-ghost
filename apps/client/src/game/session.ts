@@ -11,6 +11,7 @@ import {
   FLAG_REVERSE,
   FLAG_SMOKE,
   PHYSICS_HZ,
+  RACE_CONTROL,
   RESET_FREEZE_MS,
   STATE_HZ,
   STATES_PER_PACKET,
@@ -19,6 +20,11 @@ import {
   RaceTracker,
   decodeRelay,
   encodeBotStates,
+  greenState,
+  pitWindowLaps,
+  safetyCarAt,
+  safetyCarPath,
+  wrapDelta,
   encodeClientStates,
   makeCarState,
   nearestCenterlineIndex,
@@ -29,6 +35,8 @@ import {
   type Temperatures,
   type CarState,
   type CarsFile,
+  type PenaltyReason,
+  type RaceControlState,
   type RaceEvent,
   type RaceSetup,
   type RoomSnapshot,
@@ -36,12 +44,13 @@ import {
   type Standing,
   type TrackData,
   type WeatherState,
+  type SafetyCarPath,
 } from '@apex/shared';
 import type { Connection } from '../net/connection';
 import { RemoteCarBuffer } from '../net/remote';
 import { DamageState } from '../physics/damage';
 import { InputSmoother, Keyboard } from '../physics/input';
-import { Vehicle } from '../physics/vehicle';
+import { FUEL, Vehicle } from '../physics/vehicle';
 import { CAMERA_MODES, QUALITY, saveSettings, settings } from '../settings';
 import { Hud } from '../ui/hud';
 import { loadCarModel, loadTrackFile, type Progress } from './assets';
@@ -51,9 +60,9 @@ import type { GameAudio } from '../audio/audio';
 import { SessionAudio, type OtherCar } from '../audio/sessionAudio';
 import { LapDelta } from './lapDelta';
 import { BestLapGhost, wakeStrength } from './ghost';
-import { applySetup } from './carSetup';
+import { applySetup, vehicleSetup } from './carSetup';
 import { PitLaneMonitor } from './pitLane';
-import { defaultPlan, type ServicePlan } from './pitService';
+import { defaultPlan, serviceTime, type ServicePlan } from './pitService';
 import { PitMenu } from '../ui/pitMenu';
 import { TimingScreen } from '../ui/timingScreen';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../physics/tyres';
@@ -81,6 +90,22 @@ const MAX_FRAME_DT = 0.1;
 const PASS_OFFSET = 3.6;
 /** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). */
 const BOT_RELEASE_MS = 2500;
+/** Other cars' collision boxes with the contact rule: kinematic, they push us and only touch cars. */
+const KINEMATIC_GROUPS = (0x0002 << 16) | 0x0002;
+const FCY_MS = RACE_CONTROL.fcyKmh / 3.6;
+/** What race control's penalties are for (the drive-through announcements). */
+const PENALTY_TEXT: Record<PenaltyReason, string> = {
+  'track-limits': 'track limits',
+  reset: 'reset',
+  shortcut: 'shortcut',
+  'overtake-sc': 'overtaking under the safety car',
+  'overtake-fcy': 'overtaking under the full-course yellow',
+  'overtake-yellow': 'overtaking under yellow flags',
+  'passed-sc': 'overtaking the safety car',
+  'blue-flags': 'ignoring blue flags',
+  'missed-stop': 'no mandatory stop',
+  unserved: 'drive-through not served',
+};
 
 interface Remote {
   id: string;
@@ -94,6 +119,8 @@ interface Remote {
   vel: THREE.Vector3;
   /** Set on the host for bots: simulated here and streamed to everyone else. */
   bot?: LocalBot;
+  /** Contact rule: its collision box, moved to where the car is now. */
+  body: RAPIER.RigidBody | null;
 }
 
 interface LocalBot {
@@ -111,6 +138,16 @@ interface LocalBot {
   hint: number;
   /** Seconds left before a pass manoeuvre is given up (traffic cleared). */
   passHold: number;
+  /** Its own pit-lane monitor (enter / exit for the lap logic), the lap it makes its mandatory stop on, and the
+   * service in progress (ends at, performance.now() ms; 0 = none). */
+  pit: PitLaneMonitor | null;
+  stopLap: number;
+  serviceEnd: number;
+  servicePlan: ServicePlan | null;
+  /** Left the pit lane at (performance.now() ms): the standings take a moment to show the stop served. */
+  exitAt: number;
+  /** Told the server it is in the pit lane. */
+  pitSent: boolean;
 }
 
 export interface SessionCallbacks {
@@ -161,6 +198,7 @@ export class RaceSession {
   private finishDeadline: number | null = null;
 
   private running = false;
+  private disposed = false;
   private raf = 0;
   private lastFrame = 0;
   private acc = 0;
@@ -217,6 +255,18 @@ export class RaceSession {
   private otherCars: OtherCar[] = [];
   private message = '';
   private messageUntil = 0;
+  /** Race control's flags and course state (from the server). */
+  private rc: RaceControlState = greenState(0);
+  private greenUntil = 0;
+  private scPath: SafetyCarPath | null = null;
+  /** The safety car: its model, collision box (contact rule) and where it is now. */
+  private sc: { visual: CarVisual; body: RAPIER.RigidBody | null; s: number; speed: number; visible: boolean } | null = null;
+  /** Colliders of other cars (contact rule), for damage. */
+  private carColliders = new Set<number>();
+  /** Fuel burnt per lap: an estimate until a lap has been measured. */
+  private fuelPerLap = 0;
+  private fuelAtLap: number | null = null;
+  private readonly contact: boolean;
 
   // interpolation of my car between physics steps
   private prevPos = new THREE.Vector3();
@@ -250,6 +300,7 @@ export class RaceSession {
       }
     }
     for (const p of room.players) this.names.set(p.id, p.nick);
+    this.contact = !!this.race.rules?.contact && !spectator;
   }
 
   /* ------------------------------------------------------------ loading --- */
@@ -315,6 +366,9 @@ export class RaceSession {
     // the setup chosen in the lobby (wing, brake balance) changes the car's specs for the physics
     const tuned = applySetup(myEntry, settings.carSetup);
     this.vehicle = new Vehicle(RAPIER, this.world, tuned, this.track.groundQuery(this.world), { ...settings.assists }, this.damage);
+    // pressures, ride height on the springs, dampers
+    this.vehicle.applySetup(vehicleSetup(settings.carSetup));
+    if (this.contact) this.vehicle.setContact(true);
     this.track.excludeBody = this.vehicle.body;
     this.vehicle.drivetrain.manual = settings.manualGearbox;
     this.vehicle.place(grid.p[0], grid.p[1], grid.p[2], grid.yaw);
@@ -323,6 +377,8 @@ export class RaceSession {
     this.air = temperatures(this.race.weather, this.weather, this.trackData.map);
     this.vehicle.setAir(this.air.airC, this.air.trackC, this.air.airDensity);
     this.vehicle.fitTyres(COMPOUNDS[settings.carSetup.tyre] ?? COMPOUNDS[compoundForWeather(this.weather.wetness)], this.vehicle.ambientC + 12);
+    this.fuelPerLap = (this.trackData.length / 1000) * FUEL.perKm;
+    if (this.race.rules?.fuel) this.vehicle.setFuel(settings.carSetup.fuelL);
     this.myVisual = new CarVisual(myEntry, myModel, true);
     if (this.gfx.quality.ownHeadlightSpots) this.myVisual.addHeadlights(this.gfx.quality.ownHeadlightShadows);
     else this.myVisual.simplifyForCockpit();
@@ -359,9 +415,16 @@ export class RaceSession {
         damage: new DamageState(),
         lastDamageVersion: 0,
         vel: new THREE.Vector3(),
+        body: null,
       });
     });
     this.createLocalBots(entries);
+    // contact rule: a collision box for every car not simulated here (the bots I simulate are real vehicles)
+    if (this.contact) for (const r of this.remotes.values()) if (!r.bot) r.body = this.kinematicCar(r.entry);
+    if (this.race.rules?.raceControl && this.race.kind === 'race') {
+      this.scPath = safetyCarPath(this.trackData);
+      void this.loadSafetyCar();
+    }
     // ray casts only see colliders after the query structure is built (normally by the first step)
     this.world.updateSceneQueries();
     this.racingLine = new RacingLineFx(this.trackData, tuned.specs, this.track.groundQuery(this.world), this.air.airDensity);
@@ -477,6 +540,15 @@ export class RaceSession {
       vehicle.frozen = true;
       vehicle.setAir(this.air.airC, this.air.trackC, this.air.airDensity);
       vehicle.fitTyres(COMPOUNDS[compoundForWeather(this.weather.wetness)], vehicle.ambientC + 12);
+      if (this.contact) {
+        vehicle.setContact(true);
+        this.carColliders.add(vehicle.collider.handle);
+      }
+      // fuel for the race and a little more (they refuel at a stop if a tank is not enough), 40 l for qualifying
+      const perLap = (this.trackData.length / 1000) * FUEL.perKm;
+      if (this.race.rules?.fuel) vehicle.setFuel(this.race.kind === 'race' ? Math.min(FUEL.tankL, this.race.laps * perLap * 1.05 + 2) : 40);
+      const pit = this.trackData.pitLane ? new PitLaneMonitor(this.trackData) : null;
+      const win = pitWindowLaps(this.race.laps);
       // skill and racing line differ per bot so they spread out (deterministic per slot)
       const skill = 0.88 + ((r.slot * 37) % 10) / 100;
       const lane = (((r.slot * 7) % 5) - 2) * 0.45;
@@ -498,7 +570,54 @@ export class RaceSession {
         limits: new TrackLimits(),
         hint: -1,
         passHold: 0,
+        pit,
+        // spread over the window so they don't all stop on the same lap
+        stopLap: win.open + (r.slot % (win.close - win.open + 1)),
+        serviceEnd: 0,
+        servicePlan: null,
+        exitAt: 0,
+        pitSent: false,
       };
+      if (pit) {
+        const [a, b] = pit.boxes()[pit.boxOf(r.slot)];
+        r.bot.ai.pitBox = Math.round((a + b) / 2);
+      }
+    }
+  }
+
+  /** A collision box for a car simulated elsewhere (contact rule): moved each step to where that car is now. */
+  private kinematicCar(entry: CarEntry): RAPIER.RigidBody {
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased());
+    const H = Math.min(entry.dims.height, 1.3);
+    const hy = Math.max(0.22, (H * 0.8 - 0.3) / 2);
+    const zMid = (entry.wheels.FL.position[2] + entry.wheels.RL.position[2]) / 2;
+    const c = this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(entry.dims.width * 0.44, hy, entry.dims.length * 0.46)
+        .setTranslation(0, 0.3 + hy, zMid)
+        .setFriction(0.35)
+        .setRestitution(0.05)
+        .setCollisionGroups(KINEMATIC_GROUPS),
+      body,
+    );
+    this.carColliders.add(c.handle);
+    return body;
+  }
+
+  /** The safety car's model (race control, race only): loaded after the session, shown when it is deployed. */
+  private async loadSafetyCar(): Promise<void> {
+    const entry = this.cars.cars.find((c) => c.role === 'safety');
+    if (!entry) return;
+    try {
+      const model = await loadCarModel(entry, () => {}, 3, false, 1);
+      if (this.disposed) return;
+      const visual = new CarVisual(entry, model, false);
+      visual.object.visible = false;
+      this.scene.add(visual.object);
+      this.uploadTextures(visual.object);
+      await this.gfx.renderer.compileAsync(visual.object, this.cockpit.camera, this.scene);
+      this.sc = { visual, body: this.contact ? this.kinematicCar(entry) : null, s: 0, speed: 0, visible: false };
+    } catch (e) {
+      console.warn('[assets] safety car not loaded', e);
     }
   }
 
@@ -605,7 +724,11 @@ export class RaceSession {
 
   /** Local mirror of the server's gate logic: my car, plus the bots when I simulate them. */
   private makeTracker(startMs: number): RaceTracker {
-    const tr = new RaceTracker(this.trackData, startMs, this.race.kind === 'race' ? { raceLaps: this.race.laps } : { sessionMs: this.race.sessionMs });
+    const tr = new RaceTracker(
+      this.trackData,
+      startMs,
+      this.race.kind === 'race' ? { raceLaps: this.race.laps, pitWindow: !!this.race.rules?.pitWindow } : { sessionMs: this.race.sessionMs },
+    );
     tr.addPlayer(this.me);
     for (const r of this.remotes.values()) if (r.bot) tr.addPlayer(r.id);
     return tr;
@@ -712,6 +835,12 @@ export class RaceSession {
       case 'lap':
         if (m.playerId === this.me) {
           this.myLaps = m.lap;
+          // fuel a lap burns, measured (a lap with a stop in it doesn't count: refuelled)
+          const fuel = this.vehicle.fuelL;
+          if (fuel !== null) {
+            if (this.fuelAtLap !== null && this.fuelAtLap > fuel) this.fuelPerLap = this.fuelAtLap - fuel;
+            this.fuelAtLap = fuel;
+          }
           if (m.outLap) {
             this.flash(t('Out lap {time} (not timed) · timed lap starts now · Tab: timing', { time: fmtLap(m.lapMs) }), 4000);
             break;
@@ -728,9 +857,31 @@ export class RaceSession {
           if (m.valid) this.snd?.chime(m.best ? (sessionBest ? 'session-best' : 'best') : 'lap');
         }
         break;
-      case 'penalty':
-        // announced at once by the local mirror of the lap logic (updateLapDelta); the server's copy is authoritative
-        // for the standings, which carry each driver's lap penalty
+      case 'penalty': {
+        // track limits, resets and shortcuts are announced at once by the local mirror of the lap logic
+        // (updateLapDelta); race control's penalties come from the server only
+        if (m.reason === 'track-limits' || m.reason === 'reset' || m.reason === 'shortcut') break;
+        const what = t(PENALTY_TEXT[m.reason]);
+        const mine = m.playerId === this.me;
+        const name = this.names.get(m.playerId) ?? t('A driver');
+        if (m.driveThrough)
+          this.flash(
+            mine ? t('DRIVE-THROUGH: {what} · serve it within 3 laps', { what }) : t('{name}: drive-through, {what}', { name, what }),
+            mine ? 6000 : 3000,
+          );
+        else
+          this.flash(
+            mine ? t('+{s} s: {what}', { s: (m.ms / 1000).toFixed(0), what }) : t('{name}: +{s} s, {what}', { name, s: (m.ms / 1000).toFixed(0), what }),
+            4000,
+          );
+        if (mine) this.snd?.chime('invalid');
+        break;
+      }
+      case 'served':
+        if (m.playerId === this.me) this.flash(m.what === 'stop' ? t('Mandatory stop done') : t('Drive-through served'), 3000);
+        break;
+      case 'raceControl':
+        if (m.raceId === this.race.raceId) this.onRaceControl(m.state);
         break;
       case 'flag':
         if (m.raceId !== this.race.raceId) break;
@@ -783,6 +934,24 @@ export class RaceSession {
       default:
         break;
     }
+  }
+
+  /** Race control changed something: announce the new course state. */
+  private onRaceControl(state: RaceControlState): void {
+    const before = this.rc.course;
+    this.rc = state;
+    if (state.course === before) return;
+    const text =
+      state.course === 'fcy'
+        ? t('FULL COURSE YELLOW · {kmh} km/h in 10 s · no overtaking', { kmh: RACE_CONTROL.fcyKmh })
+        : state.course === 'sc'
+          ? t('SAFETY CAR · no overtaking, close up behind it')
+          : state.course === 'sc-in'
+            ? t('SAFETY CAR IN THIS LAP · no overtaking until the line')
+            : t('GREEN FLAG · racing resumes');
+    this.flash(text, 5000);
+    if (state.course === 'green') this.greenUntil = performance.now() + 4000;
+    this.snd?.chime(state.course === 'green' ? 'lap' : 'invalid');
   }
 
   private onBinary(buf: ArrayBuffer): void {
@@ -851,6 +1020,10 @@ export class RaceSession {
       this.applyWeather();
     }
 
+    // contact rule: the other cars where they are now, so the collision boxes match what you see
+    if (this.contact) for (const r of this.remotes.values()) this.updateRemote(r, serverNow, dt);
+    this.updateSafetyCar(serverNow, dt);
+
     // fixed-step physics
     this.acc += dt;
     const controls = this.smoother.update(dt, this.kb, this.vehicle.telemetry.forwardSpeed, this.vehicle.reverse);
@@ -865,6 +1038,7 @@ export class RaceSession {
       this.prevRot.copy(this.currRot);
       this.vehicle.step(FIXED_DT, controls);
       this.stepBots(raceT);
+      if (this.contact) this.moveKinematics();
       this.world.step(this.events);
       this.drainContacts();
       this.snapshotPose();
@@ -884,7 +1058,8 @@ export class RaceSession {
     // visuals of my car
     const v = this.vehicle;
     const susp = SUSP;
-    for (let i = 0; i < 4; i++) susp[i] = v.wheels[i].contact ? -(v.wheels[i].springLen - (v.wheels[i].restLen - v.wheels[i].fz0 / v.wheels[i].k)) : -0.05;
+    // relative to the model's own ride height (restLen0): a lowered car sits lower over its wheels
+    for (let i = 0; i < 4; i++) susp[i] = v.wheels[i].contact ? -(v.wheels[i].springLen - (v.wheels[i].restLen0 - v.wheels[i].fz0 / v.wheels[i].k)) : -0.05;
     this.myVisual.setPose(v.steerAngle, v.wheels[0].angle, v.wheels[2].angle, susp);
     const braking = v.pedals.brake > 0.1 && !v.reverse;
     this.myVisual.setLights(braking, this.headlightsOn, this.env.night);
@@ -933,8 +1108,9 @@ export class RaceSession {
     }
     cockpitGlass.value = viewCam === this.cockpit.camera ? 1 : 0;
 
-    // remote ghosts
-    for (const r of this.remotes.values()) this.updateRemote(r, serverNow, dt);
+    // remote ghosts (with the contact rule they were placed before the physics)
+    if (!this.contact) for (const r of this.remotes.values()) this.updateRemote(r, serverNow, dt);
+    else for (const r of this.remotes.values()) if (r.bot) this.updateRemote(r, serverNow, dt);
 
     // environment
     const tEnv = performance.now();
@@ -961,6 +1137,8 @@ export class RaceSession {
 
     this.updateRaceUi(serverNow, raceT, dt);
     this.updatePit(serverNow);
+    this.updateLimiters(serverNow);
+    this.updateBotPits(serverNow);
     this.editor?.update(this.kb);
     this.kb.endFrame();
     const tRender = performance.now();
@@ -973,6 +1151,181 @@ export class RaceSession {
     }
     this.perf?.end(this.gfx.renderer, this.conn, this.remotes.values());
   };
+
+  /** Contact rule: every physics step, the other cars' boxes to where they are at that step's time. */
+  private moveKinematics(): void {
+    const ahead = -this.acc; // this step's time relative to the frame (s)
+    const move = (body: RAPIER.RigidBody, o: THREE.Object3D, vel: THREE.Vector3) => {
+      body.setNextKinematicTranslation({ x: o.position.x + vel.x * ahead, y: o.position.y + vel.y * ahead, z: o.position.z + vel.z * ahead });
+      body.setNextKinematicRotation(o.quaternion);
+    };
+    for (const r of this.remotes.values()) if (r.body) move(r.body, r.visual.object, r.vel);
+    const sc = this.sc;
+    if (sc?.body) {
+      if (sc.visible) move(sc.body, sc.visual.object, _v2.set(0, 0, 0));
+      else sc.body.setNextKinematicTranslation({ x: 0, y: -500, z: 0 });
+    }
+  }
+
+  /** The safety car: drawn where race control's deterministic path puts it (every client agrees). */
+  private updateSafetyCar(serverNow: number, dt: number): void {
+    const sc = this.sc;
+    if (!sc || !this.scPath) return;
+    const d = this.rc.sc;
+    const on = !!d && serverNow >= d.t0 && (d.inAt === null || serverNow < d.inAt);
+    sc.visible = on;
+    sc.visual.object.visible = on;
+    if (!on || !d) return;
+    const s = safetyCarAt(this.scPath, d.t0, d.s0, serverNow);
+    const moved = wrapDelta(sc.s, s, this.trackData.length);
+    sc.speed = dt > 0 && moved >= 0 && moved < 100 ? moved / dt : sc.speed;
+    sc.s = s;
+    const pt = SC_PT;
+    this.track.pointAt(s, pt);
+    const o = sc.visual.object;
+    o.position.set(pt.x, pt.y, pt.z);
+    o.rotation.set(0, pt.yaw, 0);
+    o.updateMatrixWorld();
+    // the light bar flashes (it carries the brake and head light materials of the model)
+    sc.visual.setLights(Math.floor(serverNow / 400) % 2 === 0, true, this.env.night);
+  }
+
+  /** Speed limiters: the pit lane's, and the full-course yellow's after its 10 s warning (my car and my bots). */
+  private updateLimiters(serverNow: number): void {
+    const fcy = this.rc.course === 'fcy' && this.rc.limitAt !== null && serverNow >= this.rc.limitAt;
+    const lane = this.pit?.limitMs ?? null;
+    this.vehicle.speedLimitMs = this.pit?.inLane ? lane : fcy ? FCY_MS : null;
+    for (const r of this.remotes.values()) {
+      const b = r.bot;
+      if (b) b.vehicle.speedLimitMs = b.ai.inPitLane ? lane : fcy ? FCY_MS : null;
+    }
+  }
+
+  /** A yellow flag waved at lap distance s. */
+  private inYellow(s: number): boolean {
+    const L = this.trackData.length;
+    return this.rc.yellows.some(([from, to]) => wrapDelta(from, s, L) >= 0 && wrapDelta(s, to, L) >= 0);
+  }
+
+  /** Pit-window rule: is the mandatory stop (driver change) due now, done, or outside the window? */
+  private driverChangeState(): 'due' | 'done' | 'closed' | null {
+    if (!this.race.rules?.pitWindow || this.race.kind !== 'race') return null;
+    if (this.standings.find((s) => s.id === this.me)?.stopDone) return 'done';
+    const w = pitWindowLaps(this.race.laps);
+    const lap = this.myLaps + 1;
+    return lap >= w.open && lap <= w.close ? 'due' : 'closed';
+  }
+
+  /**
+   * The bots' pit stops (the host simulates them): the mandatory stop on their lap of the window, a stop for
+   * fuel when the tank won't reach the flag, a drive-through when race control gave one. They drive the pit lane
+   * (AiDriver), stand while the crew works (serviceTime, as for a player), and their lap logic sees pit in / out.
+   */
+  private updateBotPits(serverNow: number): void {
+    if (!this.startAt || serverNow < this.startAt) return;
+    const now = performance.now();
+    const rules = this.race.rules;
+    const win = pitWindowLaps(this.race.laps);
+    for (const r of this.remotes.values()) {
+      const b = r.bot;
+      const tr = this.localTracker?.players.get(r.id);
+      if (!b || !b.pit || !tr) continue;
+      const v = b.vehicle;
+      const pos = v.body.translation();
+      const lat = b.hint >= 0 ? lateralAt(this.trackData, b.hint, pos.x, pos.z) : 0;
+      const off = b.hint >= 0 ? Math.abs(lat) - (lat >= 0 ? this.trackData.widthL[b.hint] : this.trackData.widthR[b.hint]) : 0;
+      // in and out by the AI's own pit state (the monitor's 'exit' also fires when a bot is put back onto the lane's
+      // line, which then read as a second pass through the pits)
+      b.pit.update(pos.x, pos.z, off, v.telemetry.speed);
+      if (!b.pitSent && b.ai.inPitLane && b.pit.inLane) {
+        b.pitSent = true;
+        this.conn.sendJson({ t: 'pit', in: true, id: r.id });
+        this.localTracker?.pitIn(r.id, serverNow);
+      } else if (b.pitSent && !b.ai.inPitLane) {
+        b.pitSent = false;
+        this.conn.sendJson({ t: 'pit', in: false, id: r.id });
+        this.localTracker?.pitOut(r.id, this.trackData.pitLane?.exitS ?? 0, serverNow);
+        b.exitAt = now;
+      }
+      if (this.race.kind !== 'race' || tr.finishedMs !== null || tr.dnf) continue;
+      const lap = tr.laps + 1;
+      const st = this.standings.find((s) => s.id === r.id);
+      const lapsLeft = this.race.laps - tr.laps;
+      const perLap = (this.trackData.length / 1000) * FUEL.perKm;
+      const mustStop = !!rules?.pitWindow && !st?.stopDone && lap >= b.stopLap && lap <= win.close;
+      const needFuel = v.fuelL !== null && v.fuelL < perLap * 1.3 && v.fuelL < lapsLeft * perLap;
+      if (!b.ai.pitRequest && !b.ai.inPitLane && now - b.exitAt > 5000) {
+        if (mustStop || needFuel) b.ai.pitRequest = 'stop';
+        else if ((st?.driveThroughs ?? 0) > 0) b.ai.pitRequest = 'through';
+      }
+      // in the box: the crew's work, timed like a player's stop
+      if (b.ai.atBox && b.serviceEnd === 0) {
+        const wear = v.wheels.reduce((a, w) => a + w.wear, 0) / 4;
+        const plan = defaultPlan(
+          r.damage.zones,
+          wear,
+          v.compound.id,
+          this.weather.wetness,
+          v.fuelL === null ? 0 : Math.ceil(Math.min(FUEL.tankL - v.fuelL, Math.max(0, (lapsLeft + 1) * perLap - v.fuelL))),
+          !!rules?.pitWindow && !st?.stopDone && lap >= win.open && lap <= win.close,
+        );
+        b.servicePlan = plan;
+        b.serviceEnd = now + Math.max(1, serviceTime(plan, r.damage.zones).total) * 1000;
+      } else if (b.serviceEnd > 0 && now >= b.serviceEnd) {
+        const plan = b.servicePlan;
+        if (plan?.tyres) {
+          v.fitTyres(COMPOUNDS[plan.tyres], v.ambientC + 12);
+          v.weatherGrip = compoundGrip(v.compound, this.weather.wetness, this.weather.rain);
+        }
+        if (plan && plan.fuelL > 0 && v.fuelL !== null) v.setFuel(v.fuelL + plan.fuelL);
+        b.serviceEnd = 0;
+        b.servicePlan = null;
+        b.ai.pitServed();
+      }
+    }
+  }
+
+  /** Race control's flag for me (the light panel on the HUD) and the fuel readout. */
+  private raceControlHud(serverNow: number): { flag: string; flagText: string; fuelText: string; fuelLow: boolean } {
+    const rc = this.rc;
+    const me = this.standings.find((s) => s.id === this.me);
+    let flag = '';
+    let flagText = '';
+    if (rc.course === 'sc' || (rc.course === 'sc-in' && (rc.sc?.inAt ?? 0) > serverNow)) {
+      flag = 'sc';
+      flagText = rc.course === 'sc-in' ? t('SAFETY CAR IN THIS LAP') : t('SAFETY CAR · NO OVERTAKING');
+    } else if (rc.course === 'sc-in') {
+      flag = 'sc';
+      flagText = t('RESTART AT THE LINE · NO OVERTAKING');
+    } else if (rc.course === 'fcy') {
+      flag = 'fcy';
+      const left = (rc.limitAt ?? 0) - serverNow;
+      flagText =
+        left > 0 ? t('FCY · {kmh} KM/H IN {s}', { kmh: RACE_CONTROL.fcyKmh, s: Math.ceil(left / 1000) }) : t('FCY · {kmh} KM/H', { kmh: RACE_CONTROL.fcyKmh });
+    } else if (rc.blue.includes(this.me)) {
+      flag = 'blue';
+      flagText = t('BLUE FLAG · LET THE LEADERS BY');
+    } else if (this.inYellow(this.loc.s)) {
+      flag = 'yellow';
+      flagText = t('YELLOW FLAG · NO OVERTAKING');
+    } else if (me && me.driveThroughs > 0) {
+      flag = 'dt';
+      flagText = t('DRIVE-THROUGH × {n} · THROUGH THE PIT LANE', { n: me.driveThroughs });
+    } else if (performance.now() < this.greenUntil) {
+      flag = 'green';
+      flagText = t('GREEN FLAG');
+    } else if (this.driverChangeState() === 'due') {
+      flagText = t('PIT WINDOW OPEN · MANDATORY STOP');
+    }
+    const fuel = this.vehicle.fuelL;
+    const laps = fuel === null ? 0 : fuel / Math.max(0.1, this.fuelPerLap);
+    return {
+      flag,
+      flagText,
+      fuelText: fuel === null ? '' : t('FUEL {l} L · {laps} LAPS', { l: fuel.toFixed(1), laps: laps.toFixed(1) }),
+      fuelLow: fuel !== null && laps < 2,
+    };
+  }
 
   private updateTiming(): void {
     if (!this.timing.visible) return;
@@ -1104,7 +1457,7 @@ export class RaceSession {
       if (!b) return;
       // qualifying: one at a time; the race: everyone at the green light
       const started = raceT >= (this.race.kind === 'race' ? 0 : order * BOT_RELEASE_MS);
-      b.vehicle.frozen = !started;
+      b.vehicle.frozen = !started || b.serviceEnd > 0;
       const tr = this.localTracker?.players.get(r.id);
       const gates = this.trackData.gates;
       const cp = tr && tr.passed >= 0 ? gates[(tr.nextGate - 1 + gates.length) % gates.length].s : undefined;
@@ -1151,7 +1504,11 @@ export class RaceSession {
     }
     const me = this.vehicle.body.translation();
     check(me.x, me.z, this.vehicle.telemetry.speed);
-    const found = block as { along: number; lat: number } | null;
+    // the safety car: queue behind it
+    if (this.sc?.visible) check(this.sc.visual.object.position.x, this.sc.visual.object.position.z, this.sc.speed);
+    // no overtaking under a caution (FCY, safety car, a yellow flag here): follow instead
+    const caution = this.rc.course !== 'green' || this.inYellow(this.localTracker?.players.get(r.id)?.progressS ?? -1e9);
+    const found = caution ? null : (block as { along: number; lat: number } | null);
     if (found && (b.ai.passTarget !== 0 || b.ai.canPass())) {
       // pass on the side away from it (it is left of us → go right), else keep the side already chosen
       if (b.ai.passTarget === 0) b.ai.passTarget = found.lat > 0.3 ? -PASS_OFFSET : found.lat < -0.3 ? PASS_OFFSET : b.ai.roomySide() * PASS_OFFSET;
@@ -1228,8 +1585,10 @@ export class RaceSession {
       if (e.collider1() !== myHandle && e.collider2() !== myHandle) return;
       // only walls and barriers damage the car; touching the road or grass never does
       const other = e.collider1() === myHandle ? e.collider2() : e.collider1();
-      if (this.track.surfaceOf(other) !== 'wall') return;
-      const impulse = e.totalForceMagnitude() * FIXED_DT;
+      // (with the contact rule, other cars too: a box that can't give way hits harder than a car that would, so less)
+      const car = this.carColliders.has(other);
+      if (!car && this.track.surfaceOf(other) !== 'wall') return;
+      const impulse = e.totalForceMagnitude() * FIXED_DT * (car ? 0.6 : 1);
       const dir = e.maxForceDirection();
       // force on us points away from the obstacle: the hit came from the opposite side
       const sign = e.collider1() === myHandle ? -1 : 1;
@@ -1342,7 +1701,7 @@ export class RaceSession {
     r.visual.updateSmoke(dt, (s.flags & FLAG_SMOKE) !== 0 ? Math.max(0.6, r.damage.zones[4]) : 0, this.scene);
     // ghost: fade out when very close to the camera so it never blocks the cockpit view
     const d = o.position.distanceTo(_camPos);
-    const fade = this.cinematic || (this.spectator && r.id === this.specTarget) ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1);
+    const fade = this.cinematic || this.contact || (this.spectator && r.id === this.specTarget) ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1);
     r.visual.setOpacity(s.staleMs > 5000 ? 0.35 : fade);
     o.updateMatrixWorld();
   }
@@ -1360,7 +1719,7 @@ export class RaceSession {
     r.visual.setLights(v.pedals.brake > 0.1 && !v.reverse, this.headlightsOn, this.env.night);
     r.visual.updateSmoke(dt, 0, this.scene);
     const d = o.position.distanceTo(_camPos);
-    r.visual.setOpacity(this.cinematic ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1));
+    r.visual.setOpacity(this.cinematic || this.contact ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1));
     o.updateMatrixWorld();
   }
 
@@ -1385,14 +1744,12 @@ export class RaceSession {
     const edge = this.loc.lateral >= 0 ? this.trackData.widthL[this.loc.index] : this.trackData.widthR[this.loc.index];
     const ev = pit.update(this.currPos.x, this.currPos.z, Math.abs(this.loc.lateral) - (edge ?? 6), v.telemetry.speed);
     if (ev === 'enter') {
-      v.speedLimitMs = pit.limitMs;
       this.conn.sendJson({ t: 'pit', in: true });
       this.localTracker?.pitIn(this.me, serverNow);
       this.flash(t('Pit lane · limiter {n} km/h · stop in the yellow box for service', { n: pit.lane.speedLimitKmh }), 4000);
     } else if (ev === 'exit') {
-      v.speedLimitMs = null;
       this.conn.sendJson({ t: 'pit', in: false });
-      this.localTracker?.pitOut(this.me, this.trackData.pitLane?.exitS ?? 0);
+      this.localTracker?.pitOut(this.me, this.trackData.pitLane?.exitS ?? 0, serverNow);
       this.closePitMenu();
       this.flash(this.flagged ? t('Session over') : t('Out lap: bring the tyres up to temperature'), 3000);
     } else if (ev === 'box' && !this.pitHold && this.finishedMs === null) {
@@ -1415,6 +1772,11 @@ export class RaceSession {
     v.frozen = true;
     const wear = v.wheels.map((w) => w.wear);
     const avgWear = wear.reduce((a, b) => a + b, 0) / 4;
+    // the race: fuel to the finish (and a lap more); the mandatory stop when the window is open
+    const lapsLeft = this.race.kind === 'race' ? Math.max(0, this.race.laps - this.myLaps) : null;
+    const fuelNeed = lapsLeft !== null ? (lapsLeft + 1) * this.fuelPerLap : null;
+    const fuelAdd = v.fuelL !== null && fuelNeed !== null ? Math.ceil(Math.min(FUEL.tankL - v.fuelL, Math.max(0, fuelNeed - v.fuelL))) : 0;
+    const driver = this.driverChangeState();
     this.pitMenu = new PitMenu(
       {
         current: v.compound.id,
@@ -1422,7 +1784,9 @@ export class RaceSession {
         temps: v.wheels.map((w) => w.temp),
         zones: this.damage.zones,
         wetness: this.weather.wetness,
-        plan: defaultPlan(this.damage.zones, avgWear, v.compound.id, this.weather.wetness),
+        plan: defaultPlan(this.damage.zones, avgWear, v.compound.id, this.weather.wetness, fuelAdd, driver === 'due'),
+        fuel: v.fuelL === null ? null : { litres: v.fuelL, tank: FUEL.tankL, perLap: this.fuelPerLap, need: fuelNeed },
+        driverChange: driver,
       },
       (plan, seconds) => {
         const now = performance.now();
@@ -1442,6 +1806,7 @@ export class RaceSession {
     }
     // dents are visual: reset them with any bodywork repair, even if the damage value had already reached zero
     if (plan.body) this.myVisual.resetDamage();
+    if (plan.fuelL > 0 && v.fuelL !== null) v.setFuel(v.fuelL + plan.fuelL);
     if (this.damage.repair({ body: plan.body, suspension: plan.suspension, engine: plan.engine })) {
       v.drivetrain.powerScale = this.damage.powerScale;
       this.conn.sendJson({ t: 'damage', zones: Array.from(this.damage.zones, (z) => Math.round(z * 100) / 100) });
@@ -1700,6 +2065,15 @@ export class RaceSession {
       resetHint: false,
       tyreTemps: [0, 0, 0, 0],
       damageZones: [0, 0, 0, 0, 0, 0],
+      flag: this.rc.course === 'sc' || this.rc.course === 'sc-in' ? 'sc' : this.rc.course === 'fcy' ? 'fcy' : '',
+      flagText:
+        this.rc.course === 'sc' || this.rc.course === 'sc-in'
+          ? t('SAFETY CAR · NO OVERTAKING')
+          : this.rc.course === 'fcy'
+            ? t('FCY · {kmh} KM/H', { kmh: RACE_CONTROL.fcyKmh })
+            : '',
+      fuelText: '',
+      fuelLow: false,
     });
     this.mapTimer -= dt;
     if (this.mapTimer <= 0 && r) {
@@ -1772,6 +2146,7 @@ export class RaceSession {
       resetHint: this.stuckTime > 3,
       tyreTemps: v.wheels.map((w) => w.temp),
       damageZones: this.damage.zones,
+      ...this.raceControlHud(serverNow),
     });
     // minimap at ~10 Hz
     this.mapTimer -= dt;
@@ -1793,6 +2168,7 @@ export class RaceSession {
 
   dispose(): void {
     this.running = false;
+    this.disposed = true;
     cancelAnimationFrame(this.raf);
     for (const off of this.offs) off();
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -1817,6 +2193,7 @@ export class RaceSession {
 const REMOTE_LIGHT_SHARE = 0.3;
 
 const SUSP = new Float32Array(4);
+const SC_PT = { x: 0, y: 0, z: 0, yaw: 0 };
 
 function safeFlag(key: string): boolean {
   try {
@@ -1870,7 +2247,8 @@ function fillState(s: CarState, v: Vehicle, serverNow: number, headlights: boole
   s.steer = v.steerAngle;
   s.rotF = v.wheels[0].angle;
   s.rotR = v.wheels[2].angle;
-  for (let i = 0; i < 4; i++) s.susp[i] = Math.max(0, Math.min(0.25, v.wheels[i].compression));
+  // a lowered car's wheels sit higher in the arches (ride height setup), as the others should see them
+  for (let i = 0; i < 4; i++) s.susp[i] = Math.max(0, Math.min(0.25, v.wheels[i].compression - v.setup.ride[i < 2 ? 0 : 1]));
   let f = 0;
   if (v.pedals.brake > 0.1 && !v.reverse) f |= FLAG_BRAKE;
   if (headlights) f |= FLAG_HEADLIGHTS;

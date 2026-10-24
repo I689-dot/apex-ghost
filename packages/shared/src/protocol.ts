@@ -1,5 +1,6 @@
 import { MAX_PLAYERS, PROTOCOL_VERSION } from './constants';
 import type { PenaltyReason, Standing } from './race';
+import type { RaceControlState } from './raceControl';
 import { WEATHER_KINDS, type ChangeChoice, type TimeChoice, type WeatherChoice } from './weather';
 import type { WeatherPlan } from './weather';
 import { isRecord } from './validation';
@@ -28,6 +29,23 @@ export interface PlayerInfo {
 
 export type TyreChoice = 'soft' | 'medium' | 'hard' | 'wet';
 
+/**
+ * The host's rules for the sessions. All off is the original game: ghost cars, no fuel, no race control.
+ *  - contact: cars collide with each other (and take damage from it) instead of passing through;
+ *  - pitWindow: the race has one mandatory stop with a driver change in a window around mid-race (GT World
+ *    Challenge Sprint; PIT_WINDOW in race.ts);
+ *  - fuel: engines burn fuel (the car gets lighter), each driver picks a fuel load, stops can refuel (endurance);
+ *  - raceControl: yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties.
+ */
+export interface RaceRules {
+  contact: boolean;
+  pitWindow: boolean;
+  fuel: boolean;
+  raceControl: boolean;
+}
+
+export const DEFAULT_RULES: RaceRules = { contact: false, pitWindow: false, fuel: false, raceControl: false };
+
 /** What the host sets up before the session (all clients compute the same forecast from it). */
 export interface Conditions {
   trackId: string;
@@ -55,6 +73,7 @@ export interface RoomSnapshot {
   /** Listed in the public room list (anyone can join or watch without the code). */
   isPublic: boolean;
   spectators: number;
+  rules: RaceRules;
 }
 
 /** A public room as listed before joining (GET /api/rooms). */
@@ -90,6 +109,7 @@ export interface RaceSetup {
   kind: 'qualifying' | 'race';
   /** Race laps (kind 'race'); for qualifying, the race that follows (0 = none). */
   laps: number;
+  rules: RaceRules;
 }
 
 export interface RaceResultRow {
@@ -140,8 +160,10 @@ export type ClientMsg =
   /** Host: track, weather, time, changes; reroll = new forecast. */
   | { t: 'setConditions'; trackId?: string; weather?: WeatherChoice; time?: TimeChoice; changes?: ChangeChoice; reroll?: boolean }
   | { t: 'setTyre'; tyre: TyreChoice }
-  /** Pit stop: into the garage (in: true) and back out (in: false). */
-  | { t: 'pit'; in: boolean };
+  /** Host: the session rules (only the ones given change). */
+  | { t: 'setRules'; rules: Partial<RaceRules> }
+  /** Pit lane: in (true) and back out (false). `id`: a bot of the host's. */
+  | { t: 'pit'; in: boolean; id?: string };
 
 /* ------------------------------------------------------ server → client --- */
 
@@ -164,9 +186,22 @@ export type ServerMsg =
   | { t: 'countdown'; raceId: number; startAt: number }
   | { t: 'standings'; raceId: number; list: Standing[]; finishDeadline: number | null }
   | { t: 'lap'; playerId: string; lap: number; lapMs: number; penaltyMs: number; sectors: number[]; best: boolean; valid: boolean; outLap: boolean }
-  | { t: 'penalty'; playerId: string; reason: PenaltyReason; ms: number; lapPenaltyMs: number; warning?: number; noAdvantage?: boolean }
+  | {
+      t: 'penalty';
+      playerId: string;
+      reason: PenaltyReason;
+      ms: number;
+      lapPenaltyMs: number;
+      warning?: number;
+      noAdvantage?: boolean;
+      driveThrough?: boolean;
+    }
   | { t: 'flag'; raceId: number }
   | { t: 'pit'; playerId: string; in: boolean }
+  /** Race control's flags and course state (sent when it changes). */
+  | { t: 'raceControl'; raceId: number; state: RaceControlState }
+  /** A drive-through served, or the mandatory stop made. */
+  | { t: 'served'; playerId: string; what: 'drive-through' | 'stop' }
   | { t: 'sector'; playerId: string; sector: number; ms: number }
   | { t: 'finished'; playerId: string; totalMs: number }
   | {
@@ -228,7 +263,19 @@ export function parseClientMsg(raw: string): ClientMsg | null {
     case 'setRaceLaps':
       return num(v.laps) && Number.isInteger(v.laps) && v.laps >= 0 && v.laps <= 50 ? { t: 'setRaceLaps', laps: v.laps } : null;
     case 'pit':
-      return typeof v.in === 'boolean' ? { t: 'pit', in: v.in } : null;
+      if (typeof v.in !== 'boolean' || (v.id !== undefined && !str(v.id, 32))) return null;
+      return v.id === undefined ? { t: 'pit', in: v.in } : { t: 'pit', in: v.in, id: v.id };
+    case 'setRules': {
+      if (!isRecord(v.rules)) return null;
+      const out: Partial<RaceRules> = {};
+      for (const k of Object.keys(DEFAULT_RULES) as (keyof RaceRules)[]) {
+        const x = v.rules[k];
+        if (x === undefined) continue;
+        if (typeof x !== 'boolean') return null;
+        out[k] = x;
+      }
+      return { t: 'setRules', rules: out };
+    }
     case 'setTyre':
       return v.tyre === 'soft' || v.tyre === 'medium' || v.tyre === 'hard' || v.tyre === 'wet' ? { t: 'setTyre', tyre: v.tyre } : null;
     case 'setConditions': {

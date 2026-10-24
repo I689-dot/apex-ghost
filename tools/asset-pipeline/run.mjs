@@ -24,6 +24,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
 const srcDir = process.env.MODELS_DIR ?? path.join(root, '3D MODELS'); // MODELS_DIR: sources elsewhere (e.g. from a git worktree)
 const outDir = path.join(here, 'out');
+// car downloads (Sketchfab GLB / OBJ zips), extracted one folder per car: CAR_MODELS_DIR to use another place
+const newCarsDir = process.env.CAR_MODELS_DIR ?? path.join(root, 'CARS-MODELS', 'extracted');
 
 const BLENDER = process.env.BLENDER ?? path.join(homedir(), '.local/opt/blender-4.2.3-linux-x64/blender');
 const USD_PYTHON = process.env.USD_PYTHON ?? path.join(homedir(), '.local/opt/usdenv/bin/python');
@@ -92,10 +94,26 @@ async function inventory() {
   await run(USD_PYTHON, ['tools/asset-pipeline/inventory.py'], 'inventory');
 }
 
+/** The biggest .glb / .gltf / .obj under a folder (a download's model, whatever its folder layout). */
+function modelIn(dir) {
+  let best = null;
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const f = path.join(dir, e.name);
+    const cand = e.isDirectory() ? modelIn(f) : /\.(glb|gltf|obj)$/i.test(e.name) ? f : null;
+    if (cand && (!best || statSync(cand).size > statSync(best).size)) best = cand;
+  }
+  return best;
+}
+
 function carSources() {
-  const dirs = readdirSync(path.join(srcDir, 'CARS')).sort();
   const seen = new Map();
   const list = [];
+  // car downloads (CARS-MODELS/extracted/<car id>/…, one folder per extracted zip): any model file inside
+  for (const d of existsSync(newCarsDir) ? readdirSync(newCarsDir).sort() : []) {
+    const f = modelIn(path.join(newCarsDir, d));
+    if (f) list.push({ id: d, dir: d, file: f });
+  }
+  const dirs = existsSync(path.join(srcDir, 'CARS')) ? readdirSync(path.join(srcDir, 'CARS')).sort() : [];
   for (const d of dirs) {
     const f = path.join(srcDir, 'CARS', d, 'scene.usdc');
     if (!existsSync(f)) continue;

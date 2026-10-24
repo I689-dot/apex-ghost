@@ -1,5 +1,5 @@
 export const GAME_NAME = 'APEX GHOST';
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export const MAX_PLAYERS = 12;
 /** Lap-count sessions (tests and tools only): timed laps after the out lap. */

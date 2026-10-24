@@ -5,5 +5,6 @@ export * from './clock';
 export * from './weather';
 export * from './track';
 export * from './race';
+export * from './raceControl';
 export * from './protocol';
 export * from './cars';

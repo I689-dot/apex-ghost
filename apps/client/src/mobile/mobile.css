@@ -109,6 +109,13 @@ html.mobile-app .prep {
   max-height: none;
   overflow: visible;
 }
+/* advanced setup on a phone: the label above the front / rear sliders */
+html.mobile-app .setup-pair {
+  grid-template-columns: 1fr;
+}
+html.mobile-app .setup-pair > span {
+  grid-row: auto;
+}
 html.mobile-app .car-grid {
   align-self: stretch;
   max-height: none;

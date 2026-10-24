@@ -1,10 +1,13 @@
 import { GameAudio } from './audio/audio';
 import { heroUrl, uiAsset } from './ui/images';
 import { COMPOUNDS, type CompoundId } from './physics/tyres';
-import { WING, recommendSetup } from './game/carSetup';
+import { SETUP, WING, recommendSetup } from './game/carSetup';
+import { FUEL, TYRE_PRESSURE, idealColdPsi } from './physics/vehicle';
 import {
   SESSION_MINUTES,
   RACE_LAP_CHOICES,
+  pitWindowLaps,
+  type RaceRules,
   TIME_LABEL,
   WEATHER_KINDS,
   planWeather,
@@ -516,6 +519,7 @@ export class App {
           (v) => this.conn?.sendJson({ t: 'setRaceLaps', laps: Number(v) }),
         ),
       ),
+      row(t('Rules'), this.rulesPanel(room, edit)),
       h(
         'div.forecast',
         {},
@@ -540,6 +544,8 @@ export class App {
       withCar ? tyreGuide() : null,
       withCar ? row(t('Rear wing'), wingSel) : null,
       withCar ? row(t('Brake balance'), h('div.range', {}, bias, biasOut)) : null,
+      withCar && room.rules?.fuel ? this.fuelRow(room, tracks.find((tr) => tr.id === c.trackId)?.length ?? 5000) : null,
+      withCar ? this.advancedSetup(temp0.airC) : null,
       !withCar
         ? null
         : h(
@@ -559,12 +565,213 @@ export class App {
     );
   }
 
+  /** The host's rules (switches for the host in the lobby, a summary for everyone else). */
+  private rulesPanel(room: RoomSnapshot, edit: boolean): HTMLElement {
+    const rules = room.rules ?? { contact: false, pitWindow: false, fuel: false, raceControl: false };
+    const items: [keyof RaceRules, string, string][] = [
+      ['contact', t('Car contact'), t('Cars collide and take damage (off: ghost cars that pass through each other)')],
+      ['pitWindow', t('Mandatory pit stop'), t('Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint')],
+      ['fuel', t('Fuel and refuelling'), t('Engines burn fuel, you choose your fuel load, stops can refuel (endurance)')],
+      ['raceControl', t('Race control'), t('Yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties')],
+    ];
+    if (!edit) {
+      const on = items.filter(([k]) => rules[k]).map(([, label]) => label);
+      return h('b', { text: on.length ? on.join(' · ') : t('Ghost cars, no fuel, no race control') });
+    }
+    return h(
+      'div.rules',
+      {},
+      ...items.map(([k, label, help]) =>
+        h(
+          'label.switch-row',
+          { title: help },
+          h('input', {
+            type: 'checkbox',
+            checked: rules[k],
+            onchange: (e: Event) => this.conn?.sendJson({ t: 'setRules', rules: { [k]: (e.target as HTMLInputElement).checked } }),
+          }),
+          h('span', { text: label }),
+          h('small.muted', { text: help }),
+        ),
+      ),
+    );
+  }
+
+  /** Fuel load for the start (fuel rule): litres, the laps they last, and what the race needs. */
+  private fuelRow(room: RoomSnapshot, trackM: number): HTMLElement {
+    const cs = settings.carSetup;
+    const perLap = (trackM / 1000) * FUEL.perKm;
+    const laps = room.raceLaps;
+    const need = laps > 0 ? Math.min(FUEL.tankL, Math.ceil((laps + 1) * perLap)) : null;
+    const out = h('output');
+    const show = () =>
+      (out.textContent = t('{l} l · ~{laps} laps · {kg} kg', {
+        l: cs.fuelL,
+        laps: (cs.fuelL / perLap).toFixed(1),
+        kg: Math.round(cs.fuelL * FUEL.kgPerL),
+      }));
+    show();
+    const slider = h('input', {
+      type: 'range',
+      min: 10,
+      max: FUEL.tankL,
+      step: 1,
+      value: cs.fuelL,
+      oninput: (e: Event) => {
+        cs.fuelL = Number((e.target as HTMLInputElement).value);
+        show();
+        saveSettings(settings);
+      },
+    });
+    const w = laps > 1 && room.rules?.pitWindow ? pitWindowLaps(laps) : null;
+    return h(
+      'div.prep-fuel',
+      {},
+      h('div.prep-row', {}, h('span', { text: t('Fuel') }), h('div.range', {}, slider, out)),
+      h('p.prep-note', {
+        text:
+          (need !== null
+            ? t('The race needs ~{need} l ({per} l a lap). Less is lighter and faster, but you will have to refuel.', { need, per: perLap.toFixed(1) })
+            : t('About {per} l a lap. Less fuel is lighter and faster.', { per: perLap.toFixed(1) })) +
+          (w ? ` ${t('Mandatory stop on laps {a}–{b}.', { a: w.open, b: w.close })}` : ''),
+      }),
+      need !== null
+        ? h('button.ghost.small', {
+            text: t('Fuel for the whole race ({l} l)', { l: need }),
+            onclick: () => {
+              cs.fuelL = need;
+              slider.value = String(need);
+              show();
+              saveSettings(settings);
+            },
+          })
+        : null,
+    );
+  }
+
+  private advOpen = false;
+
+  /** The deeper setup: tyre pressures, ride height, anti-roll bars and dampers (front / rear). */
+  private advancedSetup(airC: number): HTMLElement {
+    const cs = settings.carSetup;
+    const opt = COMPOUNDS[cs.tyre].optimumC;
+    const setC = airC + 12;
+    const ideal = idealColdPsi(opt, setC);
+    const P = TYRE_PRESSURE;
+    const hot = (cold: number) => (cold + P.atmPsi) * ((opt + 273.15) / (setC + 273.15)) - P.atmPsi;
+    const slider = (value: number, min: number, max: number, step: number, fmt: (v: number) => string, on: (v: number) => void) => {
+      const out = h('output', { text: fmt(value) });
+      const inp = h('input', {
+        type: 'range',
+        min,
+        max,
+        step,
+        value,
+        oninput: (e: Event) => {
+          const v = Number((e.target as HTMLInputElement).value);
+          on(v);
+          out.textContent = fmt(v);
+          saveSettings(settings);
+        },
+      });
+      return h('div.range', {}, inp, out);
+    };
+    const pair = (label: string, make: (axle: 0 | 1) => HTMLElement) =>
+      h(
+        'div.setup-pair',
+        {},
+        h('span', { text: label }),
+        h('div', {}, h('small', { text: t('Front') }), make(0)),
+        h('div', {}, h('small', { text: t('Rear') }), make(1)),
+      );
+    const clicks = (key: 'arb' | 'bump' | 'rebound', soft: string, stiff: string) => (axle: 0 | 1) =>
+      slider(
+        cs[key][axle],
+        1,
+        SETUP.clicks,
+        1,
+        (v) => `${v}${v === SETUP.baseline ? ` (${t('baseline')})` : v < SETUP.baseline ? ` · ${soft}` : ` · ${stiff}`}`,
+        (v) => (cs[key][axle] = v),
+      );
+    const auto = cs.pressure === null;
+    const rerender = () => this.renderBriefing();
+    const body = h(
+      'div.setup-adv',
+      {},
+      h(
+        'label.switch-row',
+        {},
+        h('input', {
+          type: 'checkbox',
+          checked: auto,
+          onchange: (e: Event) => {
+            cs.pressure = (e.target as HTMLInputElement).checked ? null : [ideal, ideal];
+            saveSettings(settings);
+            rerender();
+          },
+        }),
+        h('span', { text: t('Crew sets the tyre pressures ({p} psi cold → {hot} psi hot)', { p: ideal.toFixed(1), hot: P.targetPsi }) }),
+      ),
+      auto
+        ? null
+        : pair(t('Tyre pressure (cold)'), (axle) =>
+            slider(
+              (cs.pressure ?? [ideal, ideal])[axle],
+              P.minColdPsi,
+              P.maxColdPsi,
+              0.1,
+              (v) => t('{p} psi → ~{hot} hot', { p: v.toFixed(1), hot: hot(v).toFixed(1) }),
+              (v) => {
+                cs.pressure ??= [ideal, ideal];
+                cs.pressure[axle] = v;
+              },
+            ),
+          ),
+      pair(t('Ride height'), (axle) =>
+        slider(
+          cs.ride[axle],
+          -SETUP.rideMm,
+          SETUP.rideMm,
+          1,
+          (v) => (v === 0 ? t('baseline') : `${v > 0 ? '+' : ''}${v} mm`),
+          (v) => (cs.ride[axle] = v),
+        ),
+      ),
+      pair(t('Anti-roll bar'), clicks('arb', t('soft'), t('stiff'))),
+      pair(t('Dampers: bump'), clicks('bump', t('soft'), t('stiff'))),
+      pair(t('Dampers: rebound'), clicks('rebound', t('soft'), t('stiff'))),
+      h('p.prep-note', {
+        text: t(
+          'Hot target {p} psi: too low runs hot and soft, too high loses grip. Lower = more downforce but it bottoms over kerbs; rear higher than front moves grip to the front. A stiffer anti-roll bar takes grip from its axle (stiff front = understeer). Stiffer dampers react faster but skip over bumps.',
+          { p: P.targetPsi },
+        ),
+      }),
+      h('button.ghost.small', {
+        text: t('Reset to baseline'),
+        onclick: () => {
+          Object.assign(cs, { pressure: null, ride: [0, 0], arb: [4, 4], bump: [4, 4], rebound: [4, 4] });
+          saveSettings(settings);
+          rerender();
+        },
+      }),
+    );
+    const d = h(
+      'details.setup-details',
+      { open: this.advOpen },
+      h('summary', { text: t('Advanced setup: pressures, ride height, anti-roll bars, dampers') }),
+      body,
+    );
+    d.addEventListener('toggle', () => (this.advOpen = (d as HTMLDetailsElement).open));
+    return d;
+  }
+
   private renderLobby(): void {
     const room = this.room;
     if (!room || !this.conn) return;
     if (this.screen === 'lobby') this.setBackdrop('straight', room.conditions.trackId); // follows the host's track choice
     const mine = this.myInfo();
-    const cars = this.cars?.cars ?? [];
+    // the safety car is race control's, nobody's to drive
+    const cars = (this.cars?.cars ?? []).filter((c) => c.role !== 'safety');
     const browsing = cars.find((c) => c.id === (this.browsing ?? mine?.carId)) ?? cars.find((c) => c.id === mine?.carId) ?? null;
     const isHost = !!mine?.host;
     // the room shows everyone's starting tyres: tell it ours (saved from last time)
