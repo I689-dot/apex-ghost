@@ -179,14 +179,14 @@
    "year": 2021,
    "category": "Safety Car",
    "color": "#0b5d3b",
-   "thumbnail": "assets/cars/aston_martin_vantage_safety_car/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/aston_martin_vantage_safety_car/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/aston_martin_vantage_safety_car/lod0.glb?v=mvm4riue",
-    "assets/cars/aston_martin_vantage_safety_car/lod1.glb?v=mvm4riue",
-    "assets/cars/aston_martin_vantage_safety_car/lod2.glb?v=mvm4riue"
+    "assets/cars/aston_martin_vantage_safety_car/lod0.glb?v=mvnosesl",
+    "assets/cars/aston_martin_vantage_safety_car/lod1.glb?v=mvnosesl",
+    "assets/cars/aston_martin_vantage_safety_car/lod2.glb?v=mvnosesl"
    ],
    "bytes": 3355548,
-   "cockpit": "assets/cars/aston_martin_vantage_safety_car/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/aston_martin_vantage_safety_car/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 2923316,
    "dims": {
     "length": 4.548,
@@ -566,8 +566,8 @@
    "cockpitCamera": {
     "position": [
      0.31,
-     1,
-     -0.26
+     1.03,
+     -0.35
     ],
     "driverSide": "left",
     "tuned": true
@@ -666,14 +666,14 @@
    "year": 2022,
    "category": "GT3",
    "color": "#0a0a0a",
-   "thumbnail": "assets/cars/bmw_m4_gt3_vecarz/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/bmw_m4_gt3_vecarz/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/bmw_m4_gt3_vecarz/lod0.glb?v=mvm4riue",
-    "assets/cars/bmw_m4_gt3_vecarz/lod1.glb?v=mvm4riue",
-    "assets/cars/bmw_m4_gt3_vecarz/lod2.glb?v=mvm4riue"
+    "assets/cars/bmw_m4_gt3_vecarz/lod0.glb?v=mvnosesl",
+    "assets/cars/bmw_m4_gt3_vecarz/lod1.glb?v=mvnosesl",
+    "assets/cars/bmw_m4_gt3_vecarz/lod2.glb?v=mvnosesl"
    ],
    "bytes": 4634896,
-   "cockpit": "assets/cars/bmw_m4_gt3_vecarz/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/bmw_m4_gt3_vecarz/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 7359016,
    "dims": {
     "length": 5.155,
@@ -736,11 +736,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3372,
-     0.9717,
-     -0.4685
+     0.402,
+     0.991,
+     -0.201
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1022,14 +1023,14 @@
    "year": 2026,
    "category": "GT3 Evo",
    "color": "#1e5bd6",
-   "thumbnail": "assets/cars/bmw_m4_gt3_evo_2026/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/bmw_m4_gt3_evo_2026/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/bmw_m4_gt3_evo_2026/lod0.glb?v=mvm4riue",
-    "assets/cars/bmw_m4_gt3_evo_2026/lod1.glb?v=mvm4riue",
-    "assets/cars/bmw_m4_gt3_evo_2026/lod2.glb?v=mvm4riue"
+    "assets/cars/bmw_m4_gt3_evo_2026/lod0.glb?v=mvnosesl",
+    "assets/cars/bmw_m4_gt3_evo_2026/lod1.glb?v=mvnosesl",
+    "assets/cars/bmw_m4_gt3_evo_2026/lod2.glb?v=mvnosesl"
    ],
    "bytes": 6551308,
-   "cockpit": "assets/cars/bmw_m4_gt3_evo_2026/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/bmw_m4_gt3_evo_2026/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 8781564,
    "dims": {
     "length": 5.317,
@@ -1092,11 +1093,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.248,
-     1.1136,
-     -0.4006
+     0.328,
+     1.056,
+     -0.457
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1199,15 +1201,15 @@
    "year": 2024,
    "category": "GT3",
    "color": "#f5a800",
-   "thumbnail": "assets/cars/corvette_z06_gt3r/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/corvette_z06_gt3r/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/corvette_z06_gt3r/lod0.glb?v=mvm4riue",
-    "assets/cars/corvette_z06_gt3r/lod1.glb?v=mvm4riue",
-    "assets/cars/corvette_z06_gt3r/lod2.glb?v=mvm4riue"
+    "assets/cars/corvette_z06_gt3r/lod0.glb?v=mvnosesl",
+    "assets/cars/corvette_z06_gt3r/lod1.glb?v=mvnosesl",
+    "assets/cars/corvette_z06_gt3r/lod2.glb?v=mvnosesl"
    ],
-   "bytes": 3328680,
-   "cockpit": "assets/cars/corvette_z06_gt3r/cockpit.glb?v=mvm4riue",
-   "cockpitBytes": 3017244,
+   "bytes": 3333572,
+   "cockpit": "assets/cars/corvette_z06_gt3r/cockpit.glb?v=mvnosesl",
+   "cockpitBytes": 3018572,
    "dims": {
     "length": 4.805,
     "width": 2.211,
@@ -1269,11 +1271,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2476,
-     0.8456,
-     -0.3325
+     0.328,
+     0.945,
+     -0.153
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1550,14 +1553,14 @@
    "year": 2024,
    "category": "GT3",
    "color": "#1c2f6b",
-   "thumbnail": "assets/cars/ferrari_296_gt3_verstappen/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/ferrari_296_gt3_verstappen/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/ferrari_296_gt3_verstappen/lod0.glb?v=mvm4riue",
-    "assets/cars/ferrari_296_gt3_verstappen/lod1.glb?v=mvm4riue",
-    "assets/cars/ferrari_296_gt3_verstappen/lod2.glb?v=mvm4riue"
+    "assets/cars/ferrari_296_gt3_verstappen/lod0.glb?v=mvnosesl",
+    "assets/cars/ferrari_296_gt3_verstappen/lod1.glb?v=mvnosesl",
+    "assets/cars/ferrari_296_gt3_verstappen/lod2.glb?v=mvnosesl"
    ],
    "bytes": 7245884,
-   "cockpit": "assets/cars/ferrari_296_gt3_verstappen/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/ferrari_296_gt3_verstappen/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 11115068,
    "dims": {
     "length": 4.873,
@@ -1620,11 +1623,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2543,
-     0.9628,
-     0.1528
+     0.334,
+     0.905,
+     0.196
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -1726,14 +1730,14 @@
    "year": 2024,
    "category": "GT3",
    "color": "#2b5fb3",
-   "thumbnail": "assets/cars/ford_mustang_gt3/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/ford_mustang_gt3/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/ford_mustang_gt3/lod0.glb?v=mvm4riue",
-    "assets/cars/ford_mustang_gt3/lod1.glb?v=mvm4riue",
-    "assets/cars/ford_mustang_gt3/lod2.glb?v=mvm4riue"
+    "assets/cars/ford_mustang_gt3/lod0.glb?v=mvnosesl",
+    "assets/cars/ford_mustang_gt3/lod1.glb?v=mvnosesl",
+    "assets/cars/ford_mustang_gt3/lod2.glb?v=mvnosesl"
    ],
    "bytes": 7653724,
-   "cockpit": "assets/cars/ford_mustang_gt3/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/ford_mustang_gt3/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 11608820,
    "dims": {
     "length": 5.225,
@@ -1796,11 +1800,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.2491,
-     1.0977,
-     -0.1752
+     0.329,
+     1.04,
+     -0.232
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2387,14 +2392,14 @@
    "year": 2026,
    "category": "GT3",
    "color": "#8fd14f",
-   "thumbnail": "assets/cars/lamborghini_temerario_gt3/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/lamborghini_temerario_gt3/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/lamborghini_temerario_gt3/lod0.glb?v=mvm4riue",
-    "assets/cars/lamborghini_temerario_gt3/lod1.glb?v=mvm4riue",
-    "assets/cars/lamborghini_temerario_gt3/lod2.glb?v=mvm4riue"
+    "assets/cars/lamborghini_temerario_gt3/lod0.glb?v=mvnosesl",
+    "assets/cars/lamborghini_temerario_gt3/lod1.glb?v=mvnosesl",
+    "assets/cars/lamborghini_temerario_gt3/lod2.glb?v=mvnosesl"
    ],
    "bytes": 4923068,
-   "cockpit": "assets/cars/lamborghini_temerario_gt3/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/lamborghini_temerario_gt3/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 6973932,
    "dims": {
     "length": 5.017,
@@ -2457,11 +2462,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3581,
-     0.8689,
-     -0.1708
+     0.36,
+     0.94,
+     0.095
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {
@@ -2554,14 +2560,14 @@
    "year": 2018,
    "category": "GT3",
    "color": "#e6e6e6",
-   "thumbnail": "assets/cars/lexus_rc_f_gt3/thumb.webp?v=mvm4riue",
+   "thumbnail": "assets/cars/lexus_rc_f_gt3/thumb.webp?v=mvnosesl",
    "lods": [
-    "assets/cars/lexus_rc_f_gt3/lod0.glb?v=mvm4riue",
-    "assets/cars/lexus_rc_f_gt3/lod1.glb?v=mvm4riue",
-    "assets/cars/lexus_rc_f_gt3/lod2.glb?v=mvm4riue"
+    "assets/cars/lexus_rc_f_gt3/lod0.glb?v=mvnosesl",
+    "assets/cars/lexus_rc_f_gt3/lod1.glb?v=mvnosesl",
+    "assets/cars/lexus_rc_f_gt3/lod2.glb?v=mvnosesl"
    ],
    "bytes": 5859428,
-   "cockpit": "assets/cars/lexus_rc_f_gt3/cockpit.glb?v=mvm4riue",
+   "cockpit": "assets/cars/lexus_rc_f_gt3/cockpit.glb?v=mvnosesl",
    "cockpitBytes": 6029296,
    "dims": {
     "length": 4.998,
@@ -2624,11 +2630,12 @@
    },
    "cockpitCamera": {
     "position": [
-     0.3326,
-     1.0532,
-     -0.0943
+     0.416,
+     1.031,
+     -0.138
     ],
-    "driverSide": "left"
+    "driverSide": "left",
+    "tuned": true
    },
    "hasInterior": true,
    "lights": {

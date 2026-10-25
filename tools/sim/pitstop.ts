@@ -84,8 +84,17 @@ v.setAir(20, 32, 1.2);
 v.fitTyres(COMPOUNDS.medium, 32);
 const ai = new AiDriver(track, v, 0.95, 0);
 const pit = new PitLaneMonitor(track);
+const wallRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 });
+pit.measureBoxes((x, y, z, dx, dz, max) => {
+  wallRay.origin = { x, y: y + 0.8, z };
+  wallRay.dir = { x: dx, y: 0, z: dz };
+  const h = world.castRay(wallRay, max, true, undefined, (0xffff << 16) | 0x0004);
+  return h ? h.timeOfImpact : null;
+});
 const [a, b] = pit.boxes()[pit.boxOf(slot)];
 ai.pitBox = Math.round((a + b) / 2);
+ai.pitBoxShift = process.env.NOSHIFT ? 0 : pit.shiftAt(ai.pitBox);
+console.log(`  box shift ${ai.pitBoxShift.toFixed(1)} m towards the garage`);
 ai.pitRequest = through ? 'through' : 'stop';
 const ev = new RAPIER.EventQueue(true);
 const lane = track.pitLane;
@@ -121,6 +130,10 @@ for (let i = 0; i < 120 * 400; i++) {
   }
   v.speedLimitMs = ai.inPitLane ? lane.speedLimitKmh / 3.6 : null;
   if (ai.atBox && boxAt < 0) {
+    const pp = v.body.translation();
+    const q = lane.points[ai.pitBox];
+    const [ax, az] = pit.awayAt(ai.pitBox);
+    console.log(`  stopped ${((pp.x - q[0]) * ax + (pp.z - q[2]) * az).toFixed(1)} m across from the traced line (box at ${ai.pitBoxShift.toFixed(1)} m)`);
     boxAt = t;
     serviceUntil = t + 22;
   }

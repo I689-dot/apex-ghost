@@ -47,6 +47,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     e.specs = carSpecs(cfg, c);
     e.info = c.info ?? null;
     e.role = c.role ?? null;
+    // a hand-set eye (cars.config pipeline.cockpitEye) without converting the model again
+    if (c.pipeline?.cockpitEye) e.cockpitCamera = { ...e.cockpitCamera, position: c.pipeline.cockpitEye, tuned: true };
     console.log(`${e.id.padEnd(40)} ${String(e.specs.powerKw).padStart(3)} kW  ${e.specs.massKg} kg  ClA ${e.specs.downforceArea}  Cd·A ${e.specs.dragArea}`);
   }
   writeFileSync(file, JSON.stringify(cars, null, 1));

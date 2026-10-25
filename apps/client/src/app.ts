@@ -122,6 +122,9 @@ export class App {
 
   showMenu(error = ''): void {
     this.screen = 'menu';
+    // whatever the race left on top (the pause menu after "Leave race" stayed over the menu, which then took no clicks)
+    this.setPause(false);
+    this.setCountdown('', '');
     this.teardownConnection();
     this.setBackdrop('grid');
     const nick = h('input', {

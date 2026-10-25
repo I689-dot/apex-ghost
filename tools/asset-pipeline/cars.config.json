@@ -458,7 +458,7 @@
       "pipeline": {
         "realLengthM": 4.82,
         "cockpitOffset": [0.06, -0.06, 0.3],
-        "cockpitEye": [0.31, 1, -0.26]
+        "cockpitEye": [0.31, 1.03, -0.35]
       },
       "profile": "gt3_front_i6tt",
       "specs": {
@@ -747,7 +747,8 @@
         "team": "Lexus customer racing (IMSA GTD, WEC LMGT3)"
       },
       "pipeline": {
-        "realLengthM": 4.845
+        "realLengthM": 4.845,
+        "cockpitEye": [0.416, 1.031, -0.138]
       }
     },
     "corvette_z06_gt3r": {
@@ -788,8 +789,37 @@
             "texture": "textures/ext_skin.png",
             "metallic": 0.25,
             "roughness": 0.3
+          },
+          "^INT_(PLASTIC|CARBON|BANNER)|CHASSIS_CARBON": {
+            "color": "#1c1d20",
+            "roughness": 0.55
+          },
+          "^INT_METAL": {
+            "color": "#4a4d52",
+            "metallic": 0.1,
+            "roughness": 0.6
+          },
+          "^INT_ROOLCAGE": {
+            "color": "#6a6d72",
+            "metallic": 0.1,
+            "roughness": 0.55
+          },
+          "^INT_ALCANTARA": {
+            "color": "#26272a",
+            "roughness": 0.9
+          },
+          "^EXT_MECANICALS_PARTS": {
+            "color": "#3a3b3e",
+            "metallic": 0.3,
+            "roughness": 0.5
+          },
+          "^EXT_EXAULST": {
+            "color": "#7a7a78",
+            "metallic": 0.8,
+            "roughness": 0.35
           }
-        }
+        },
+        "cockpitEye": [0.328, 0.945, -0.153]
       }
     },
     "ferrari_296_gt3_verstappen": {
@@ -823,7 +853,8 @@
         "team": "Verstappen.com Racing (GT World Challenge Europe)"
       },
       "pipeline": {
-        "realLengthM": 4.69
+        "realLengthM": 4.69,
+        "cockpitEye": [0.334, 0.905, 0.196]
       }
     },
     "ford_mustang_gt3": {
@@ -857,7 +888,8 @@
         "team": "Ford Performance (IMSA GTD Pro, WEC LMGT3, GT World Challenge)"
       },
       "pipeline": {
-        "realLengthM": 4.95
+        "realLengthM": 4.95,
+        "cockpitEye": [0.329, 1.04, -0.232]
       }
     },
     "lamborghini_temerario_gt3": {
@@ -891,7 +923,8 @@
         "team": "Lamborghini Squadra Corse (2026 debut with Pfaff Motorsports)"
       },
       "pipeline": {
-        "realLengthM": 4.8
+        "realLengthM": 4.8,
+        "cockpitEye": [0.36, 0.94, 0.095]
       }
     },
     "bmw_m4_gt3_evo_2026": {
@@ -911,7 +944,8 @@
         "team": "BMW M Motorsport customer racing"
       },
       "pipeline": {
-        "realLengthM": 5.02
+        "realLengthM": 5.02,
+        "cockpitEye": [0.328, 1.056, -0.457]
       }
     },
     "bmw_m4_gt3_vecarz": {
@@ -931,7 +965,8 @@
         "team": "BMW M Motorsport customer racing"
       },
       "pipeline": {
-        "realLengthM": 5.02
+        "realLengthM": 5.02,
+        "cockpitEye": [0.402, 0.991, -0.201]
       }
     },
     "aston_martin_vantage_safety_car": {

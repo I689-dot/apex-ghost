@@ -61,7 +61,7 @@ import { SessionAudio, type OtherCar } from '../audio/sessionAudio';
 import { LapDelta } from './lapDelta';
 import { BestLapGhost, wakeStrength } from './ghost';
 import { applySetup, vehicleSetup } from './carSetup';
-import { PitLaneMonitor } from './pitLane';
+import { PitLaneMonitor, type WallProbe } from './pitLane';
 import { defaultPlan, serviceTime, type ServicePlan } from './pitService';
 import { PitMenu } from '../ui/pitMenu';
 import { TimingScreen } from '../ui/timingScreen';
@@ -88,11 +88,14 @@ const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
 const MAX_FRAME_DT = 0.1;
 /** How far a bot moves over to pass a slower car (m). */
 const PASS_OFFSET = 3.6;
-/** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). */
-const BOT_RELEASE_MS = 2500;
+/** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). 2.5 s kept the last of 11
+ * bots waiting 27 s, which looked like bots that would not start. */
+const BOT_RELEASE_MS = 1000;
 /** Other cars' collision boxes with the contact rule: kinematic, they push us and only touch cars. */
 const KINEMATIC_GROUPS = (0x0002 << 16) | 0x0002;
 const FCY_MS = RACE_CONTROL.fcyKmh / 3.6;
+/** Maps whose pit lane gets our own surface (pitLane.buildSurface): Zandvoort's model draws it near-white. */
+const PIT_SURFACE_MAPS = new Set(['zandvoort']);
 /** What race control's penalties are for (the drive-through announcements). */
 const PENALTY_TEXT: Record<PenaltyReason, string> = {
   'track-limits': 'track limits',
@@ -259,6 +262,8 @@ export class RaceSession {
   private rc: RaceControlState = greenState(0);
   private greenUntil = 0;
   private scPath: SafetyCarPath | null = null;
+  /** Where the safety car waits (the end of the pit lane, on the ground), found once. */
+  private scPark: { x: number; y: number; z: number; yaw: number } | null = null;
   /** The safety car: its model, collision box (contact rule) and where it is now. */
   private sc: { visual: CarVisual; body: RAPIER.RigidBody | null; s: number; speed: number; visible: boolean } | null = null;
   /** Colliders of other cars (contact rule), for damage. */
@@ -434,6 +439,7 @@ export class RaceSession {
     this.scene.add(this.racingLine.object);
     if (this.trackData.pitLane) {
       this.pit = new PitLaneMonitor(this.trackData);
+      this.pit.measureBoxes(this.wallProbe);
       // painted on the *visible* road: the collision under painted layers is flattened a few cm lower, so markings
       // placed on it disappeared under the asphalt
       const roadMeshes: THREE.Object3D[] = [];
@@ -447,18 +453,15 @@ export class RaceSession {
       const gq = this.track.groundQuery(this.world);
       const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' as const };
       this.track.root.updateMatrixWorld(true);
-      this.scene.add(
-        this.pit.buildMarkings(
-          (x, z, y) => {
-            rc.set(new THREE.Vector3(x, y + 2.5, z), down);
-            rc.far = 6;
-            const h = rc.intersectObjects(roadMeshes, false)[0];
-            if (h) return h.point.y;
-            return gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y;
-          },
-          this.spectator ? null : { slot: this.race.slots[this.me] ?? 0, name: this.names.get(this.me) ?? '' },
-        ),
-      );
+      const paintGround = (x: number, z: number, y: number) => {
+        rc.set(new THREE.Vector3(x, y + 2.5, z), down);
+        rc.far = 6;
+        const h = rc.intersectObjects(roadMeshes, false)[0];
+        if (h) return h.point.y;
+        return gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y;
+      };
+      if (PIT_SURFACE_MAPS.has(this.trackData.map ?? '')) this.scene.add(this.pit.buildSurface(paintGround, this.wallProbe));
+      this.scene.add(this.pit.buildMarkings(paintGround, this.spectator ? null : { slot: this.race.slots[this.me] ?? 0, name: this.names.get(this.me) ?? '' }));
     }
 
     this.localTracker = this.makeTracker(0);
@@ -579,11 +582,23 @@ export class RaceSession {
         pitSent: false,
       };
       if (pit) {
+        pit.measureBoxes(this.wallProbe);
         const [a, b] = pit.boxes()[pit.boxOf(r.slot)];
         r.bot.ai.pitBox = Math.round((a + b) / 2);
+        r.bot.ai.pitBoxShift = pit.shiftAt(r.bot.ai.pitBox);
       }
     }
   }
+
+  /** Distance to the circuit's walls (collision), horizontally from 0.8 m above (x, y, z): where the garages are. */
+  private wallRay: RAPIER.Ray | null = null;
+  private wallProbe: WallProbe = (x, y, z, dx, dz, max) => {
+    const ray = (this.wallRay ??= new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }));
+    ray.origin = { x, y: y + 0.8, z };
+    ray.dir = { x: dx, y: 0, z: dz };
+    const h = this.world.castRay(ray, max, true, undefined, (0xffff << 16) | 0x0004);
+    return h ? h.timeOfImpact : null;
+  };
 
   /** A collision box for a car simulated elsewhere (contact rule): moved each step to where that car is now. */
   private kinematicCar(entry: CarEntry): RAPIER.RigidBody {
@@ -1162,7 +1177,7 @@ export class RaceSession {
     for (const r of this.remotes.values()) if (r.body) move(r.body, r.visual.object, r.vel);
     const sc = this.sc;
     if (sc?.body) {
-      if (sc.visible) move(sc.body, sc.visual.object, _v2.set(0, 0, 0));
+      if (sc.visual.object.visible) move(sc.body, sc.visual.object, _v2.set(0, 0, 0));
       else sc.body.setNextKinematicTranslation({ x: 0, y: -500, z: 0 });
     }
   }
@@ -1174,8 +1189,29 @@ export class RaceSession {
     const d = this.rc.sc;
     const on = !!d && serverNow >= d.t0 && (d.inAt === null || serverNow < d.inAt);
     sc.visible = on;
-    sc.visual.object.visible = on;
-    if (!on || !d) return;
+    sc.visual.object.visible = true;
+    if (!on || !d) {
+      // waiting at the end of the pit lane, as at a real race, lights off
+      const lane = this.trackData.pitLane;
+      if (!lane) {
+        sc.visual.object.visible = false;
+        return;
+      }
+      if (!this.scPark) {
+        const i = Math.max(1, lane.points.length - 14);
+        const p = lane.points[i];
+        const q = lane.points[i + 1];
+        const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' as const };
+        const y = this.track.groundQuery(this.world).cast(p[0], p[1] + 2, p[2], 0, -1, 0, 5, hit) ? hit.py : p[1];
+        this.scPark = { x: p[0], y, z: p[2], yaw: Math.atan2(q[0] - p[0], q[2] - p[2]) };
+      }
+      const o = sc.visual.object;
+      o.position.set(this.scPark.x, this.scPark.y, this.scPark.z);
+      o.rotation.set(0, this.scPark.yaw, 0);
+      o.updateMatrixWorld();
+      sc.visual.setLights(false, false, this.env.night);
+      return;
+    }
     const s = safetyCarAt(this.scPath, d.t0, d.s0, serverNow);
     const moved = wrapDelta(sc.s, s, this.trackData.length);
     sc.speed = dt > 0 && moved >= 0 && moved < 100 ? moved / dt : sc.speed;
@@ -2158,6 +2194,7 @@ export class RaceSession {
         if (!r.visual.object.visible || (!r.bot && !r.buffer.hasData)) continue;
         dots.push({ x: r.visual.object.position.x, z: r.visual.object.position.z, me: false, color: r.entry.color });
       }
+      if (this.sc?.visible) dots.push({ x: this.sc.visual.object.position.x, z: this.sc.visual.object.position.z, me: false, color: '#ffb000' });
       _v1.set(0, 0, 1).applyQuaternion(this.currRot);
       this.hud.drawMap(dots, p.x, p.z, _v1.x, _v1.z);
     }

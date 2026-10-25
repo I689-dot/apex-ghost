@@ -1,6 +1,7 @@
 import { nearestCenterlineIndex, progressAt, wrapDelta, type CarSpecs, type TrackData } from '@apex/shared';
 import type { Controls } from '../physics/input';
 import type { Vehicle } from '../physics/vehicle';
+import { laneGeometry } from './pitLane';
 
 const G = 9.81;
 
@@ -225,6 +226,8 @@ export class AiDriver {
    */
   pitRequest: 'stop' | 'through' | null = null;
   pitBox = 0;
+  /** How far its box is from the traced lane, towards the garage (m: PitLaneMonitor.measureBoxes). */
+  pitBoxShift = 0;
   inPitLane = false;
   private boxDone = false;
   private laneIdx = 0;
@@ -321,7 +324,12 @@ export class AiDriver {
       this.laneStuck = 0;
       this.resetRequested = true;
     }
-    return { follow: true, x: pts[k][0], z: pts[k][2], v };
+    // across to the box in front of the garage over the last 12 m, back to the lane line over 15 m after it
+    let w = 0;
+    if (this.pitRequest === 'stop' && this.pitBoxShift > 0)
+      w = this.boxDone ? clamp(1 - ((k - this.pitBox) * step) / 15, 0, 1) : clamp(1 - ((this.pitBox - k) * step) / 12, 0, 1);
+    const [ax, az] = w > 0 ? laneGeometry(this.track).away[k] : [0, 0];
+    return { follow: true, x: pts[k][0] + ax * this.pitBoxShift * w, z: pts[k][2] + az * this.pitBoxShift * w, v };
   }
 
   /** The side (+1 left, −1 right) with more track beside the line here. */
