@@ -58,10 +58,10 @@ node tools/asset-pipeline/optimize.mjs --map zandvoort --only collision   # coll
 
 Set `MODELS_DIR=/path/to/3D MODELS` when the sources are elsewhere (for example in a git worktree). Each run updates its own map's entries in `public/assets/tracks.json` (the lobby list) and `packages/shared/src/generated/tracks-race.json` (server lap validation) and keeps the other maps'. Check a rebuilt map with `pnpm tsx tools/sim/holes.ts --track zandvoort`, `node tools/sim/pitlat.mjs 0 640 --track zandvoort`, `pnpm tsx tools/sim/ailap.ts --track zandvoort --laps 3` and `node tools/e2e/tour.mjs --track zandvoort --aerial`; debug plots are in the map's output folder (`debug_track.png`, `debug_grid.png`).
 
-**Nordschleife.** `maps/nordschleife.json` has no source model: it is built around the GP map (`"baseMap": "nurburgring"`) and adds the 24h layout (`nurburgring_24h`, GP + Nordschleife, 24.3 km). The centreline is traced from the channel the GP map's satellite terrain leaves for it (`trace_nordschleife.mjs`, offline) or, with `"source": "osm"`, taken from OpenStreetMap and EU-DEM heights. Build the GP map first, then:
+**Nordschleife.** `maps/nordschleife.json` has no source model: it is built around the GP map (`"baseMap": "nurburgring"`) and adds the 24h layout (`nurburgring_24h`, GP + Nordschleife, 25.9 km). The centreline comes from OpenStreetMap (`"source": "osm"`, the raceways chained from the 24h link roads) with EU-DEM heights (downloads, cached in the map's output folder); `"source": "terrain"` traces the channel the GP map's terrain leaves for it instead (`trace_nordschleife.mjs`, offline, approximate). Build the GP map first (or unpack its published terrain: `node tools/asset-pipeline/unpack_glb.mjs apps/client/public/assets/track/map_terrain.glb tools/asset-pipeline/out/map/map_terrain.glb`), then:
 
 ```bash
-pnpm assets --only map --map nordschleife                                # trace (~1 min) + Blender: road, verges, armco, corridor, terrain
+pnpm assets --only map --map nordschleife                                # Blender: OSM + DEM trace, road, verges, armco, corridor, terrain
 node tools/asset-pipeline/optimize.mjs --map nordschleife --only map     # KTX2/meshopt, junction cuts, merged collision, layout JSON
 node tools/asset-pipeline/forest_scatter.mjs --map nordschleife          # forest within 450 m of the lap
 node tools/asset-pipeline/optimize.mjs --map nurburgring --only fill     # re-encode an older map_fill.glb's textures to KTX2

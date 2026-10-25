@@ -10,7 +10,20 @@
  */
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, KHRTextureBasisu, EXTTextureWebP, EXTMeshoptCompression } from '@gltf-transform/extensions';
-import { dedup, prune, weld, simplify, simplifyPrimitive, meshopt, reorder, listTextureSlots, compactPrimitive, normals } from '@gltf-transform/functions';
+import {
+  dedup,
+  dequantize,
+  prune,
+  weld,
+  simplify,
+  simplifyPrimitive,
+  meshopt,
+  quantize,
+  reorder,
+  listTextureSlots,
+  compactPrimitive,
+  normals,
+} from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { execFile } from 'node:child_process';
@@ -339,8 +352,13 @@ function dropTiny(doc, minSize) {
   return n;
 }
 
-async function finish(doc, file) {
-  await doc.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+async function finish(doc, file, positionBits = 14) {
+  if (positionBits === 14) await doc.transform(prune(), meshopt({ encoder: MeshoptEncoder, level: 'high' }));
+  else {
+    // what meshopt() does, with finer positions
+    await doc.transform(prune(), reorder({ encoder: MeshoptEncoder }), quantize({ quantizePosition: positionBits }));
+    doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
+  }
   mkdirSync(path.dirname(file), { recursive: true });
   await io.write(file, doc);
   return statSync(file).size;
@@ -562,7 +580,17 @@ async function map() {
     }
     await compressTextures(doc, { maxColor: kind === 'terrain' ? 2048 : 512, maxData: 256, tag: `map-${kind}` });
     const file = `map_${kind}.glb`;
-    const size = await finish(doc, path.join(dstDir, file));
+    // 14-bit positions per mesh: the Nordschleife's terrain is one 7 km mesh, 0.43 m steps, more than the 0.3 m the
+    // builder keeps it under the road (it showed through the verges and edge lines). Such meshes get 16 bits (0.11 m).
+    let ext = 0;
+    for (const mesh of doc.getRoot().listMeshes())
+      for (const prim of mesh.listPrimitives()) {
+        const p = prim.getAttribute('POSITION');
+        const lo = p.getMin([]);
+        const hi = p.getMax([]);
+        ext = Math.max(ext, hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+      }
+    const size = await finish(doc, path.join(dstDir, file), ext / 16384 > 0.1 ? 16 : 14);
     files[kind] = file;
     log(`map ${kind}: ${before} → ${triCount(doc)} tris, ${(size / 1e6).toFixed(2)} MB`);
   }
@@ -578,8 +606,9 @@ async function map() {
   // instead of copying them (download and Vercel size stay the same for the GP)
   if (MAP.baseMap) {
     const baseLayout = baseLayoutOf(MAP.baseMap);
-    // the base map's hole fill also closed the Nordschleife channel with flat 'terrain_fill' ground: cut it along
-    // the new road and ship the trimmed copy (it replaces the base chunk_fill on this map's layouts)
+    // the base map's hole fill also closed the Nordschleife channel with flat 'terrain_fill' ground, and its
+    // 'grass_fill' patches reached out to the link roads (up to 11 m above the new road at the junctions): cut both
+    // along the new road and ship the trimmed copy (it replaces the base chunk_fill on this map's layouts)
     const fillChunk = baseLayout.chunks.find((c) => c.node === 'chunk_fill');
     if (fillChunk) {
       const doc = await io.read(path.join(pub, '..', fillChunk.file.replace(/\?.*$/, '')));
@@ -591,7 +620,7 @@ async function map() {
         if (!mesh) continue;
         const m = node.getWorldMatrix();
         for (const prim of mesh.listPrimitives()) {
-          if (!/^terrain_fill/i.test(prim.getMaterial()?.getName() ?? '')) continue;
+          if (!/^(terrain|grass)_fill/i.test(prim.getMaterial()?.getName() ?? '')) continue;
           const pos = prim.getAttribute('POSITION');
           const ind = prim.getIndices();
           const keep = [];
@@ -670,6 +699,68 @@ async function map() {
         copied.push(path.basename(out));
       }
       if (cutTris) log(`junctions: ${cutTris} wall/fence triangles of ${MAP.baseMap} cut where the new lap passes (${copied.join(', ')})`);
+    }
+    // the base map's own trees line its (approximate) Nordschleife channel: where the new road strays from it they
+    // stood on the road's edge, 2.5 m from the cars (big photo-textured walls at Hatzenbogen). Whole trees (connected
+    // pieces of a mesh) within `treeClearM` of the new road go; copies of the touched chunks replace the originals.
+    {
+      const own = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
+      const near = nearNewRoad(baseLayout, own, MAP.nordschleife?.treeClearM ?? 14);
+      const list = baseLayout.chunks.filter((c) => c.kind === 'trees');
+      const files = [...new Set(list.map((c) => c.file))];
+      let trees = 0;
+      for (const [k, file] of files.entries()) {
+        const doc = await io.read(path.join(pub, '..', file.replace(/\?.*$/, '')));
+        const names = new Set(list.filter((c) => c.file === file).map((c) => c.node));
+        const hit = new Set();
+        for (const node of doc.getRoot().listScenes()[0].listChildren()) {
+          if (!names.has(node.getName())) continue;
+          node.traverse((nd) => {
+            const mesh = nd.getMesh();
+            if (!mesh) return;
+            const m = nd.getWorldMatrix();
+            for (const prim of mesh.listPrimitives()) {
+              const pos = prim.getAttribute('POSITION');
+              const ind = prim.getIndices();
+              if (!ind) continue;
+              // connected pieces (one tree each): union-find over the triangles' vertices
+              const parent = new Int32Array(pos.getCount()).map((_, i) => i);
+              const find = (i) => {
+                while (parent[i] !== i) i = parent[i] = parent[parent[i]];
+                return i;
+              };
+              for (let t = 0; t < ind.getCount(); t += 3) {
+                const a = find(ind.getScalar(t));
+                parent[find(ind.getScalar(t + 1))] = a;
+                parent[find(ind.getScalar(t + 2))] = a;
+              }
+              const gone = new Set();
+              const v = [0, 0, 0];
+              for (let i = 0; i < pos.getCount(); i++) {
+                pos.getElement(i, v);
+                if (near(m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14])) gone.add(find(i));
+              }
+              if (!gone.size) continue;
+              const keep = [];
+              for (let t = 0; t < ind.getCount(); t += 3)
+                if (!gone.has(find(ind.getScalar(t)))) keep.push(ind.getScalar(t), ind.getScalar(t + 1), ind.getScalar(t + 2));
+              if (keep.length) ind.setArray(pos.getCount() > 65535 ? new Uint32Array(keep) : new Uint16Array(keep));
+              else prim.dispose(); // all its trees gone (an empty index buffer fails meshopt's encoder)
+              trees += gone.size;
+              hit.add(node.getName());
+            }
+          });
+        }
+        if (!hit.size) continue;
+        for (const node of doc.getRoot().listScenes()[0].listChildren()) if (!hit.has(node.getName())) node.dispose();
+        await doc.transform(prune(), dequantize()); // the base's quantised attributes (3- and 6-byte strides) cannot be re-encoded as they are
+        const out = path.join(dstDir, `map_trees_${k}.glb`);
+        await finish(doc, out);
+        for (const c of list) if (c.file === file && hit.has(c.node)) render.chunks.push({ ...c, file: `${base}/${path.basename(out)}${V}` });
+        log(
+          `base trees: ${trees} of ${MAP.baseMap}'s trees removed within ${MAP.nordschleife?.treeClearM ?? 14} m of the new road (${hit.size} chunks, ${path.basename(out)})`,
+        );
+      }
     }
     // chunks this map rebuilds (the conformed terrain, the trimmed fill, the cut walls) replace the base map's chunks of the same name
     const own = new Set(render.chunks.map((c) => c.node));
@@ -967,6 +1058,33 @@ function roadSurface(mapOut) {
  * (x, z) → true within `R` m of the parts of `own`'s lap line that are not on the base layout's lap line, and
  * closer to them than to the base lap (so near the junctions the base map keeps its own ground).
  */
+/** (x, z) → within R of the new road (the layout's centreline points that are not the base layout's). */
+function nearNewRoad(baseLayout, own, R) {
+  const onBase = new Set();
+  for (let i = 0; i < baseLayout.centerline.length / 3; i++)
+    onBase.add(`${baseLayout.centerline[i * 3].toFixed(2)},${baseLayout.centerline[i * 3 + 2].toFixed(2)}`);
+  const grid = new Map();
+  const cl = own.centerline;
+  for (let i = 0; i < cl.length / 3; i++) {
+    const x = cl[i * 3];
+    const z = cl[i * 3 + 2];
+    if (onBase.has(`${x.toFixed(2)},${z.toFixed(2)}`)) continue;
+    const k = `${Math.floor(x / R)},${Math.floor(z / R)}`;
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(x, z);
+  }
+  return (x, z) => {
+    const gx = Math.floor(x / R);
+    const gz = Math.floor(z / R);
+    for (let a = -1; a <= 1; a++)
+      for (let c = -1; c <= 1; c++) {
+        const p = grid.get(`${gx + a},${gz + c}`);
+        if (p) for (let i = 0; i < p.length; i += 2) if ((p[i] - x) ** 2 + (p[i + 1] - z) ** 2 < R * R) return true;
+      }
+    return false;
+  };
+}
+
 function newRoadTest(baseLayout, own, R) {
   const onBase = new Set();
   for (let i = 0; i < baseLayout.centerline.length / 3; i++)
@@ -1047,6 +1165,39 @@ function connectorTest(baseLayout, own, R) {
   return test;
 }
 
+/** Is (x, z) under one of these collision parts' triangles (top-down)? Spatial hash of 8 m cells. */
+function surfaceCover(list) {
+  const G = 8;
+  const grid = new Map();
+  for (const { pos, idx } of list)
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t] * 3;
+      const b = idx[t + 1] * 3;
+      const c = idx[t + 2] * 3;
+      const x0 = Math.floor(Math.min(pos[a], pos[b], pos[c]) / G);
+      const x1 = Math.floor(Math.max(pos[a], pos[b], pos[c]) / G);
+      const z0 = Math.floor(Math.min(pos[a + 2], pos[b + 2], pos[c + 2]) / G);
+      const z1 = Math.floor(Math.max(pos[a + 2], pos[b + 2], pos[c + 2]) / G);
+      if ((x1 - x0 + 1) * (z1 - z0 + 1) > 400) continue;
+      for (let i = x0; i <= x1; i++)
+        for (let j = z0; j <= z1; j++) {
+          const k = i * 100003 + j;
+          if (!grid.has(k)) grid.set(k, []);
+          grid.get(k).push([pos[a], pos[a + 2], pos[b], pos[b + 2], pos[c], pos[c + 2]]);
+        }
+    }
+  return (x, z) => {
+    for (const [ax, az, bx, bz, cx, cz] of grid.get(Math.floor(x / G) * 100003 + Math.floor(z / G)) ?? []) {
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+      if (Math.abs(d) < 1e-9) continue;
+      const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+      const l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+      if (l1 >= -1e-4 && l2 >= -1e-4 && 1 - l1 - l2 >= -1e-4) return true;
+    }
+    return false;
+  };
+}
+
 /** The default layout JSON of another map (for maps built around it). */
 function baseLayoutOf(mapId) {
   const idx = JSON.parse(readFileSync(path.join(pub, 'tracks.json'), 'utf8')).tracks;
@@ -1104,6 +1255,9 @@ async function tracksOnly() {
 
 const SURF = ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'];
 const SIMPLIFY_ERR = { asphalt: 0, curb: 0, grass: 0.00004, gravel: 0, sand: 0.00004, wall: 0.00012 };
+// ...relative to the mesh's extent, so a 7 km map got 0.28 m on its grass: the builder's ground lies 0.3 m under the
+// road, and the simplified triangles crossed the asphalt by up to 10 cm (wheels on grass, spins). Capped in metres.
+const SIMPLIFY_MAX_M = { grass: 0.08, sand: 0.08 };
 
 /**
  * collision.bin layout (little endian):
@@ -1134,7 +1288,18 @@ async function collision(mapOut, dstDir) {
       log(`collision ${s}: stacked layers: ${r.snapped} vertices snapped down (up to ${(r.maxGap * 100).toFixed(1)} cm), ${r.dropped} triangles dropped`);
     }
     if (SIMPLIFY_ERR[s] > 0) {
-      const [simp] = MeshoptSimplifier.simplify(idx, pos, 3, 0, SIMPLIFY_ERR[s], ['LockBorder']);
+      let ext = 0;
+      for (let a = 0; a < 3; a++) {
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (let i = a; i < pos.length; i += 3) {
+          lo = Math.min(lo, pos[i]);
+          hi = Math.max(hi, pos[i]);
+        }
+        ext = Math.max(ext, hi - lo);
+      }
+      const err = Math.min(SIMPLIFY_ERR[s], (SIMPLIFY_MAX_M[s] ?? Infinity) / ext);
+      const [simp] = MeshoptSimplifier.simplify(idx, pos, 3, 0, err, ['LockBorder']);
       idx = simp;
     }
     // compact unused vertices
@@ -1182,6 +1347,9 @@ async function collision(mapOut, dstDir) {
     const nearNew = newRoadTest(bl, ownBase, (MAP.nordschleife?.corridorM ?? 90) + 10);
     const crossing = connectorTest(bl, ownBase, 7.5); // walls: the opening
     const paved = connectorTest(bl, ownBase, 4.2); // ground: only where the new road's asphalt lies on top
+    // ...and only where it really does: the builder leaves out its own asphalt where it lies on the base's, so cutting
+    // the base's there left a hole in the road at the Nordschleife exit (nothing under the left wheels)
+    const covered = surfaceCover(parts.filter((q) => SURF[q.si] === 'asphalt' || SURF[q.si] === 'curb'));
     let kept = 0;
     for (const f of [bl.collision.file, ...(bl.collision.extra ?? [])]) {
       let raw = readFileSync(path.join(pub, '..', f.replace(/\?.*$/, '')));
@@ -1211,7 +1379,9 @@ async function collision(mapOut, dstDir) {
             const c = idx[t + 2] * 3;
             const hit = isWall
               ? crossing.tri(pos[a], pos[a + 2], pos[b], pos[b + 2], pos[c], pos[c + 2])
-              : paved((pos[a] + pos[b] + pos[c]) / 3, (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3);
+              : paved((pos[a] + pos[b] + pos[c]) / 3, (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3) &&
+                [a, b, c].every((v) => covered(pos[v], pos[v + 2])) &&
+                covered((pos[a] + pos[b] + pos[c]) / 3, (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3);
             if (!hit) k.push(idx[t], idx[t + 1], idx[t + 2]);
           }
           if (k.length !== idx.length)

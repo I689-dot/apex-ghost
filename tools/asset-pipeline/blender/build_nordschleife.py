@@ -224,8 +224,8 @@ def load_base_collision():
 BASE_COL = load_base_collision()
 
 
-def raster(tris, x0, z0, W, H, res, value="mask"):
-    """Rasterise triangles top-down: mask (bool) or max height."""
+def raster(tris, x0, z0, W, H, res, value="mask", tol=0.02):
+    """Rasterise triangles top-down: mask (bool) or max height. `tol`: barycentric slack (relative to the triangle)."""
     out = np.full((H, W), -np.inf) if value == "height" else np.zeros((H, W), bool)
     cx = tris[:, :, 0]
     cz = tris[:, :, 2]
@@ -243,7 +243,7 @@ def raster(tris, x0, z0, W, H, res, value="mask"):
         w1 = ((bz - qz) * (gx - qx) + (qx - bx) * (gz - qz)) / den
         w2 = ((qz - az) * (gx - qx) + (ax - qx) * (gz - qz)) / den
         w3 = 1 - w1 - w2
-        inside = (w1 >= -0.02) & (w2 >= -0.02) & (w3 >= -0.02)
+        inside = (w1 >= -tol) & (w2 >= -tol) & (w3 >= -tol)
         if value == "height":
             h = w1 * ay + w2 * by + w3 * qy
             blk = out[j0 : j1 + 1, i0 : i1 + 1]
@@ -377,12 +377,55 @@ if SOURCE == "osm":
     osm = osm_data()
     ways = [w for w in osm["elements"] if w.get("type") == "way" and "geometry" in w]
     log(f"OSM: {len(ways)} raceway ways")
-    name_re = NS.get("osmName", "nordschleife").lower()
-    ns_ways = [w for w in ways if name_re in (w.get("tags", {}).get("name", "") + " " + w.get("tags", {}).get("alt_name", "")).lower()]
-    other_ways = [w for w in ways if w not in ns_ways]
-    if not ns_ways:
-        raise SystemExit(f"no OSM raceway named like '{name_re}' in the bbox: check maps/nordschleife.json osmName/bbox")
-    log(f"OSM: {len(ns_ways)} Nordschleife ways, {len(other_ways)} other raceway ways")
+    # OSM maps the Nordschleife as ~50 one-way raceways named after its corners (only a 28 m piece is called
+    # "Nordschleife"), so it is chained head to tail in the racing direction from `osmStart`, skipping the sprint
+    # circuit, pit lanes, rallycross and other link roads (`osmExclude`), until `osmEnd` leads back onto the GP. The
+    # 24h layout's link roads ("Anbindung zur Nordschleife" after the NGK chicane, "Anbindung zum GP Kurs" onto the
+    # start straight) join the T13 straight mid-way, so a way may also be entered or left at an inner node.
+    import re
+
+    excl = re.compile(NS.get("osmExclude", "sprint|boxengasse|rallycross|müllenbach|variante|schikane|goodyear|ford-kurve|michael-schumacher|anbindung"), re.I)
+    wname = lambda w: w.get("tags", {}).get("name", "")
+    cand = [w for w in ways if not excl.search(wname(w)) and len(w["geometry"]) > 1]
+    end_key = lambda p: (round(p["lat"], 6), round(p["lon"], 6))
+    by_node = {}
+    for w in cand:
+        for k, p in enumerate(w["geometry"][:-1]):
+            by_node.setdefault(end_key(p), []).append((w, k))
+    named = lambda nm: next((w for w in ways if wname(w) == nm and len(w["geometry"]) > 1), None)
+    start = named(NS.get("osmStart", "Anbindung zur Nordschleife"))
+    finish = named(NS["osmEnd"]) if NS.get("osmEnd") else None
+    if start is None:
+        raise SystemExit(f"no OSM raceway named '{NS.get('osmStart')}' in the bbox: check maps/nordschleife.json osmStart/bbox")
+    wlen = lambda w: float(np.sum(np.linalg.norm(np.diff(ll_to_en([p["lat"] for p in w["geometry"]], [p["lon"] for p in w["geometry"]]), axis=0), axis=1)))
+    ns_ways, used, total = [start], {start["id"]}, wlen(start)
+    while total < NS.get("osmMaxM", 24000):
+        here = end_key(ns_ways[-1]["geometry"][-1])
+        if finish is not None and total > NS.get("osmMaxM", 24000) / 2:
+            # `osmEnd` leaves from here, or from an inner node of the way that starts here
+            if end_key(finish["geometry"][0]) == here:
+                ns_ways.append(finish)
+                total += wlen(finish)
+                break
+            fk = end_key(finish["geometry"][0])
+            via = next((w for w, k in by_node.get(here, []) if any(end_key(p) == fk for p in w["geometry"][k + 1 :])), None)
+            if via is not None:
+                k0 = next(k for k, p in enumerate(via["geometry"]) if end_key(p) == here)
+                k1 = next(k for k, p in enumerate(via["geometry"]) if k > k0 and end_key(p) == fk)
+                part = {**via, "geometry": via["geometry"][k0 : k1 + 1]}
+                ns_ways += [part, finish]
+                total += wlen(part) + wlen(finish)
+                break
+        # ways starting here, or the rest of a way passing through here (a link road joining it mid-way)
+        nxt = [{**w, "geometry": w["geometry"][k:]} for w, k in by_node.get(here, []) if w["id"] not in used]
+        if not nxt:
+            break
+        w = max(nxt, key=lambda x: (wname(x) != "", wlen(x)))  # the named (racing) way at a fork, then the longer
+        ns_ways.append(w)
+        used.add(w["id"])
+        total += wlen(w)
+    other_ways = [w for w in ways if w["id"] not in used]
+    log(f"OSM: Nordschleife chained from {wname(start)}: {len(ns_ways)} ways, {total:.0f} m ({' > '.join(wname(w) or '?' for w in ns_ways[:6])} … {' > '.join(wname(w) or '?' for w in ns_ways[-4:])}); {len(other_ways)} other raceway ways")
 
     # ---------------------------------------------------------------- 2. align OSM ↔ game (ICP on the GP) ---
     gp_xz = np.stack([gp_cl[:, 0], -gp_cl[:, 2]], 1)  # game (x, -z): east/north-like, right-handed in 2D
@@ -417,6 +460,9 @@ if SOURCE == "osm":
         raise SystemExit("alignment failed: the OSM GP and the game's lap line do not match (check bbox/gpCenterLatLon)")
 
 
+    # the OSM ↔ game transform, for tools that place other OSM data (forest_scatter.mjs: the woods)
+    (OUT / "osm_align.json").write_text(json.dumps({"refLatLon": list(REF), "R": R_AL.tolist(), "T": T_AL.tolist(), "S": S_AL}))
+
     def en_to_game(en):
         """OSM metres → game (x, z)."""
         g = ((R_AL.T @ (np.asarray(en) - T_AL).T) / S_AL).T
@@ -429,40 +475,8 @@ if SOURCE == "osm":
 
 
     # -------------------------------------------------------------------- 3. the Nordschleife path ---
-    # chain the named ways end to end through shared OSM nodes (longest path)
-    ends = {}
-    for w in ns_ways:
-        for nid in (w["nodes"][0], w["nodes"][-1]):
-            ends.setdefault(nid, []).append(w)
-
-
-    def chain():
-        best_path = []
-        for start in ns_ways:
-            for flip in (False, True):
-                used = {id(start)}
-                seq = [(start, flip)]
-                tail = start["nodes"][0] if flip else start["nodes"][-1]
-                while True:
-                    nxt = [w for w in ends.get(tail, []) if id(w) not in used]
-                    if not nxt:
-                        break
-                    w = max(nxt, key=lambda x: len(x["geometry"]))
-                    fl = w["nodes"][-1] == tail
-                    used.add(id(w))
-                    seq.append((w, fl))
-                    tail = w["nodes"][0] if fl else w["nodes"][-1]
-                if sum(len(w["geometry"]) for w, _ in seq) > sum(len(w["geometry"]) for w, _ in best_path):
-                    best_path = seq
-        pts = []
-        for w, fl in best_path:
-            g = w["geometry"][::-1] if fl else w["geometry"]
-            ll = ll_to_en([p["lat"] for p in g], [p["lon"] for p in g])
-            pts.append(ll if not pts else ll[1:])
-        return np.concatenate(pts)
-
-
-    ns_en = chain()
+    # the chained ways (already in the racing direction), end to end
+    ns_en = np.concatenate([ll_to_en([p["lat"] for p in w["geometry"]], [p["lon"] for p in w["geometry"]])[0 if k == 0 else 1 :] for k, w in enumerate(ns_ways)])
     ns_xz = en_to_game(ns_en)
     ns_xz = resample(ns_xz, 2.0)
     gp_grid = Grid2D(gp_cl[:, [0, 2]], 20.0)
@@ -636,9 +650,27 @@ for c in NS.get("crests", []):
         continue
     Y += c["heightM"] * np.exp(-0.5 * ((S - S[k]) / (c["lengthM"] / 2.5)) ** 2)
     log(f"crest {c['name']}: +{c['heightM']} m at {S[k]:.0f} m")
-# blend into the GP lap-line heights at both junctions
-y_exit = float(np.interp(S_EXIT, gp_s, gp_cl[:, 1]))
-y_ret = float(np.interp(S_RETURN, gp_s, gp_cl[:, 1]))
+# blend into the GP's asphalt at both junctions. Its lap line's stored heights are off by up to ~3 m near the finish
+# (they wrap with a step at the line), so the asphalt itself is read where the path meets it.
+def gp_asphalt_y(xz, guess):
+    tris = np.concatenate([BASE_COL[k] for k in ("asphalt", "curb") if k in BASE_COL])
+    tris = tris[np.hypot(tris[:, :, 0].mean(1) - xz[0], tris[:, :, 2].mean(1) - xz[1]) < 30]
+    hs = []
+    for (ax, ay, az), (bx, by, bz), (qx, qy, qz) in tris:
+        den = (bz - qz) * (ax - qx) + (qx - bx) * (az - qz)
+        if abs(den) < 1e-9:
+            continue
+        a_ = ((bz - qz) * (xz[0] - qx) + (qx - bx) * (xz[1] - qz)) / den
+        b_ = ((qz - az) * (xz[0] - qx) + (ax - qx) * (xz[1] - qz)) / den
+        if min(a_, b_, 1 - a_ - b_) >= -1e-4:
+            hs.append(a_ * ay + b_ * by + (1 - a_ - b_) * qy)
+    return min(hs, key=lambda h: abs(h - guess)) if hs else guess
+
+
+y_exit = gp_asphalt_y(P[0], float(np.interp(S_EXIT, gp_s, gp_cl[:, 1])))
+y_ret = gp_asphalt_y(P[-1], float(np.interp(S_RETURN, gp_s, gp_cl[:, 1])))
+log(f"junction heights from the GP's asphalt: exit {y_exit:.2f} m (lap line {np.interp(S_EXIT, gp_s, gp_cl[:, 1]):.2f}), "
+    f"return {y_ret:.2f} m (lap line {np.interp(S_RETURN, gp_s, gp_cl[:, 1]):.2f})")
 ramp = NS.get("junctionRampM", 160.0)
 w0 = np.clip(1 - S / ramp, 0, 1) ** 2
 w1 = np.clip(1 - (L_NS - S) / ramp, 0, 1) ** 2
@@ -659,7 +691,22 @@ def base_ground_height(x, z, tris):
     return best
 
 
-_gnd = np.concatenate([BASE_COL[k] for k in ("asphalt", "curb", "grass", "sand", "gravel") if k in BASE_COL])
+# the GP's ground as optimize.mjs keeps it (newRoadTest): its other ground goes where it is nearer the new road than
+# the GP lap, more than 25 m from the lap and within the corridor + 10 m. There it is mostly the GP's own hole fill
+# across the old channel, up to 5 m above the real terrain: following it lifted the road 3.4 m at Hatzenbogen and set
+# it down again in a kink. Its verges along the GP road stay, and the new road must not dip under them.
+def gp_ground_kept():
+    soft = np.concatenate([BASE_COL[k] for k in ("grass", "sand", "gravel") if k in BASE_COL])
+    cen = soft.mean(1)[:, [0, 2]]
+    _, dn = Grid2D(P, 25.0).nearest(cen)
+    _, db = Grid2D(gp_cl[:, [0, 2]], 25.0).nearest(cen)
+    dropped = (dn < CORRIDOR_M + 10.0) & (db > 25.0) & (dn < db)
+    return np.concatenate([*(BASE_COL[k] for k in ("asphalt", "curb") if k in BASE_COL), soft[~dropped]])
+
+
+CORRIDOR_M = NS.get("corridorM", 90.0)
+GP_KEPT = gp_ground_kept()
+_gnd = GP_KEPT
 _gcen = _gnd.mean(1)
 _dgp0 = Grid2D(gp_cl[:, [0, 2]]).nearest(P)[1]
 # junction zones: the new road is the only drivable surface along its connectors (optimize.mjs removes the GP's
@@ -683,7 +730,7 @@ def ground_heights(x, z, tris):
 floor_ = np.full(n, -np.inf)
 TT = np.gradient(P, axis=0)
 hw0 = NS.get("roadWidthM", 9.4) / 2
-for idxs, y_start in ((range(n), float(np.interp(S_EXIT, gp_s, gp_cl[:, 1]))), (range(n - 1, -1, -1), float(np.interp(S_RETURN, gp_s, gp_cl[:, 1])))):
+for idxs, y_start in ((range(n), y_exit), (range(n - 1, -1, -1), y_ret)):
     prev = y_start
     for i in idxs:
         if _dgp0[i] > 120.0:
@@ -691,28 +738,59 @@ for idxs, y_start in ((range(n), float(np.interp(S_EXIT, gp_s, gp_cl[:, 1]))), (
         T_ = TT[i] / (np.linalg.norm(TT[i]) or 1)
         Lv = np.array([T_[1], -T_[0]])
         near_t = _gnd[np.hypot(_gcen[:, 0] - P[i, 0], _gcen[:, 2] - P[i, 1]) < 40]
-        best = None
+        # the walk follows the ground under the middle of the road; the edges lift it by at most 0.3 m (following the
+        # highest point across, it climbed the bank beside the link road at the return: 1.8 m above the GP's asphalt)
+        across = []
         for o in np.linspace(-hw0, hw0, 7):
             hs = [h for h in ground_heights(*(P[i] + Lv * o), near_t) if abs(h - prev) < 1.5]
-            if hs:
-                h = min(hs, key=lambda v: abs(v - prev))
-                best = h if best is None else max(best, h)
-        if best is not None:
-            floor_[i] = max(floor_[i], best + 0.03)
-            prev = best
+            across.append(min(hs, key=lambda v: abs(v - prev)) if hs else None)
+        found = [h for h in across if h is not None]
+        if found:
+            mid = across[3] if across[3] is not None else float(np.median(found))
+            floor_[i] = max(floor_[i], min(max(found), mid + 0.3) + 0.03)
+            prev = mid
+
+
+def smooth_lift(need, slope=0.015, sigma_m=8.0):
+    """A lift ≥ `need` everywhere, without steps: a hard max leaves one where the floor ends (a 0.3 m shelf at
+    185 km/h after the Sabine-Schmitz-Kurve threw the cars). The upper envelope of cones (the lift fades at `slope`
+    per metre either side), its corners rounded. A flat max over a window instead lifted the last metres before the
+    return junction by what a dip 20 m earlier needed: 1 m above the GP's asphalt they meet."""
+    need = np.maximum(need, 0.0)
+    if need.max() <= 0:
+        return need
+    lift = need.copy()
+    for k in range(1, int(need.max() / (slope * STEP)) + 1):
+        drop = slope * STEP * k
+        lift[k:] = np.maximum(lift[k:], need[:-k] - drop)
+        lift[:-k] = np.maximum(lift[:-k], need[k:] - drop)
+    r_ = int(math.ceil(2 * sigma_m / STEP))
+    wide = np.array([lift[max(0, i - r_) : i + r_ + 1].max() for i in range(n)])
+    k_ = np.exp(-0.5 * (np.arange(-r_, r_ + 1) / (sigma_m / STEP)) ** 2)
+    return np.convolve(np.pad(wide, r_, mode="edge"), k_ / k_.sum(), "valid")
+
+
 if np.isfinite(floor_).any():
     before = Y.copy()
-    for _ in range(4):
-        Y = np.maximum(Y, floor_)
-        for i in range(1, n):  # grade clamp, both ways
-            dy = G_MAX * (S[i] - S[i - 1])
-            Y[i] = min(max(Y[i], Y[i - 1] - dy), Y[i - 1] + dy)
-        for i in range(n - 2, -1, -1):
-            dy = G_MAX * (S[i + 1] - S[i])
-            Y[i] = min(max(Y[i], Y[i + 1] - dy), Y[i + 1] + dy)
-        Y = smooth1d(Y, 4.0 / STEP)
-    Y = np.maximum(Y, floor_)
-    log(f"junctions: new road kept on/above the GP's ground (lifted up to {np.max(Y - before):.2f} m)")
+    # where the road lies on the GP's ground it follows it (up and down), fading to the elevation data where that ends:
+    # a normalised local average of the difference, weighted by how much of the window has ground. (A lower bound
+    # alone, applied in a loop, piled up: the last 120 m before the return were lifted 2–3 m, ending 1.8 m above the
+    # GP's asphalt they join.)
+    fin = np.isfinite(floor_)
+    r_ = int(math.ceil(3 * 25.0 / STEP))  # σ 25 m: the DEM lay 2.4 m under the GP's ground at the return (σ 10 m: a 12 % kink)
+    k_ = np.exp(-0.5 * (np.arange(-r_, r_ + 1) / (25.0 / STEP)) ** 2)
+    cw = np.convolve(np.pad(fin.astype(float), r_), k_ / k_.sum(), "valid")
+    cd = np.convolve(np.pad(np.where(fin, floor_ - Y, 0.0), r_), k_ / k_.sum(), "valid")
+    Y = Y + np.where(cw > 1e-6, cd / np.maximum(cw, 1e-6), 0.0) * np.minimum(1.0, 2.0 * cw)
+    for i in range(1, n):  # grade clamp, both ways
+        dy = G_MAX * (S[i] - S[i - 1])
+        Y[i] = min(max(Y[i], Y[i - 1] - dy), Y[i - 1] + dy)
+    for i in range(n - 2, -1, -1):
+        dy = G_MAX * (S[i + 1] - S[i])
+        Y[i] = min(max(Y[i], Y[i + 1] - dy), Y[i + 1] + dy)
+    Y = smooth1d(Y, 4.0 / STEP)
+    Y = Y + smooth_lift(floor_ - Y)  # what smoothing left under the ground (a few cm)
+    log(f"junctions: new road on the GP's ground (moved by {np.min(Y - before):+.2f} … {np.max(Y - before):+.2f} m)")
 
 # frames, curvature, banking
 T = np.gradient(P, axis=0)
@@ -753,9 +831,20 @@ if ON_BASE.any():
     _, D_ON = Grid2D(P[ON_BASE]).nearest(P)
 else:
     D_ON = np.full(n, np.inf)
-# no armco, kerbs or verges of our own near the GP: its own barriers and run-off are there (and offset barriers
-# would cut across the tighter junction curves)
-FREE = D_GP > NS.get("gpClearM", 120.0)
+# no armco, kerbs or verges of our own near the GP's roads: its own barriers and run-off are there (and offset barriers
+# would cut across the tighter junction curves). Measured to its paved ground, not its lap line: Hatzenbogen runs
+# 50–90 m from the GP's back straight, within 120 m of the lap, and was left bare (no lines, verges or armco).
+_paved = np.concatenate([BASE_COL[k] for k in ("asphalt", "curb") if k in BASE_COL])
+_paved = _paved[Grid2D(P, 25.0).nearest(_paved.mean(1)[:, [0, 2]])[1] < 400.0]
+_samples = []
+for _t in _paved:
+    _k = max(1, int(max(np.linalg.norm(_t[1] - _t[0]), np.linalg.norm(_t[2] - _t[0]), np.linalg.norm(_t[2] - _t[1])) / 2.0))
+    for _a in range(_k + 1):
+        for _b in range(_k + 1 - _a):
+            _samples.append((_t[0] * (1 - (_a + _b) / _k) + _t[1] * (_a / _k) + _t[2] * (_b / _k))[[0, 2]])
+_, D_PAVED = Grid2D(np.array(_samples) if _samples else np.array([[1e9, 1e9]]), 25.0).nearest(P)
+FREE = D_PAVED > NS.get("gpPavedClearM", 30.0)
+log(f"side objects: {int((~FREE).sum() * STEP)} m of the path within {NS.get('gpPavedClearM', 30.0):.0f} m of the GP's roads")
 if os.environ.get("NS_DEBUG"):
     for i in list(range(0, 60, 3)) + list(range(n - 60, n, 3)):
         log(f"dbg i={i} S={S[i]:.0f} D_GP={D_GP[i]:.1f} on={ON_BASE[i]} conn={CONN[i]} free={FREE[i]} y={Y[i]:.1f}")
@@ -769,9 +858,10 @@ if JZONE.any():
     _hi = _jp.max(0) + 20
     _res = 0.5
     _W, _H = int((_hi[0] - _lo[0]) / _res) + 1, int((_hi[1] - _lo[1]) / _res) + 1
-    _ground = np.concatenate([BASE_COL[k] for k in ("asphalt", "curb", "grass", "sand", "gravel") if k in BASE_COL])
-    JR = (_lo, _res, _W, _H, raster(BASE_COL["asphalt"], _lo[0], _lo[1], _W, _H, _res), raster(_ground, _lo[0], _lo[1], _W, _H, _res, "height"),
-          raster(BASE_COL["asphalt"], _lo[0], _lo[1], _W, _H, _res, "height"))
+    _ground = GP_KEPT
+    # exact edges: with the default slack a grass bank's big triangles reached 0.5 m+ over the road, and lifted its edge
+    JR = (_lo, _res, _W, _H, raster(BASE_COL["asphalt"], _lo[0], _lo[1], _W, _H, _res, tol=0.0),
+          raster(_ground, _lo[0], _lo[1], _W, _H, _res, "height", tol=0.0), raster(BASE_COL["asphalt"], _lo[0], _lo[1], _W, _H, _res, "height", tol=0.0))
 
 
 def j_lookup(x, z):
@@ -797,10 +887,20 @@ def snap_junction(i0, verts, faces, drop_on_asphalt, up=0.005):
             continue
         if a_ and abs(h_ + up - y) < 1.0:  # over the GP's asphalt: flush with it (no step where the roads meet)
             out_v[k] = (x, h_ + up, z)
-        elif y < h_ + up < y + 0.5:  # over its other ground: never below it (and never onto a deck above)
+        elif y < h_ + up < y + 0.25:  # over its other ground: never below it (a bank or a deck above stays)
             out_v[k] = (x, h_ + up, z)
     if drop_on_asphalt:
-        faces = [f for f in faces if not all(on[q] for q in f)]
+        # wholly: its corners, edge midpoints and centre (where the GP's road edge curves away, corners on its asphalt
+        # with grass between them left a gap in the new road at the Nordschleife exit)
+        def wholly_on(f):
+            if not all(on[q] for q in f):
+                return False
+            pts = [verts[q] for q in f]
+            mids = [((a[0] + b[0]) / 2, (a[2] + b[2]) / 2) for a, b in zip(pts, pts[1:] + pts[:1])]
+            mids.append((sum(p[0] for p in pts) / len(pts), sum(p[2] for p in pts) / len(pts)))
+            return all(j_lookup(x, z)[0] for x, z in mids)
+
+        faces = [f for f in faces if not wholly_on(f)]
     return out_v, faces
 
 # terrain cross-fall for the corridor where the map's terrain has holes: DEM at ±40 m every 30 m (few requests)
@@ -960,6 +1060,23 @@ CSTRIDE = max(1, int(round(NS.get("corridorStepM", 9.0) / NS.get("stepM", 3.0)))
 SAT_FROM = 35.0  # corridor columns from here on show the satellite photo
 kerb_on = smooth1d((np.abs(curv) > 1 / NS.get("kerbRadiusM", 140.0)).astype(float), 3) > 0.3
 kerb_side = np.sign(curv)  # inside of the corner
+
+
+from mathutils.kdtree import KDTree as _KD
+
+ROAD_KD = _KD(n)
+for _i in range(n):
+    ROAD_KD.insert((P[_i, 0], P[_i, 1], 0.0), _i)
+ROAD_KD.balance()
+
+
+def owned(x, z, i):
+    """(x, z) belongs to path point i's stretch: no stretch further along the lap (> 60 m away along it) is nearer."""
+    d_own = math.hypot(x - P[i, 0], z - P[i, 1])
+    for _co, j, d in ROAD_KD.find_range((x, z, 0.0), d_own - 0.5):
+        if abs(S[j] - S[i]) > 60.0:
+            return False
+    return True
 
 
 def yp(i, o):
@@ -1196,10 +1313,14 @@ for ci in range(n_chunks):
                         else:
                             uvs.append((o / 3.0, S[i] / 3.0))
                 m = len(ks)
+                # ground that is nearer another stretch of the road belongs to that stretch's corridor: where the
+                # Nordschleife passes itself at another height (the Breidscheid valley) this one hung over it
+                own = [owned(verts[q][0], verts[q][2], rows[q // m]) for q in range(len(verts))]
                 for r in range(len(rows) - 1):
                     for k in range(m - 1):
                         q = r * m + k
-                        faces.append([q, q + 1, q + 1 + m, q + m])
+                        if own[q] and own[q + 1] and own[q + 1 + m] and own[q + m]:
+                            faces.append([q, q + 1, q + 1 + m, q + m])
                 faces = orient_up(verts, faces)
                 terr_parts.append((key, verts, faces, uvs))
                 add(col["grass"], verts, faces)
@@ -1242,9 +1363,93 @@ if CONFORM:
         ob.matrix_world.identity()
         bm = bmesh.new()
         bm.from_mesh(me)
+        from mathutils.bvhtree import BVHTree
+
+        # holes: the GP map's terrain leaves a channel where its own (approximate) Nordschleife ran. Where that
+        # channel strays from the new road and its corridor, the sky shows through. Gaps enclosed by the terrain, away
+        # from the GP (its own holes sit under its track and buildings, covered by its ground), get a grid patch:
+        # heights from the terrain around, the photo's planar UVs, refined and conformed below like the rest.
+        bm.faces.ensure_lookup_table()
+        bvh0 = BVHTree.FromBMesh(bm)
+        others = [BVHTree.FromPolygons([o.matrix_world @ v.co for v in o.data.vertices], [p.vertices[:] for p in o.data.polygons])
+                  for o in ter_objs if o is not ob]
+        V0 = np.array([v.co[:] for v in bm.verts])
+        rh = NS.get("holeCellM", 12.0)
+        hx0, hy0 = float(V0[:, 0].min()), float(V0[:, 1].min())
+        HW_, HH_ = int((V0[:, 0].max() - hx0) / rh) + 1, int((V0[:, 1].max() - hy0) / rh) + 1
+        down = Vector((0, 0, -1))
+        cov = np.array([[any(b.ray_cast(Vector((hx0 + (i + 0.5) * rh, hy0 + (j + 0.5) * rh, 5000.0)), down)[2] is not None for b in (bvh0, *others))
+                         for i in range(HW_)] for j in range(HH_)])
+        # the GP's ground counts where optimize.mjs keeps it (GP_KEPT)
+        near_road = CORRIDOR[-1] + 10.0
+        gp_paved = np.concatenate([BASE_COL[k] for k in ("asphalt", "curb") if k in BASE_COL])
+        cov |= raster(GP_KEPT, hx0, -(hy0 + HH_ * rh), HW_, HH_, rh)[::-1]  # game z = −Blender y
+        # the GP's paved ground per cell (highest point): the patch stays off it and under its edges
+        paved_h = raster(gp_paved, hx0, -(hy0 + HH_ * rh), HW_, HH_, rh, "height")[::-1]
+        # outside the terrain: open cells reachable from the border
+        from collections import deque
+
+        outside = np.zeros_like(cov)
+        q = deque((j, i) for j in range(HH_) for i in (0, HW_ - 1)) + deque((j, i) for i in range(HW_) for j in (0, HH_ - 1))
+        while q:
+            j, i = q.popleft()
+            if 0 <= j < HH_ and 0 <= i < HW_ and not cov[j, i] and not outside[j, i]:
+                outside[j, i] = True
+                q.extend(((j + 1, i), (j - 1, i), (j, i + 1), (j, i - 1)))
+        hole = ~cov & ~outside
+        gpk0 = KDTree(len(gp_cl))
+        for k, g_ in enumerate(gp_cl):
+            gpk0.insert((g_[0], -g_[2], 0.0), k)
+        gpk0.balance()
+        for j, i in zip(*np.nonzero(hole)):
+            q_ = (hx0 + (i + 0.5) * rh, hy0 + (j + 0.5) * rh, 0.0)
+            if gpk0.find(q_)[2] < NS.get("gpClearM", 120) and kd.find(q_)[2] > near_road:
+                hole[j, i] = False
+        if hole.any():
+            # one cell beyond the gap, under the terrain's edge (no crack between the patch's steps and the edge)
+            patch = hole.copy()
+            patch[1:] |= hole[:-1]
+            patch[:-1] |= hole[1:]
+            patch[:, 1:] |= hole[:, :-1]
+            patch[:, :-1] |= hole[:, 1:]
+            patch &= ~np.isfinite(paved_h)  # (12 m cells: one step further reached over the GP's road, 2.5 m above it)
+            tkd = KDTree(len(V0))
+            for k, v_ in enumerate(V0):
+                tkd.insert((v_[0], v_[1], 0.0), k)
+            tkd.balance()
+            uvl = bm.loops.layers.uv.active
+            A, U = [], []
+            for f in bm.faces:
+                for lp in f.loops:
+                    A.append((lp.vert.co.x, lp.vert.co.y, 1.0))
+                    U.append(lp[uvl].uv[:])
+            fit, res_uv, *_ = np.linalg.lstsq(np.array(A), np.array(U), rcond=None)
+            mat_i = bm.faces[0].material_index
+            corner = {}
+
+            def cvert(i, j):
+                if (i, j) not in corner:
+                    x, y = hx0 + i * rh, hy0 + j * rh
+                    near_ = tkd.find_n((x, y, 0.0), 8)
+                    w_ = [1.0 / max(d_, 1.0) ** 2 for _, _, d_ in near_]
+                    zz = sum(wk * V0[k, 2] for wk, (_, k, _) in zip(w_, near_)) / sum(w_) - 0.4
+                    # a corner next to the GP's paved ground stays 0.3 m under it
+                    near_paved = paved_h[max(0, j - 1) : j + 1, max(0, i - 1) : i + 1]
+                    if np.isfinite(near_paved).any():
+                        zz = min(zz, float(near_paved[np.isfinite(near_paved)].min()) - 0.3)
+                    corner[(i, j)] = bm.verts.new((x, y, zz))
+                return corner[(i, j)]
+
+            for j, i in zip(*np.nonzero(patch)):
+                f = bm.faces.new((cvert(i, j), cvert(i + 1, j), cvert(i + 1, j + 1), cvert(i, j + 1)))
+                f.material_index = mat_i
+                for lp in f.loops:
+                    lp[uvl].uv = tuple(np.array((lp.vert.co.x, lp.vert.co.y, 1.0)) @ fit)
+            uv_rms = float(np.sqrt(res_uv.sum() / len(U))) if len(res_uv) else 0.0
+            log(f"terrain {ob.name}: {int(hole.sum())} cells ({hole.sum() * rh * rh / 1e4:.1f} ha) of enclosed gaps patched (UV fit rms {uv_rms:.4f})")
         # faces the road passes under (vertical rays from the path) or with a corner in the band
         bm.faces.ensure_lookup_table()
-        from mathutils.bvhtree import BVHTree
+        bm.faces.index_update()  # the patch's new faces: BVH hits are face indices
 
         bvh = BVHTree.FromBMesh(bm)
         hit_faces = set()
@@ -1288,6 +1493,29 @@ if CONFORM:
                 w = w * w * (3 - 2 * w)
                 v.co.z = road_y * (1 - w) + v.co.z * w
             moved += 1
+        # last: nothing of it above the road. Coarse triangles span between stretches at different heights (they take
+        # the nearest stretch's profile), and pushed up through the asphalt in a few places (0.7 m at Pflanzgarten).
+        # Rays down across the road every path point; any face above it is pulled under the road.
+        for it in range(4):
+            bm.faces.ensure_lookup_table()
+            bm.faces.index_update()
+            bvh2 = BVHTree.FromBMesh(bm)
+            lowered = 0
+            for i in range(n):
+                for f_ in (-1.1, -0.8, -0.4, 0.0, 0.4, 0.8, 1.1):
+                    o = f_ * (HW[i] + 0.5)
+                    x, z = P[i, 0] + LEFT[i, 0] * o, P[i, 1] + LEFT[i, 1] * o
+                    road_y = yp(i, max(-HW[i], min(HW[i], o)))
+                    h = bvh2.ray_cast(Vector((x, -z, road_y + 6.0)), Vector((0, 0, -1)), 6.0 + 0.2)
+                    if h[2] is None:
+                        continue
+                    for v in bm.faces[h[2]].verts:
+                        if v.co.z > road_y - 0.3:
+                            v.co.z = road_y - 0.3
+                            lowered += 1
+            if lowered == 0:
+                break
+            log(f"terrain pass {it + 1}: {lowered} vertices pulled under the road")
         bm.to_mesh(me)
         bm.free()
         me.update()

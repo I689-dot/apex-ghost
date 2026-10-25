@@ -11,6 +11,11 @@
  *  4. a jittered grid (`--spacing` m) keeps a tree where the smoothed forest share wins a coin flip, so stands get soft
  *     edges and a few hedgerow trees stand in the fields.
  * `--band` (or the map's "forestBand") keeps trees within that distance of the lap line only (long tracks).
+ * Maps built from OpenStreetMap ("forestOsm": true, the Nordschleife) also plant the mapped woods (natural=wood,
+ * landuse=forest; © OpenStreetMap contributors, ODbL), placed with the builder's OSM ↔ game transform
+ * (out/<map out>/osm_align.json): the photo is ~9 m/px there, and the ground the builder generates along the road
+ * shows no photo at all, so before this the Nordschleife ran through bare fields. "forestTrackGapM" (default 22) is
+ * the distance kept from the road edge.
  * Writes public/assets/<map assets>/forest.bin (8 bytes per tree, sorted by 128 m cells) + forest.json, a debug image
  * in tools/asset-pipeline/out/<map out>/debug_forest.png, and adds `forest` to the map's layout JSONs.
  * Chromium: Playwright's, or CHROMIUM_PATH=/path/to/chrome.
@@ -29,6 +34,7 @@ const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1
 const MAP = JSON.parse(readFileSync(path.join(here, 'maps', `${opt('map', 'nurburgring')}.json`), 'utf8'));
 const BAND = Number(opt('band', String(MAP.forestBand ?? 1e9)));
 const MARGIN = Math.min(Number(opt('margin', '1300')), BAND);
+const TRACK_GAP = MAP.forestTrackGapM ?? 22;
 const SPACING = Number(opt('spacing', '4.6'));
 const CELL = 128;
 
@@ -162,6 +168,7 @@ const mask = flipRows(new Uint8Array(Buffer.from(out.maskB64, 'base64')), 4);
 
 // --- classification ---------------------------------------------------------------------------------------------
 const N = W * H;
+const woods = await osmWoods();
 const forestRaw = new Float32Array(N);
 const broadRaw = new Float32Array(N);
 const built = new Uint8Array(N);
@@ -171,6 +178,14 @@ for (let p = 0; p < N; p++) {
   const g = color[p * 4 + 1] / 255;
   const bl = color[p * 4 + 2] / 255;
   const a = color[p * 4 + 3];
+  if (woods?.[p]) {
+    // mapped woods: forest wherever the ground is (the photo there may be blurred or replaced by grass)
+    forestRaw[p] = 1;
+    broadRaw[p] = color[p * 4 + 3] >= 128 ? smooth(0.0, 0.05, g - bl) * smooth(0.1, 0.19, 0.299 * r + 0.587 * g + 0.114 * bl) : 0.3;
+    built[p] = mask[p * 4] > 127 ? 1 : 0;
+    hasTerrain++;
+    continue;
+  }
   if (a < 128) continue; // off the terrain
   hasTerrain++;
   const lum = 0.299 * r + 0.587 * g + 0.114 * bl;
@@ -182,6 +197,100 @@ for (let p = 0; p < N; p++) {
   broadRaw[p] = smooth(0.0, 0.05, g - bl) * smooth(0.1, 0.19, lum);
   built[p] = mask[p * 4] > 127 ? 1 : 0;
 }
+/** The mapped woods as a raster (1 = wood), or null when the map has none. Downloaded once (Overpass), cached. */
+async function osmWoods() {
+  if (!MAP.forestOsm) return null;
+  const outDir = path.join(here, 'out', MAP.out);
+  const alignFile = path.join(outDir, 'osm_align.json');
+  if (!existsSync(alignFile)) {
+    console.warn(`[forest] ${alignFile} missing (run the map builder): no OSM woods`);
+    return null;
+  }
+  const al = JSON.parse(readFileSync(alignFile, 'utf8'));
+  const cacheFile = path.join(outDir, 'cache', 'osm_woods.json');
+  if (!existsSync(cacheFile)) {
+    const [s, w, n, e] = MAP.nordschleife?.bbox ?? MAP.osmBbox;
+    const q = `[out:json][timeout:180];(way["natural"="wood"](${s},${w},${n},${e});way["landuse"="forest"](${s},${w},${n},${e});relation["natural"="wood"](${s},${w},${n},${e});relation["landuse"="forest"](${s},${w},${n},${e}););out geom;`;
+    console.log('[forest] downloading OpenStreetMap woods (Overpass API)…');
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'User-Agent': 'apex-ghost-track-builder/1.0 (private game)', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ data: q }),
+    });
+    if (!res.ok) throw new Error(`Overpass ${res.status}`);
+    mkdirSync(path.dirname(cacheFile), { recursive: true });
+    writeFileSync(cacheFile, await res.text());
+  }
+  const osm = JSON.parse(readFileSync(cacheFile, 'utf8'));
+  const [refLat, refLon] = al.refLatLon;
+  const R_E = 6378137;
+  const toGame = (p) => {
+    const en = [
+      (((p.lon - refLon) * Math.PI) / 180) * R_E * Math.cos((refLat * Math.PI) / 180) - al.T[0],
+      (((p.lat - refLat) * Math.PI) / 180) * R_E - al.T[1],
+    ];
+    // (R^T · (en − T)) / S, then game z = −north
+    const gx = (al.R[0][0] * en[0] + al.R[1][0] * en[1]) / al.S;
+    const gy = (al.R[0][1] * en[0] + al.R[1][1] * en[1]) / al.S;
+    return [gx, -gy];
+  };
+  // rings: closed ways, and multipolygon members joined end to end
+  const rings = [];
+  const join = (parts) => {
+    const left = parts.map((g) => g.slice());
+    while (left.length) {
+      let ring = left.shift();
+      let grew = true;
+      while (grew && !(ring[0].lat === ring.at(-1).lat && ring[0].lon === ring.at(-1).lon)) {
+        grew = false;
+        for (let k = 0; k < left.length; k++) {
+          const g = left[k];
+          const same = (a, b) => a.lat === b.lat && a.lon === b.lon;
+          if (same(ring.at(-1), g[0])) ring = ring.concat(g.slice(1));
+          else if (same(ring.at(-1), g.at(-1))) ring = ring.concat(g.slice(0, -1).reverse());
+          else continue;
+          left.splice(k, 1);
+          grew = true;
+          break;
+        }
+      }
+      rings.push(ring);
+    }
+  };
+  for (const el of osm.elements) {
+    if (el.type === 'way' && el.geometry?.length > 2) join([el.geometry]);
+    else if (el.type === 'relation') join(el.members.filter((m) => m.type === 'way' && m.geometry?.length > 1).map((m) => m.geometry));
+  }
+  // even-odd scanline fill of every ring into the raster (inner rings toggle back out)
+  const r = new Uint8Array(N);
+  const [rx0, rz0] = rect;
+  for (const ring of rings) {
+    const pts = ring.map(toGame).map(([x, z]) => [(x - rx0) / RES, (z - rz0) / RES]);
+    let jmin = Infinity;
+    let jmax = -Infinity;
+    for (const [, v] of pts) {
+      jmin = Math.min(jmin, v);
+      jmax = Math.max(jmax, v);
+    }
+    for (let j = Math.max(0, Math.floor(jmin)); j <= Math.min(H - 1, Math.ceil(jmax)); j++) {
+      const yc = j + 0.5;
+      const xs = [];
+      for (let k = 0; k < pts.length; k++) {
+        const [ax, ay] = pts[k];
+        const [bx, by] = pts[(k + 1) % pts.length];
+        if (ay <= yc !== by <= yc) xs.push(ax + ((yc - ay) / (by - ay)) * (bx - ax));
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2)
+        for (let i = Math.max(0, Math.ceil(xs[k] - 0.5)); i <= Math.min(W - 1, Math.floor(xs[k + 1] - 0.5)); i++) r[j * W + i] ^= 1;
+    }
+  }
+  let n = 0;
+  for (let p = 0; p < N; p++) n += r[p];
+  console.log(`[forest] OSM woods: ${rings.length} rings, ${((n * RES * RES) / 1e6).toFixed(1)} km² in the scanned area`);
+  return r;
+}
+
 function smooth(e0, e1, x) {
   const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
   return t * t * (3 - 2 * t);
@@ -301,12 +410,12 @@ for (let z = z0 + SPACING / 2; z < rect[3]; z += SPACING)
     const j = Math.floor((tz - z0) / RES);
     if (i < 0 || j < 0 || i >= W || j >= H) continue;
     const p = j * W + i;
-    if (color[p * 4 + 3] < 128 || built[p] || builtNear[p] > 0.02 || band[p] > BAND) continue;
+    if ((color[p * 4 + 3] < 128 && !woods?.[p]) || built[p] || builtNear[p] > 0.02 || band[p] > BAND) continue;
     // forest share → probability; a thin 3 % of field points become hedgerow/solitary trees
     let prob = smooth(0.35, 0.75, forest[p]);
     if (prob < 0.03 && noise2(tx, tz, 23) > 0.82) prob = 0.04;
     if (rnd() >= prob) continue;
-    if (nearTrack(tx, tz, 22)) continue;
+    if (nearTrack(tx, tz, TRACK_GAP)) continue;
     const y = height[p * 4];
     if (!(Math.abs(y) < 5000)) continue;
     // stands: spruce dominates (≈70 %), beech where the photo is lighter green and in noise patches

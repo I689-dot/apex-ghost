@@ -18,13 +18,12 @@
   "forest": true,
   "forestBand": 450,
   "nordschleife": {
-    "source": "terrain",
+    "source": "osm",
     "traceFile": "ns_trace.json",
-    "_doc": "Built by blender/build_nordschleife.py. source 'terrain' (default): centreline traced from the channel in the GP map's terrain (trace_nordschleife.mjs, offline). source 'osm': OpenStreetMap + EU-DEM (downloads, cached). Distances in metres. exitS/returnS/reverse override the automatic junction detection. Features (banking, crests) take 'at' = share of the Nordschleife from the GP exit (approximate, from published corner distances), or lat/lon with the osm source (read off Google Earth).",
+    "_doc": "Built by blender/build_nordschleife.py. source 'osm' (used): OpenStreetMap raceways chained in the racing direction from osmStart (the link road off the GP after the NGK chicane) until osmEnd (the link road back onto the start straight) + EU-DEM 25 m heights (downloads, cached in out/map_nordschleife/cache). source 'terrain': centreline traced from the channel in the GP map's terrain (trace_nordschleife.mjs, offline, approximate). Distances in metres. exitS/returnS/reverse override the automatic junction detection. Features (banking, crests) take 'at' = share of the Nordschleife from the GP exit (approximate, from published corner distances), or lat/lon with the osm source (read off Google Earth).",
     "bbox": [50.315, 6.905, 50.395, 7.035],
     "refLatLon": [50.3356, 6.9475],
     "gpCenterLatLon": [50.333, 6.9425],
-    "osmName": "nordschleife",
     "demDataset": "eudem25m",
     "alignScale": false,
     "maxAlignErrorM": 6.0,
@@ -80,6 +79,10 @@
       }
     ],
     "maxGrade": 0.17,
-    "gpClearM": 120
-  }
+    "gpClearM": 120,
+    "osmStart": "Anbindung zur Nordschleife",
+    "osmEnd": "Anbindung zum GP Kurs"
+  },
+  "forestOsm": true,
+  "forestTrackGapM": 10
 }
