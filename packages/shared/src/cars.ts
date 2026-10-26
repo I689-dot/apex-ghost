@@ -48,6 +48,10 @@ export interface CarSpecs {
   aspiration?: 'na' | 'turbo' | 'hybrid';
   /** Carbon-ceramic brake discs: they fade far hotter (~1,000 °C) than the steel discs GT3 cars race on. */
   carbonBrakes?: boolean;
+  /** The tyres' thermal size against a GT3 slick (heat capacity and cooling, ×; absent: 1). Tyres are built for
+   * their car: a 1,775 kg, 780 kW hypercar or a 515 kW one-make car runs tyres made for that load, and on GT3
+   * slicks it ran 15–25 °C over everyone else (tools/sim/tyreheat.ts calibrates it). */
+  tyreHeatScale?: number;
 }
 
 export interface CarWheelGeom {

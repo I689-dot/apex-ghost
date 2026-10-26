@@ -89,6 +89,12 @@ export const TYRE_TEMP = {
   frontScrub: 1.7,
   /** Extra cooling on a fully wet track (×). */
   wetCool: 1.5,
+  /** Above its window a tyre takes in less heat: the tread rubber's loss factor falls once it is well past the
+   * temperature it was compounded for (less of each flex becomes heat), and a tread hotter than the track passes
+   * more of its sliding heat into the asphalt. Heat in × 1 / (1 + °C past the window / this). Without it a tyre that
+   * overheated lost grip, slid more and ran away (rears at 140–200 °C on the Nordschleife); with it an abused tyre
+   * levels off around 110–120 °C, as a real slick does. */
+  hotFadeC: 30,
 };
 
 /** Engine power in air of this density, against standard air: a naturally aspirated engine loses it all; a turbo
@@ -904,13 +910,18 @@ export class Vehicle {
       w.angle += w.omega * dt;
       // tyre temperature
       const slipPower = Math.abs((fxSum / SUB) * (w.omega * R - vx)) + Math.abs(fyT * vy) * (w.front ? TYRE_TEMP.frontScrub : 1);
-      const heat = slipPower + (TYRE_TEMP.rolling * fz + TYRE_TEMP.flex * flexK * (Math.abs(fxT) + Math.abs(fyT))) * Math.abs(vx);
+      const past = Math.max(0, w.temp - this.compound.optimumC - TYRE_TEMP.windowC);
+      const heat =
+        (slipPower + (TYRE_TEMP.rolling * fz + TYRE_TEMP.flex * flexK * (Math.abs(fxT) + Math.abs(fyT))) * Math.abs(vx)) / (1 + past / TYRE_TEMP.hotFadeC);
       // water on the track carries heat away (why slicks never reach their window in the rain, and why wets on
       // a wet track stay near their 65 °C instead of cooking: bots' rear wets ran away past 200 °C and spun)
+      // tyres sized for the car (tyreHeatScale): more rubber to heat and more surface to cool
+      const size = s.tyreHeatScale ?? 1;
       const cool =
-        (TYRE_TEMP.coolBase + TYRE_TEMP.coolPerMs * Math.abs(vx)) * (1 + TYRE_TEMP.wetCool * this.wetness) * (w.temp - this.ambientC) +
-        (w.contact ? TYRE_TEMP.road : 0) * (w.temp - this.trackC);
-      w.temp += ((heat - cool) / (TYRE_TEMP.heatCapacity * this.compound.heatCap)) * dt;
+        ((TYRE_TEMP.coolBase + TYRE_TEMP.coolPerMs * Math.abs(vx)) * (1 + TYRE_TEMP.wetCool * this.wetness) * (w.temp - this.ambientC) +
+          (w.contact ? TYRE_TEMP.road : 0) * (w.temp - this.trackC)) *
+        size;
+      w.temp += ((heat - cool) / (TYRE_TEMP.heatCapacity * this.compound.heatCap * size)) * dt;
       // tread wear from sliding energy, faster when overheated
       const over = Math.max(0, w.temp - this.compound.optimumC - 15) / 30;
       w.wear = Math.min(1, w.wear + slipPower * dt * WEAR_PER_J * wearRate(this.compound, this.wetness) * (1 + over));

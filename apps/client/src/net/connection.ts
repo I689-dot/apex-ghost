@@ -160,7 +160,8 @@ export class Connection {
     if (msg.t === 'welcome') {
       if (!this.spectate) setSession(this.code, msg.session);
       this.flushBacklog();
-      this.offset = msg.serverTime - Date.now();
+      // first estimate (no round trip yet); kept relative to performance.now() like the pong estimates
+      this.offset = msg.serverTime - performance.now();
       this.samples = [];
       this.setState('open');
       this.startTimers();
@@ -201,7 +202,7 @@ export class Connection {
     this.pingTimer = this.kaTimer = null;
   }
 
-  /** Re-run a quick clock sync (e.g. after the tab was hidden). */
+  /** Re-run a quick clock sync (e.g. after the tab was hidden). The last estimate stays in use until new pongs. */
   resync(): void {
     if (this.state === 'open') {
       this.samples = [];
@@ -234,12 +235,10 @@ export class Connection {
 
   /** Current server time estimate (ms). */
   serverNow(): number {
-    return performance.now() + this.offsetPerf();
-  }
-
-  private offsetPerf(): number {
-    // `offset` from pongs is relative to performance.now(); the welcome estimate is Date-based
-    return this.samples.length ? this.offset : this.offset + (Date.now() - performance.now());
+    // `offset` is always relative to performance.now(): it used to be Date-based until the first pong, so clearing
+    // the samples on a tab switch put the clock ~55 years ahead until the next pong; the packets stamped in that
+    // window locked the remote cars' buffers (every later packet looked older), and the other cars froze
+    return performance.now() + this.offset;
   }
 
   on(l: Listener): () => void {

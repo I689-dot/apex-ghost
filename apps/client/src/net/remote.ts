@@ -1,6 +1,8 @@
 import { INTERP_DELAY_MS, MAX_EXTRAPOLATION_MS, SNAP_DISTANCE_M, copyCarState, makeCarState, type CarState } from '@apex/shared';
 
 const BUF = 32;
+/** A stamp this far off the stream is a clock jump, not a late packet. */
+const RESYNC_MS = 3000;
 
 /** Output of sampling a remote car at render time. */
 export interface RemoteSample extends CarState {
@@ -40,7 +42,12 @@ export class RemoteCarBuffer {
     this.lastSeq = seq;
     this.recvCount++;
     const newest = this.states[this.head];
-    if (this.count > 0 && s.t <= newest.t) return; // out of order / duplicate
+    if (this.count > 0 && s.t <= newest.t) {
+      // out of order / duplicate; but a newest state seconds ahead of the stream is a bad stamp (a clock jump), and
+      // keeping it would refuse every later packet: start over
+      if (newest.t - s.t < RESYNC_MS) return;
+      this.reset();
+    }
     this.head = (this.head + 1) % BUF;
     copyCarState(this.states[this.head], s);
     if (this.count < BUF) this.count++;

@@ -377,7 +377,8 @@
         "brakeTorqueNm": 9200,
         "topSpeedKmh": 352,
         "aspiration": "hybrid",
-        "carbonBrakes": true
+        "carbonBrakes": true,
+        "tyreHeatScale": 1.26
       },
       "info": {
         "engine": "1.6 L V6 turbo (F1-derived) + 4 electric motors, 1,063 hp",
@@ -513,7 +514,8 @@
           [8700, 250]
         ],
         "_note": "Ferrari / Motor Sport: 700 cv, 740 Nm, 1,330 kg dry, 7-speed F1 DCT, 870 kg of downforce at 250 km/h. Tyre grip calibrated with tools/sim/ailap.ts so it laps ~2 % slower than the GT3s, as Ferrari says the 296 GT3 (100 hp less) laps \"a handful of seconds\" faster; the top speed is an estimate.",
-        "carbonBrakes": true
+        "carbonBrakes": true,
+        "tyreHeatScale": 1.09
       },
       "info": {
         "engine": "3.0 L twin-turbo 120° V6, 700 cv",
@@ -1000,6 +1002,8 @@
         "team": "Race control"
       },
       "pipeline": {
+        "_flipFront": "the front was guessed from the wrong end (no wing, the roof light bar, equal tyres): it drove backwards",
+        "flipFront": true,
         "realLengthM": 4.465,
         "materials": {
           "Coloured_Material|^body2?$": {

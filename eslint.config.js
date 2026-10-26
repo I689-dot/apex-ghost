@@ -26,7 +26,7 @@ export default tseslint.config(
   },
   {
     files: ['tools/e2e/**/*.mjs'],
-    languageOptions: { globals: { window: 'readonly', document: 'readonly', requestAnimationFrame: 'readonly' } },
+    languageOptions: { globals: { window: 'readonly', document: 'readonly', requestAnimationFrame: 'readonly', WebSocket: 'readonly', Event: 'readonly' } },
   },
   {
     files: ['**/*.mjs', '**/*.js'],

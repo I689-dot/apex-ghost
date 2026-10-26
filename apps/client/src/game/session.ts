@@ -265,7 +265,17 @@ export class RaceSession {
   /** Where the safety car waits (the end of the pit lane, on the ground), found once. */
   private scPark: { x: number; y: number; z: number; yaw: number } | null = null;
   /** The safety car: its model, collision box (contact rule) and where it is now. */
-  private sc: { visual: CarVisual; body: RAPIER.RigidBody | null; s: number; speed: number; visible: boolean } | null = null;
+  private sc: {
+    visual: CarVisual;
+    body: RAPIER.RigidBody | null;
+    s: number;
+    speed: number;
+    /** World velocity on track (its body moves with it every physics step). */
+    vel: THREE.Vector3;
+    visible: boolean;
+    /** Its body collides (on track, and placed where no car was). */
+    solid: boolean;
+  } | null = null;
   /** Colliders of other cars (contact rule), for damage. */
   private carColliders = new Set<number>();
   /** Fuel burnt per lap: an estimate until a lap has been measured. */
@@ -630,7 +640,9 @@ export class RaceSession {
       this.scene.add(visual.object);
       this.uploadTextures(visual.object);
       await this.gfx.renderer.compileAsync(visual.object, this.cockpit.camera, this.scene);
-      this.sc = { visual, body: this.contact ? this.kinematicCar(entry) : null, s: 0, speed: 0, visible: false };
+      const body = this.contact ? this.kinematicCar(entry) : null;
+      body?.setEnabled(false); // solid only on track (moveKinematics)
+      this.sc = { visual, body, s: 0, speed: 0, vel: new THREE.Vector3(), visible: false, solid: false };
     } catch (e) {
       console.warn('[assets] safety car not loaded', e);
     }
@@ -1177,9 +1189,35 @@ export class RaceSession {
     for (const r of this.remotes.values()) if (r.body) move(r.body, r.visual.object, r.vel);
     const sc = this.sc;
     if (sc?.body) {
-      if (sc.visual.object.visible) move(sc.body, sc.visual.object, _v2.set(0, 0, 0));
-      else sc.body.setNextKinematicTranslation({ x: 0, y: -500, z: 0 });
+      // Solid only on track. It never travels to or from there as a body: a kinematic body moved in one step
+      // carries that step's speed into whatever it touches (it came up from 500 m under the map and went back down
+      // when it came in, throwing cars into the air or through the ground, and stood solid on the pit-lane line).
+      if (!sc.visible) {
+        if (sc.solid) sc.body.setEnabled(false);
+        sc.solid = false;
+      } else if (!sc.solid) {
+        // placed where it joins, and solid once no car is inside its box there
+        const p = sc.visual.object.position;
+        const clear = this.carsClearOf(p.x, p.z, 6.5);
+        if (clear) {
+          sc.body.setTranslation({ x: p.x, y: p.y, z: p.z }, false);
+          sc.body.setRotation(sc.visual.object.quaternion, false);
+          sc.body.setEnabled(true);
+          sc.solid = true;
+        }
+      } else move(sc.body, sc.visual.object, sc.vel);
     }
+  }
+
+  /** No car (mine, the bots, the others' boxes) within r (m) of (x, z). */
+  private carsClearOf(x: number, z: number, r: number): boolean {
+    const near = (px: number, pz: number) => (px - x) ** 2 + (pz - z) ** 2 < r * r;
+    if (!this.spectator && near(this.currPos.x, this.currPos.z)) return false;
+    for (const o of this.remotes.values()) {
+      const p = o.bot ? o.bot.vehicle.body.translation() : o.visual.object.position;
+      if (near(p.x, p.z)) return false;
+    }
+    return true;
   }
 
   /** The safety car: drawn where race control's deterministic path puts it (every client agrees). */
@@ -1201,14 +1239,23 @@ export class RaceSession {
         const i = Math.max(1, lane.points.length - 14);
         const p = lane.points[i];
         const q = lane.points[i + 1];
+        // beside the lane line, not on it (the cars leaving the pits drive along it): towards the garages, clear of
+        // the wall there, else the other way
+        const [ax, az] = this.pit ? this.pit.awayAt(i) : [0, 0];
+        const room = (sx: number) => this.wallProbe(p[0], p[1], p[2], ax * sx, az * sx, 12) ?? 12;
+        const side = room(1) >= 5.5 ? 1 : room(-1) >= 5.5 ? -1 : room(1) >= room(-1) ? 1 : -1;
+        const off = Math.max(0, Math.min(4.2, room(side) - 1.3));
+        const x = p[0] + ax * side * off;
+        const z = p[2] + az * side * off;
         const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' as const };
-        const y = this.track.groundQuery(this.world).cast(p[0], p[1] + 2, p[2], 0, -1, 0, 5, hit) ? hit.py : p[1];
-        this.scPark = { x: p[0], y, z: p[2], yaw: Math.atan2(q[0] - p[0], q[2] - p[2]) };
+        const y = this.track.groundQuery(this.world).cast(x, p[1] + 2, z, 0, -1, 0, 5, hit) ? hit.py : p[1];
+        this.scPark = { x, y, z, yaw: Math.atan2(q[0] - p[0], q[2] - p[2]) };
       }
       const o = sc.visual.object;
       o.position.set(this.scPark.x, this.scPark.y, this.scPark.z);
       o.rotation.set(0, this.scPark.yaw, 0);
       o.updateMatrixWorld();
+      sc.vel.set(0, 0, 0);
       sc.visual.setLights(false, false, this.env.night);
       return;
     }
@@ -1222,6 +1269,7 @@ export class RaceSession {
     o.position.set(pt.x, pt.y, pt.z);
     o.rotation.set(0, pt.yaw, 0);
     o.updateMatrixWorld();
+    sc.vel.set(Math.sin(pt.yaw) * sc.speed, 0, Math.cos(pt.yaw) * sc.speed);
     // the light bar flashes (it carries the brake and head light materials of the model)
     sc.visual.setLights(Math.floor(serverNow / 400) % 2 === 0, true, this.env.night);
   }
@@ -1540,8 +1588,15 @@ export class RaceSession {
     }
     const me = this.vehicle.body.translation();
     check(me.x, me.z, this.vehicle.telemetry.speed);
-    // the safety car: queue behind it
-    if (this.sc?.visible) check(this.sc.visual.object.position.x, this.sc.visual.object.position.z, this.sc.speed);
+    // the safety car: queue behind it, seen from far enough to stop behind it (the 40 m of a car ahead were too
+    // short from 250 km/h to its 150, and the bots ran into it)
+    const sc = this.sc;
+    if (sc?.visible) {
+      // the gap along the track (straight-line "ahead" picks up the other side of a hairpin)
+      const prog = this.localTracker?.players.get(r.id)?.progressS;
+      const gap = prog !== undefined ? wrapDelta(prog, sc.s, this.trackData.length) : -1;
+      if (gap > 0 && gap < 220) cap = Math.min(cap, Math.sqrt(sc.speed ** 2 + 2 * 7 * Math.max(0, gap - 18)));
+    }
     // no overtaking under a caution (FCY, safety car, a yellow flag here): follow instead
     const caution = this.rc.course !== 'green' || this.inYellow(this.localTracker?.players.get(r.id)?.progressS ?? -1e9);
     const found = caution ? null : (block as { along: number; lat: number } | null);

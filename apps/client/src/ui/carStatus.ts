@@ -18,8 +18,10 @@ function el<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, 
 }
 
 const TYRE_COLOURS = { cold: '#3a86ff', warm: '#5ec8ff', ok: '#30d158', hot: '#ff453a' };
-function tyreColour(t: number): string {
-  return t < 65 ? TYRE_COLOURS.cold : t < 75 ? TYRE_COLOURS.warm : t <= 105 ? TYRE_COLOURS.ok : TYRE_COLOURS.hot;
+/** Around the compound's own window (Medium 85 °C: blue below 65, green 77–103; wets 60 °C), not fixed numbers:
+ * wets at their best showed blue, and Hards green while still short of theirs. */
+function tyreColour(t: number, optimumC: number): string {
+  return t < optimumC - 20 ? TYRE_COLOURS.cold : t < optimumC - 8 ? TYRE_COLOURS.warm : t <= optimumC + 18 ? TYRE_COLOURS.ok : TYRE_COLOURS.hot;
 }
 function damageColour(d: number): string {
   return d < 0.05 ? 'transparent' : d < 0.3 ? '#ffd60a' : d < 0.6 ? '#ff9f0a' : '#ff453a';
@@ -128,8 +130,9 @@ export class CarStatus {
     const key = `${t.join(',')}|${z.join(',')}|${abs ? 1 : 0}${tc ? 1 : 0}|${compound}|${wr.join(',')}|${bk.join('')}`;
     if (key === this.key) return;
     this.key = key;
+    const opt = COMPOUNDS[compound].optimumC;
     for (let i = 0; i < 4; i++) {
-      this.tyres[i].setAttribute('fill', tyreColour(t[i]));
+      this.tyres[i].setAttribute('fill', tyreColour(t[i], opt));
       this.temps[i].textContent = `${t[i]}°`;
       this.treads[i].setAttribute('height', String(16 * Math.min(1, wr[i] / 50)));
       this.brakes[i].setAttribute('fill', { c: '#5ec8ff', o: '#30d158', h: '#ff9f0a', f: '#ff453a' }[bk[i] ?? 'c'] ?? '#5ec8ff');
