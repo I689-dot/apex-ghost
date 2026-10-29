@@ -192,6 +192,11 @@ export function racingLineFor(track: TrackData): RacingLine {
   return lineCache.line;
 }
 
+/** Store a racing line built elsewhere (racingLinePrep.ts: in a worker while the session downloads). */
+export function primeRacingLine(track: TrackData, line: RacingLine): void {
+  if (lineCache?.track !== track) lineCache = { track, line };
+}
+
 /** Racing AI: pure-pursuit steering along the racing line (plus its own small offset) and a speed profile. */
 export class AiDriver {
   readonly controls: Controls = { throttle: 0, brake: 0, steer: 0, handbrake: 0, digital: false };

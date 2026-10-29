@@ -1,17 +1,31 @@
 import * as THREE from 'three';
-import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import { sunPosition, type WeatherPlan, type WeatherState } from '@apex/shared';
 import type { QualityConfig } from '../settings';
+import { FOG_SHARED, installAtmosphereChunks, skyRadiance, sunTransmittance } from './atmosphere';
+import { SkyDome } from './sky';
+import { SHADOW_LAYER } from './carVisual';
 
 const _sun = new THREE.Vector3();
 const _c = new THREE.Color();
-const _fc = new THREE.Color();
-const DUSK = new THREE.Color(0.85, 0.55, 0.38);
-const NIGHT = new THREE.Color(0.05, 0.06, 0.095);
+const _v = new THREE.Vector3();
+const _grey = new THREE.Color();
+const _fogAway = new THREE.Color();
+const _fogSun = new THREE.Color();
+const _disc = new THREE.Color();
+const _cloudSun = new THREE.Color();
+const _cloudAmb = new THREE.Color();
+const _white = new THREE.Color(1, 1, 1);
+const _dusk = new THREE.Color(0.42, 0.5, 0.75);
+const NIGHT = new THREE.Color(0.012, 0.016, 0.03);
+const OVERCAST = new THREE.Color(0.62, 0.66, 0.7);
 
-/** Sky, sun/moon light, fog, clouds, stars and rain. Driven by the deterministic weather state. */
+/**
+ * Sky, sun/moon light, fog, clouds, stars and rain. Driven by the deterministic weather state.
+ * The sky (sky.ts) and every colour derived from it (sunlight, sky ambient, fog) come from one atmosphere model
+ * (atmosphere.ts), so the light on the track always matches the sky behind it.
+ */
 export class Environment {
-  readonly sky = new Sky();
+  readonly skyDome: SkyDome;
   readonly sun = new THREE.DirectionalLight(0xffffff, 3);
   readonly hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a4436, 0.6);
   readonly fog = new THREE.FogExp2(0xbfc8d0, 0.0002);
@@ -19,12 +33,10 @@ export class Environment {
   fogScale = 1;
   /** The camera-centred rain streaks look like blobs from an aerial camera: hidden during the flyover. */
   hideRain = false;
-  private clouds: THREE.Mesh;
   private stars: THREE.Points;
   private moon: THREE.Sprite;
   private rain: THREE.LineSegments;
   private rainMat: THREE.ShaderMaterial;
-  private cloudMat: THREE.ShaderMaterial;
   /** 0 day … 1 full night. */
   night = 0;
   sunElevation = 0;
@@ -34,15 +46,23 @@ export class Environment {
   private envHour = -99;
   readonly sunDir = new THREE.Vector3(0, 1, 0);
   private time = 0;
+  /** Atmosphere colours, recomputed when the sun or the haze moves (see refreshColours). */
+  private sunT = new THREE.Color(1, 1, 1);
+  private zenith = new THREE.Color();
+  private horizonSun = new THREE.Color();
+  private horizonAway = new THREE.Color();
+  private colourSun = new THREE.Vector3(0, -2, 0);
+  private colourHaze = -1;
 
   constructor(
     private readonly scene: THREE.Scene,
     private readonly plan: WeatherPlan,
     private quality: QualityConfig,
+    renderer: THREE.WebGLRenderer,
   ) {
-    this.sky.scale.setScalar(20000);
-    this.sky.frustumCulled = false;
-    scene.add(this.sky);
+    installAtmosphereChunks();
+    this.skyDome = new SkyDome(renderer, quality.cloudDetail);
+    scene.add(this.skyDome.mesh);
     scene.fog = this.fog;
 
     this.sun.castShadow = quality.shadows;
@@ -55,55 +75,11 @@ export class Environment {
     cam.bottom = -r;
     cam.near = 1;
     cam.far = 600;
+    // shadow-only stand-ins (your car's LOD0 while you sit in its detailed cockpit model)
+    this.sun.shadow.camera.layers.enable(SHADOW_LAYER);
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.04;
     scene.add(this.sun, this.sun.target, this.hemi);
-
-    // procedural cloud dome
-    this.cloudMat = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      side: THREE.BackSide,
-      fog: false,
-      uniforms: {
-        uTime: { value: 0 },
-        uCover: { value: 0.3 },
-        uLight: { value: new THREE.Color(1, 1, 1) },
-        uShade: { value: new THREE.Color(0.6, 0.62, 0.68) },
-        uSunDir: { value: new THREE.Vector3(0, 1, 0) },
-      },
-      vertexShader: /* glsl */ `
-        varying vec3 vDir;
-        void main() {
-          vDir = normalize(position);
-          vec4 p = modelViewMatrix * vec4(position, 1.0);
-          gl_Position = projectionMatrix * p;
-          gl_Position.z = gl_Position.w * 0.99999;
-        }`,
-      fragmentShader: /* glsl */ `
-        uniform float uTime; uniform float uCover; uniform vec3 uLight; uniform vec3 uShade; uniform vec3 uSunDir;
-        varying vec3 vDir;
-        float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float noise(vec2 p) {
-          vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-          return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
-        }
-        float fbm(vec2 p) { float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; } return v; }
-        void main() {
-          if (vDir.y < 0.0) discard;
-          vec2 uv = vDir.xz / (vDir.y + 0.12) * 1.6 + vec2(uTime * 0.004, uTime * 0.0015);
-          float n = fbm(uv);
-          float d = smoothstep(1.0 - uCover, 1.05 - uCover * 0.35, n);
-          float horizon = smoothstep(0.0, 0.18, vDir.y);
-          float lit = clamp(dot(normalize(vDir), uSunDir) * 0.5 + 0.5, 0.0, 1.0);
-          vec3 col = mix(uShade, uLight, lit * (1.0 - d * 0.6));
-          gl_FragColor = vec4(col, d * horizon * 0.95);
-        }`,
-    });
-    this.clouds = new THREE.Mesh(new THREE.SphereGeometry(8000, 32, 16), this.cloudMat);
-    this.clouds.frustumCulled = false;
-    this.clouds.renderOrder = -1;
-    scene.add(this.clouds);
 
     // stars
     const n = 2500;
@@ -196,6 +172,19 @@ export class Environment {
     scene.add(this.rain);
   }
 
+  /** Sunlight colour, zenith and horizon colours from the atmosphere model (cheap enough per change, not per frame). */
+  private refreshColours(haze: number): void {
+    const s = this.sunDir;
+    if (s.distanceToSquared(this.colourSun) < 1e-6 && Math.abs(haze - this.colourHaze) < 0.01) return;
+    this.colourSun.copy(s);
+    this.colourHaze = haze;
+    sunTransmittance(s, haze, this.sunT);
+    skyRadiance(_v.set(0, 1, 0), s, haze, this.zenith);
+    const az = Math.hypot(s.x, s.z) > 1e-4 ? Math.atan2(s.z, s.x) : 0;
+    skyRadiance(_v.set(Math.cos(az), 0.035, Math.sin(az)).normalize(), s, haze, this.horizonSun);
+    skyRadiance(_v.set(-Math.cos(az), 0.035, -Math.sin(az)).normalize(), s, haze, this.horizonAway);
+  }
+
   /** Update for the given weather state. Cheap; called every frame. */
   update(dt: number, w: WeatherState, camera: THREE.Camera, focus: THREE.Vector3, carVel: THREE.Vector3, renderer: THREE.WebGLRenderer): void {
     this.time += dt;
@@ -207,22 +196,21 @@ export class Environment {
     const day = THREE.MathUtils.smoothstep(elevation, -0.1, 0.12);
     this.night = 1 - THREE.MathUtils.smoothstep(elevation, -0.2, 0.02);
     const overcast = w.clouds;
-
-    const u = this.sky.material.uniforms;
-    u.sunPosition.value.copy(_sun);
-    u.turbidity.value = 2 + overcast * 10 + w.fog * 6;
-    u.rayleigh.value = 1.2 + (1 - day) * 1.5 + overcast * 0.6;
-    u.mieCoefficient.value = 0.004 + w.fog * 0.02;
-    u.mieDirectionalG.value = 0.8;
+    // crisp blue on clear days, milky in haze and fog
+    const haze = 0.55 + overcast * 0.9 + w.fog * 4;
+    this.skyDome.updateLut(renderer, _sun, haze);
+    this.refreshColours(haze);
 
     // sun or moon light
-    const low = 1 - THREE.MathUtils.smoothstep(elevation, 0.02, 0.35); // warm when low
     const direct = (1 - overcast * 0.8) * (1 - w.fog * 0.6);
+    const sunT = this.sunT;
+    const tMax = Math.max(sunT.r, sunT.g, sunT.b, 1e-4);
     if (elevation > -0.02) {
       this.sun.position.copy(_sun).multiplyScalar(300).add(focus);
-      _c.setRGB(1, 0.92 - 0.25 * low, 0.85 - 0.45 * low);
-      this.sun.color.copy(_c);
-      this.sun.intensity = 3.4 * day * direct + 0.0001;
+      // hue from the atmosphere (white-yellow at noon, orange near the horizon); brightness falls with the air mass
+      this.sun.color.setRGB(sunT.r / tMax, sunT.g / tMax, sunT.b / tMax).lerp(_white, overcast * 0.6);
+      const airMass = THREE.MathUtils.clamp(Math.sqrt((0.2126 * sunT.r + 0.7152 * sunT.g + 0.0722 * sunT.b) / 0.86), 0.35, 1.05);
+      this.sun.intensity = 3.6 * day * direct * airMass + 0.0001;
     } else {
       // moonlight from the opposite side of the sky
       this.sun.position.set(-_sun.x, Math.max(0.35, -_sun.y), -_sun.z).normalize().multiplyScalar(300).add(focus);
@@ -237,33 +225,63 @@ export class Environment {
     this.sun.position.x += this.sun.target.position.x - focus.x;
     this.sun.position.z += this.sun.target.position.z - focus.z;
 
-    // generous sky ambient: by day it fills shadows and cockpits, at night it is a moonlit blue
+    // sky ambient: the zenith's colour (deep blue at noon, violet at dusk), greyer under cloud; at night moonlit blue
+    const zm = Math.max(this.zenith.r, this.zenith.g, this.zenith.b, 1e-4);
+    _c.setRGB(this.zenith.r / zm, this.zenith.g / zm, this.zenith.b / zm)
+      .lerp(_white, 0.45)
+      .lerp(OVERCAST, overcast * 0.8);
     this.hemi.intensity = 0.38 + 1.05 * day * (0.8 + overcast * 0.4);
-    this.hemi.color.setRGB(0.55 + 0.2 * overcast, 0.65 + 0.15 * overcast, 0.85 - 0.1 * overcast).multiplyScalar(0.4 + 0.6 * day);
-    this.hemi.groundColor.setRGB(0.32, 0.29, 0.24).multiplyScalar(0.3 + 0.7 * day);
+    this.hemi.color
+      .copy(_c)
+      .multiplyScalar(0.4 + 0.6 * day)
+      .lerp(_dusk, this.night * 0.8);
+    this.hemi.groundColor.setRGB(0.3, 0.28, 0.22).multiplyScalar(0.3 + 0.7 * day);
 
-    // fog colour approximates the horizon colour
-    const fc = _fc
-      .setRGB(0.68 + overcast * 0.05, 0.74, 0.8 - overcast * 0.06)
-      .lerp(DUSK, low * day * (1 - overcast))
-      .lerp(NIGHT, this.night);
-    this.fog.color.copy(fc);
-    this.fog.density = (1.95 / Math.max(120, w.visibility)) * this.fogScale;
+    // fog: the horizon colours of the sky in the same direction (towards / away from the sun), grey under cloud
     const heavyFog = THREE.MathUtils.smoothstep(1 - w.visibility / 900, 0, 1);
-    this.sky.visible = heavyFog < 0.98;
-    (this.sky.material as THREE.ShaderMaterial).uniforms.up.value.set(0, 1, 0);
-    renderer.setClearColor(fc);
+    const grey = _grey.copy(OVERCAST).multiplyScalar(0.25 + 1.25 * day);
+    const greyMix = Math.min(1, overcast * 0.85 + w.fog * 0.8);
+    const fogAway = _fogAway
+      .copy(this.horizonAway)
+      .lerp(grey, greyMix)
+      .lerp(NIGHT, this.night * 0.9);
+    const fogSun = _fogSun
+      .copy(this.horizonSun)
+      .lerp(grey, greyMix)
+      .lerp(NIGHT, this.night * 0.9);
+    this.fog.color.copy(fogAway);
+    FOG_SHARED.sunColor.r = fogSun.r - fogAway.r;
+    FOG_SHARED.sunColor.g = fogSun.g - fogAway.g;
+    FOG_SHARED.sunColor.b = fogSun.b - fogAway.b;
+    FOG_SHARED.sunDir.x = _sun.x;
+    FOG_SHARED.sunDir.y = _sun.y;
+    FOG_SHARED.sunDir.z = _sun.z;
+    // aerial perspective: ~25 km half-way haze on a clear day, a 1.4 km scale height
+    FOG_SHARED.params.x = (1 / 26000) * (0.6 + haze * 0.7) * this.fogScale;
+    FOG_SHARED.params.y = 1 / 1400;
+    this.fog.density = (1.95 / Math.max(120, w.visibility)) * this.fogScale;
+    renderer.setClearColor(fogAway);
 
-    this.cloudMat.uniforms.uTime.value = this.time + (this.plan.seed % 1000);
-    this.cloudMat.uniforms.uCover.value = Math.min(0.98, overcast * 0.9 + w.fog * 0.3);
-    this.cloudMat.uniforms.uSunDir.value.copy(_sun);
-    (this.cloudMat.uniforms.uLight.value as THREE.Color).setRGB(1, 0.95 - 0.2 * low, 0.9 - 0.35 * low).multiplyScalar(0.15 + 0.85 * day);
-    (this.cloudMat.uniforms.uShade.value as THREE.Color)
-      .setRGB(0.5, 0.52, 0.58)
-      .multiplyScalar(0.08 + 0.9 * day)
-      .lerp(fc, heavyFog);
-    this.clouds.position.copy(camera.position);
-    this.sky.position.copy(camera.position);
+    // sky dome: clouds lit by the sun's transmitted colour and the sky's ambient
+    const sunIllum = THREE.MathUtils.smoothstep(elevation, -0.04, 0.06);
+    this.skyDome.update({
+      sunDir: _sun,
+      sunDisc: _disc.copy(sunT).multiplyScalar(60 * sunIllum * (1 - overcast * 0.95) * (1 - w.fog)),
+      cloudSun: _cloudSun.copy(sunT).multiplyScalar(2.6 * sunIllum * (1 - overcast * 0.55)),
+      cloudAmbient: _cloudAmb
+        .copy(this.zenith)
+        .multiplyScalar(0.9)
+        .add(_c.copy(this.horizonAway).multiplyScalar(0.55))
+        .lerp(_c.copy(grey).multiplyScalar(0.95), overcast * 0.7)
+        .add(_c.setRGB(0.006, 0.008, 0.014).multiplyScalar(this.night)),
+      cover: Math.min(0.97, 0.12 + overcast * 0.85 + w.fog * 0.2),
+      cirrus: (1 - overcast) * 0.8,
+      fogMix: heavyFog,
+      fogColor: fogAway,
+      night: this.night,
+      time: this.time + (this.plan.seed % 1000) * 7,
+    });
+    this.skyDome.mesh.position.copy(camera.position);
 
     (this.stars.material as THREE.PointsMaterial).opacity = this.night * (1 - overcast) * (1 - w.fog);
     this.stars.position.copy(camera.position);
@@ -289,13 +307,11 @@ export class Environment {
     this.envHour = hour;
     const pmrem = new THREE.PMREMGenerator(renderer);
     const envScene = new THREE.Scene();
-    const sky = new Sky();
-    sky.scale.setScalar(1000);
-    const su = sky.material.uniforms;
-    const u = this.sky.material.uniforms;
-    for (const k of ['turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG']) su[k].value = u[k].value;
-    su.sunPosition.value.copy(u.sunPosition.value);
-    envScene.add(sky);
+    // the same dome (atmosphere and clouds), centred on the cube camera
+    const dome = new THREE.Mesh(this.skyDome.mesh.geometry, this.skyDome.material);
+    dome.scale.setScalar(500);
+    dome.frustumCulled = false;
+    envScene.add(dome);
     const ground = new THREE.Mesh(
       new THREE.CircleGeometry(900, 16).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: this.hemi.groundColor.clone().multiplyScalar(0.6) }),
@@ -307,7 +323,8 @@ export class Environment {
     this.envTarget = rt;
     this.envMap = rt.texture;
     pmrem.dispose();
-    sky.material.dispose();
+    ground.geometry.dispose();
+    (ground.material as THREE.Material).dispose();
     return true;
   }
 
@@ -321,6 +338,7 @@ export class Environment {
     this.sun.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
     this.sun.shadow.map?.dispose();
     this.sun.shadow.map = null;
+    this.skyDome.setDetail(q.cloudDetail);
   }
 }
 

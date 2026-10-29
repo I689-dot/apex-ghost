@@ -96,6 +96,8 @@ export interface Settings {
   qualityAuto: boolean;
   resolutionScale: number;
   dynamicResolution: boolean;
+  /** Phone app: display refresh rate asked for (60, or the screen's 90 / 120 / 144 Hz). */
+  refreshRate: number;
   fov: number;
   /** Cockpit camera adjustment (m): + raises the eye / moves it forward. */
   seatHeight: number;
@@ -141,6 +143,7 @@ export const DEFAULT_SETTINGS: Settings = {
   qualityAuto: true,
   resolutionScale: 1,
   dynamicResolution: true,
+  refreshRate: 60,
   fov: 72,
   seatHeight: 0,
   seatForward: 0,
@@ -256,8 +259,11 @@ export interface QualityConfig {
   remoteDetail: boolean;
   /** Spectators on the grandstands: share of the seats taken (0 = none). */
   crowd: number;
-  /** 3D grass tufts beside the track within this many metres of the camera (0 = off). */
-  grassRadius: number;
+  /** Sky clouds: 0 flat (one noise sample), 1 lit cumulus + cirrus, 2 cumulus with deeper self-shadowing. */
+  cloudDetail: 0 | 1 | 2;
+  /** 3D lawn on the verges (grassShells.ts): layers of blades (0 = flat lawn) within grassShellRadius m. */
+  grassShells: number;
+  grassShellRadius: number;
   /** Screen-space ambient occlusion (N8AO): soft contact shadows in the cockpit and around cars. */
   ao: boolean;
   ownHeadlightShadows: boolean;
@@ -294,7 +300,9 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cockpitDetail: false,
     remoteDetail: false,
     crowd: 0.5,
-    grassRadius: 0,
+    cloudDetail: 0,
+    grassShells: 0,
+    grassShellRadius: 0,
     ownHeadlightSpots: false,
     ownHeadlightShadows: false,
     treeShadows: false,
@@ -325,14 +333,16 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cockpitDetail: true,
     remoteDetail: true,
     crowd: 1,
-    grassRadius: 26,
+    cloudDetail: 1,
+    grassShells: 6,
+    grassShellRadius: 16,
     ownHeadlightSpots: false,
     ownHeadlightShadows: false,
     treeShadows: false,
     softShadows: false,
     anisotropy: 4,
     envMapSize: 128,
-    forestNear: 110,
+    forestNear: 80,
     forestFar: 1100,
     forestNearDensity: 0.8,
     forestDensity: 0.6,
@@ -356,14 +366,16 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cockpitDetail: true,
     remoteDetail: true,
     crowd: 1,
-    grassRadius: 38,
+    cloudDetail: 2,
+    grassShells: 10,
+    grassShellRadius: 24,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
     softShadows: true,
     anisotropy: 8,
     envMapSize: 256,
-    forestNear: 170,
+    forestNear: 110,
     forestFar: 1400,
     forestNearDensity: 1,
     forestDensity: 0.7,
@@ -387,14 +399,16 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cockpitDetail: true,
     remoteDetail: true,
     crowd: 1,
-    grassRadius: 50,
+    cloudDetail: 2,
+    grassShells: 14,
+    grassShellRadius: 32,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
     softShadows: true,
     anisotropy: 16,
     envMapSize: 256,
-    forestNear: 240,
+    forestNear: 150,
     forestFar: 2200,
     forestNearDensity: 1,
     forestDensity: 0.9,

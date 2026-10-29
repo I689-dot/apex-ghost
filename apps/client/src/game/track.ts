@@ -4,7 +4,9 @@ import { nearestCenterlineIndex, progressAt, type Surface, type TrackData } from
 import { fetchWithProgress, loadCollision, parseGltf, type CollisionMesh } from './assets';
 import { RAY_GROUPS, TRACK_GROUPS, WALL_GROUPS, type GroundHit, type GroundQuery } from '../physics/vehicle';
 import type { QualityConfig } from '../settings';
-import type { Forest } from './forest';
+import type { CardTree, Forest } from './forest';
+import { VEG_BASE } from './vegetation';
+import { SHELL_GROUND } from './grassShells';
 
 type R = typeof RAPIER;
 
@@ -70,11 +72,6 @@ function pavedDetail(): THREE.DataTexture {
 }
 
 /**
- * Mown grass seen from the cockpit: the source grass texture is a 256 px tile that turns to green mush within a few
- * metres. A procedural detail tile (~0.9 m) adds blades and clover-like clumps: short random strokes over a soft
- * noise, modulating the colour by ±20 %.
- */
-/**
  * Gravel traps and sand: the source textures are flat tan tiles. A pebble tile (~0.3 m) of rounded stones with a
  * light top and a dark gap around each, so the trap reads as loose stones from the cockpit.
  */
@@ -115,54 +112,44 @@ function gravelDetail(): THREE.DataTexture {
   return gravelTex;
 }
 
-let grassTex: THREE.DataTexture | null = null;
-function grassDetail(): THREE.DataTexture {
-  if (grassTex) return grassTex;
-  const N = 256;
-  const v = new Float32Array(N * N).fill(0.5);
-  let seed = 7654321;
-  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
-  // clumps
-  for (let k = 0; k < 140; k++) {
-    const cx = rnd() * N;
-    const cy = rnd() * N;
-    const r = 6 + rnd() * 18;
-    const b = (rnd() - 0.5) * 0.25;
-    for (let y = Math.floor(cy - r); y <= cy + r; y++)
-      for (let x = Math.floor(cx - r); x <= cx + r; x++) {
-        const d = Math.hypot(x - cx, y - cy) / r;
-        if (d < 1) v[((y + N) % N) * N + ((x + N) % N)] += b * (1 - d * d);
-      }
-  }
-  // blades: short strokes, lighter tips over darker gaps
-  for (let k = 0; k < 9000; k++) {
-    let x = rnd() * N;
-    let y = rnd() * N;
-    const a = rnd() * Math.PI * 2;
-    const len = 2 + rnd() * 5;
-    const b = rnd() < 0.55 ? 0.22 : -0.2;
-    for (let t = 0; t < len; t++) {
-      const i = ((Math.round(y) % N) + N) % N;
-      const j = ((Math.round(x) % N) + N) % N;
-      v[i * N + j] += b * (1 - t / len);
-      x += Math.cos(a);
-      y += Math.sin(a);
-    }
-  }
-  const d = new Uint8Array(N * N * 4);
-  for (let i = 0; i < N * N; i++) {
-    const c = Math.max(0, Math.min(255, Math.round(v[i] * 255)));
-    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = c;
-    d[i * 4 + 3] = 255;
-  }
-  grassTex = new THREE.DataTexture(d, N, N);
-  grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
-  grassTex.magFilter = THREE.LinearFilter;
-  grassTex.minFilter = THREE.LinearMipmapLinearFilter;
-  grassTex.generateMipmaps = true;
-  grassTex.anisotropy = 8;
-  grassTex.needsUpdate = true;
-  return grassTex;
+let lawnTex: THREE.Texture | null = null;
+/** Mean colour of the lawn tile: the shader divides by it, so the tile adds texture, not a colour cast. */
+const lawnMean = { value: new THREE.Vector3(0.5, 0.5, 0.5) };
+
+/**
+ * Mown lawn as seen from a race car: the source grass texture is a 256 px tile that turns to green mush within a few
+ * metres, so a real lawn modulates it: assets/vegetation/lawn.jpg, a seamless top-down render of a photogrammetry
+ * scan of a mown lawn (tools/asset-pipeline/vegetation.mjs). Flat grey until it has loaded.
+ */
+function lawnDetail(): THREE.Texture {
+  if (lawnTex) return lawnTex;
+  const grey = document.createElement('canvas');
+  grey.width = grey.height = 4;
+  const gg = grey.getContext('2d') as CanvasRenderingContext2D;
+  gg.fillStyle = '#808080';
+  gg.fillRect(0, 0, 4, 4);
+  const tex = new THREE.Texture(grey);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 8;
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  lawnTex = tex;
+  const photo = new Image();
+  photo.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const cg = c.getContext('2d') as CanvasRenderingContext2D;
+    cg.drawImage(photo, 0, 0, 32, 32);
+    const px = cg.getImageData(0, 0, 32, 32).data;
+    const m = [0, 0, 0];
+    for (let i = 0; i < px.length; i += 4) for (let k = 0; k < 3; k++) m[k] += px[i + k] / 255 / (32 * 32);
+    lawnMean.value.set(m[0], m[1], m[2]);
+    tex.image = photo;
+    tex.needsUpdate = true;
+  };
+  photo.src = `${VEG_BASE}lawn.jpg`;
+  return tex;
 }
 
 /**
@@ -173,9 +160,13 @@ function grassDetail(): THREE.DataTexture {
 function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean, detail = 0, kind: 'grass' | 'gravel' | 'paved' = 'paved'): void {
   const grass = kind === 'grass';
   // detail tile sizes (m): fine and coarse
-  const [fine, coarse] = grass ? [0.9, 3.7] : kind === 'gravel' ? [0.32, 1.25] : [1.6, 7.3];
+  const [fine, coarse] = grass ? [3.2, 11.3] : kind === 'gravel' ? [0.32, 1.25] : [1.6, 7.3];
   m.onBeforeCompile = (sh) => {
-    if (detail > 0) sh.uniforms.apxDetail = { value: grass ? grassDetail() : kind === 'gravel' ? gravelDetail() : pavedDetail() };
+    if (detail > 0) sh.uniforms.apxDetail = { value: grass ? lawnDetail() : kind === 'gravel' ? gravelDetail() : pavedDetail() };
+    if (detail > 0 && grass) {
+      sh.uniforms.apxDetailMean = lawnMean;
+      sh.uniforms.apxShellGround = SHELL_GROUND;
+    }
     sh.vertexShader = sh.vertexShader
       .replace('void main() {', 'varying vec3 vApxW;\nvoid main() {')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvApxW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -184,6 +175,7 @@ function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue:
         'void main() {',
         `varying vec3 vApxW;
 ${detail > 0 ? 'uniform sampler2D apxDetail;' : ''}
+${detail > 0 && grass ? 'uniform vec3 apxDetailMean;\nuniform float apxShellGround;' : ''}
 float apxHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float apxNoise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -199,7 +191,28 @@ void main() {`,
   float n = apxNoise(wp / 37.0) * 0.65 + apxNoise(wp / 9.0) * 0.35;
   diffuseColor.rgb *= 1.0 + (n - 0.5) * ${(strength * 2).toFixed(2)};
   ${hue ? 'float d = apxNoise(wp / 61.0 + 7.3); diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.04, 0.78), smoothstep(0.55, 0.9, d) * 0.6);' : ''}
-  ${detail > 0 ? `float g = texture2D(apxDetail, wp / ${fine.toFixed(2)}).r * 0.6 + texture2D(apxDetail, wp / ${coarse.toFixed(2)} + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};` : ''}
+  ${
+    detail > 0 && grass
+      ? `vec3 g = texture2D(apxDetail, wp / ${fine.toFixed(2)}).rgb * 0.65 + texture2D(apxDetail, mat2(0.8, -0.6, 0.6, 0.8) * wp / ${coarse.toFixed(2)} + 0.37).rgb * 0.35;
+  vec3 gr = g / max(apxDetailMean, vec3(0.02));
+  gr = mix(vec3(dot(gr, vec3(0.3, 0.5, 0.2))), gr, 0.7);
+  diffuseColor.rgb *= mix(vec3(1.0), gr, ${Math.min(1, detail * 2.7).toFixed(2)});
+  // mowing stripes, 6 m wide, the blades of each laid the opposite way: a band looks light seen with the grain and
+  // dark against it, so the pattern changes with the viewing direction like on a real circuit
+  vec2 apxSd = vec2(0.8, 0.6);
+  float apxS = fract(dot(wp, apxSd) / 12.0);
+  float apxLay = (smoothstep(0.0, 0.03, apxS) - smoothstep(0.5, 0.53, apxS)) * 2.0 - 1.0;
+  vec3 apxV = normalize(vApxW - cameraPosition);
+  float apxAlong = dot(normalize(apxV.xz + vec2(1e-4)), apxSd);
+  diffuseColor.rgb *= 1.0 + apxLay * (0.06 + 0.13 * apxAlong * (1.0 - abs(apxV.y) * 0.6));
+  // a lusher, deeper green
+  diffuseColor.rgb *= vec3(0.93, 1.03, 0.86);
+  // under the 3D blades near the camera (grassShells.ts): soil and shade between them
+  if (apxShellGround > 0.0) diffuseColor.rgb *= 1.0 - 0.12 * (1.0 - smoothstep(apxShellGround * 0.5, apxShellGround, distance(vApxW, cameraPosition)));`
+      : detail > 0
+        ? `float g = texture2D(apxDetail, wp / ${fine.toFixed(2)}).r * 0.6 + texture2D(apxDetail, wp / ${coarse.toFixed(2)} + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};`
+        : ''
+  }
 }`,
       );
   };
@@ -233,7 +246,7 @@ interface Chunk {
 /** Loaded track: render scene, collision, and centreline helpers. */
 export class Track {
   readonly root = new THREE.Group();
-  readonly chunks: Chunk[] = [];
+  chunks: Chunk[] = [];
   private details: { mesh: THREE.Mesh; center: THREE.Vector3; radius: number }[] = [];
   private barriers: { mesh: THREE.Mesh; center: THREE.Vector3; radius: number }[] = [];
   readonly roadMaterials: { mat: THREE.MeshStandardMaterial; color: THREE.Color; roughness: number }[] = [];
@@ -243,12 +256,82 @@ export class Track {
   private ray: RAPIER.Ray | null = null;
   /** The local car body, excluded from wheel ray casts. */
   excludeBody: RAPIER.RigidBody | undefined;
+  /** The mown grass of the verges and infields (grassShells.ts grows blades on it). */
+  readonly lawnMaterials = new Set<THREE.MeshStandardMaterial>();
   /** Procedural forest around the circuit (null when the map has none or it failed to load). */
   forest: Forest | null = null;
 
   setForest(f: Forest): void {
     this.forest = f;
     this.root.add(f.root);
+  }
+
+  /**
+   * The source map's trackside trees are crossed alpha cards (a vertical seam down every crown, flat from the side).
+   * Each connected group of cards is one tree: its base, height and width are read here and the card chunks are
+   * removed, so the forest plants its 3D models in the same places. Wide cards (rows of trees on one quad) give
+   * several trees along their length; tall narrow ones and the pine material are spruces.
+   */
+  extractCardTrees(): CardTree[] {
+    const out: CardTree[] = [];
+    const v = new THREE.Vector3();
+    for (const c of this.chunks.filter((ch) => ch.kind === 'trees')) {
+      c.object.updateWorldMatrix(true, true);
+      c.object.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const pine = [mesh.material].flat().some((m) => /pine/i.test(m.name));
+        const g = mesh.geometry;
+        const pos = g.getAttribute('position');
+        const idx = g.getIndex();
+        const n = pos.count;
+        const par = new Int32Array(n).map((_, i) => i);
+        const find = (a: number) => {
+          while (par[a] !== a) a = par[a] = par[par[a]];
+          return a;
+        };
+        if (idx) for (let i = 0; i < idx.count; i += 3) par[find(idx.getX(i + 1))] = par[find(idx.getX(i + 2))] = find(idx.getX(i));
+        // minX, minY, minZ, maxX, maxY, maxZ, then Σx, Σz, Σxz, count (the sign of the x/z covariance: which diagonal)
+        const box = new Map<number, number[]>();
+        for (let i = 0; i < n; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+          const r = find(i);
+          const b = box.get(r);
+          if (!b) box.set(r, [v.x, v.y, v.z, v.x, v.y, v.z, v.x, v.z, v.x * v.z, 1]);
+          else {
+            b[6] += v.x;
+            b[7] += v.z;
+            b[8] += v.x * v.z;
+            b[9]++;
+            b[0] = Math.min(b[0], v.x);
+            b[1] = Math.min(b[1], v.y);
+            b[2] = Math.min(b[2], v.z);
+            b[3] = Math.max(b[3], v.x);
+            b[4] = Math.max(b[4], v.y);
+            b[5] = Math.max(b[5], v.z);
+          }
+        }
+        for (const b of box.values()) {
+          const h = b[4] - b[1];
+          const wx = b[3] - b[0];
+          const wz = b[5] - b[2];
+          const w = Math.hypot(wx, wz);
+          if (h < 1.5) continue;
+          // a row of trees on one card: one tree per ~0.6 × height along it
+          const k = w > 1.4 * h ? Math.max(2, Math.round(w / (0.6 * h))) : 1;
+          const down = b[8] / b[9] - (b[6] / b[9]) * (b[7] / b[9]) < 0;
+          for (let j = 0; j < k; j++) {
+            const t = k === 1 ? 0.5 : (j + 0.5) / k;
+            const z = down ? b[5] - wz * t : b[2] + wz * t;
+            out.push({ x: b[0] + wx * t, y: b[1], z, h, spruce: pine || (k === 1 && w < 0.45 * h) });
+          }
+        }
+        g.dispose();
+      });
+      c.object.removeFromParent();
+    }
+    this.chunks = this.chunks.filter((ch) => ch.kind !== 'trees');
+    return out;
   }
 
   constructor(readonly data: TrackData) {
@@ -313,6 +396,7 @@ export class Track {
           // the satellite terrain (top2) is only seen from afar: no close-up detail there; stones need contrast
           const det = /^top2/i.test(sm.name) ? 0 : isGrass ? 0.28 : isGravel ? 0.42 : 0.16;
           addMacroVariation(sm, 0.22, isGrass || /top2/i.test(sm.name), det, isGrass ? 'grass' : isGravel ? 'gravel' : 'paved');
+          if (isGrass && det > 0) t.lawnMaterials.add(sm);
         } else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : 0.22);
       }
       const first = mats[0] as THREE.MeshStandardMaterial | undefined;
@@ -393,7 +477,10 @@ export class Track {
         mesh.userData.pbr ??= mesh.material;
         const pbr = mesh.userData.pbr as THREE.Material | THREE.Material[];
         if (q.pbrScenery) {
-          mesh.material = pbr;
+          // grass, gravel and sand stay diffuse: as PBR materials the sky's reflection at grazing angles (and the
+          // reflection environment on High/Ultra) washed the verges out to a pale mint seen from the cockpit
+          const diffuse = (m: THREE.Material): THREE.Material => (GROUND_MAT_RE.test(m.name) || m.name === 'grass_fill' ? this.lambertOf(m) : m);
+          mesh.material = Array.isArray(pbr) ? pbr.map(diffuse) : diffuse(pbr);
           mesh.receiveShadow = c.kind !== 'trees' && c.kind !== 'terrain';
           return;
         }

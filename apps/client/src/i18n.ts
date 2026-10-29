@@ -437,6 +437,25 @@ const ES: Record<string, string> = {
   'The website is made for a keyboard. On your phone, race with the APEX GHOST app: touch or tilt steering, the same rooms as your friends.':
     'La web está pensada para teclado. En el móvil, corre con la app de APEX GHOST: dirección táctil o por inclinación, las mismas salas que tus amigos.',
   'Install the app': 'Instalar la app',
+  'Frame rate': 'Frecuencia de imagen',
+  'Planting the forest': 'Plantando el bosque',
+  'Building the circuit physics': 'Creando la física del circuito',
+  'Setting up sky and weather': 'Preparando el cielo y el tiempo',
+  'Placing the cars on the grid': 'Colocando los coches en la parrilla',
+  'Bringing out the other drivers': 'Sacando a los demás pilotos',
+  'Drawing the racing line': 'Trazando la línea ideal',
+  'Preparing the TV intro': 'Preparando la intro de TV',
+  'Tip: the first lap from the grid is an out lap. Warm up your tyres.': 'Consejo: la primera vuelta desde la parrilla es de salida. Calienta los neumáticos.',
+  'Tip: brake in a straight line, then turn in.': 'Consejo: frena en línea recta y después gira.',
+  'Tip: cold tyres slide. Blue on the tyre gauge means not ready yet.':
+    'Consejo: los neumáticos fríos deslizan. Azul en el indicador significa que aún no están listos.',
+  'Tip: all four wheels off the track and the lap does not count.': 'Consejo: con las cuatro ruedas fuera de la pista la vuelta no cuenta.',
+  'Tip: follow another car closely to use its slipstream.': 'Consejo: sigue de cerca a otro coche para aprovechar su rebufo.',
+  'Tip: Settings → Quality changes how the world looks.': 'Consejo: Ajustes → Calidad cambia cómo se ve el mundo.',
+  'Try the beta': 'Probar la beta',
+  'The newest changes before everyone else. Installs next to the normal app as “APEX GHOST Beta”.':
+    'Las últimas novedades antes que nadie. Se instala junto a la app normal como «APEX GHOST Beta».',
+  '90 / 120 / 144 Hz on phones that have it: smoother, uses more battery': '90 / 120 / 144 Hz en los móviles que lo tienen: más fluido, gasta más batería',
   'Android 7 or newer · APK': 'Android 7 o posterior · APK',
   'After the download, open the file and allow your browser to install apps when Android asks.':
     'Tras la descarga, abre el archivo y permite que el navegador instale apps cuando Android lo pida.',

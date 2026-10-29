@@ -103,6 +103,9 @@ export class Graphics {
   }
 
   private rebuildPipeline(): void {
+    // EffectComposer.dispose frees its own targets, not its passes' (AO, bloom, SMAA buffers leaked on every
+    // quality change)
+    for (const p of this.composer?.passes ?? []) p.dispose();
     this.composer?.dispose();
     this.composer = null;
     if (!this.scene || !this.camera) return;
@@ -112,7 +115,9 @@ export class Graphics {
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     // Low/Medium: render straight to the (natively multisampled) canvas, tone mapping in the material shaders
     if (!q.bloom) return;
-    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: q.antialias === 'msaa' ? 4 : 0 });
+    // with AO the scene is drawn by N8AO (no hardware MSAA; SMAA smooths the edges): a multisampled target would only
+    // cost bandwidth on every pass
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: q.antialias === 'msaa' && !q.ao ? 4 : 0 });
     const composer = new EffectComposer(this.renderer, rt);
     composer.setPixelRatio(1);
     if (q.ao) {
@@ -165,7 +170,10 @@ export class Graphics {
     else this.renderer.render(this.scene, this.camera);
   }
 
-  /** Feed frame times; lowers/raises the render resolution to hold ~45+ fps (rarely, with hysteresis). */
+  /**
+   * Feed frame times; lowers/raises the render resolution to hold ~73 % of the display rate (45 fps at 60 Hz, 88 at
+   * 120 Hz), rarely and with hysteresis.
+   */
   trackFrame(dtMs: number, now: number): void {
     this.frameTimes[this.frameIdx++ % this.frameTimes.length] = dtMs;
     // react quickly when too slow (1.5 s), cautiously when there is headroom (4 s)
@@ -174,8 +182,9 @@ export class Graphics {
     for (const t of this.frameTimes) sum += t;
     const avg = sum / this.frameTimes.length;
     let next = this.dynScale;
-    if (avg > 1000 / 44) next = Math.max(0.6, this.dynScale - 0.1);
-    else if (avg < 1000 / 58 && this.dynScale < 1 && now - this.lastDynChange > 4000) next = Math.min(1, this.dynScale + 0.1);
+    const hz = Math.max(60, settings.refreshRate);
+    if (avg > 1000 / (hz * 0.73)) next = Math.max(0.6, this.dynScale - 0.1);
+    else if (avg < 1000 / (hz * 0.96) && this.dynScale < 1 && now - this.lastDynChange > 4000) next = Math.min(1, this.dynScale + 0.1);
     if (next !== this.dynScale) {
       this.dynScale = next;
       this.lastDynChange = now;

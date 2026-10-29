@@ -25,3 +25,10 @@ if (!IS_APP && isMobileDevice()) {
     root.append(h('div.fatal', {}, h('h2', { text: t('Cannot start') }), h('p', { text: (e as Error).message })));
   }
 }
+
+// the boot splash (index.html) leaves once the first screen is built
+const boot = document.getElementById('boot');
+if (boot) {
+  requestAnimationFrame(() => boot.classList.add('out'));
+  setTimeout(() => boot.remove(), 600);
+}

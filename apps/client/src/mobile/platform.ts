@@ -31,6 +31,8 @@ export const WEB_URL = (env.VITE_WEB_URL ?? 'https://apex-ghost-liard.vercel.app
 /** The signed Android app, served by the website itself (apps/client/public/downloads). */
 export const APK_PATH = 'downloads/apex-ghost.apk';
 export const APK_URL = `${WEB_URL}/${APK_PATH}`;
+/** The beta ("APEX GHOST Beta", its own app id: installs next to the stable app). */
+export const APK_BETA_PATH = 'downloads/apex-ghost-beta.apk';
 
 export function isAndroid(): boolean {
   return /Android/i.test(navigator.userAgent);

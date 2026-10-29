@@ -20,6 +20,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // the game's own native piece: 90/120/144 Hz display modes (Settings → Frame rate)
+        registerPlugin(RefreshRatePlugin.class);
         super.onCreate(savedInstanceState);
         Window window = getWindow();
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);

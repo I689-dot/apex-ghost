@@ -113,6 +113,8 @@ export class App {
       document.getElementById('app')?.prepend(this.backdropEl);
     }
     this.backdropEl.classList.toggle('show', !!name);
+    // loading: the circuit photo drifts slowly (a CSS animation, alive even while the game builds the world)
+    this.backdropEl.classList.toggle('kenburns', !!name && this.screen === 'loading');
     const map = this.trackIndex.find((tr) => tr.id === trackId)?.map;
     const img = `url(${uiAsset(`photo_${name}${map && map !== 'nurburgring' ? `_${map}` : ''}.webp`)})`;
     if (name && this.backdropEl.style.backgroundImage !== img) this.backdropEl.style.backgroundImage = img;
@@ -1121,37 +1123,77 @@ export class App {
     const slot = (race.slots[this.me] ?? 0) + 1;
     const bar = h('div.bar-fill');
     const label = h('div.load-label', { text: t('Preparing…') });
+    // the loading steps (session.load names them), lit one by one
+    const steps = [
+      t('Loading track and cars'),
+      t('Building the world'),
+      t('Planting the forest'),
+      t('Building the circuit physics'),
+      t('Setting up sky and weather'),
+      t('Placing the cars on the grid'),
+      t('Bringing out the other drivers'),
+      t('Drawing the racing line'),
+      t('Preparing the TV intro'),
+      t('Compiling shaders'),
+    ];
+    const ticks = steps.map(() => h('i'));
+    let stepAt = 0;
+    const setStep = (lbl: string) => {
+      const k = steps.indexOf(lbl);
+      if (k >= 0) stepAt = k;
+      ticks.forEach((el, i) => (el.className = i < stepAt ? 'done' : i === stepAt ? 'on' : ''));
+    };
+    setStep(steps[0]);
+    const tips = [
+      t('Tip: the first lap from the grid is an out lap. Warm up your tyres.'),
+      t('Tip: brake in a straight line, then turn in.'),
+      t('Tip: cold tyres slide. Blue on the tyre gauge means not ready yet.'),
+      t('Tip: all four wheels off the track and the lap does not count.'),
+      t('Tip: follow another car closely to use its slipstream.'),
+      t('Tip: Settings → Quality changes how the world looks.'),
+    ];
+    let tipAt = Math.floor(Math.random() * tips.length);
+    const tip = h('div.load-tip.in', { text: tips[tipAt] });
+    const tipTimer = setInterval(() => {
+      tipAt = (tipAt + 1) % tips.length;
+      tip.textContent = tips[tipAt];
+      // restart the fade-in
+      tip.classList.remove('in');
+      void tip.offsetWidth;
+      tip.classList.add('in');
+    }, 4500);
     const weatherTxt = race.weather.change
       ? t('{weather} → {later} later', { weather: t(WEATHER_LABEL[race.weather.kind]), later: t(WEATHER_LABEL[race.weather.change.to]) })
       : t(WEATHER_LABEL[race.weather.kind]);
-    this.setUi(
+    const loadingEl = h(
+      'div.loading',
+      {},
       h(
-        'div.loading',
+        'div.load-card',
         {},
-        h(
-          'div.load-card',
-          {},
-          h('div.logo.small', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-          h('h2', {
-            text: t('{track} · {min}-minute qualifying', {
-              track: t(this.trackIndex.find((tr) => tr.id === race.trackId)?.name ?? 'Nürburgring GP'),
-              min: Math.round(race.sessionMs / 60000),
-            }),
+        h('div.logo.small.load-logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
+        h('h2', {
+          text: t('{track} · {min}-minute qualifying', {
+            track: t(this.trackIndex.find((tr) => tr.id === race.trackId)?.name ?? 'Nürburgring GP'),
+            min: Math.round(race.sessionMs / 60000),
           }),
-          h(
-            'div.race-facts',
-            {},
-            fact(t('Grid'), t('P{slot} of {n}', { slot, n: race.grid.length })),
-            fact(t('Weather'), weatherTxt),
-            fact(t('Time'), formatHour(w0.hour)),
-            fact(t('Track'), w0.wetness > 0.3 ? t('Wet') : w0.wetness > 0.05 ? t('Damp') : t('Dry')),
-            fact(t('Air / track'), `${Math.round(temp0.airC)} / ${Math.round(temp0.trackC)} °C`),
-          ),
-          h('div.bar', {}, bar),
-          label,
+        }),
+        h(
+          'div.race-facts',
+          {},
+          fact(t('Grid'), t('P{slot} of {n}', { slot, n: race.grid.length })),
+          fact(t('Weather'), weatherTxt),
+          fact(t('Time'), formatHour(w0.hour)),
+          fact(t('Track'), w0.wetness > 0.3 ? t('Wet') : w0.wetness > 0.05 ? t('Damp') : t('Dry')),
+          fact(t('Air / track'), `${Math.round(temp0.airC)} / ${Math.round(temp0.trackC)} °C`),
         ),
+        h('div.bar', {}, bar),
+        h('div.load-steps', {}, ...ticks),
+        label,
+        tip,
       ),
     );
+    this.setUi(loadingEl);
     const session = new RaceSession(
       this.gfx,
       this.conn,
@@ -1172,15 +1214,18 @@ export class App {
     try {
       await session.load((l, t, lbl) => {
         bar.style.transform = `scaleX(${t ? l / t : 0})`;
-        label.textContent = `${lbl} · ${Math.round((l / Math.max(1, t)) * 100)} %`;
+        label.textContent = l < t ? `${lbl} · ${Math.round((l / Math.max(1, t)) * 100)} %` : lbl;
+        setStep(lbl);
       });
     } catch (e) {
+      clearInterval(tipTimer);
       console.error(e);
       session.dispose();
       this.session = null;
       this.fatal(t('Could not load the race: {msg}', { msg: (e as Error).message }));
       return;
     }
+    clearInterval(tipTimer);
     if (this.session !== session) return; // superseded
     if (this.pendingStartAt !== null) session.setStartAt(this.pendingStartAt);
     this.screen = 'race';
@@ -1193,7 +1238,21 @@ export class App {
       h('div.cd-info', { text: `P${slot} · ${weatherTxt} · ${formatHour(w0.hour)}` }),
     );
     this.setUi(h('div.race-ui', {}, session.cinematicElement, session.hudElement, this.countdownEl));
+    // the loading screen stays on top as a curtain until the first frames are on screen (the first ones upload the
+    // last textures: an empty grey sky before), then fades out
+    label.textContent = t('Ready');
+    setStep('');
+    ticks.forEach((el) => (el.className = 'done'));
+    loadingEl.classList.add('curtain');
+    this.ui.append(loadingEl);
     session.start();
+    let frames = 0;
+    const lift = () => {
+      if (++frames < 4) return void requestAnimationFrame(lift);
+      loadingEl.classList.add('out');
+      setTimeout(() => loadingEl.remove(), 700);
+    };
+    requestAnimationFrame(lift);
   }
 
   private setCountdown(text: string, sub: string): void {

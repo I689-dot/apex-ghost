@@ -4,6 +4,8 @@
  * with individual features switched off to find the expensive ones.
  *
  *   node tools/e2e/profile.mjs [--quality medium] [--width 1920 --height 1080]
+ *   node tools/e2e/profile.mjs --app --quality ultra        phone: the app's presets, 915×412 at 2× pixels
+ *   EXP=parts …                                             the cost of each part of the frame (sky, forest, AO…)
  */
 import { chromium } from 'playwright';
 
@@ -11,24 +13,43 @@ const args = process.argv.slice(2);
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
 const URL = opt('url', 'http://127.0.0.1:5173');
 const QUALITY = opt('quality', 'medium');
-const W = Number(opt('width', '1920'));
-const H = Number(opt('height', '1080'));
+const APP = args.includes('--app');
+const W = Number(opt('width', APP ? '915' : '1920'));
+const H = Number(opt('height', APP ? '412' : '1080'));
 
+// --vsync: frames paced like a real display (unpaced frames queue up on some GPUs and the numbers drift)
 const browser = await chromium.launch({
-  args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist', '--disable-gpu-vsync', '--disable-frame-rate-limit'],
+  args: [
+    '--use-angle=gl',
+    '--enable-gpu',
+    '--ignore-gpu-blocklist',
+    ...(args.includes('--vsync') ? [] : ['--disable-gpu-vsync', '--disable-frame-rate-limit']),
+  ],
 });
-const page = await browser.newPage({ viewport: { width: W, height: H } });
+const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: APP ? 2 : 1 });
 page.on('pageerror', (e) => console.log('pageerror', String(e)));
 await page.addInitScript((q) => {
   localStorage.setItem(
     'apexghost.settings.v1',
-    JSON.stringify({ nickname: 'Profiler', quality: q, qualityAuto: false, showPerf: true, dynamicResolution: false }),
+    JSON.stringify({ nickname: 'Profiler', quality: q, qualityAuto: false, showPerf: true, dynamicResolution: false, resolutionScale: 1 }),
   );
+  localStorage.setItem('apexghost.app.init.v1', '1');
+  localStorage.setItem('apexghost.noAudio', '1');
 }, QUALITY);
-await page.goto(URL);
+await page.goto(APP ? `${URL}/?app=1` : URL);
 await page.waitForSelector('.menu-card');
 await page.click('button.primary:has-text("Create room")');
 await page.waitForSelector('.car-card');
+const TIME = opt('time', '');
+const WEATHER = opt('weather', '');
+if (WEATHER) {
+  await page.selectOption('.prep .prep-row:nth-of-type(2) select', WEATHER);
+  await page.waitForTimeout(600);
+}
+if (TIME) {
+  await page.selectOption('.prep .prep-row:nth-of-type(3) select', TIME);
+  await page.waitForTimeout(600);
+}
 await page.click('.car-card >> nth=0');
 await page.waitForTimeout(800);
 await page.click('.lobby-actions button:has-text("Ready")');
@@ -38,9 +59,31 @@ await page.click('button:has-text("Start race")');
 await page.click('button:has-text("Ready to go")', { timeout: 20_000 }).catch(() => {});
 await page.waitForSelector('.race-ui', { timeout: 240_000 });
 await page.waitForTimeout(7000);
+if (args.includes('--skip-intro')) {
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+}
 // stay on the grid: a fixed (and busy) view makes experiments comparable
 await page.waitForTimeout(3000);
 
+console.log(
+  'conditions',
+  JSON.stringify(
+    await page.evaluate(() => {
+      const s = window.__apex.session;
+      const w = s.weather;
+      return {
+        hour: w.hour.toFixed(1),
+        clouds: w.clouds,
+        rain: w.rain,
+        fog: w.fog,
+        night: s.env.night.toFixed(2),
+        px: window.__apex.gfx.renderer.getDrawingBufferSize(new window.__apex.THREE.Vector2()).toArray(),
+      };
+    }),
+  ),
+);
+await page.screenshot({ path: 'tools/e2e/out/profile_view.png' });
 async function measure(label, setup) {
   await page.evaluate(setup ?? (() => {}));
   await page.waitForTimeout(600);
@@ -75,6 +118,161 @@ async function measure(label, setup) {
 }
 
 const experiments = (process.env.EXP ?? 'features').split(',');
+if (experiments.includes('carmats')) {
+  console.log(
+    JSON.stringify(
+      await page.evaluate(() => {
+        const out = {};
+        window.__apex.session.myVisual.object.traverse((o) => {
+          if (!o.material) return;
+          for (const m of [o.material].flat()) {
+            const k = `${m.type} ${m.name}`;
+            out[k] ??= {
+              n: 0,
+              tris: 0,
+              transmission: m.transmission ?? 0,
+              transparent: m.transparent,
+              clearcoat: m.clearcoat ?? 0,
+              side: m.side,
+              maps: Object.keys(m)
+                .filter((x) => /Map$/.test(x) && m[x])
+                .join(','),
+            };
+            out[k].n++;
+            out[k].tris += (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
+          }
+        });
+        return out;
+      }),
+      null,
+      0,
+    ).replace(/},/g, '},\n'),
+  );
+}
+if (experiments.includes('gpu')) {
+  // GPU time of one frame (rendered synchronously: gl.finish), with each part of the scene hidden in turn
+  const res = await page.evaluate(() => {
+    const a = window.__apex;
+    const gl = a.gfx.renderer.getContext();
+    a.session.running = false; // stop the loop: we render by hand
+    const time = () => {
+      const t = [];
+      for (let i = 0; i < 6; i++) {
+        const t0 = performance.now();
+        a.gfx.render();
+        gl.finish();
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+        t.push(performance.now() - t0);
+      }
+      t.sort((x, y) => x - y);
+      return t[2];
+    };
+    const out = [['full frame', time()]];
+    const parts = [];
+    a.scene.traverse((o) => {
+      if (o === a.scene) return;
+      if (o.parent === a.scene || o.parent?.name === 'track' || o.parent?.name === 'forest') parts.push(o);
+    });
+    for (const o of parts) {
+      if (!o.visible) continue;
+      o.visible = false;
+      out.push([`- ${o.name || o.type}`, time()]);
+      o.visible = true;
+    }
+    const car = a.session.myVisual.object;
+    const lights = [];
+    const meshes = [];
+    car.traverse((o) => (o.isLight ? lights.push(o) : o.isMesh && meshes.push(o)));
+    for (const l of lights) l.visible = false;
+    out.push([`- my car's ${lights.length} lights (${lights.map((l) => l.type + (l.castShadow ? '+shadow' : '')).join(' ')})`, time()]);
+    for (const l of lights) l.visible = true;
+    for (const m of meshes) m.visible = false;
+    out.push([`- my car's meshes (${meshes.length})`, time()]);
+    for (const m of meshes) m.visible = true;
+    const byMat = new Map();
+    for (const m of meshes) {
+      const k = [m.material].flat()[0].name || '?';
+      byMat.set(k, [...(byMat.get(k) ?? []), m]);
+    }
+    for (const [k, list] of byMat) {
+      for (const m of list) m.visible = false;
+      const tris = list.reduce((s, m) => s + (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3, 0);
+      const tex = [
+        ...new Set(
+          list.flatMap((m) =>
+            [m.material].flat().flatMap((mt) =>
+              ['map', 'normalMap', 'roughnessMap']
+                .map((x) => mt[x]?.image)
+                .filter(Boolean)
+                .map((im) => `${im.width}x${im.height}`),
+            ),
+          ),
+        ),
+      ].join(' ');
+      out.push([`  - car ${k} (${(tris / 1000).toFixed(0)}k tris, ${tex})`, time()]);
+      for (const m of list) m.visible = true;
+    }
+    a.scene.overrideMaterial = new a.THREE.MeshBasicMaterial();
+    out.push(['  (everything with a flat material)', time()]);
+    a.scene.overrideMaterial = null;
+    a.gfx.renderer.shadowMap.enabled = false;
+    out.push(['- shadow maps', time()]);
+    a.gfx.renderer.shadowMap.enabled = true;
+    const comp = a.gfx.composer;
+    a.gfx.composer = null;
+    out.push(['- post-processing (AO, bloom, SMAA)', time()]);
+    a.gfx.composer = comp;
+    return out;
+  });
+  const base = res[0][1];
+  for (const [n, ms] of res)
+    console.log(`${n.slice(0, 40).padEnd(42)} ${ms.toFixed(1).padStart(7)} ms  ${n === 'full frame' ? '' : `saves ${(base - ms).toFixed(1)}`}`);
+}
+if (experiments.includes('solo')) {
+  // one feature off at a time, then back on: the cost of each, not cumulative
+  const pre = 'const a = window.__apex; const q = a.gfx.quality; const r = a.gfx.renderer; const tr = a.session.track;';
+  const dirty = 'a.scene.traverse((o) => { if (o.material) for (const m of [o.material].flat()) m.needsUpdate = true; });';
+  const solo = [
+    ['shadows', 'q.shadows = false; a.gfx.rebuildPipeline();' + dirty, 'q.shadows = true; a.gfx.rebuildPipeline();' + dirty],
+    ['AO', 'q.ao = false; a.gfx.rebuildPipeline();', 'q.ao = true; a.gfx.rebuildPipeline();'],
+    ['bloom/post', 'q.bloom = false; q.ao = false; a.gfx.rebuildPipeline();', 'q.bloom = true; q.ao = true; a.gfx.rebuildPipeline();'],
+    ['forest', 'tr.forest.root.visible = false;', 'tr.forest.root.visible = true;'],
+    ['tree shadows', 'for (const m of tr.forest.near) m.castShadow = false;', 'for (const m of tr.forest.near) m.castShadow = true;'],
+    ['sky', 'a.session.env.skyDome.mesh.visible = false;', 'a.session.env.skyDome.mesh.visible = true;'],
+    [
+      'scenery',
+      'for (const c of tr.chunks) if (c.kind === "scenery") c.object.visible = false;',
+      'for (const c of tr.chunks) if (c.kind === "scenery") c.object.visible = true;',
+    ],
+    [
+      'crowd',
+      'a.scene.traverse((o) => { if (/crowd/i.test(o.name)) o.visible = false; });',
+      'a.scene.traverse((o) => { if (/crowd/i.test(o.name)) o.visible = true; });',
+    ],
+    ['half resolution', 'a.gfx.dynScale = 0.7; a.gfx.resize();', 'a.gfx.dynScale = 1; a.gfx.resize();'],
+  ];
+  await page.evaluate('window.__apex.session.track.updateVisibility = () => {};');
+  for (const [name, on, back] of solo) {
+    await measure('baseline');
+    await measure(`  without ${name}`, `(() => { ${pre} ${on} })()`);
+    await page.evaluate(`(() => { ${pre} ${back} })()`);
+  }
+}
+if (experiments.includes('parts')) {
+  // page.evaluate gets a string: a closure over `fn` would not reach the page
+  const off = (fn) => `(() => { const a = window.__apex; a.session.track.updateVisibility = () => {}; ${fn} })()`;
+  await measure('baseline');
+  await measure('forest far cards hidden', off('for (const m of a.session.track.forest?.far ?? []) m.visible = false;'));
+  await measure('+ forest 3D trees hidden', off('for (const m of a.session.track.forest?.near ?? []) m.visible = false;'));
+  await measure('+ sky dome hidden', off('a.session.env.skyDome.mesh.visible = false;'));
+  await measure(
+    '+ shadows off',
+    off('a.gfx.renderer.shadowMap.enabled = false; a.scene.traverse((o) => { if (o.material) for (const m of [o.material].flat()) m.needsUpdate = true; });'),
+  );
+  await measure('+ AO off', off('a.gfx.quality.ao = false; a.gfx.rebuildPipeline();'));
+  await measure('+ post off', off('a.gfx.quality.bloom = false; a.gfx.rebuildPipeline();'));
+  await measure('+ scenery hidden', off('for (const c of a.session.track.chunks) if (c.kind === "scenery") c.object.visible = false;'));
+}
 if (experiments.includes('features')) {
   await measure('baseline');
   await measure('shadows off', () => {

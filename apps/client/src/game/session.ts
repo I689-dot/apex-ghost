@@ -76,7 +76,9 @@ import { Track } from './track';
 import { Forest } from './forest';
 import { RoadWear } from './roadWear';
 import { buildCrowd } from './crowd';
-import { GrassTufts } from './grassTufts';
+import { WIND } from './vegetation';
+import { prepareRacingLine } from './racingLinePrep';
+import { GrassShells } from './grassShells';
 import { PerfOverlay } from './perf';
 import { TrackEditor } from './trackEditor';
 import { IS_DEV } from '../config';
@@ -184,6 +186,7 @@ export class RaceSession {
   private track!: Track;
   private trackData!: TrackData;
   private env!: Environment;
+  private shells: GrassShells | null = null;
   private windshield = new WindshieldFx();
   private vehicle!: Vehicle;
   private myVisual!: CarVisual;
@@ -241,7 +244,6 @@ export class RaceSession {
   /** Air and track temperature and air density now (temperatures() in the shared weather code). */
   air: Temperatures = { airC: 20, trackC: 25, airDensity: 1.2 };
   private roadWear: RoadWear | null = null;
-  private grass: GrassTufts | null = null;
   private cinematic: Cinematic | null = null;
   private snd: SessionAudio | null = null;
   private pit: PitLaneMonitor | null = null;
@@ -324,6 +326,8 @@ export class RaceSession {
     progress(0, 1, t('Starting physics'));
     await initRapier();
     this.trackData = await loadTrackFile(this.race.trackId);
+    // the racing line is optimised in a worker meanwhile (seconds on a phone)
+    const linePrep = prepareRacingLine(this.trackData);
     const entries = new Map(this.cars.cars.map((c) => [c.id, c]));
     const racers = this.race.grid.map((id) => ({ id, player: this.room.players.find((p) => p.id === id) }));
     const myCarId = this.spectator
@@ -339,43 +343,59 @@ export class RaceSession {
     const trackBytes = 22_000_000;
     const total = trackBytes + myEntry.bytes + remoteEntries.reduce((s, r) => s + r.entry.bytes * REMOTE_LIGHT_SHARE, 0);
     let loaded = 0;
+    // downloads after the first step (the forest) keep that step's name on screen
+    let stepLabel = t('Loading track and cars');
     const onBytes = (n: number) => {
       loaded += n;
-      progress(Math.min(loaded, total), total, t('Loading track and cars'));
+      progress(Math.min(loaded, total), total, stepLabel);
     };
 
-    const [trackRes, myModel, ...remoteModels] = await Promise.all([
+    // with the detailed cockpit model, also the normal LOD0: it is what the outside cameras show (half the triangles)
+    const withCockpit = this.gfx.quality.cockpitDetail && !!myEntry.cockpit;
+    const [trackRes, myModel, myOutside, ...remoteModels] = await Promise.all([
       Track.load(this.trackData, onBytes),
       loadCarModel(myEntry, onBytes, 1, this.gfx.quality.cockpitDetail),
+      withCockpit ? loadCarModel(myEntry, onBytes, 1, false) : Promise.resolve(null),
       // other cars: the light levels now, their full-detail level after loading (streamRemoteDetail)
       ...remoteEntries.map((r) => loadCarModel(r.entry, onBytes, 3, false, 1)),
     ]);
-    progress(total, total, t('Building the world'));
+    // the rest runs on the main thread in long steps (seconds on a phone): name each one and let the loading screen
+    // repaint before it, so the player sees it moving on
+    const step = async (label: string) => {
+      stepLabel = label;
+      progress(total, total, label);
+      await nextPaint();
+    };
+    await step(t('Building the world'));
     this.track = trackRes.track;
     this.scene.add(this.track.root);
-    if (this.trackData.forest) {
-      const forest = await Forest.load(this.trackData.forest, this.gfx.renderer, onBytes);
-      if (forest) this.track.setForest(forest);
-    }
+    await step(t('Planting the forest'));
+    // the scattered forest, and the map's own trackside trees (flat cards) replanted as the same 3D trees
+    const forest = await Forest.load(this.trackData.forest, this.track.extractCardTrees(), this.gfx.renderer, onBytes, this.gfx.quality);
+    if (forest) this.track.setForest(forest);
 
+    await step(t('Building the circuit physics'));
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
     this.events = new RAPIER.EventQueue(true);
     this.track.buildColliders(RAPIER, this.world, trackRes.collision);
     // ray casts only see colliders once the query structure is built: placing the cars on the ground needs it
     this.world.updateSceneQueries();
-    // spectators on the stands, grass tufts beside the track (found with the same ray casts as the wheels)
+    // blades on the verges near the racing line
+    this.shells = GrassShells.build(this.track.root, this.track.lawnMaterials, this.trackData);
+    if (this.shells) this.scene.add(this.shells.root);
+    // spectators on the stands
     const crowd = buildCrowd(this.track.root, this.trackData, this.gfx.quality.crowd);
     if (crowd) this.scene.add(crowd);
-    this.grass = GrassTufts.build(this.trackData, this.track.groundQuery(this.world));
-    if (this.grass) this.scene.add(this.grass.mesh);
 
     // weather & environment
+    await step(t('Setting up sky and weather'));
     this.weather = weatherAt(this.race.weather, 0);
-    this.env = new Environment(this.scene, this.race.weather, this.gfx.quality);
+    this.env = new Environment(this.scene, this.race.weather, this.gfx.quality, this.gfx.renderer);
     this.track.applyQuality(this.gfx.quality);
 
     // my car
+    await step(t('Placing the cars on the grid'));
     const slot = this.race.slots[this.me] ?? 0;
     const grid = this.trackData.grid[slot] ?? this.trackData.grid[0];
     // the setup chosen in the lobby (wing, brake balance) changes the car's specs for the physics
@@ -394,7 +414,7 @@ export class RaceSession {
     this.vehicle.fitTyres(COMPOUNDS[settings.carSetup.tyre] ?? COMPOUNDS[compoundForWeather(this.weather.wetness)], this.vehicle.ambientC + 12);
     this.fuelPerLap = (this.trackData.length / 1000) * FUEL.perKm;
     if (this.race.rules?.fuel) this.vehicle.setFuel(settings.carSetup.fuelL);
-    this.myVisual = new CarVisual(myEntry, myModel, true);
+    this.myVisual = new CarVisual(myEntry, myModel, true, myOutside?.lods[0]);
     if (this.gfx.quality.ownHeadlightSpots) this.myVisual.addHeadlights(this.gfx.quality.ownHeadlightShadows);
     else this.myVisual.simplifyForCockpit();
     this.scene.add(this.myVisual.object);
@@ -433,6 +453,8 @@ export class RaceSession {
         body: null,
       });
     });
+    await step(t('Bringing out the other drivers'));
+    await linePrep;
     this.createLocalBots(entries);
     // contact rule: a collision box for every car not simulated here (the bots I simulate are real vehicles)
     if (this.contact) for (const r of this.remotes.values()) if (!r.bot) r.body = this.kinematicCar(r.entry);
@@ -442,6 +464,7 @@ export class RaceSession {
     }
     // ray casts only see colliders after the query structure is built (normally by the first step)
     this.world.updateSceneQueries();
+    await step(t('Drawing the racing line'));
     this.racingLine = new RacingLineFx(this.trackData, tuned.specs, this.track.groundQuery(this.world), this.air.airDensity);
     this.roadWear = new RoadWear(this.trackData, tuned.specs, this.track.groundQuery(this.world), this.air.airDensity);
     this.scene.add(this.roadWear.object);
@@ -452,22 +475,84 @@ export class RaceSession {
       this.pit.measureBoxes(this.wallProbe);
       // painted on the *visible* road: the collision under painted layers is flattened a few cm lower, so markings
       // placed on it disappeared under the asphalt
-      const roadMeshes: THREE.Object3D[] = [];
+      // ray casts against the whole road (hundreds of thousands of triangles, no spatial index) took seconds on a
+      // phone: copy once only the road triangles within ~40 m of the pit lane into one small mesh
+      const near = new Set<number>();
+      const CELL = 8;
+      const key = (x: number, z: number) => Math.floor(x / CELL) * 65536 + Math.floor(z / CELL);
+      for (const p of this.trackData.pitLane.points)
+        for (let dx = -5; dx <= 5; dx++) for (let dz = -5; dz <= 5; dz++) near.add(key(p[0] + dx * CELL, p[2] + dz * CELL));
+      const pitBox = new THREE.Box3();
+      for (const p of this.trackData.pitLane.points) pitBox.expandByPoint(new THREE.Vector3(p[0], p[1], p[2]));
+      pitBox.expandByScalar(45);
+      const tris: number[] = [];
+      const v = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+      const box = new THREE.Box3();
+      this.track.root.updateMatrixWorld(true);
       this.track.root.traverse((o) => {
         const m = o as THREE.Mesh;
         const mat = m.isMesh ? ([m.material].flat()[0] as THREE.Material) : null;
-        if (mat && /^(asph|pits|conc_|pavement|tiles|lines|box_decal)/i.test(mat.name)) roadMeshes.push(m);
+        if (!mat || !/^(asph|pits|conc_|pavement|tiles|lines|box_decal)/i.test(mat.name)) return;
+        m.geometry.computeBoundingBox();
+        if (
+          !box
+            .copy(m.geometry.boundingBox as THREE.Box3)
+            .applyMatrix4(m.matrixWorld)
+            .intersectsBox(pitBox)
+        )
+          return;
+        const pos = m.geometry.getAttribute('position');
+        const idx = m.geometry.getIndex();
+        const e = m.matrixWorld.elements;
+        const count = idx ? idx.count : pos.count;
+        for (let i = 0; i < count; i += 3) {
+          // the first corner decides (cheap); only nearby triangles are transformed in full
+          const a0 = idx ? idx.getX(i) : i;
+          const x = pos.getX(a0);
+          const y = pos.getY(a0);
+          const z = pos.getZ(a0);
+          if (!near.has(key(e[0] * x + e[4] * y + e[8] * z + e[12], e[2] * x + e[6] * y + e[10] * z + e[14]))) continue;
+          for (let k = 0; k < 3; k++) v[k].fromBufferAttribute(pos, idx ? idx.getX(i + k) : i + k).applyMatrix4(m.matrixWorld);
+          for (const p of v) tris.push(p.x, p.y, p.z);
+        }
       });
-      const rc = new THREE.Raycaster();
-      const down = new THREE.Vector3(0, -1, 0);
+      // a 2 m grid of those triangles: a height lookup is a point-in-triangle test on a handful of them
+      const G = 2;
+      const gkey = (x: number, z: number) => Math.floor(x / G) * 65536 + Math.floor(z / G);
+      const grid = new Map<number, number[]>();
+      for (let t = 0; t < tris.length; t += 9) {
+        const x0 = Math.min(tris[t], tris[t + 3], tris[t + 6]);
+        const x1 = Math.max(tris[t], tris[t + 3], tris[t + 6]);
+        const z0 = Math.min(tris[t + 2], tris[t + 5], tris[t + 8]);
+        const z1 = Math.max(tris[t + 2], tris[t + 5], tris[t + 8]);
+        for (let gx = Math.floor(x0 / G); gx <= Math.floor(x1 / G); gx++)
+          for (let gz = Math.floor(z0 / G); gz <= Math.floor(z1 / G); gz++) {
+            const k = gx * 65536 + gz;
+            const l = grid.get(k);
+            if (l) l.push(t);
+            else grid.set(k, [t]);
+          }
+      }
+      const roadHeight = (x: number, z: number, top: number): number | null => {
+        let best: number | null = null;
+        for (const t of grid.get(gkey(x, z)) ?? []) {
+          const [ax, ay, az, bx, by, bz, cx, cy, cz] = tris.slice(t, t + 9);
+          const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+          if (Math.abs(d) < 1e-9) continue;
+          const u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+          const w = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+          if (u < -1e-4 || w < -1e-4 || u + w > 1 + 1e-4) continue;
+          const y = u * ay + w * by + (1 - u - w) * cy;
+          // the highest surface below the probe (a bridge over the pit lane would be above it)
+          if (y <= top && y >= top - 6 && (best === null || y > best)) best = y;
+        }
+        return best;
+      };
       const gq = this.track.groundQuery(this.world);
       const hit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' as const };
-      this.track.root.updateMatrixWorld(true);
       const paintGround = (x: number, z: number, y: number) => {
-        rc.set(new THREE.Vector3(x, y + 2.5, z), down);
-        rc.far = 6;
-        const h = rc.intersectObjects(roadMeshes, false)[0];
-        if (h) return h.point.y;
+        const h = roadHeight(x, z, y + 2.5);
+        if (h !== null) return h;
         return gq.cast(x, y + 2.5, z, 0, -1, 0, 6, hit) ? hit.py : y;
       };
       if (PIT_SURFACE_MAPS.has(this.trackData.map ?? '')) this.scene.add(this.pit.buildSurface(paintGround, this.wallProbe));
@@ -476,6 +561,7 @@ export class RaceSession {
 
     this.localTracker = this.makeTracker(0);
 
+    await step(t('Preparing the TV intro'));
     this.buildCinematic(entries);
     this.hud.setTrack(this.trackData);
     this.hud.raceLaps = this.race.kind === 'race' ? this.race.laps : 0;
@@ -487,7 +573,7 @@ export class RaceSession {
     this.collectEnvMaterials();
     this.applyWeather();
 
-    progress(total, total, t('Compiling shaders'));
+    await step(t('Compiling shaders'));
     await this.warmUp();
     if (IS_DEV || settings.showPerf) this.perf = new PerfOverlay();
     if (IS_DEV) this.editor = new TrackEditor(this.scene, this.trackData, trackRes.collision);
@@ -1134,6 +1220,7 @@ export class RaceSession {
       _camPos.copy(this.specCam.position);
     }
     cockpitGlass.value = viewCam === this.cockpit.camera ? 1 : 0;
+    this.myVisual.setInside(viewCam === this.cockpit.camera);
 
     // remote ghosts (with the contact rule they were placed before the physics)
     if (!this.contact) for (const r of this.remotes.values()) this.updateRemote(r, serverNow, dt);
@@ -1142,12 +1229,14 @@ export class RaceSession {
     // environment
     const tEnv = performance.now();
     this.env.update(dt, this.weather, viewCam, this.currPos, _carVel, this.gfx.renderer);
+    // trees and grass sway: a breeze, stronger under cloud and in rain
+    WIND.time.value += dt;
+    WIND.strength.value = 0.7 + this.weather.clouds * 0.6 + this.weather.rain * 0.9;
     // aerial shots see the whole circuit: distance culling (meant for the cockpit) would leave holes
     if (this.cinematic?.aerial) {
       this.track.showAll();
       this.track.forest?.update(_camPos, this.gfx.quality);
     } else this.track.updateVisibility(_camPos, this.gfx.quality);
-    this.grass?.update(_camPos, this.cinematic?.aerial ? 0 : this.gfx.quality.grassRadius);
     if (!this.spectator)
       this.windshield.update(
         dt,
@@ -1157,6 +1246,7 @@ export class RaceSession {
         1 - this.env.night * 0.8,
         this.cockpit.lookingForward && !outside,
       );
+    this.shells?.update(_camPos, this.gfx.quality, !!this.cinematic?.aerial);
     this.windshield.setCrack(this.spectator ? 0 : this.damage.zones[0], this.cockpit.lookingForward && !outside);
     this.updateAudio(dt, viewCam);
     this.updateWake();
@@ -2374,4 +2464,9 @@ function zoneDir(zone: number, out: THREE.Vector3): THREE.Vector3 {
   if (zone === 1) return out.set(0, 0, 1);
   if (zone === 2) return out.set(-1, 0, 0);
   return out.set(1, 0, 0);
+}
+
+/** Resolves after the browser has painted a frame (a progress label set before it is on screen). */
+function nextPaint(): Promise<void> {
+  return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 }

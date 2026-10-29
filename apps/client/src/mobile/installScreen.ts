@@ -1,9 +1,27 @@
 import { h } from '../ui/dom';
 import { t } from '../i18n';
 import { uiAsset } from '../ui/images';
-import { APK_PATH, APK_URL, isIOS } from './platform';
+import { APK_BETA_PATH, APK_PATH, APK_URL, isIOS } from './platform';
 
 const apkHref = (): string => `${import.meta.env.BASE_URL}${APK_PATH}`;
+const betaHref = (): string => `${import.meta.env.BASE_URL}${APK_BETA_PATH}`;
+
+/** The beta download: a second, smaller button with what it brings. */
+function betaLink(): HTMLElement {
+  return h(
+    'div.install-beta',
+    {},
+    h(
+      'a.install-btn.small',
+      { href: betaHref(), download: 'apex-ghost-beta.apk', type: 'application/vnd.android.package-archive' },
+      h('span.install-ico', { text: '⬇' }),
+      h('b', { text: t('Try the beta') }),
+    ),
+    h('p.muted', {
+      text: t('The newest changes before everyone else. Installs next to the normal app as “APEX GHOST Beta”.'),
+    }),
+  );
+}
 
 /** The website opened on a phone: still desktop-only, with a big button to install the Android app. */
 export function installScreen(): HTMLElement {
@@ -23,6 +41,7 @@ export function installScreen(): HTMLElement {
       h('span', {}, h('b', { text: t('Install the app') }), h('small', { text: t('Android 7 or newer · APK') })),
     ),
     h('p.install-help', { text: t('After the download, open the file and allow your browser to install apps when Android asks.') }),
+    betaLink(),
     h('p.install-ios', {
       text: ios
         ? t('iPhone and iPad: the iOS app is not available yet. Play on a computer meanwhile.')
@@ -63,6 +82,7 @@ async function openGetApp(): Promise<void> {
             h('b', { text: t('Download the APK') }),
           ),
           h('p.muted', { text: t('Touch or tilt steering, phone graphics, the same rooms and solo races. Android 7 or newer.') }),
+          betaLink(),
           h('p.muted', { text: t('iPhone and iPad: the iOS app is not available yet.') }),
         ),
       ),

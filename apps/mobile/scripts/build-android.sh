@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One command: web bundle (app mode) → Capacitor sync → signed release APK → apps/client/public/downloads.
 #   pnpm app:android            (from the repo root)
+#   pnpm app:android:beta       the separate "APEX GHOST Beta" app (APEX_BETA=1) → downloads/apex-ghost-beta.apk
 # Needs: JDK 21 + Android SDK (tools/mobile/setup-android.sh installs both in ~/Android, no sudo)
 #        and the release keystore (scripts/make-keystore.sh, kept in ~/.android-keys, never in git).
 set -euo pipefail
@@ -39,7 +40,9 @@ cd "$here/android"
 APK="$here/android/app/build/outputs/apk/release/app-release.apk"
 BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
 "$BT/apksigner" verify --print-certs "$APK" | head -3
-OUT="$repo/apps/client/public/downloads/apex-ghost.apk"
+SUFFIX=""
+if [ "${APEX_BETA:-}" = 1 ]; then SUFFIX="-beta"; fi
+OUT="$repo/apps/client/public/downloads/apex-ghost$SUFFIX.apk"
 mkdir -p "$(dirname "$OUT")"
 cp "$APK" "$OUT"
 echo "✔ $OUT ($(du -h "$OUT" | cut -f1))"

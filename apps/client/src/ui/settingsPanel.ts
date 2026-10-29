@@ -2,6 +2,7 @@ import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, DEFAULT_SETTINGS, save
 import { h } from './dom';
 import { LANGUAGES, setLang, t } from '../i18n';
 import { IS_APP } from '../mobile/platform';
+import { applyFrameRate, frameRateChoices } from '../mobile/refreshRate';
 import { padSetupBox } from '../input/padSetup';
 import { touchSettingsSection } from '../mobile/touchSettings';
 
@@ -107,6 +108,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       }),
       t('Lowers resolution briefly to stay above 45 fps'),
     ),
+    ...(IS_APP ? [frameRateRow()] : []),
     row(
       t('Field of view'),
       range(
@@ -467,4 +469,27 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     ),
   );
   return panel;
+}
+
+/** Phone app: 60 Hz, or the 90 / 120 / 144 Hz modes of the screen (filled in once the phone has answered). */
+function frameRateRow(): HTMLElement {
+  const sel = h('select', {
+    onchange: (e: Event) => {
+      settings.refreshRate = Number((e.target as HTMLSelectElement).value);
+      saveSettings(settings);
+      void applyFrameRate();
+    },
+  }) as HTMLSelectElement;
+  const fill = (rates: number[]) => {
+    sel.replaceChildren(...rates.map((hz) => h('option', { value: String(hz), text: `${hz} Hz`, selected: hz === settings.refreshRate })));
+    if (!rates.includes(settings.refreshRate)) sel.value = '60';
+  };
+  fill([60]);
+  void frameRateChoices().then(fill);
+  return h(
+    'div.set-row',
+    {},
+    h('div', {}, h('span', { text: t('Frame rate') }), h('small', { text: t('90 / 120 / 144 Hz on phones that have it: smoother, uses more battery') })),
+    sel,
+  );
 }

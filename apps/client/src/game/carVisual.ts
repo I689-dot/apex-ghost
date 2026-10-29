@@ -3,7 +3,9 @@ import type { CarEntry } from '@apex/shared';
 import type { CarModel } from './assets';
 
 const WHEELS = ['FL', 'FR', 'RL', 'RR'] as const;
-const LOD_DIST = [0, 18, 80]; // LOD0 is cockpit-grade (100–200k tris): only very close remote cars use it
+const LOD_DIST = [0, 18, 80];
+/** Objects only shadow cameras render (environment.ts enables it on the sun). */
+export const SHADOW_LAYER = 1; // LOD0 is cockpit-grade (100–200k tris): only very close remote cars use it
 
 interface WheelRig {
   hub: THREE.Object3D;
@@ -83,10 +85,19 @@ export class CarVisual {
   private opacity = 1;
   readonly staticComp: number[];
 
+  /** Your own car with the cockpit model: that model inside, the normal LOD0 seen from outside (setInside). */
+  private insideRoot: THREE.Object3D | null = null;
+  private outsideRoot: THREE.Object3D | null = null;
+
+  /**
+   * `outside`: for your own car when `model` is the cockpit model (~2× the triangles of LOD0, the extra detail all in
+   * the cabin): the chase cameras, TV shots and replays show this normal LOD0 instead.
+   */
   constructor(
     readonly entry: CarEntry,
     model: CarModel,
     readonly local: boolean,
+    outside?: THREE.Group,
   ) {
     this.object.name = `car_${entry.id}`;
     if (entry.steering) this.steerAxis.set(...entry.steering.axis).normalize();
@@ -105,17 +116,26 @@ export class CarVisual {
       this.levels.push(rig);
       if (this.lod) this.lod.addLevel(root, LOD_DIST[first + i] ?? 200, 0.02);
       else this.object.add(root);
-      if (i === 0) this.setBody(root);
+      if (i === 0) this.addBody(root);
+      if (i === 0) this.insideRoot = root;
     });
+    if (local && outside) {
+      const root = outside.clone(true);
+      this.prepareMaterials(root, matCache);
+      this.levels.push(this.rig(root));
+      this.addBody(root);
+      this.object.add(root);
+      this.outsideRoot = root;
+      this.setInside(true);
+    }
     this.object.traverse((o) => this.setShadows(o));
     this.staticComp = [0, 0, 0, 0];
     // remote cars always, and your own car when real spot lights are too expensive, get a projected light pool
     this.makeLightPool();
   }
 
-  /** Dents go on the most detailed level. */
-  private setBody(root: THREE.Object3D): void {
-    this.bodyMeshes = [];
+  /** Dents go on the most detailed level (and on the outside model of your own car). */
+  private addBody(root: THREE.Object3D): void {
     root.getObjectByName('body')?.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) this.bodyMeshes.push(o as THREE.Mesh);
     });
@@ -145,7 +165,8 @@ export class CarVisual {
     await warm(root);
     this.levels.push(rig);
     lod.addLevel(root, 0, 0.02);
-    this.setBody(root);
+    this.bodyMeshes = [];
+    this.addBody(root);
     return true;
   }
 
@@ -236,6 +257,21 @@ export class CarVisual {
    * Cockpit-only cost cut for weaker GPUs: glass becomes a plain tint (no PBR layer over the
    * whole screen). The interior keeps environment lighting. Must run before shader warm-up.
    */
+  private inside: boolean | null = null;
+
+  /**
+   * Your own car: the cockpit model while the camera is in it, LOD0 from outside (no-op without an outside model).
+   * Inside, LOD0 still casts the car's shadow: it moves to SHADOW_LAYER, which the sun's shadow camera renders and the
+   * view camera does not (same silhouette, half the triangles in the shadow pass).
+   */
+  setInside(inside: boolean): void {
+    if (!this.insideRoot || !this.outsideRoot || inside === this.inside) return;
+    this.inside = inside;
+    this.insideRoot.visible = inside;
+    this.insideRoot.traverse((o) => ((o as THREE.Mesh).isMesh ? (o.castShadow = false) : undefined));
+    this.outsideRoot.traverse((o) => o.layers.set(inside ? SHADOW_LAYER : 0));
+  }
+
   simplifyForCockpit(): void {
     const tint = new THREE.MeshBasicMaterial({ color: 0x8090a0, transparent: true, opacity: 0.1, depthWrite: false });
     this.object.traverse((o) => {

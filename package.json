@@ -19,6 +19,7 @@
     "setup:tools": "bash tools/asset-pipeline/setup-tools.sh",
     "app:web": "pnpm --filter @apex/shared build && pnpm --filter @apex/client build:app",
     "app:android": "bash apps/mobile/scripts/build-android.sh",
+    "app:android:beta": "APEX_BETA=1 bash apps/mobile/scripts/build-android.sh",
     "setup:android": "bash tools/mobile/setup-android.sh"
   },
   "devDependencies": {

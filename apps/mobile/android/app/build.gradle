@@ -8,6 +8,8 @@ if (keyPropsFile.exists()) keyPropsFile.withInputStream { keyProps.load(it) }
 // versionCode / versionName: set by scripts/build-android.sh (APEX_VERSION_CODE, APEX_VERSION_NAME)
 def apexVersionCode = (System.getenv('APEX_VERSION_CODE') ?: '1').toInteger()
 def apexVersionName = System.getenv('APEX_VERSION_NAME') ?: '1.0'
+// APEX_BETA=1 (pnpm app:android:beta): a separate "APEX GHOST Beta" app that installs next to the stable one
+def apexBeta = System.getenv('APEX_BETA') == '1'
 
 android {
     namespace = "app.apexghost.racing"
@@ -18,6 +20,9 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode apexVersionCode
         versionName apexVersionName
+        if (apexBeta) applicationIdSuffix ".beta"
+        resValue "string", "app_name", apexBeta ? "APEX GHOST Beta" : "APEX GHOST"
+        resValue "string", "title_activity_main", apexBeta ? "APEX GHOST Beta" : "APEX GHOST"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

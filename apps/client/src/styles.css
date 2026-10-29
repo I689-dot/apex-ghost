@@ -472,12 +472,90 @@ select:focus {
 }
 
 /* ---------------------------------------------------------------- loading */
+/* Everything that moves here is a CSS transform/opacity animation: the browser runs those off the main thread, so
+   the screen stays alive while the game builds the world (seconds on a phone). */
 .loading {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle at 30% 20%, #1b1e25 0%, var(--bg) 70%);
+  /* the circuit photo (the backdrop, drifting) shows through */
+  background: radial-gradient(ellipse at 50% 45%, rgba(13, 14, 17, 0.55) 0%, rgba(13, 14, 17, 0.9) 78%);
+}
+.loading.curtain {
+  z-index: 50;
+  transition: opacity 0.6s ease;
+}
+.loading.curtain.out {
+  opacity: 0;
+  pointer-events: none;
+}
+.backdrop.kenburns {
+  animation: apx-kenburns 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes apx-kenburns {
+  from {
+    transform: scale(1.04) translate(0, 0);
+  }
+  to {
+    transform: scale(1.2) translate(-3%, 2%);
+  }
+}
+.load-logo {
+  animation: apx-pulse 1.6s ease-in-out infinite alternate;
+  transform-origin: left center;
+}
+@keyframes apx-pulse {
+  from {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+.load-steps {
+  display: flex;
+  gap: 4px;
+  margin-top: 0.7rem;
+}
+.load-steps i {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.load-steps i.done {
+  background: var(--accent);
+}
+.load-steps i.on {
+  background: #fff;
+  animation: apx-blink 0.8s ease-in-out infinite alternate;
+}
+@keyframes apx-blink {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.load-tip {
+  margin-top: 0.8rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--muted);
+}
+.load-tip.in {
+  animation: apx-tip 0.5s ease;
+}
+@keyframes apx-tip {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 .load-card {
   width: min(620px, 90vw);
@@ -514,10 +592,28 @@ select:focus {
   font-size: 1.15rem;
 }
 .bar {
+  position: relative;
   height: 4px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   overflow: hidden;
+}
+/* a light sweeping along the bar: it keeps running when the percentage can't move */
+.loading .bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: apx-sweep 1.4s linear infinite;
+}
+@keyframes apx-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
 }
 .bar-fill {
   height: 100%;
