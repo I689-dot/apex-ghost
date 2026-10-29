@@ -150,7 +150,7 @@
     "weightFront": 0.48,
     "comHeightM": 0.42,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
     "dragArea": 0.96,
     "downforceArea": 3.01,
@@ -179,14 +179,14 @@
    "year": 2021,
    "category": "Safety Car",
    "color": "#0b5d3b",
-   "thumbnail": "assets/cars/aston_martin_vantage_safety_car/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/aston_martin_vantage_safety_car/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/aston_martin_vantage_safety_car/lod0.glb?v=mvpl42xy",
-    "assets/cars/aston_martin_vantage_safety_car/lod1.glb?v=mvpl42xy",
-    "assets/cars/aston_martin_vantage_safety_car/lod2.glb?v=mvpl42xy"
+    "assets/cars/aston_martin_vantage_safety_car/lod0.glb?v=mvtz9wm0",
+    "assets/cars/aston_martin_vantage_safety_car/lod1.glb?v=mvtz9wm0",
+    "assets/cars/aston_martin_vantage_safety_car/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 3355916,
-   "cockpit": "assets/cars/aston_martin_vantage_safety_car/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/aston_martin_vantage_safety_car/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 2923412,
    "dims": {
     "length": 4.548,
@@ -302,7 +302,7 @@
     "weightFront": 0.49,
     "comHeightM": 0.42,
     "tyreGrip": 1.5,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
     "dragArea": 0.4,
     "downforceArea": 0.5,
@@ -466,7 +466,7 @@
     "weightFront": 0.42,
     "comHeightM": 0.39,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8000,
+    "brakeTorqueNm": 12400,
     "brakeBiasFront": 0.6,
     "dragArea": 1.04,
     "downforceArea": 3.09,
@@ -637,7 +637,7 @@
     "weightFront": 0.5,
     "comHeightM": 0.45,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8600,
+    "brakeTorqueNm": 13300,
     "brakeBiasFront": 0.62,
     "dragArea": 1.11,
     "downforceArea": 2.92,
@@ -655,7 +655,7 @@
    "info": {
     "engine": "3.0 L twin-turbo straight-six (P58)",
     "gearbox": "6-speed Xtrac sequential",
-    "team": "BMW M Motorsport · Nürburgring 24h 2024 (SPX class)"
+    "team": "BMW M Motorsport \u00b7 N\u00fcrburgring 24h 2024 (SPX class)"
    },
    "role": null
   },
@@ -666,14 +666,14 @@
    "year": 2022,
    "category": "GT3",
    "color": "#0a0a0a",
-   "thumbnail": "assets/cars/bmw_m4_gt3_vecarz/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/bmw_m4_gt3_vecarz/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/bmw_m4_gt3_vecarz/lod0.glb?v=mvpl42xy",
-    "assets/cars/bmw_m4_gt3_vecarz/lod1.glb?v=mvpl42xy",
-    "assets/cars/bmw_m4_gt3_vecarz/lod2.glb?v=mvpl42xy"
+    "assets/cars/bmw_m4_gt3_vecarz/lod0.glb?v=mvtz9wm0",
+    "assets/cars/bmw_m4_gt3_vecarz/lod1.glb?v=mvtz9wm0",
+    "assets/cars/bmw_m4_gt3_vecarz/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 4634896,
-   "cockpit": "assets/cars/bmw_m4_gt3_vecarz/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/bmw_m4_gt3_vecarz/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 7359016,
    "dims": {
     "length": 5.155,
@@ -822,9 +822,9 @@
     "weightFront": 0.5,
     "comHeightM": 0.43,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8600,
+    "brakeTorqueNm": 13300,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.06,
+    "dragArea": 1.05,
     "downforceArea": 3.01,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
@@ -994,9 +994,9 @@
     "weightFront": 0.5,
     "comHeightM": 0.43,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8600,
+    "brakeTorqueNm": 13300,
     "brakeBiasFront": 0.62,
-    "dragArea": 1.06,
+    "dragArea": 1.05,
     "downforceArea": 3.01,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
@@ -1023,14 +1023,14 @@
    "year": 2026,
    "category": "GT3 Evo",
    "color": "#1e5bd6",
-   "thumbnail": "assets/cars/bmw_m4_gt3_evo_2026/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/bmw_m4_gt3_evo_2026/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/bmw_m4_gt3_evo_2026/lod0.glb?v=mvpl42xy",
-    "assets/cars/bmw_m4_gt3_evo_2026/lod1.glb?v=mvpl42xy",
-    "assets/cars/bmw_m4_gt3_evo_2026/lod2.glb?v=mvpl42xy"
+    "assets/cars/bmw_m4_gt3_evo_2026/lod0.glb?v=mvtz9wm0",
+    "assets/cars/bmw_m4_gt3_evo_2026/lod1.glb?v=mvtz9wm0",
+    "assets/cars/bmw_m4_gt3_evo_2026/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 6551308,
-   "cockpit": "assets/cars/bmw_m4_gt3_evo_2026/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/bmw_m4_gt3_evo_2026/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 8781564,
    "dims": {
     "length": 5.317,
@@ -1172,7 +1172,7 @@
     "weightFront": 0.5,
     "comHeightM": 0.43,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8600,
+    "brakeTorqueNm": 13300,
     "brakeBiasFront": 0.62,
     "dragArea": 1.05,
     "downforceArea": 3.01,
@@ -1201,14 +1201,14 @@
    "year": 2024,
    "category": "GT3",
    "color": "#f5a800",
-   "thumbnail": "assets/cars/corvette_z06_gt3r/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/corvette_z06_gt3r/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/corvette_z06_gt3r/lod0.glb?v=mvpl42xy",
-    "assets/cars/corvette_z06_gt3r/lod1.glb?v=mvpl42xy",
-    "assets/cars/corvette_z06_gt3r/lod2.glb?v=mvpl42xy"
+    "assets/cars/corvette_z06_gt3r/lod0.glb?v=mvtz9wm0",
+    "assets/cars/corvette_z06_gt3r/lod1.glb?v=mvtz9wm0",
+    "assets/cars/corvette_z06_gt3r/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 3333572,
-   "cockpit": "assets/cars/corvette_z06_gt3r/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/corvette_z06_gt3r/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 3018572,
    "dims": {
     "length": 4.805,
@@ -1348,7 +1348,7 @@
     "weightFront": 0.42,
     "comHeightM": 0.4,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
     "dragArea": 0.96,
     "downforceArea": 3.19,
@@ -1523,7 +1523,7 @@
     "weightFront": 0.41,
     "comHeightM": 0.39,
     "tyreGrip": 1.68,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
     "dragArea": 1.06,
     "downforceArea": 2.9,
@@ -1541,7 +1541,7 @@
     "tyreHeatScale": 1.09
    },
    "info": {
-    "engine": "3.0 L twin-turbo 120° V6, 700 cv",
+    "engine": "3.0 L twin-turbo 120\u00b0 V6, 700 cv",
     "gearbox": "7-speed F1 dual-clutch",
     "team": "Ferrari Challenge (one-make series)"
    },
@@ -1554,14 +1554,14 @@
    "year": 2024,
    "category": "GT3",
    "color": "#1c2f6b",
-   "thumbnail": "assets/cars/ferrari_296_gt3_verstappen/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/ferrari_296_gt3_verstappen/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/ferrari_296_gt3_verstappen/lod0.glb?v=mvpl42xy",
-    "assets/cars/ferrari_296_gt3_verstappen/lod1.glb?v=mvpl42xy",
-    "assets/cars/ferrari_296_gt3_verstappen/lod2.glb?v=mvpl42xy"
+    "assets/cars/ferrari_296_gt3_verstappen/lod0.glb?v=mvtz9wm0",
+    "assets/cars/ferrari_296_gt3_verstappen/lod1.glb?v=mvtz9wm0",
+    "assets/cars/ferrari_296_gt3_verstappen/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 7245884,
-   "cockpit": "assets/cars/ferrari_296_gt3_verstappen/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/ferrari_296_gt3_verstappen/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 11115068,
    "dims": {
     "length": 4.873,
@@ -1702,9 +1702,9 @@
     "weightFront": 0.42,
     "comHeightM": 0.39,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
-    "dragArea": 0.97,
+    "dragArea": 0.96,
     "downforceArea": 3.13,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
@@ -1718,7 +1718,7 @@
     "aspiration": "turbo"
    },
    "info": {
-    "engine": "3.0 L twin-turbo 120° V6",
+    "engine": "3.0 L twin-turbo 120\u00b0 V6",
     "gearbox": "6-speed sequential",
     "team": "Verstappen.com Racing (GT World Challenge Europe)"
    },
@@ -1731,14 +1731,14 @@
    "year": 2024,
    "category": "GT3",
    "color": "#2b5fb3",
-   "thumbnail": "assets/cars/ford_mustang_gt3/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/ford_mustang_gt3/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/ford_mustang_gt3/lod0.glb?v=mvpl42xy",
-    "assets/cars/ford_mustang_gt3/lod1.glb?v=mvpl42xy",
-    "assets/cars/ford_mustang_gt3/lod2.glb?v=mvpl42xy"
+    "assets/cars/ford_mustang_gt3/lod0.glb?v=mvtz9wm0",
+    "assets/cars/ford_mustang_gt3/lod1.glb?v=mvtz9wm0",
+    "assets/cars/ford_mustang_gt3/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 7653724,
-   "cockpit": "assets/cars/ford_mustang_gt3/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/ford_mustang_gt3/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 11608820,
    "dims": {
     "length": 5.225,
@@ -1879,7 +1879,7 @@
     "weightFront": 0.49,
     "comHeightM": 0.42,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
     "dragArea": 0.97,
     "downforceArea": 3.01,
@@ -1903,7 +1903,7 @@
   },
   {
    "id": "lamborghini_huracan_gt3_evo",
-   "name": "Lamborghini Huracán GT3 EVO",
+   "name": "Lamborghini Hurac\u00e1n GT3 EVO",
    "manufacturer": "Lamborghini",
    "year": 2019,
    "category": "GT3 Evo",
@@ -2038,9 +2038,9 @@
     "weightFront": 0.42,
     "comHeightM": 0.39,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8000,
+    "brakeTorqueNm": 12400,
     "brakeBiasFront": 0.6,
-    "dragArea": 1.11,
+    "dragArea": 1.1,
     "downforceArea": 3.09,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
@@ -2062,7 +2062,7 @@
   },
   {
    "id": "2023_lamborghini_huracan_gt3_evo2",
-   "name": "Lamborghini Huracán GT3 EVO2",
+   "name": "Lamborghini Hurac\u00e1n GT3 EVO2",
    "manufacturer": "Lamborghini",
    "year": 2023,
    "category": "GT3 Evo",
@@ -2209,7 +2209,7 @@
     "weightFront": 0.42,
     "comHeightM": 0.39,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8000,
+    "brakeTorqueNm": 12400,
     "brakeBiasFront": 0.6,
     "dragArea": 1.04,
     "downforceArea": 3.09,
@@ -2233,7 +2233,7 @@
   },
   {
    "id": "lamborghini_huracan_gt3_evo2",
-   "name": "Lamborghini Huracán GT3 EVO2 (Iron Lynx)",
+   "name": "Lamborghini Hurac\u00e1n GT3 EVO2 (Iron Lynx)",
    "manufacturer": "Lamborghini",
    "year": 2023,
    "category": "GT3 Evo",
@@ -2364,7 +2364,7 @@
     "weightFront": 0.42,
     "comHeightM": 0.39,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8000,
+    "brakeTorqueNm": 12400,
     "brakeBiasFront": 0.6,
     "dragArea": 0.99,
     "downforceArea": 3.09,
@@ -2393,14 +2393,14 @@
    "year": 2026,
    "category": "GT3",
    "color": "#8fd14f",
-   "thumbnail": "assets/cars/lamborghini_temerario_gt3/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/lamborghini_temerario_gt3/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/lamborghini_temerario_gt3/lod0.glb?v=mvpl42xy",
-    "assets/cars/lamborghini_temerario_gt3/lod1.glb?v=mvpl42xy",
-    "assets/cars/lamborghini_temerario_gt3/lod2.glb?v=mvpl42xy"
+    "assets/cars/lamborghini_temerario_gt3/lod0.glb?v=mvtz9wm0",
+    "assets/cars/lamborghini_temerario_gt3/lod1.glb?v=mvtz9wm0",
+    "assets/cars/lamborghini_temerario_gt3/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 4923068,
-   "cockpit": "assets/cars/lamborghini_temerario_gt3/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/lamborghini_temerario_gt3/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 6973932,
    "dims": {
     "length": 5.017,
@@ -2532,9 +2532,9 @@
     "weightFront": 0.42,
     "comHeightM": 0.4,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
-    "dragArea": 0.96,
+    "dragArea": 0.95,
     "downforceArea": 3.19,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
@@ -2561,14 +2561,14 @@
    "year": 2018,
    "category": "GT3",
    "color": "#e6e6e6",
-   "thumbnail": "assets/cars/lexus_rc_f_gt3/thumb.webp?v=mvpl42xy",
+   "thumbnail": "assets/cars/lexus_rc_f_gt3/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/lexus_rc_f_gt3/lod0.glb?v=mvpl42xy",
-    "assets/cars/lexus_rc_f_gt3/lod1.glb?v=mvpl42xy",
-    "assets/cars/lexus_rc_f_gt3/lod2.glb?v=mvpl42xy"
+    "assets/cars/lexus_rc_f_gt3/lod0.glb?v=mvtz9wm0",
+    "assets/cars/lexus_rc_f_gt3/lod1.glb?v=mvtz9wm0",
+    "assets/cars/lexus_rc_f_gt3/lod2.glb?v=mvtz9wm0"
    ],
    "bytes": 5859428,
-   "cockpit": "assets/cars/lexus_rc_f_gt3/cockpit.glb?v=mvpl42xy",
+   "cockpit": "assets/cars/lexus_rc_f_gt3/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 6029296,
    "dims": {
     "length": 4.998,
@@ -2703,9 +2703,9 @@
     "weightFront": 0.5,
     "comHeightM": 0.42,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
-    "dragArea": 0.81,
+    "dragArea": 0.8,
     "downforceArea": 3.01,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
@@ -2864,7 +2864,7 @@
     "weightFront": 0.43,
     "comHeightM": 0.4,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
     "dragArea": 0.7,
     "downforceArea": 2.92,
@@ -3047,7 +3047,7 @@
     "weightFront": 0.43,
     "comHeightM": 0.4,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
     "dragArea": 0.89,
     "downforceArea": 3.19,
@@ -3215,9 +3215,9 @@
     "weightFront": 0.43,
     "comHeightM": 0.4,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
-    "dragArea": 0.93,
+    "dragArea": 0.92,
     "downforceArea": 3.28,
     "aeroBalanceFront": 0.42,
     "diffLock": 0.45,
@@ -3373,7 +3373,7 @@
     "weightFront": 0.43,
     "comHeightM": 0.4,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8200,
+    "brakeTorqueNm": 12700,
     "brakeBiasFront": 0.6,
     "dragArea": 0.98,
     "downforceArea": 3.28,
@@ -3545,9 +3545,9 @@
     "weightFront": 0.49,
     "comHeightM": 0.42,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
-    "dragArea": 0.96,
+    "dragArea": 0.95,
     "downforceArea": 2.82,
     "aeroBalanceFront": 0.44,
     "diffLock": 0.5,
@@ -3709,7 +3709,7 @@
     "weightFront": 0.49,
     "comHeightM": 0.42,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
     "dragArea": 0.95,
     "downforceArea": 3.01,
@@ -3879,7 +3879,7 @@
     "weightFront": 0.49,
     "comHeightM": 0.42,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8400,
+    "brakeTorqueNm": 13000,
     "brakeBiasFront": 0.62,
     "dragArea": 0.95,
     "downforceArea": 3.13,
@@ -4054,7 +4054,7 @@
     "weightFront": 0.42,
     "comHeightM": 0.4,
     "tyreGrip": 1.72,
-    "brakeTorqueNm": 9200,
+    "brakeTorqueNm": 14300,
     "brakeBiasFront": 0.6,
     "dragArea": 1.04,
     "downforceArea": 2.6,
@@ -4074,7 +4074,7 @@
    "info": {
     "engine": "1.6 L V6 turbo (F1-derived) + 4 electric motors, 1,063 hp",
     "gearbox": "7-speed automated manual",
-    "team": "Road-legal hypercar · Nordschleife record 6:29.090 (2024)"
+    "team": "Road-legal hypercar \u00b7 Nordschleife record 6:29.090 (2024)"
    },
    "role": null
   },
@@ -4230,9 +4230,9 @@
     "weightFront": 0.39,
     "comHeightM": 0.38,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8000,
+    "brakeTorqueNm": 12400,
     "brakeBiasFront": 0.62,
-    "dragArea": 0.99,
+    "dragArea": 0.98,
     "downforceArea": 3.13,
     "aeroBalanceFront": 0.4,
     "diffLock": 0.4,
@@ -4404,9 +4404,9 @@
     "weightFront": 0.39,
     "comHeightM": 0.38,
     "tyreGrip": 1.95,
-    "brakeTorqueNm": 8000,
+    "brakeTorqueNm": 12400,
     "brakeBiasFront": 0.62,
-    "dragArea": 0.99,
+    "dragArea": 0.98,
     "downforceArea": 3.13,
     "aeroBalanceFront": 0.4,
     "diffLock": 0.4,
@@ -4423,6 +4423,176 @@
     "engine": "4.2 L flat-six, naturally aspirated",
     "gearbox": "6-speed sequential",
     "team": "Porsche Motorsport customer racing"
+   },
+   "role": null
+  },
+  {
+   "id": "porsche_911_gt3_r_rennsport",
+   "name": "Porsche 911 GT3 R Rennsport",
+   "manufacturer": "Porsche",
+   "year": 2023,
+   "category": "GT3 Unrestricted",
+   "color": "#86b5df",
+   "thumbnail": "assets/cars/porsche_911_gt3_r_rennsport/thumb.webp?v=mvtz9wm0",
+   "lods": [
+    "assets/cars/porsche_911_gt3_r_rennsport/lod0.glb?v=mvtz9wm0",
+    "assets/cars/porsche_911_gt3_r_rennsport/lod1.glb?v=mvtz9wm0",
+    "assets/cars/porsche_911_gt3_r_rennsport/lod2.glb?v=mvtz9wm0"
+   ],
+   "bytes": 6709880,
+   "cockpit": "assets/cars/porsche_911_gt3_r_rennsport/cockpit.glb?v=mvtz9wm0",
+   "cockpitBytes": 6677128,
+   "dims": {
+    "length": 4.754,
+    "width": 2.036,
+    "height": 1.164
+   },
+   "wheels": {
+    "FL": {
+     "position": [
+      0.8137,
+      0.3443,
+      1.247
+     ],
+     "radius": 0.3441,
+     "width": 0.3341
+    },
+    "FR": {
+     "position": [
+      -0.8137,
+      0.3447,
+      1.247
+     ],
+     "radius": 0.344,
+     "width": 0.3341
+    },
+    "RL": {
+     "position": [
+      0.802,
+      0.3461,
+      -1.247
+     ],
+     "radius": 0.3459,
+     "width": 0.3481
+    },
+    "RR": {
+     "position": [
+      -0.802,
+      0.3461,
+      -1.247
+     ],
+     "radius": 0.3461,
+     "width": 0.3481
+    }
+   },
+   "wheelbase": 2.4941,
+   "trackFront": 1.6273,
+   "trackRear": 1.604,
+   "steering": {
+    "position": [
+     0.297,
+     0.7009,
+     0.1851
+    ],
+    "axis": [
+     0.0026,
+     0.3137,
+     -0.9495
+    ],
+    "diameter": 0.307
+   },
+   "cockpitCamera": {
+    "position": [
+     0.2183,
+     0.9777,
+     -0.1897
+    ],
+    "driverSide": "left"
+   },
+   "hasInterior": true,
+   "lights": {
+    "head": [
+     "LIGHT_HEAD_MI_Carbon_Fiber_Lights",
+     "LIGHT_HEAD_MI_Porsche_992_GT3_R_Rennsport_Lights",
+     "LIGHT_HEAD_MI_Porsche_992_GT3_R_Rennsport_Lights_Glass"
+    ],
+    "tail": [
+     "LIGHT_TAIL_MI_Porsche_992_GT3_R_Rennsport_Lights",
+     "LIGHT_TAIL_MI_Porsche_992_GT3_R_Rennsport_Lights_Glass"
+    ]
+   },
+   "genericWheels": [],
+   "specs": {
+    "massKg": 1335,
+    "powerKw": 469,
+    "idleRpm": 1300,
+    "redlineRpm": 9400,
+    "limiterRpm": 9600,
+    "torqueCurve": [
+     [
+      1000,
+      265
+     ],
+     [
+      3000,
+      460
+     ],
+     [
+      5000,
+      535
+     ],
+     [
+      6500,
+      580
+     ],
+     [
+      8000,
+      560
+     ],
+     [
+      9400,
+      463
+     ],
+     [
+      9700,
+      260
+     ]
+    ],
+    "gears": [
+     3.4,
+     2.5,
+     1.98,
+     1.62,
+     1.36,
+     1.15
+    ],
+    "reverseRatio": 3.3,
+    "finalDrive": 3.45,
+    "shiftTimeMs": 50,
+    "drivetrain": "RWD",
+    "frontTorqueSplit": 0,
+    "weightFront": 0.39,
+    "comHeightM": 0.38,
+    "tyreGrip": 1.95,
+    "brakeTorqueNm": 12400,
+    "brakeBiasFront": 0.62,
+    "dragArea": 0.93,
+    "downforceArea": 3.6,
+    "aeroBalanceFront": 0.41,
+    "diffLock": 0.4,
+    "maxSteerDeg": 24,
+    "springRateFront": 125000,
+    "springRateRear": 160000,
+    "antiRollFront": 42000,
+    "antiRollRear": 26000,
+    "suspTravelM": 0.14,
+    "topSpeedKmh": 300,
+    "aspiration": "na"
+   },
+   "info": {
+    "engine": "4.2 L flat-six, naturally aspirated, 620 PS",
+    "gearbox": "6-speed sequential",
+    "team": "Porsche Motorsport (limited edition, track only)"
    },
    "role": null
   }

@@ -274,3 +274,59 @@ describe('rules messages', () => {
     expect(parseClientMsg(JSON.stringify({ t: 'pit', in: true, id: 5 }))).toBeNull();
   });
 });
+
+describe('timed race (GT3 style)', () => {
+  /** Cars driving at the same time at their own speeds (m/s), from just behind the line, a sample every 50 ms. */
+  function run(tr: RaceTracker, speeds: Record<string, number>, untilMs: number, ev: RaceEvent[]): void {
+    const s: Record<string, number> = {};
+    for (const id of Object.keys(speeds)) s[id] = -10;
+    for (let t = 0; t <= untilMs; t += 50)
+      for (const [id, v] of Object.entries(speeds)) {
+        const [x, y, z] = ovalPos(R, s[id]);
+        tr.ingest(id, t, x, y, z, false, ev);
+        s[id] += v * 0.05;
+      }
+  }
+
+  it('flags the leader on the first crossing after the time is up; the others finish the lap they are on', () => {
+    const tr = new RaceTracker(track, 0, { raceMs: 110_000 });
+    tr.addPlayer('fast');
+    tr.addPlayer('slow');
+    const ev: RaceEvent[] = [];
+    // laps of 25.1 s and 27.9 s: the slow car crosses at 111.9 s, after the time is up but not leading, so it goes
+    // on; the leader crosses at 125.9 s and gets the flag; the slow car's next crossing (139.8 s) ends its race
+    run(tr, { fast: 50, slow: 45 }, 200_000, ev);
+    const fast = tr.players.get('fast');
+    const slow = tr.players.get('slow');
+    expect(fast?.finishedMs).toBeGreaterThan(125_000);
+    expect(fast?.finishedMs).toBeLessThan(127_000);
+    expect(fast?.laps).toBe(5);
+    expect(slow?.laps).toBe(5);
+    expect(slow?.finishedMs).toBeGreaterThan(139_000);
+    expect(tr.standings().map((x) => x.id)).toEqual(['fast', 'slow']);
+  });
+
+  it('counts the mandatory stop only when the pit entry is crossed inside the window (25–35 min of 60)', () => {
+    const tr = new RaceTracker(track, 0, { raceMs: 12 * 60_000, pitWindow: true });
+    expect(tr.pitWindowMs).toEqual({ open: 300_000, close: 420_000 });
+    tr.addPlayer('early');
+    tr.addPlayer('inside');
+    const ev: RaceEvent[] = [];
+    for (const [id, pitAt] of [
+      ['early', 4],
+      ['inside', 13],
+    ] as const) {
+      // laps of 25 s at 50 m/s: lap 4 starts at ~75 s (too early), lap 13 at ~300 s (in the window)
+      let t = drive(tr, id, 0, -10, (pitAt - 1) * L + 1, 50, 0, ev);
+      t = pitLap(tr, id, t, (pitAt - 1) * L, PIT_WINDOW.minStopMs, ev);
+      expect(tr.players.get(id)?.pitInMs).toBeGreaterThan(0);
+    }
+    expect(ev.filter((e) => e.type === 'served' && e.what === 'stop').map((e) => (e as { playerId: string }).playerId)).toEqual(['inside']);
+  });
+
+  it('is a timed race message the server accepts', () => {
+    expect(parseClientMsg(JSON.stringify({ t: 'setRaceMinutes', minutes: 30 }))).toEqual({ t: 'setRaceMinutes', minutes: 30 });
+    expect(parseClientMsg(JSON.stringify({ t: 'setPractice', minutes: 20 }))).toEqual({ t: 'setPractice', minutes: 20 });
+    expect(parseClientMsg(JSON.stringify({ t: 'setRaceMinutes', minutes: 7 }))).toBeNull();
+  });
+});

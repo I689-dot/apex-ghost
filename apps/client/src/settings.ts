@@ -233,6 +233,15 @@ export function setSession(code: string, token: string | null): void {
 export interface QualityConfig {
   shadowMapSize: number;
   shadows: boolean;
+  /** Rendered at this many times the display's resolution, then scaled down (supersampling: Ultra). */
+  superSample: number;
+  /** Ambient occlusion quality (N8AO's modes) and whether it runs at full resolution. */
+  aoQuality: 'Low' | 'Medium' | 'High' | 'Ultra';
+  aoFullRes: boolean;
+  /** Distances at which cars switch to lighter models, × the base ones (18 m, 80 m). */
+  carLodScale: number;
+  /** A gentle filmic grade over the frame (contrast, saturation, vignette). */
+  grade: boolean;
   shadowRange: number;
   pixelRatioCap: number;
   bloom: boolean;
@@ -264,6 +273,12 @@ export interface QualityConfig {
   /** 3D lawn on the verges (grassShells.ts): layers of blades (0 = flat lawn) within grassShellRadius m. */
   grassShells: number;
   grassShellRadius: number;
+  /** Real blades over the lawn (grassBlades.ts) within this many m (0 = none): blades per tuft, tufts per m² at the
+   * edge, and how wide a strip beside the edge gets them (m). */
+  grassBladeRadius: number;
+  grassBlades: number;
+  grassDensity: number;
+  grassBand: number;
   /** Screen-space ambient occlusion (N8AO): soft contact shadows in the cockpit and around cars. */
   ao: boolean;
   ownHeadlightShadows: boolean;
@@ -284,6 +299,11 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
   low: {
     shadowMapSize: 1024,
     shadows: false,
+    superSample: 1,
+    aoQuality: 'Low',
+    aoFullRes: false,
+    carLodScale: 1,
+    grade: false,
     shadowRange: 60,
     pixelRatioCap: 1,
     bloom: false,
@@ -303,6 +323,10 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cloudDetail: 0,
     grassShells: 0,
     grassShellRadius: 0,
+    grassBladeRadius: 0,
+    grassBlades: 6,
+    grassDensity: 3,
+    grassBand: 8,
     ownHeadlightSpots: false,
     ownHeadlightShadows: false,
     treeShadows: false,
@@ -317,6 +341,11 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
   medium: {
     shadowMapSize: 2048,
     shadows: true,
+    superSample: 1,
+    aoQuality: 'Low',
+    aoFullRes: false,
+    carLodScale: 1,
+    grade: false,
     shadowRange: 60,
     pixelRatioCap: 1,
     bloom: false,
@@ -336,6 +365,10 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cloudDetail: 1,
     grassShells: 6,
     grassShellRadius: 16,
+    grassBladeRadius: 0,
+    grassBlades: 6,
+    grassDensity: 3,
+    grassBand: 8,
     ownHeadlightSpots: false,
     ownHeadlightShadows: false,
     treeShadows: false,
@@ -350,6 +383,11 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
   high: {
     shadowMapSize: 2048,
     shadows: true,
+    superSample: 1,
+    aoQuality: 'Medium',
+    aoFullRes: false,
+    carLodScale: 1.4,
+    grade: true,
     shadowRange: 120,
     pixelRatioCap: 1.5,
     bloom: true,
@@ -369,6 +407,10 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     cloudDetail: 2,
     grassShells: 10,
     grassShellRadius: 24,
+    grassBladeRadius: 36,
+    grassBlades: 12,
+    grassDensity: 7,
+    grassBand: 10,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
@@ -381,8 +423,15 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     forestDensity: 0.7,
   },
   ultra: {
-    shadowMapSize: 4096,
+    shadowMapSize: 8192,
     shadows: true,
+    // measured on the dev machine's Vega 8 (render ms): Ultra before 90; with 1.5× supersampling and full-res High
+    // AO 439 (unplayable even on a strong GPU); 1.25× and Medium AO at half resolution 163
+    superSample: 1.25,
+    aoQuality: 'Medium',
+    aoFullRes: false,
+    carLodScale: 2.5,
+    grade: true,
     shadowRange: 150,
     pixelRatioCap: 2,
     bloom: true,
@@ -401,13 +450,17 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     crowd: 1,
     cloudDetail: 2,
     grassShells: 14,
-    grassShellRadius: 32,
+    grassShellRadius: 44,
+    grassBladeRadius: 80,
+    grassBlades: 18,
+    grassDensity: 12,
+    grassBand: 20,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
     softShadows: true,
     anisotropy: 16,
-    envMapSize: 256,
+    envMapSize: 512,
     forestNear: 150,
     forestFar: 2200,
     forestNearDensity: 1,

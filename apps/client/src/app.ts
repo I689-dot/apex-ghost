@@ -6,6 +6,9 @@ import { FUEL, TYRE_PRESSURE, idealColdPsi } from './physics/vehicle';
 import {
   SESSION_MINUTES,
   RACE_LAP_CHOICES,
+  RACE_MINUTE_CHOICES,
+  PRACTICE_MINUTE_CHOICES,
+  PIT_WINDOW,
   pitWindowLaps,
   type RaceRules,
   TIME_LABEL,
@@ -39,6 +42,8 @@ import { settingsPanel } from './ui/settingsPanel';
 import { getLang, t } from './i18n';
 import { IS_APP } from './mobile/platform';
 import { mobileAppLink } from './mobile/installScreen';
+import * as acc from './net/account';
+import { accountBar, friendsPanel, recordsModal } from './ui/social';
 
 type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 'results';
 
@@ -55,7 +60,15 @@ export class App {
   private session: RaceSession | null = null;
   private pendingRace: RaceSetup | null = null;
   private pendingStartAt: number | null = null;
-  private screen: Screen = 'menu';
+  private screenNow: Screen = 'menu';
+  private get screen(): Screen {
+    return this.screenNow;
+  }
+  /** Every screen change tells signed-in friends where I am (presence). */
+  private set screen(s: Screen) {
+    this.screenNow = s;
+    this.sendPresence();
+  }
   private browsing: string | null = null;
   private lobbyEl: HTMLElement | null = null;
   private overlay: HTMLElement | null = null;
@@ -106,7 +119,7 @@ export class App {
    * Full-screen photo behind the menus (in-engine shots of the circuit, tools/e2e/photos.mjs); null in races.
    * Other maps than the Nürburgring have their own set (photo_<name>_<map>.webp), picked by the session's track.
    */
-  private setBackdrop(name: 'grid' | 'straight' | 'aerial' | 'pole' | null, trackId?: string): void {
+  private setBackdrop(name: 'hero' | 'grid' | 'straight' | 'aerial' | 'pole' | null, trackId?: string): void {
     this.showroom.stop();
     if (!this.backdropEl) {
       this.backdropEl = h('div.backdrop');
@@ -120,6 +133,21 @@ export class App {
     if (name && this.backdropEl.style.backgroundImage !== img) this.backdropEl.style.backgroundImage = img;
   }
 
+  private sendPresence(): void {
+    const s = this.screenNow;
+    const code = this.conn && !isLocalCode(this.conn.code) ? this.conn.code : null;
+    const race = this.session?.race ?? this.pendingRace;
+    if (s === 'menu') acc.setPresence({ state: 'menu', room: null, trackId: null, session: null });
+    else if (s === 'lobby' || s === 'briefing') acc.setPresence({ state: 'lobby', room: code, trackId: this.room?.conditions.trackId ?? null, session: null });
+    else
+      acc.setPresence({
+        state: this.spectating || s === 'watch' ? 'watching' : 'racing',
+        room: code,
+        trackId: race?.trackId ?? null,
+        session: race?.kind ?? null,
+      });
+  }
+
   /* ----------------------------------------------------------------- menu --- */
 
   showMenu(error = ''): void {
@@ -128,14 +156,17 @@ export class App {
     this.setPause(false);
     this.setCountdown('', '');
     this.teardownConnection();
-    this.setBackdrop('grid');
+    this.setBackdrop('hero');
+    // signed in: your nickname is the account's
+    const signedIn = acc.account();
     const nick = h('input', {
       type: 'text',
       maxlength: 16,
       placeholder: t('Your nickname'),
-      value: settings.nickname,
+      value: signedIn?.user.nick ?? settings.nickname,
       autocomplete: 'off',
       spellcheck: 'false',
+      disabled: !!signedIn,
     });
     const code = h('input.code-input', { type: 'text', maxlength: 7, placeholder: t('ROOM CODE'), autocomplete: 'off', spellcheck: 'false' });
     const err = h('div.form-error', { text: error });
@@ -225,6 +256,7 @@ export class App {
     const form = h(
       'div.menu-card',
       {},
+      accountBar(() => this.showMenu()),
       h('label', { text: t('Nickname') }),
       nick,
       h('button.primary', { text: t('Create room'), onclick: () => void create() }),
@@ -255,10 +287,21 @@ export class App {
         ),
         form,
         this.roomList(joinCode, watchIt),
+        signedIn
+          ? friendsPanel(
+              () => this.trackIndex,
+              (c) => void joinCode(c),
+              (c) => void watchIt(c),
+            )
+          : null,
         h(
           'div.menu-foot',
           {},
           h('button.ghost', { text: t('Settings'), onclick: () => this.openSettings() }),
+          h('button.ghost', {
+            text: t('Records'),
+            onclick: () => document.body.append(recordsModal(this.trackIndex, this.cars?.cars ?? [], this.trackIndex.find((x) => x.default)?.id ?? '')),
+          }),
           h('span.muted', { text: t('Keyboard: W/S throttle & brake · A/D steer · Space handbrake · Esc menu') }),
           IS_APP ? null : mobileAppLink(),
         ),
@@ -502,6 +545,14 @@ export class App {
         ),
       ),
       row(
+        t('Practice'),
+        sel(
+          room.practiceMinutes ?? 0,
+          PRACTICE_MINUTE_CHOICES.map((m) => [m, m === 0 ? t('No free practice') : t('{m} min free practice first', { m })] as [number, string]),
+          (v) => this.conn?.sendJson({ t: 'setPractice', minutes: Number(v) }),
+        ),
+      ),
+      row(
         t('Room'),
         edit
           ? h(
@@ -518,10 +569,21 @@ export class App {
       ),
       row(
         t('Race'),
+        // by laps, or by time as GT World Challenge races are (the leader's lap after the time is up is the last)
         sel(
-          room.raceLaps,
-          RACE_LAP_CHOICES.map((n) => [n, n === 0 ? t('Qualifying only') : t('Race: {n} laps', { n })] as [number, string]),
-          (v) => this.conn?.sendJson({ t: 'setRaceLaps', laps: Number(v) }),
+          (room.raceMinutes ?? 0) > 0 ? `T${room.raceMinutes}` : `L${room.raceLaps}`,
+          [
+            ...RACE_LAP_CHOICES.map((n) => [`L${n}`, n === 0 ? t('Qualifying only') : t('Race: {n} laps', { n })] as [string, string]),
+            ...RACE_MINUTE_CHOICES.filter((m) => m > 0).map((m) => [`T${m}`, t('Race: {m} min + 1 lap', { m })] as [string, string]),
+          ],
+          (v) => {
+            const n = Number(v.slice(1));
+            if (v[0] === 'T') this.conn?.sendJson({ t: 'setRaceMinutes', minutes: n });
+            else {
+              this.conn?.sendJson({ t: 'setRaceMinutes', minutes: 0 });
+              this.conn?.sendJson({ t: 'setRaceLaps', laps: n });
+            }
+          },
         ),
       ),
       row(t('Rules'), this.rulesPanel(room, edit)),
@@ -606,7 +668,9 @@ export class App {
   private fuelRow(room: RoomSnapshot, trackM: number): HTMLElement {
     const cs = settings.carSetup;
     const perLap = (trackM / 1000) * FUEL.perKm;
-    const laps = room.raceLaps;
+    // a timed race: the laps that fit in its time at a GT3's pace (~43 m/s average), plus the one after the flag
+    const timed = (room.raceMinutes ?? 0) > 0;
+    const laps = timed ? Math.ceil((room.raceMinutes * 60) / (trackM / 43)) + 1 : room.raceLaps;
     const need = laps > 0 ? Math.min(FUEL.tankL, Math.ceil((laps + 1) * perLap)) : null;
     const out = h('output');
     const show = () =>
@@ -628,7 +692,14 @@ export class App {
         saveSettings(settings);
       },
     });
-    const w = laps > 1 && room.rules?.pitWindow ? pitWindowLaps(laps) : null;
+    const w = laps > 1 && room.rules?.pitWindow && !timed ? pitWindowLaps(laps) : null;
+    const wt =
+      timed && room.rules?.pitWindow
+        ? t('Mandatory stop: into the pit lane between {a} and {b} min.', {
+            a: Math.round(room.raceMinutes * PIT_WINDOW.timedOpenShare),
+            b: Math.round(room.raceMinutes * PIT_WINDOW.timedCloseShare),
+          })
+        : '';
     return h(
       'div.prep-fuel',
       {},
@@ -638,7 +709,8 @@ export class App {
           (need !== null
             ? t('The race needs ~{need} l ({per} l a lap). Less is lighter and faster, but you will have to refuel.', { need, per: perLap.toFixed(1) })
             : t('About {per} l a lap. Less fuel is lighter and faster.', { per: perLap.toFixed(1) })) +
-          (w ? ` ${t('Mandatory stop on laps {a}–{b}.', { a: w.open, b: w.close })}` : ''),
+          (w ? ` ${t('Mandatory stop on laps {a}–{b}.', { a: w.open, b: w.close })}` : '') +
+          (wt ? ` ${wt}` : ''),
       }),
       need !== null
         ? h('button.ghost.small', {
@@ -951,8 +1023,12 @@ export class App {
         : r.phase === 'briefing'
           ? t('Briefing')
           : r.kind === 'race'
-            ? t('Race · {n} laps', { n: r.raceLaps })
-            : t('Qualifying · {m} min', { m: r.sessionMinutes });
+            ? r.raceLaps > 0
+              ? t('Race · {n} laps', { n: r.raceLaps })
+              : t('Race · timed')
+            : r.kind === 'practice'
+              ? t('Free practice')
+              : t('Qualifying · {m} min', { m: r.sessionMinutes });
     const refresh = async () => {
       const rooms = await listPublicRooms();
       if (this.screen !== 'menu') return;
@@ -1357,7 +1433,8 @@ export class App {
       const at = m.raceAt;
       const tick = () => {
         const left = Math.max(0, Math.ceil((at - (this.conn?.serverNow() ?? 0)) / 1000));
-        next.textContent = t('The race starts in {s} s · grid in qualifying order', { s: left });
+        next.textContent =
+          m.kind === 'practice' ? t('Qualifying starts in {s} s', { s: left }) : t('The race starts in {s} s · grid in qualifying order', { s: left });
       };
       tick();
       this.resultsTimer = window.setInterval(() => (this.screen === 'results' ? tick() : clearInterval(this.resultsTimer)), 250);
@@ -1369,7 +1446,7 @@ export class App {
         h(
           'div.results-card',
           {},
-          h('h2', { text: race ? t('Race results') : t('Qualifying results') }),
+          h('h2', { text: race ? t('Race results') : m.kind === 'practice' ? t('Free practice results') : t('Qualifying results') }),
           h(
             'div.podium',
             {},

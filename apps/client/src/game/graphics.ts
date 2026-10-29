@@ -23,6 +23,26 @@ const HdrClampShader = {
     }`,
 };
 import { QUALITY, detectQuality, saveSettings, settings, type QualityConfig } from '../settings';
+
+/**
+ * A light filmic grade after tone mapping (High/Ultra), as a broadcast camera's look: a little more contrast
+ * around mid-grey, a little more saturation, a soft vignette. The straight ACES output read flat and hazy.
+ */
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.07 }, uSaturation: { value: 1.05 }, uVignette: { value: 0.22 } },
+  vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse; uniform float uContrast; uniform float uSaturation; uniform float uVignette; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      vec3 col = (c.rgb - 0.5) * uContrast + 0.5;
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(l), col, uSaturation);
+      vec2 d = vUv - 0.5;
+      col *= 1.0 - uVignette * smoothstep(0.25, 0.75, dot(d, d) * 2.0);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), c.a);
+    }`,
+};
 import { t } from '../i18n';
 
 /** Owns the WebGL renderer and the (cheap) post-processing chain. */
@@ -79,7 +99,9 @@ export class Graphics {
   }
 
   get pixelRatio(): number {
-    return Math.min(window.devicePixelRatio, this.quality.pixelRatioCap) * settings.resolutionScale * this.dynScale;
+    // Ultra supersamples: above the display's own resolution, scaled down by the browser (the cleanest edges there
+    // are, on thin things above all: fences, grass, wires)
+    return Math.min(window.devicePixelRatio, this.quality.pixelRatioCap) * this.quality.superSample * settings.resolutionScale * this.dynScale;
   }
 
   setScene(scene: THREE.Scene, camera: THREE.Camera): void {
@@ -126,9 +148,9 @@ export class Graphics {
       ao.configuration.aoRadius = 1.2; // metres: dashboard details, wheel arches, kerbs
       ao.configuration.distanceFalloff = 1;
       ao.configuration.intensity = 2.2;
-      ao.configuration.halfRes = true;
+      ao.configuration.halfRes = !q.aoFullRes;
       ao.configuration.gammaCorrection = false; // OutputPass converts at the end
-      ao.setQualityMode(settings.quality === 'ultra' ? 'Medium' : 'Low');
+      ao.setQualityMode(q.aoQuality);
       this.renderPass = ao;
     } else this.renderPass = new RenderPass(this.scene, this.camera);
     composer.addPass(this.renderPass);
@@ -143,6 +165,7 @@ export class Graphics {
     // N8AO renders without hardware MSAA: smooth the edges with SMAA (its docs recommend it)
     if (q.ao) composer.addPass(new SMAAPass(size.x, size.y));
     composer.addPass(new OutputPass());
+    if (q.grade) composer.addPass(new ShaderPass(GradeShader));
     composer.setSize(size.x, size.y);
     this.composer = composer;
   }

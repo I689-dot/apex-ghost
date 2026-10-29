@@ -34,7 +34,7 @@ const H = 540;
 const labPath = path.join(out, 'lab.json');
 const lab = existsSync(labPath) ? JSON.parse(readFileSync(labPath, 'utf8')) : {};
 
-const browser = await chromium.launch({ args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'] });
 for (const i of list) {
   const car = cars[i];
   const page = await browser.newPage({ viewport: { width: W, height: H } });

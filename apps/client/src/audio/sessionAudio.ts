@@ -184,12 +184,13 @@ export class SessionAudio {
   }
 
   /** Pit service: air jacks, then the wheel guns if the tyres are changed. */
-  pitService(tyres: boolean): void {
+  /** A moment of the pit stop (pitCrew.stopTimeline): wheel guns, jacks and the fuel coupling, panned to their side
+   * of the car (-1 left … 1 right). */
+  pitEvent(kind: 'jackUp' | 'jackDown' | 'gunOff' | 'gunOn' | 'fuelOn' | 'fuelOff', pan: number): void {
     const a = this.a;
-    a.burst('lowpass', 900, 0.7, 0.25, 0.5);
-    if (!tyres) return;
-    for (let k = 0; k < 4; k++) setTimeout(() => a.wheelGun(k % 2 ? 0.6 : -0.6), 900 + k * 1700);
-    for (let k = 0; k < 4; k++) setTimeout(() => a.wheelGun(k % 2 ? 0.6 : -0.6), 8500 + k * 1500);
+    if (kind === 'gunOff' || kind === 'gunOn') a.wheelGun(pan);
+    else if (kind === 'jackUp' || kind === 'jackDown') a.airJack(kind === 'jackUp', pan);
+    else a.clunk(pan);
   }
 
   impact(severity: number): void {

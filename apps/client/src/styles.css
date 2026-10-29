@@ -1035,6 +1035,73 @@ select:focus {
   grid-template-columns: 1fr 1fr 1.2fr;
   gap: 1.6rem;
 }
+/* tabs: one section at a time */
+.settings-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--line);
+  margin: -0.2rem 0 1.1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.settings-tab {
+  flex: none;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.55rem 0.95rem 0.5rem;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.settings-tab:hover,
+.settings-tab:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+.settings-tab.on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.settings-body {
+  height: min(62vh, 560px);
+  overflow-y: auto;
+  padding-right: 0.4rem;
+}
+/* the rows of a tab in two columns where there is room */
+.settings-body > section {
+  columns: 2 380px;
+  column-gap: 2.4rem;
+}
+.settings-body > section > h3,
+.settings-body > section > p,
+.settings-body > section > .pad-map,
+.settings-body > section > div:not(.set-row) {
+  column-span: all;
+}
+.settings-body > section > h3:not(:first-child) {
+  margin-top: 1.2rem;
+}
+.settings-body .set-row {
+  break-inside: avoid;
+}
+.settings-body > section > h3:first-child:not(.keep) {
+  display: none;
+}
+.preset-note {
+  margin: 0.8rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
 .settings h3 {
   font-family: var(--display);
   text-transform: uppercase;
@@ -1503,6 +1570,9 @@ body.reconnecting::after {
   display: block;
   width: 100%;
   height: auto;
+}
+.cs-car {
+  opacity: 1;
 }
 .cs-body {
   fill: rgba(255, 255, 255, 0.1);
@@ -2620,4 +2690,186 @@ button.pit-tyre.on {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+/* ------------------------------------------------------- accounts & friends --- */
+.account-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: space-between;
+  padding-bottom: 0.7rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.account-bar > span:not(.account-dot) {
+  flex: 1;
+}
+.account-dot,
+.friend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 0 6px var(--good);
+  flex: none;
+}
+.menu-card.friends {
+  max-height: 46vh;
+  display: flex;
+  flex-direction: column;
+}
+.friends-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 0.6rem;
+}
+.friend {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+.friend .friend-dot {
+  background: #5a5f68;
+  box-shadow: none;
+}
+.friend.online .friend-dot {
+  background: var(--good);
+  box-shadow: 0 0 6px var(--good);
+}
+.friend.racing .friend-dot {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+.friend-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.friend-name small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.friend-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+.sign-in {
+  width: min(420px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.sign-in.busy,
+.menu-card.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.sign-in-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.sign-in-actions > button {
+  flex: 1;
+}
+.records {
+  width: min(1100px, 95vw);
+}
+.records-grid {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 1.6rem;
+  max-height: 70vh;
+}
+.records-grid > section {
+  overflow-y: auto;
+}
+.records-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+}
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.records-table th {
+  text-align: left;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+.records-table td {
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+}
+.records-table tr.me td {
+  color: var(--accent-2);
+}
+.records-table tbody tr:first-child td:nth-child(4) {
+  color: #b48cff;
+}
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+.stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0.6rem 0 1rem;
+}
+.stat-tile {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.stat-tile b {
+  font-family: var(--display);
+  font-size: 1.7rem;
+}
+.stat-tile span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.best-laps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.best-laps li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 0.6rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.best-laps small {
+  color: var(--muted);
+  grid-column: 1 / -1;
+}
+@media (max-width: 760px) {
+  .records-grid {
+    grid-template-columns: 1fr;
+  }
 }

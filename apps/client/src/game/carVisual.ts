@@ -4,12 +4,15 @@ import type { CarModel } from './assets';
 
 const WHEELS = ['FL', 'FR', 'RL', 'RR'] as const;
 const LOD_DIST = [0, 18, 80];
+/** The quality preset's car detail distance (QualityConfig.carLodScale): set before the cars are built. */
+export const CAR_LOD = { scale: 1 };
 /** Objects only shadow cameras render (environment.ts enables it on the sun). */
 export const SHADOW_LAYER = 1; // LOD0 is cockpit-grade (100–200k tris): only very close remote cars use it
 
 interface WheelRig {
   hub: THREE.Object3D;
   spin: THREE.Object3D;
+  baseX: number;
   baseY: number;
 }
 
@@ -114,7 +117,7 @@ export class CarVisual {
       this.prepareMaterials(root, matCache);
       const rig = this.rig(root);
       this.levels.push(rig);
-      if (this.lod) this.lod.addLevel(root, LOD_DIST[first + i] ?? 200, 0.02);
+      if (this.lod) this.lod.addLevel(root, (LOD_DIST[first + i] ?? 200) * CAR_LOD.scale, 0.02);
       else this.object.add(root);
       if (i === 0) this.addBody(root);
       if (i === 0) this.insideRoot = root;
@@ -219,7 +222,7 @@ export class CarVisual {
       const children = hub.children.filter((c) => c.name.endsWith('_spin') || c.name.includes('spin'));
       hub.add(spinPivot);
       for (const c of children) spinPivot.attach(c);
-      wheels.push({ hub, spin: spinPivot, baseY: hub.position.y });
+      wheels.push({ hub, spin: spinPivot, baseX: hub.position.x, baseY: hub.position.y });
     }
     let steering: THREE.Object3D | null = null;
     const sw = root.getObjectByName('steering_wheel');
@@ -321,6 +324,8 @@ export class CarVisual {
         w.hub.rotation.y = front ? steer : 0;
         w.spin.rotation.x = front ? rotF : rotR;
         w.hub.position.y = w.baseY + (susp[i] ?? 0);
+        // a pit stop: the wheel off its hub, outwards
+        w.hub.position.x = w.baseX + Math.sign(w.baseX) * this.wheelOut[i];
       }
       if (lvl.steering) {
         // the axis points at the driver, so a positive angle turns the rim counter-clockwise (left)
@@ -328,6 +333,9 @@ export class CarVisual {
       }
     }
   }
+
+  /** How far each wheel is off its hub (m, FL, FR, RL, RR): the pit crew's work (pitCrew.stopPose). */
+  readonly wheelOut = new Float32Array(4);
 
   setLights(brake: boolean, headlights: boolean, night: number): void {
     const tail = brake ? 5 : headlights || night > 0.3 ? 1.1 : 0.12;

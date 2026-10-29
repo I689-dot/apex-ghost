@@ -114,14 +114,14 @@ function gravelDetail(): THREE.DataTexture {
 
 let lawnTex: THREE.Texture | null = null;
 /** Mean colour of the lawn tile: the shader divides by it, so the tile adds texture, not a colour cast. */
-const lawnMean = { value: new THREE.Vector3(0.5, 0.5, 0.5) };
+export const lawnMean = { value: new THREE.Vector3(0.5, 0.5, 0.5) };
 
 /**
  * Mown lawn as seen from a race car: the source grass texture is a 256 px tile that turns to green mush within a few
  * metres, so a real lawn modulates it: assets/vegetation/lawn.jpg, a seamless top-down render of a photogrammetry
  * scan of a mown lawn (tools/asset-pipeline/vegetation.mjs). Flat grey until it has loaded.
  */
-function lawnDetail(): THREE.Texture {
+export function lawnDetail(): THREE.Texture {
   if (lawnTex) return lawnTex;
   const grey = document.createElement('canvas');
   grey.width = grey.height = 4;
@@ -217,6 +217,45 @@ void main() {`,
       );
   };
   m.customProgramCacheKey = () => `macro-${strength}-${hue}-${detail}-${kind}`;
+}
+
+/**
+ * Depth layers of the circuit's flat parts (measured with tools/e2e/decalheight.mjs on the GP: of the paint's
+ * vertices 5 % lie under the asphalt and 39 % within a centimetre of it, of the kerbs 32 % under it and 92 % within a
+ * centimetre; Zandvoort's are lower). Under the road the lines broke into dashes; level with it they flickered with distance. Paint and kerbs
+ * are drawn a little higher (world up, in the shader: the collision, and so the physics, are untouched) and pulled
+ * forwards in depth; adverts are pulled forwards off the barriers they are printed on; grass and terrain pushed
+ * back, under the asphalt they meet.
+ */
+const DECAL_LAYERS: [RegExp, { lift: number; offset: number }][] = [
+  // (Zandvoort's paint is lower still: 28 % under its asphalt, the lowest twentieth 4 cm under)
+  [/^(lines|redline|box_decal|nurb_decal)/i, { lift: 0.035, offset: -2 }],
+  [/^curb/i, { lift: 0.045, offset: -1 }],
+  [/^(adv|spons|logos_wall|dorint_spons|garage_spons|signs|display)/i, { lift: 0, offset: -2 }],
+  [/^(grass|grassbrd|grassblock|astroturf|sandbrd|travert_grass)/i, { lift: 0, offset: 1 }],
+  [/^(top2|terrain_fill|grass_fill)/i, { lift: 0, offset: 2 }],
+];
+
+function applyDecalLayer(sm: THREE.MeshStandardMaterial): void {
+  const layer = DECAL_LAYERS.find(([re]) => re.test(sm.name))?.[1];
+  if (!layer) return;
+  sm.polygonOffset = true;
+  sm.polygonOffsetFactor = layer.offset;
+  sm.polygonOffsetUnits = layer.offset * 4;
+  if (!layer.lift) return;
+  const base = sm.onBeforeCompile;
+  const baseKey = sm.customProgramCacheKey.bind(sm);
+  sm.onBeforeCompile = (sh, r) => {
+    base.call(sm, sh, r);
+    sh.vertexShader = sh.vertexShader.replace(
+      '#include <project_vertex>',
+      `vec4 apxLift = modelMatrix * vec4(transformed, 1.0);
+apxLift.y += ${layer.lift.toFixed(3)};
+vec4 mvPosition = viewMatrix * apxLift;
+gl_Position = projectionMatrix * mvPosition;`,
+    );
+  };
+  sm.customProgramCacheKey = () => `${baseKey()}-lift${layer.lift}`;
 }
 
 const ROAD_MAT_RE = /^(asph|curb|lines|redline|pits|conc_|travert_0|box_decal|pavement)/i;
@@ -398,6 +437,7 @@ export class Track {
           addMacroVariation(sm, 0.22, isGrass || /top2/i.test(sm.name), det, isGrass ? 'grass' : isGravel ? 'gravel' : 'paved');
           if (isGrass && det > 0) t.lawnMaterials.add(sm);
         } else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : 0.22);
+        applyDecalLayer(sm);
       }
       const first = mats[0] as THREE.MeshStandardMaterial | undefined;
       const culled = first && DETAIL_MAT_RE.test(first.name) ? t.details : first && BARRIER_MAT_RE.test(first.name) ? t.barriers : null;

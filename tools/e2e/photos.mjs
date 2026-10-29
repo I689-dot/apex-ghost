@@ -24,8 +24,10 @@ const URL = opt('url', 'http://127.0.0.1:5173');
 const TIME = opt('time', 'morning');
 const TRACK = opt('track', '');
 const MAP = opt('map', '');
+/** The car on pole (by name, as the car cards show it). */
+const CAR = opt('car', 'Rennsport');
 
-const browser = await chromium.launch({ args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 page.on('pageerror', (e) => console.log('pageerror', String(e)));
 await page.addInitScript(() => {
@@ -52,7 +54,14 @@ if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRAC
 await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
 await page.selectOption('.prep .prep-row:nth-of-type(3) select', TIME);
 await page.waitForTimeout(400);
-await page.click('.car-card >> nth=16'); // Porsche 911 GT3 R
+{
+  const names = await page.evaluate(() => [...document.querySelectorAll('.car-card')].map((c) => c.textContent ?? ''));
+  const i = Math.max(
+    0,
+    names.findIndex((n) => n.toLowerCase().includes(CAR.toLowerCase())),
+  );
+  await page.click(`.car-card >> nth=${i}`);
+}
 await page.waitForTimeout(600);
 for (let i = 0; i < 7; i++) {
   await page.click('button.add-bot');
@@ -71,11 +80,12 @@ await page.evaluate(() => ((document.querySelector('.cinematic') ?? document.bod
 await page.waitForTimeout(400);
 const save = async (name) => {
   const png = await page.screenshot();
-  // a little contrast and saturation, like a graded photo (morning haze washes the raw frame out)
+  // the game grades its own frame on High/Ultra (graphics.ts GradeShader): only a touch more here, or the liveries
+  // turn garish (Gulf blue went royal blue, its orange red)
   await sharp(png)
     .resize(1920, 1080)
-    .modulate({ saturation: 1.2, brightness: 0.9 })
-    .linear(1.18, -22)
+    .modulate({ saturation: 1.02, brightness: 0.97 })
+    .linear(1.04, -4)
     .webp({ quality: 82 })
     .toFile(path.join(ui, `photo_${name}${MAP ? `_${MAP}` : ''}.webp`));
   console.log(`  photo_${name}${MAP ? `_${MAP}` : ''}.webp`);
@@ -120,4 +130,7 @@ await shot('grid', 0, [16, -3, 0.9], 3, [0, 0, 0.6], 34);
 await shot('straight', 5, [4, -12, 2.2], 0, [0, 0, 0.8], 46);
 // close three-quarter of the pole car
 await shot('pole', 0, [5.5, 3.5, 1.1], 0, [0, 0, 0.55], 32);
+// the main menu: the chosen car (CAR) on its grid slot, low from the front three-quarter, a long lens
+const mine = await page.evaluate(() => window.__apex.session.race.slots[window.__apex.session.me] ?? 0);
+await shot('hero', mine, [6.2, 3.1, 0.42], mine, [0, 0.3, 0.55], 26);
 await browser.close();

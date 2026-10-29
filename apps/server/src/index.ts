@@ -4,6 +4,8 @@
  *   GET  /api/rooms          → public rooms (the room list before joining), from the DirectoryDO
  *   GET  /api/rooms/:code/ws → WebSocket into the room's Durable Object
  *   GET  /health
+ *   /api/account/register|login|logout|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats
+ *       → accounts.ts (Supabase Postgres, DATABASE_URL secret); presence lives in the DirectoryDO
  * One Durable Object per room (idFromName(code)); WebSocket Hibernation API.
  */
 import { DurableObject } from 'cloudflare:workers';
@@ -11,11 +13,15 @@ import { generateRoomCode, normalizeRoomCode, type RoomSummary, type TrackRaceDa
 import trackRace from '@apex/shared/generated/track-race.json';
 import tracksRace from '@apex/shared/generated/tracks-race.json';
 import carIdList from '@apex/shared/generated/car-ids.json';
-import { RoomCore, type Conn, type PersistedRoom } from './room';
+import { isPresence, type Presence } from '@apex/shared';
+import { RoomCore, type Conn, type PersistedRoom, type RecordEvent } from './room';
+import * as acc from './accounts';
 
 export interface Env {
   ROOMS: DurableObjectNamespace<RoomDO>;
   DIRECTORY: DurableObjectNamespace<DirectoryDO>;
+  /** The accounts database (wrangler secret / .dev.vars); without it accounts are off. */
+  DATABASE_URL?: string;
 }
 
 const TRACK = trackRace as unknown as TrackRaceData;
@@ -26,16 +32,78 @@ const CAR_IDS: ReadonlySet<string> | null = (carIdList as string[]).length ? new
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
 
+const directory = (env: Env) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
+
+/** Accounts, friends, presence and records (accounts.ts). */
+async function accountApi(req: Request, env: Env, ctx: ExecutionContext, path: string): Promise<Response> {
+  const sql = acc.db(env);
+  if (!sql) return json({ error: 'Accounts are not available on this server.' }, 503);
+  try {
+    const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
+    const q = new URL(req.url).searchParams;
+    const presence = async (ids: string[]): Promise<Record<string, Presence>> => {
+      const r = await directory(env).fetch('https://directory/presence-of', { method: 'POST', body: JSON.stringify({ ids }) });
+      return (await r.json()) as Record<string, Presence>;
+    };
+    switch (`${req.method} ${path}`) {
+      case 'POST register':
+        return json(await acc.register(sql, body), 201);
+      case 'POST login':
+        return json(await acc.login(sql, body));
+      case 'POST logout':
+        await acc.logout(sql, req);
+        return json({ ok: true });
+      case 'GET me': {
+        const u = await acc.userOf(sql, req);
+        return u ? json({ user: u }) : json({ error: 'Sign in first.' }, 401);
+      }
+      case 'GET friends':
+        return json({ friends: await acc.friends(sql, req, presence) });
+      case 'POST friends/add':
+        await acc.addFriend(sql, req, body);
+        return json({ ok: true });
+      case 'POST friends/accept':
+        await acc.acceptFriend(sql, req, body);
+        return json({ ok: true });
+      case 'POST friends/remove':
+        await acc.removeFriend(sql, req, body);
+        return json({ ok: true });
+      case 'POST presence': {
+        // a heartbeat: where I am now (kept in memory by the directory, ~90 s)
+        const u = await acc.presenceUser(sql, req);
+        if (!u) return json({ error: 'Sign in first.' }, 401);
+        if (!isPresence(body.presence)) return json({ error: 'Bad presence.' }, 400);
+        await directory(env).fetch('https://directory/presence', { method: 'POST', body: JSON.stringify({ id: u.id, presence: body.presence }) });
+        return json({ ok: true });
+      }
+      case 'GET records':
+        return json({ rows: await acc.records(sql, req, q) });
+      case 'GET stats':
+        return json({ stats: await acc.stats(sql, req, q) });
+      default:
+        return json({ error: 'Not found' }, 404);
+    }
+  } catch (e) {
+    if (e instanceof acc.HttpError) return json({ error: e.message }, e.status);
+    console.error('[accounts]', e);
+    return json({ error: 'Account server error, try again.' }, 500);
+  } finally {
+    ctx.waitUntil(sql.end({ timeout: 2 }));
+  }
+}
+
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (url.pathname === '/health') return json({ ok: true });
+    const am = url.pathname.match(/^\/api\/(?:account\/)?(register|login|logout|me|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/);
+    if (am) return accountApi(req, env, ctx, am[1]);
 
     if (url.pathname === '/api/rooms' && req.method === 'GET') {
       const res = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).fetch('https://directory/list');
@@ -130,7 +198,31 @@ export class RoomDO extends DurableObject<Env> {
       track: TRACK,
       tracks: TRACKS,
       carIds: CAR_IDS,
+      record: (e) => this.record(e),
     });
+  }
+
+  /** Signed-in drivers' laps and results: batched, written to the accounts database after the message. */
+  private records: RecordEvent[] = [];
+  private record(e: RecordEvent): void {
+    this.records.push(e);
+    if (this.records.length > 1) return;
+    this.ctx.waitUntil(
+      (async () => {
+        await Promise.resolve();
+        const batch = this.records;
+        this.records = [];
+        const sql = acc.db(this.env);
+        if (!sql) return;
+        try {
+          await acc.writeRecords(sql, batch);
+        } catch (err) {
+          console.error('[records]', err);
+        } finally {
+          await sql.end({ timeout: 2 });
+        }
+      })(),
+    );
   }
 
   private wrap(ws: WebSocket, cid: string): Conn {
@@ -216,6 +308,9 @@ export class RoomDO extends DurableObject<Env> {
  */
 export class DirectoryDO extends DurableObject<Env> {
   private rooms: Map<string, RoomSummary> | null = null;
+  /** Signed-in players' presence (heartbeats). Also in storage: an idle object is evicted within seconds, and a
+   * map kept only in memory lost everyone's presence between two friends' requests. */
+  private presence = new Map<string, Presence>();
 
   private async load(): Promise<Map<string, RoomSummary>> {
     if (!this.rooms) this.rooms = new Map(Object.entries((await this.ctx.storage.get<Record<string, RoomSummary>>('rooms')) ?? {}));
@@ -233,6 +328,30 @@ export class DirectoryDO extends DurableObject<Env> {
       else rooms.delete(code);
       await this.ctx.storage.put('rooms', Object.fromEntries(rooms));
       return new Response(null, { status: 204 });
+    }
+    if (url.pathname === '/presence' && req.method === 'POST') {
+      const { id, presence } = (await req.json()) as { id: string; presence: Omit<Presence, 'at'> };
+      const p = { ...presence, at: now };
+      this.presence.set(id, p);
+      await this.ctx.storage.put(`p:${id}`, p);
+      return new Response(null, { status: 204 });
+    }
+    if (url.pathname === '/presence-of' && req.method === 'POST') {
+      const { ids } = (await req.json()) as { ids: string[] };
+      const missing = ids.filter((id) => !this.presence.has(id)).slice(0, 128);
+      if (missing.length) for (const [k, v] of await this.ctx.storage.get<Presence>(missing.map((id) => `p:${id}`))) this.presence.set(k.slice(2), v);
+      const out: Record<string, Presence> = {};
+      const stale: string[] = [];
+      for (const id of ids) {
+        const p = this.presence.get(id);
+        if (p && now - p.at < 90_000) out[id] = p;
+        else if (p) {
+          this.presence.delete(id);
+          stale.push(`p:${id}`);
+        }
+      }
+      if (stale.length) await this.ctx.storage.delete(stale);
+      return new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json' } });
     }
     if (url.pathname === '/list') {
       const list = [...rooms.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);

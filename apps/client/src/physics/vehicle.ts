@@ -55,6 +55,24 @@ export const WALL_GROUPS = (0x0004 << 16) | 0xffff;
 export const CAR_GROUPS = (0x0002 << 16) | 0x0005;
 /** Wheel rays only see the track. */
 export const RAY_GROUPS = (0xffff << 16) | 0x0005;
+/** Stand-ins for cars simulated elsewhere (the contact rule; bit 3): they touch only the cars simulated here, never
+ * each other (their owners settle that) or the track. */
+export const PROXY_GROUPS = (0x0008 << 16) | 0x0002;
+
+/**
+ * What one step of car-to-car contact may do to a car. Box against box, a contact on an edge (a car diving under
+ * braking, one riding up a rear wheel) points the push up or down: cars were launched into the air or pressed
+ * through the road. Real cars mostly shove each other sideways and spin: the vertical part and the roll and pitch
+ * it adds are capped, the yaw and the sideways shove are kept (DECISIONS.md, "Contact between cars").
+ */
+export const CAR_CONTACT = {
+  /** Vertical speed a contact may add in one step (m/s). */
+  maxDvy: 0.6,
+  /** Roll / pitch rate a contact may add in one step (rad/s). */
+  maxDwTilt: 0.5,
+  /** Horizontal speed change in one step (m/s): a 30 m/s closing speed shared by two cars is 15. */
+  maxDv: 16,
+};
 /** Standard air (15 °C, sea level): the reference for drag, downforce and engine power. */
 export const RHO = 1.225;
 
@@ -96,6 +114,60 @@ export const TYRE_TEMP = {
    * levels off around 110–120 °C, as a real slick does. */
   hotFadeC: 30,
 };
+
+/**
+ * Chassis details of a real racing car the simple model lacked (DECISIONS.md, "Physics realism pass"):
+ *  - digressive dampers: a race damper's force rises steeply up to a knee (~0.08 m/s shaft speed: body roll and
+ *    pitch, which it holds tight) and gently after it (kerbs and bumps, which it lets the wheel ride over);
+ *  - the tyre's relaxation length (how far it rolls before its side force builds) grows with load, ~0.3 m at
+ *    the static load of a slick (Pacejka, "Tire and Vehicle Dynamics" ch. 7), shorter when lightly loaded;
+ *  - aero platform: a nose diving under braking moves the balance forward (splitter nearer the ground, diffuser
+ *    and wing rising), a squatting car moves it back; in yaw (a slide) the car loses downforce, the rear wing first;
+ *  - camber in roll: double wishbones recover only part of the body's roll, so the outer tyre leans out of its
+ *    best camber as the car rolls, and loses a little grip: stiffer bars and springs keep it working.
+ */
+export const CHASSIS = {
+  damperKnee: 0.08,
+  /** Damping below / above the knee, × the linear coefficient. */
+  damperLow: 1.45,
+  damperHigh: 0.55,
+  relaxM: 0.3,
+  relaxMin: 0.12,
+  relaxMax: 0.55,
+  /** Aero balance shift per mm of pitch (front lower than rear, relative to static), capped. */
+  balancePerMm: 0.0022,
+  balanceMax: 0.06,
+  /** Downforce left in yaw: 1 − yawLoss · β² (β the body slip, rad), at least yawMin; drag × 1 + yawDrag · β². */
+  yawLoss: 10,
+  yawMin: 0.55,
+  yawDrag: 3,
+  /** Rear share of the yaw loss (the wing stalls first): balance moves forward by this × the loss. */
+  yawRear: 0.35,
+  /** Camber the wishbones do not recover (× body roll), and the grip lost per degree² off the best camber. */
+  camberRoll: 0.4,
+  camberGrip: 0.005,
+  /** Body roll (°) at which the outer tyre sits at its best camber (the static camber is set for it). */
+  camberRollRef: 1.2,
+  /** Downforce × 1 + heavePerMm · (mm the car sits lower than static, both axles), within ±heaveMax: pressed down
+   * by its own downforce or a compression it gains a little, lifted over a crest it loses some. */
+  heavePerMm: 0.0015,
+  heaveMax: 0.05,
+  /**
+   * Limited-slip differential (a GT3's plated ramp diff): a preload that always locks a little, then locking that
+   * grows with the torque through it, less on the overrun (coast ramp) than on power: off the throttle the inside
+   * wheel can turn freer, so the car rotates into a corner; on the throttle it locks and drives out. Nm, ×.
+   */
+  diffPreload: 110,
+  diffCoast: 0.55,
+};
+
+/**
+ * Track evolution: rubber laid on the racing line raises grip through a session (a dry, green track gains a few
+ * per cent: here 2 % over the first 20 minutes); rain washes it away. Same clock on every client (session.ts).
+ */
+export function trackRubber(sessionMs: number, wetness: number): number {
+  return 1 + 0.02 * Math.min(1, Math.max(0, sessionMs) / 1_200_000) * (1 - Math.min(1, wetness * 2));
+}
 
 /** Engine power in air of this density, against standard air: a naturally aspirated engine loses it all; a turbo
  * (GT3 boost limits are ratios of the ambient pressure, SRO BoP) or a hybrid about half. */
@@ -255,6 +327,8 @@ export class Wheel {
   wear = 0;
   /** Brake disc temperature (°C): see BRAKE_TEMP. */
   brakeTemp = 60;
+  /** ABS: the share of the pedal's torque this wheel's valve lets through (1 = all). */
+  abs = 1;
   /** Cold pressure (psi) and the tyre temperature it was set at; the hot pressure now (TYRE_PRESSURE). */
   coldPsi = 22.5;
   setC = 32;
@@ -326,6 +400,8 @@ export class Vehicle {
   private motion: MotionState = { vx: 0, vy: 0, r: 0, a: 1.3, b: 1.3, wheelbase: 2.6, maxLockRad: 0.4, alphaPeak: 0.115 };
   /** Grip of the fitted compound for the current water on the track (set from the weather). */
   weatherGrip = 1;
+  /** Rubber on the track (trackRubber, set by the session). */
+  rubber = 1;
   /** Fitted tyre compound. */
   compound: Compound = COMPOUNDS.medium;
   /** Track water 0..1 (for tyre wear). */
@@ -478,6 +554,18 @@ export class Vehicle {
     }
   }
 
+  /** One new tyre (the pit crew fits them one at a time): the compound for the car, this wheel's tread and heat. */
+  fitWheel(i: number, compound: Compound, tempC: number): void {
+    this.compound = compound;
+    const w = this.wheels[i];
+    w.wear = 0;
+    w.temp = tempC;
+    w.setC = tempC;
+    const set = this.setup.pressure;
+    w.coldPsi = set ? set[w.front ? 0 : 1] : idealColdPsi(compound.optimumC, tempC);
+    w.pressure = w.coldPsi;
+  }
+
   /** The garage setup: ride height (spring length and travel to the bump stop) and dampers. Before place(). */
   applySetup(setup: VehicleSetup): void {
     this.setup = setup;
@@ -520,7 +608,7 @@ export class Vehicle {
   }
 
   private applyGroups(): void {
-    const filter = 0x0001 | (this.wallsOn ? 0x0004 : 0) | (this.contactOn ? 0x0002 : 0);
+    const filter = 0x0001 | (this.wallsOn ? 0x0004 : 0) | (this.contactOn ? 0x0002 | 0x0008 : 0);
     this.collider.setCollisionGroups((0x0002 << 16) | filter);
   }
 
@@ -538,6 +626,76 @@ export class Vehicle {
       else r += g;
     }
     return Math.min(f, r) / 2;
+  }
+
+  /* ------------------------------------------------- contact safety --- */
+
+  private pre = { vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0 };
+
+  /** Before the solver step: the velocity the contact limits compare against. */
+  beforeSolve(): void {
+    const v = this.body.linvel();
+    const w = this.body.angvel();
+    const p = this.pre;
+    p.vx = v.x;
+    p.vy = v.y;
+    p.vz = v.z;
+    p.wx = w.x;
+    p.wy = w.y;
+    p.wz = w.z;
+  }
+
+  /** After a solver step in which this car touched another: cap what the contact did (CAR_CONTACT). */
+  limitCarContact(): void {
+    const C = CAR_CONTACT;
+    const p = this.pre;
+    const v = this.body.linvel();
+    const w = this.body.angvel();
+    const clamp = (x: number, m: number) => (x > m ? m : x < -m ? -m : x);
+    let dx = v.x - p.vx;
+    let dz = v.z - p.vz;
+    const dh = Math.hypot(dx, dz);
+    if (dh > C.maxDv) {
+      dx *= C.maxDv / dh;
+      dz *= C.maxDv / dh;
+    }
+    this.body.setLinvel({ x: p.vx + dx, y: p.vy + clamp(v.y - p.vy, C.maxDvy), z: p.vz + dz }, true);
+    // the angular change split along the car's axes: yaw (up) kept, roll (forward) and pitch (left) capped
+    this.basis(this.body.rotation());
+    const ax = w.x - p.wx;
+    const ay = w.y - p.wy;
+    const az = w.z - p.wz;
+    const up = ax * this.ux + ay * this.uy + az * this.uz;
+    const roll = clamp(ax * this.fx + ay * this.fy + az * this.fz, C.maxDwTilt);
+    const pitch = clamp(ax * this.lx + ay * this.ly + az * this.lz, C.maxDwTilt);
+    this.body.setAngvel(
+      {
+        x: p.wx + up * this.ux + roll * this.fx + pitch * this.lx,
+        y: p.wy + up * this.uy + roll * this.fy + pitch * this.ly,
+        z: p.wz + up * this.uz + roll * this.fz + pitch * this.lz,
+      },
+      true,
+    );
+  }
+
+  /**
+   * A car pushed under the road (by another car, or the solver) has nothing under its wheels and falls forever: the
+   * road found within 2 m above its origin (which sits on the ground) puts it back on top, upright, keeping its
+   * heading and horizontal speed. Bridges are far higher than 2 m over the road under them. Returns true if moved.
+   */
+  rescueBelowGround(): boolean {
+    const p = this.body.translation();
+    const h = this.ground.cast(p.x, p.y + 2, p.z, 0, -1, 0, 2.2, this.hit);
+    if (!h || h.surface === 'wall' || h.py < p.y + 0.3 || h.ny < 0.6) return false;
+    const q = this.body.rotation();
+    const yaw = Math.atan2(2 * (q.x * q.z + q.y * q.w), 1 - 2 * (q.x * q.x + q.y * q.y));
+    const v = this.body.linvel();
+    this.body.setTranslation({ x: p.x, y: h.py + 0.05, z: p.z }, true);
+    this.body.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, true);
+    this.body.setLinvel({ x: v.x, y: 0, z: v.z }, true);
+    this.body.setAngvel({ x: 0, y: this.body.angvel().y, z: 0 }, true);
+    for (const w of this.wheels) w.compression = w.prevCompression = w.fz0 / w.k;
+    return true;
   }
 
   place(x: number, y: number, z: number, yaw: number): void {
@@ -757,7 +915,11 @@ export class Vehicle {
         continue;
       }
       const vel = (w.compression - w.prevCompression) / dt;
-      const damp = (vel > 0 ? w.cBump : w.cRebound) * vel * dmg.damperScale(w.key);
+      // digressive: steep to the knee, gentle beyond it (CHASSIS)
+      const av = Math.abs(vel);
+      const C = CHASSIS;
+      const dv = av <= C.damperKnee ? av * C.damperLow : C.damperKnee * C.damperLow + (av - C.damperKnee) * C.damperHigh;
+      const damp = (vel > 0 ? w.cBump : w.cRebound) * Math.sign(vel) * dv * dmg.damperScale(w.key);
       let f = w.k * w.compression + damp;
       const other = this.wheels[i ^ 1];
       const arb = w.front ? arbF : arbR;
@@ -800,10 +962,17 @@ export class Vehicle {
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i];
       let bt = ((brakeTotal * (w.front ? s.brakeBiasFront : 1 - s.brakeBiasFront)) / 2) * brakeTempFactor(w.brakeTemp, s.carbonBrakes);
-      if (this.assists.abs && bt > 0 && w.contact && Math.abs(vF) > 3 && w.slipRatio < -0.13) {
-        bt *= 0.25;
-        tel.absActive = true;
-      }
+      // ABS: each wheel's valve holds its slip near the tyre's peak. It used to drop to a quarter of the torque
+      // whenever slip passed 13 %, so the wheels cycled through the peak and braked ~1.6 g where the tyres held 2+.
+      // Released fast in proportion to the overshoot, reapplied more slowly (a modern Bosch M5 does both in ms).
+      if (this.assists.abs && bt > 0 && w.contact && Math.abs(vF) > 3) {
+        const target = this.tire.p.kappaPeak * 0.95;
+        const over = (-w.slipRatio - target) / target;
+        if (over > 0) w.abs = Math.max(0.1, w.abs - dt * (12 + 80 * over));
+        else w.abs = Math.min(1, w.abs + dt * (4 - 6 * over));
+        if (w.abs < 0.98) tel.absActive = true;
+        bt *= w.abs;
+      } else w.abs = 1;
       if (!w.front) bt += hbTorque;
       if (i === escWheel) bt += escBrake;
       w.brakeTorque = bt;
@@ -816,7 +985,10 @@ export class Vehicle {
     /* ---------------------------------------------------- tyres ------- */
     const SUB = 4;
     const h = dt / SUB;
-    const muBase = s.tyreGrip * this.weatherGrip;
+    const muBase = s.tyreGrip * this.weatherGrip * this.rubber;
+    // body roll per axle (°, + = rolled onto the left wheels), from the spring compressions
+    const rollF = (Math.atan2(this.wheels[0].compression - this.wheels[1].compression, this.car.trackFront || 1.6) * 180) / Math.PI;
+    const rollR = (Math.atan2(this.wheels[2].compression - this.wheels[3].compression, this.car.trackRear || 1.6) * 180) / Math.PI;
     for (const w of this.wheels) {
       // contact frame
       const sinS = Math.sin(w.steer);
@@ -866,13 +1038,21 @@ export class Vehicle {
       const pr = Math.max(0.5, w.pressure / TP.targetPsi);
       const stiff = pr ** TP.stiffExp;
       const flexK = Math.min(1.8, pr ** -TP.flexExp);
-      const mu = muBase * surf.grip * dmg.gripScale(w.key) * tyreTempGrip(w.temp, this.compound.optimumC) * wearGrip(w.wear) * pressureGrip(w.pressure);
+      // camber in roll: the wheel leans with the body by what the wishbones don't recover; the loaded (outer) wheel
+      // is at its best camber at camberRollRef of roll, the static camber being set for that (CHASSIS)
+      const bodyRoll = w.front ? rollF : rollR;
+      const lean = CHASSIS.camberRoll * (w.left ? bodyRoll : -bodyRoll);
+      const off = lean - CHASSIS.camberRoll * CHASSIS.camberRollRef;
+      const camberGrip = 1 - Math.min(0.08, CHASSIS.camberGrip * off * off);
+      const mu =
+        muBase * surf.grip * dmg.gripScale(w.key) * tyreTempGrip(w.temp, this.compound.optimumC) * wearGrip(w.wear) * pressureGrip(w.pressure) * camberGrip;
       const fz = w.fz;
       const R = w.radius;
       const den = Math.max(Math.abs(vx), 2.5);
-      // lateral slip with a short relaxation length (stable at parking speeds)
+      // lateral slip through the tyre's relaxation length, longer under load (stable at parking speeds)
       const alpha = Math.atan2(-vy, Math.max(Math.abs(vx), 2.5));
-      w.alphaRelax += (alpha - w.alphaRelax) * Math.min(1, ((Math.abs(vx) + 2) * dt) / 0.25);
+      const relax = Math.max(CHASSIS.relaxMin, Math.min(CHASSIS.relaxMax, CHASSIS.relaxM * Math.sqrt(Math.max(0, fz) / w.fz0)));
+      w.alphaRelax += (alpha - w.alphaRelax) * Math.min(1, ((Math.abs(vx) + 2) * dt) / relax);
       w.slipAngle = w.alphaRelax;
       // initial slope of the longitudinal curve (N per unit slip ratio)
       const kx = (mu * fz * this.tire.bx * this.tire.cx) / this.tire.p.kappaPeak;
@@ -935,11 +1115,23 @@ export class Vehicle {
 
     /* ---------------------------------------------------- aero -------- */
     // slipstream: the wake of a car ahead lowers drag (and some downforce): set by the session each frame
-    const dragArea = s.dragArea * dmg.dragScale() * this.wake.drag;
+    // in yaw the car loses downforce (the rear wing first) and gains drag (CHASSIS)
+    const beta = Math.abs(vF) > 8 ? Math.atan2(Math.abs(vL), Math.abs(vF)) : 0;
+    const yawKeep = Math.max(CHASSIS.yawMin, 1 - CHASSIS.yawLoss * beta * beta);
+    const dragArea = s.dragArea * dmg.dragScale() * this.wake.drag * (1 + CHASSIS.yawDrag * beta * beta);
     const fd = 0.5 * this.airDensity * dragArea * speed;
     body.addForce({ x: -fd * v.x, y: -fd * v.y, z: -fd * v.z }, true);
-    const df = 0.5 * this.airDensity * s.downforceArea * dmg.downforceScale() * this.wake.downforce * vF * vF;
-    const dfF = df * s.aeroBalanceFront;
+    const W0 = this.wheels;
+    const heaveMm =
+      ((W0[0].compression + W0[1].compression - (2 * W0[0].fz0) / W0[0].k + W0[2].compression + W0[3].compression - (2 * W0[2].fz0) / W0[2].k) / 4) * 1000;
+    const heave = Math.max(1 - CHASSIS.heaveMax, Math.min(1 + CHASSIS.heaveMax, 1 + CHASSIS.heavePerMm * heaveMm));
+    const df = 0.5 * this.airDensity * s.downforceArea * dmg.downforceScale() * this.wake.downforce * vF * vF * yawKeep * heave;
+    // pitch: the nose down (front springs more compressed than static, the rear less) moves the balance forward
+    const W = this.wheels;
+    const pitchMm =
+      (((W[0].compression + W[1].compression) / 2 - W[0].fz0 / W[0].k - ((W[2].compression + W[3].compression) / 2 - W[2].fz0 / W[2].k)) * 1000) | 0;
+    const shift = Math.max(-CHASSIS.balanceMax, Math.min(CHASSIS.balanceMax, pitchMm * CHASSIS.balancePerMm)) + CHASSIS.yawRear * (1 - yawKeep);
+    const dfF = df * Math.max(0.2, Math.min(0.7, s.aeroBalanceFront + shift));
     const dfR = df - dfF;
     const zf = this.car.wheels.FL.position[2];
     const zr = this.car.wheels.RL.position[2];
@@ -968,9 +1160,10 @@ export class Vehicle {
       wa.driveTorque = wb.driveTorque = 0;
       return;
     }
-    const lock = this.specs.diffLock;
+    // preload, then the ramp: the power ramp on drive, the coast ramp (less) on the overrun (CHASSIS)
+    const lock = this.specs.diffLock * (torque >= 0 ? 1 : CHASSIS.diffCoast);
     const d = wa.omega - wb.omega;
-    const limit = lock * Math.max(Math.abs(torque), 250) * 0.5;
+    const limit = CHASSIS.diffPreload + lock * Math.abs(torque) * 0.5;
     const bias = Math.max(-limit, Math.min(limit, d * 90));
     wa.driveTorque = torque / 2 - bias;
     wb.driveTorque = torque / 2 + bias;

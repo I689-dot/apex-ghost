@@ -183,6 +183,17 @@ export class GameAudio {
     if (v > 0.35) this.burst('bandpass', 3800, 1.5, 0.35, 0.25 * v, this.sfxBus, pan);
   }
 
+  /** Air jacks: the hiss of the lance going in and the car rising (up), or the dump valve (down). */
+  airJack(up: boolean, pan = 0): void {
+    this.burst('highpass', up ? 2600 : 1800, 0.6, up ? 0.55 : 0.4, up ? 0.32 : 0.42, this.sfxBus, pan);
+    this.burst('lowpass', 320, 0.9, 0.18, up ? 0.35 : 0.5, this.sfxBus, pan);
+  }
+
+  /** The refuelling rig's coupling: a heavy clunk. */
+  clunk(pan = 0): void {
+    this.burst('lowpass', 650, 1.1, 0.12, 0.6, this.sfxBus, pan);
+  }
+
   /** Pneumatic wheel gun: a fast rattling whirr. */
   wheelGun(pan = 0): void {
     const t = this.ctx.currentTime;

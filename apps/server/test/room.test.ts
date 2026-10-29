@@ -412,6 +412,65 @@ describe('qualifying sessions', () => {
   });
 });
 
+describe('a GT3 weekend: free practice, qualifying, a timed race', () => {
+  it('runs practice, then qualifying, then a race by time with the pit window by time', () => {
+    const { room, join, send, advance } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    send(a.conn, { t: 'setPractice', minutes: 10 });
+    send(a.conn, { t: 'setSession', minutes: 5 });
+    send(a.conn, { t: 'setRaceMinutes', minutes: 30 });
+    expect(room.raceLaps).toBe(0);
+    send(b.conn, { t: 'setRaceMinutes', minutes: 60 }); // not the host
+    expect(room.raceMinutes).toBe(30);
+    for (const [p, car] of [
+      [a, 'car_a'],
+      [b, 'car_b'],
+    ] as const) {
+      send(p.conn, { t: 'selectCar', carId: car });
+      send(p.conn, { t: 'ready', ready: true });
+    }
+    send(a.conn, { t: 'start' });
+    const session = () => {
+      send(a.conn, { t: 'loaded', raceId: room.raceId });
+      send(b.conn, { t: 'loaded', raceId: room.raceId });
+    };
+    // free practice
+    expect(room.race).toMatchObject({ kind: 'practice', sessionMs: 10 * 60_000 });
+    session();
+    advance((room.startAt as number) - 1_000_000 + 10 * 60_000 + 250_000);
+    room.tick();
+    expect(b.conn.last('results')?.kind).toBe('practice');
+    expect(room.phase).toBe('results');
+    // then qualifying, by itself
+    advance(QUALI_TO_RACE_MS + 10);
+    room.tick();
+    expect(room.race).toMatchObject({ kind: 'qualifying', sessionMs: 5 * 60_000 });
+    session();
+    // after the flag both come into the pits: their qualifying is over (no laps here, but they took part)
+    advance((room.startAt as number) - advance(0) + 5 * 60_000 + 1000);
+    room.tick();
+    send(a.conn, { t: 'pit', in: true });
+    send(b.conn, { t: 'pit', in: true });
+    expect(b.conn.last('results')?.kind).toBe('qualifying');
+    // then the race: 30 minutes, by time
+    advance(QUALI_TO_RACE_MS + 10);
+    room.tick();
+    expect(room.race).toMatchObject({ kind: 'race', raceMs: 30 * 60_000 });
+    session();
+    expect(room.tracker?.raceEndAt).toBe((room.startAt as number) + 30 * 60_000);
+  });
+
+  it('laps or minutes: choosing one clears the other', () => {
+    const { room, join, send } = makeRoom();
+    const a = join('Ana');
+    send(a.conn, { t: 'setRaceMinutes', minutes: 20 });
+    expect([room.raceLaps, room.raceMinutes]).toEqual([0, 20]);
+    send(a.conn, { t: 'setRaceLaps', laps: 10 });
+    expect([room.raceLaps, room.raceMinutes]).toEqual([10, 0]);
+  });
+});
+
 describe('session setup', () => {
   it('only the host sets track and weather; players set their tyres; the race uses them', () => {
     const { room, join, send } = makeRoom();
@@ -491,6 +550,49 @@ describe('race rules', () => {
     send(a.conn, { t: 'pit', in: true, id: bot?.id });
     expect(room.tracker?.players.get(bot?.id as string)?.inPit).toBe(true);
     expect(b.conn.last('pit')).toMatchObject({ playerId: bot?.id, in: true });
+  });
+
+  it('contact rule: a bump goes to whoever simulates the car that was hit', () => {
+    const { room, join, send, advance } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    send(a.conn, { t: 'setRules', rules: { contact: true } });
+    for (const [p, car] of [
+      [a, 'car_a'],
+      [b, 'car_b'],
+    ] as const) {
+      send(p.conn, { t: 'selectCar', carId: car });
+      send(p.conn, { t: 'ready', ready: true });
+    }
+    send(a.conn, { t: 'addBot' });
+    const bot = [...room.players.values()].find((p) => p.bot);
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded', raceId: room.raceId });
+    send(b.conn, { t: 'loaded', raceId: room.raceId });
+    advance((room.startAt as number) - 1_000_000 + 1000);
+    room.tick();
+    const c = join('Cai'); // joins during the session: waits for the next one
+    const hit = { ix: 800, iy: 0, iz: -300, ty: 120 };
+    // Ben hits Ana: Ana gets it, nobody else
+    send(b.conn, { t: 'bump', to: a.id, ...hit });
+    expect(a.conn.last('bump')).toMatchObject({ from: b.id, to: a.id, ix: 800 });
+    expect(c.conn.last('bump')).toBeUndefined();
+    // Ben hits the bot: the host (Ana) simulates it
+    a.conn.inbox.length = 0;
+    send(b.conn, { t: 'bump', to: bot?.id, ...hit });
+    expect(a.conn.last('bump')).toMatchObject({ from: b.id, to: bot?.id });
+    // the host's bot hits Ben; only the host may speak for a bot
+    send(a.conn, { t: 'bump', to: b.id, from: bot?.id, ...hit });
+    expect(b.conn.last('bump')).toMatchObject({ from: bot?.id, to: b.id });
+    b.conn.inbox.length = 0;
+    send(c.conn, { t: 'bump', to: b.id, ...hit }); // not racing
+    send(a.conn, { t: 'bump', to: b.id, from: b.id, ...hit }); // not a bot
+    send(a.conn, { t: 'bump', to: b.id, ...hit, ix: 1e6 }); // implausible
+    expect(b.conn.last('bump')).toBeUndefined();
+    // at most 30 a second from one sender
+    advance(1000);
+    for (let i = 0; i < 40; i++) send(a.conn, { t: 'bump', to: b.id, ...hit });
+    expect(b.conn.inbox.filter((m) => m.t === 'bump')).toHaveLength(30);
   });
 });
 

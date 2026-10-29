@@ -1,4 +1,5 @@
-import type { Standing, TrackData } from '@apex/shared';
+import type { CarEntry, Standing, TrackData } from '@apex/shared';
+import type { TopView } from '../game/topView';
 import { settings } from '../settings';
 import type { CompoundId } from '../physics/tyres';
 import { CarStatus } from './carStatus';
@@ -166,6 +167,11 @@ export class Hud {
   private static readonly MAP_RANGE_M = 320;
 
   /** Cache the track outline as a path in world coordinates (metres, x right, z down). */
+  /** Your car in the status instrument (its picture from above, its wheels and engine where they are). */
+  setCar(entry: CarEntry, view: TopView | null): void {
+    this.status.setCar(entry, view);
+  }
+
   setTrack(t: TrackData): void {
     const cl = t.centerline;
     const path = new Path2D();
@@ -304,6 +310,8 @@ export class Hud {
   /** Timing screen around the player's position: best lap for the leader, gaps for the others. */
   /** Race (after qualifying): positions and gaps on the board instead of best laps. */
   raceLaps = 0;
+  /** A timed race: the board shows the lap, not "of how many". */
+  timedRace = false;
 
   setBoard(list: Standing[], me: string, names: Map<string, string>): void {
     if (this.raceLaps) {
@@ -357,7 +365,9 @@ export class Hud {
           : r.position === 1
             ? r.finishedMs !== null
               ? t('FIN')
-              : t('LAP {n}/{max}', { n: Math.min(r.laps + 1, this.raceLaps), max: this.raceLaps })
+              : this.timedRace
+                ? t('LAP {n}', { n: r.laps + 1 })
+                : t('LAP {n}/{max}', { n: Math.min(r.laps + 1, this.raceLaps), max: this.raceLaps })
             : leaderLaps - r.laps >= 2 || (leaderLaps - r.laps === 1 && (r.gapMs ?? 0) > 60_000)
               ? `+${leaderLaps - r.laps} ${t('LAP')}`
               : `+${((r.gapMs ?? 0) / 1000).toFixed(1)}`;

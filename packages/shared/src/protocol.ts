@@ -1,4 +1,4 @@
-import { MAX_PLAYERS, PROTOCOL_VERSION } from './constants';
+import { MAX_PLAYERS, PRACTICE_MINUTE_CHOICES, PROTOCOL_VERSION, RACE_MINUTE_CHOICES } from './constants';
 import type { PenaltyReason, Standing } from './race';
 import type { RaceControlState } from './raceControl';
 import { WEATHER_KINDS, type ChangeChoice, type TimeChoice, type WeatherChoice } from './weather';
@@ -68,8 +68,12 @@ export interface RoomSnapshot {
   conditions: Conditions;
   /** Briefing phase: when it ends (server time). */
   briefingUntil: number | null;
-  /** Race after qualifying: laps (0 = qualifying only). */
+  /** Race after qualifying: laps (0 = qualifying only, unless timed). */
   raceLaps: number;
+  /** A timed race instead of laps (minutes; 0 = by laps). */
+  raceMinutes: number;
+  /** Free practice before qualifying (minutes; 0 = none). */
+  practiceMinutes: number;
   /** Listed in the public room list (anyone can join or watch without the code). */
   isPublic: boolean;
   spectators: number;
@@ -82,8 +86,8 @@ export interface RoomSummary {
   host: string;
   trackId: string;
   phase: Phase;
-  /** Session in progress: qualifying or race. */
-  kind: 'qualifying' | 'race' | null;
+  /** Session in progress. */
+  kind: SessionKind | null;
   drivers: number;
   humans: number;
   spectators: number;
@@ -92,6 +96,9 @@ export interface RoomSummary {
   raceLaps: number;
   updatedAt: number;
 }
+
+/** The sessions of a weekend: free practice (optional), qualifying, the race. */
+export type SessionKind = 'practice' | 'qualifying' | 'race';
 
 export interface RaceSetup {
   raceId: number;
@@ -105,10 +112,12 @@ export interface RaceSetup {
   sessionMs: number;
   /** Layout (tracks.json id). */
   trackId: string;
-  /** Qualifying (timed, best lap) or the race after it (laps, grid from qualifying). */
-  kind: 'qualifying' | 'race';
+  /** Free practice and qualifying (timed, best lap; practice decides nothing) or the race (grid from qualifying). */
+  kind: SessionKind;
   /** Race laps (kind 'race'); for qualifying, the race that follows (0 = none). */
   laps: number;
+  /** A timed race: its length (ms); the leader's crossing after it gets the flag. 0/absent: a race by laps. */
+  raceMs?: number;
   rules: RaceRules;
 }
 
@@ -143,7 +152,8 @@ export type ErrorCode =
 /* ------------------------------------------------------ client → server --- */
 
 export type ClientMsg =
-  | { t: 'hello'; v: number; nick: string; session: string | null; spectate?: boolean }
+  /** `account`: the signed-in player's token (accounts.ts): their laps and results go to their records. */
+  | { t: 'hello'; v: number; nick: string; session: string | null; spectate?: boolean; account?: string }
   | { t: 'selectCar'; carId: string | null }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
@@ -156,6 +166,8 @@ export type ClientMsg =
   | { t: 'removeBot'; id: string }
   | { t: 'setSession'; minutes: number }
   | { t: 'setRaceLaps'; laps: number }
+  | { t: 'setRaceMinutes'; minutes: number }
+  | { t: 'setPractice'; minutes: number }
   | { t: 'setPublic'; isPublic: boolean }
   /** Host: track, weather, time, changes; reroll = new forecast. */
   | { t: 'setConditions'; trackId?: string; weather?: WeatherChoice; time?: TimeChoice; changes?: ChangeChoice; reroll?: boolean }
@@ -163,7 +175,15 @@ export type ClientMsg =
   /** Host: the session rules (only the ones given change). */
   | { t: 'setRules'; rules: Partial<RaceRules> }
   /** Pit lane: in (true) and back out (false). `id`: a bot of the host's. */
-  | { t: 'pit'; in: boolean; id?: string };
+  | { t: 'pit'; in: boolean; id?: string }
+  /**
+   * Contact rule: my car hit `to` here (impulse on it, N·s, world; `ty`: yaw torque impulse, N·m·s), for its owner
+   * to apply if its own simulation missed the contact. `from`: a bot of the host's that did the hitting.
+   */
+  | { t: 'bump'; to: string; ix: number; iy: number; iz: number; ty: number; from?: string };
+
+/** Largest impulse a bump may carry (N·s): a 1.4 t car stopped from 30 m/s. */
+export const MAX_BUMP_IMPULSE = 42_000;
 
 /* ------------------------------------------------------ server → client --- */
 
@@ -207,13 +227,15 @@ export type ServerMsg =
   | {
       t: 'results';
       raceId: number;
-      kind: 'qualifying' | 'race';
+      kind: SessionKind;
       rows: RaceResultRow[];
       fastestLap: { id: string; ms: number } | null;
       /** After qualifying: when the race loads (server time), or null. */
       raceAt: number | null;
     }
   | { t: 'damage'; playerId: string; zones: number[] }
+  /** Contact rule: `from` hit `to` (relayed to whoever simulates `to`). */
+  | { t: 'bump'; from: string; to: string; ix: number; iy: number; iz: number; ty: number }
   | { t: 'pong'; c: number; s: number };
 
 const str = (v: unknown, max = 64): v is string => typeof v === 'string' && v.length <= max;
@@ -232,7 +254,14 @@ export function parseClientMsg(raw: string): ClientMsg | null {
   switch (v.t) {
     case 'hello':
       return num(v.v) && str(v.nick, 64) && (v.session === null || str(v.session, 64))
-        ? { t: 'hello', v: v.v, nick: v.nick, session: v.session, spectate: v.spectate === true }
+        ? {
+            t: 'hello',
+            v: v.v,
+            nick: v.nick,
+            session: v.session,
+            spectate: v.spectate === true,
+            ...(typeof v.account === 'string' && /^[0-9a-f]{48}$/.test(v.account) ? { account: v.account } : {}),
+          }
         : null;
     case 'selectCar':
       return v.carId === null || str(v.carId, 64) ? { t: 'selectCar', carId: v.carId } : null;
@@ -260,11 +289,24 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       return num(v.minutes) && Number.isInteger(v.minutes) && v.minutes >= 1 && v.minutes <= 60 ? { t: 'setSession', minutes: v.minutes } : null;
     case 'setPublic':
       return typeof v.isPublic === 'boolean' ? { t: 'setPublic', isPublic: v.isPublic } : null;
+    case 'setRaceMinutes':
+      return num(v.minutes) && (RACE_MINUTE_CHOICES as readonly number[]).includes(v.minutes) ? { t: 'setRaceMinutes', minutes: v.minutes } : null;
+    case 'setPractice':
+      return num(v.minutes) && (PRACTICE_MINUTE_CHOICES as readonly number[]).includes(v.minutes) ? { t: 'setPractice', minutes: v.minutes } : null;
     case 'setRaceLaps':
       return num(v.laps) && Number.isInteger(v.laps) && v.laps >= 0 && v.laps <= 50 ? { t: 'setRaceLaps', laps: v.laps } : null;
     case 'pit':
       if (typeof v.in !== 'boolean' || (v.id !== undefined && !str(v.id, 32))) return null;
       return v.id === undefined ? { t: 'pit', in: v.in } : { t: 'pit', in: v.in, id: v.id };
+    case 'bump': {
+      const ok = (x: unknown, max: number): x is number => num(x) && Math.abs(x) <= max;
+      if (!str(v.to, 32) || !ok(v.ix, MAX_BUMP_IMPULSE) || !ok(v.iy, MAX_BUMP_IMPULSE) || !ok(v.iz, MAX_BUMP_IMPULSE) || !ok(v.ty, MAX_BUMP_IMPULSE))
+        return null;
+      if (v.from !== undefined && !str(v.from, 32)) return null;
+      const out: Extract<ClientMsg, { t: 'bump' }> = { t: 'bump', to: v.to, ix: v.ix, iy: v.iy, iz: v.iz, ty: v.ty };
+      if (v.from !== undefined) out.from = v.from as string;
+      return out;
+    }
     case 'setRules': {
       if (!isRecord(v.rules)) return null;
       const out: Partial<RaceRules> = {};

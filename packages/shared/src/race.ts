@@ -95,6 +95,10 @@ export const PENALTY = {
 export const PIT_WINDOW = {
   openShare: 0.4,
   closeShare: 0.6,
+  /** A timed race: the car must cross the pit entry from 25:00 to 34:59 of a 60 min race (SRO GTWC 2026 Sporting
+   * Regulations, art. 418.1), the same shares of any length. */
+  timedOpenShare: 25 / 60,
+  timedCloseShare: 35 / 60,
   minStopMs: 20_000,
   /** Position samples are 50 ms apart and the car rolls into its box: a 20 s driver change measures a little short. */
   toleranceMs: 1500,
@@ -144,8 +148,10 @@ export interface PlayerRaceState {
   /** In the garage (pit stop). */
   inPit: boolean;
   pitStops: number;
-  /** Lap in progress (1-based) when the car entered the pit lane, and how long it has stood still in it (ms). */
+  /** Lap in progress (1-based) when the car entered the pit lane, when (server ms), and how long it has stood
+   * still in it (ms). */
   pitLap: number;
+  pitInMs: number;
   stoppedMs: number;
   /** Pit-window rule: the mandatory stop is done. */
   stopDone: boolean;
@@ -230,17 +236,30 @@ export class RaceTracker {
   readonly isRace: boolean = false;
   /** Race with the pit-window rule: its laps, or null. */
   readonly pitWindow: { open: number; close: number } | null = null;
+  /** A timed race (GT3 style): when its time is up (server ms; the leader's next crossing gets the flag), and its
+   * pit window in time (when the pit entry must be crossed), or null. */
+  readonly raceEndAt: number | null = null;
+  readonly pitWindowMs: { open: number; close: number } | null = null;
   readonly driveThroughMs: number;
 
   constructor(
     readonly track: TrackRaceData,
     readonly startMs: number,
-    mode: number | { sessionMs: number } | { raceLaps: number; pitWindow?: boolean } = RACE_LAPS,
+    mode: number | { sessionMs: number } | { raceLaps: number; pitWindow?: boolean } | { raceMs: number; pitWindow?: boolean } = RACE_LAPS,
   ) {
     this.driveThroughMs = driveThroughCostMs(track);
     if (typeof mode === 'number') {
       this.laps = mode;
       this.flagAt = null;
+    } else if ('raceMs' in mode) {
+      // a timed race (as GT World Challenge's are): the leader is shown the flag when crossing the line after the
+      // time is up, everyone else finishes the lap they are on (SRO 2026 art. 4.3, 42.1); laps decide, then order
+      this.laps = 0;
+      this.flagAt = null;
+      this.isRace = true;
+      this.raceEndAt = startMs + mode.raceMs;
+      if (mode.pitWindow && mode.raceMs >= 6 * 60_000)
+        this.pitWindowMs = { open: startMs + mode.raceMs * PIT_WINDOW.timedOpenShare, close: startMs + mode.raceMs * PIT_WINDOW.timedCloseShare };
     } else if ('raceLaps' in mode) {
       // the race: standing start, every lap timed from the green light, finish after raceLaps
       this.laps = mode.raceLaps;
@@ -266,6 +285,7 @@ export class RaceTracker {
     p.inPit = true;
     p.pitStops++;
     p.pitLap = p.laps + 1;
+    p.pitInMs = t;
     p.stoppedMs = 0;
     p.servingDt = this.isRace && p.driveThroughs.length > 0;
     if (!this.isRace) {
@@ -305,7 +325,9 @@ export class RaceTracker {
     }
     p.servingDt = false;
     const w = this.pitWindow;
-    if (w && !p.stopDone && p.pitLap >= w.open && p.pitLap <= w.close && p.stoppedMs >= PIT_WINDOW.minStopMs - PIT_WINDOW.toleranceMs) {
+    const wt = this.pitWindowMs;
+    const inWindow = w ? p.pitLap >= w.open && p.pitLap <= w.close : wt ? p.pitInMs >= wt.open && p.pitInMs < wt.close : false;
+    if (inWindow && !p.stopDone && p.stoppedMs >= PIT_WINDOW.minStopMs - PIT_WINDOW.toleranceMs) {
       p.stopDone = true;
       out.push({ type: 'served', playerId: p.id, what: 'stop' });
     }
@@ -329,8 +351,21 @@ export class RaceTracker {
       p.sectorStartMs = t;
       p.sectors = [];
       p.lapPenaltyMs = 0;
-      if (p.laps >= this.laps || (this.firstFinishMs !== null && t >= this.firstFinishMs)) this.finish(p, t, out);
+      if (this.raceDone(p, t)) this.finish(p, t, out);
     }
+  }
+
+  /**
+   * A race car crossing the line at t has finished: its laps are done (a lap race), or the time is up and it leads
+   * (a timed race), or the winner has finished already (the rest finish the lap they are on).
+   */
+  private raceDone(p: PlayerRaceState, t: number): boolean {
+    if (this.firstFinishMs !== null && t >= this.firstFinishMs) return true;
+    if (this.raceEndAt === null) return p.laps >= this.laps;
+    if (t < this.raceEndAt) return false;
+    // the leader: nobody still running has covered more of the race
+    for (const o of this.players.values()) if (o !== p && !o.dnf && o.finishedMs === null && o.raceDist > p.raceDist + 1) return false;
+    return true;
   }
 
   /** The car's last known lap distance is from `before` to `after` metres around s (true without s or a position). */
@@ -383,6 +418,7 @@ export class RaceTracker {
       inPit: false,
       pitStops: 0,
       pitLap: 0,
+      pitInMs: 0,
       stoppedMs: 0,
       stopDone: false,
       driveThroughs: [],
@@ -574,9 +610,7 @@ export class RaceTracker {
           this.addPenalty(p, 'unserved', this.driveThroughMs + PENALTY.unservedExtraMs, out);
         }
         // the race: the chequered flag is shown to the leader after `laps`; everyone else finishes the lap they are on
-        const lapsDone = this.isRace
-          ? p.laps >= this.laps || (this.firstFinishMs !== null && tc >= this.firstFinishMs)
-          : this.laps > 0 && p.laps >= this.laps + 1;
+        const lapsDone = this.isRace ? this.raceDone(p, tc) : this.laps > 0 && p.laps >= this.laps + 1;
         const flagged = this.flagAt !== null && tc >= this.flagAt;
         if (lapsDone || flagged) this.finish(p, tc, out);
       } else {
@@ -619,7 +653,9 @@ export class RaceTracker {
   addDriveThrough(id: string, reason: PenaltyReason, out: RaceEvent[] = []): RaceEvent[] {
     const p = this.players.get(id);
     if (!this.isRace || !p || p.dnf || p.finishedMs !== null) return out;
-    if (this.laps - p.laps <= PENALTY.serveLaps) {
+    // too late to serve it: a lap race's last laps, or a timed race's last minutes (at this car's pace)
+    const lapsLeft = this.raceEndAt !== null ? (this.raceEndAt - p.lt) / Math.max(60_000, p.lastLapMs ?? 120_000) : this.laps - p.laps;
+    if (lapsLeft <= PENALTY.serveLaps) {
       this.addPenalty(p, reason, this.driveThroughMs, out);
       return out;
     }

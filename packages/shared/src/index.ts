@@ -8,3 +8,4 @@ export * from './race';
 export * from './raceControl';
 export * from './protocol';
 export * from './cars';
+export * from './accounts';

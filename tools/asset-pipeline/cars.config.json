@@ -26,7 +26,7 @@
       "weightFront": 0.43,
       "comHeightM": 0.4,
       "tyreGrip": 1.95,
-      "brakeTorqueNm": 8200,
+      "brakeTorqueNm": 12700,
       "brakeBiasFront": 0.6,
       "dragArea": 0.78,
       "downforceArea": 3.19,
@@ -65,7 +65,7 @@
       "weightFront": 0.42,
       "comHeightM": 0.39,
       "tyreGrip": 1.95,
-      "brakeTorqueNm": 8000,
+      "brakeTorqueNm": 12400,
       "brakeBiasFront": 0.6,
       "dragArea": 0.76,
       "downforceArea": 3.09,
@@ -104,7 +104,7 @@
       "weightFront": 0.49,
       "comHeightM": 0.42,
       "tyreGrip": 1.95,
-      "brakeTorqueNm": 8400,
+      "brakeTorqueNm": 13000,
       "brakeBiasFront": 0.62,
       "dragArea": 0.8,
       "downforceArea": 3.01,
@@ -143,7 +143,7 @@
       "weightFront": 0.39,
       "comHeightM": 0.38,
       "tyreGrip": 1.95,
-      "brakeTorqueNm": 8000,
+      "brakeTorqueNm": 12400,
       "brakeBiasFront": 0.62,
       "dragArea": 0.77,
       "downforceArea": 3.13,
@@ -183,7 +183,7 @@
       "weightFront": 0.5,
       "comHeightM": 0.43,
       "tyreGrip": 1.95,
-      "brakeTorqueNm": 8600,
+      "brakeTorqueNm": 13300,
       "brakeBiasFront": 0.62,
       "dragArea": 0.82,
       "downforceArea": 3.01,
@@ -222,7 +222,7 @@
       "weightFront": 0.42,
       "comHeightM": 0.39,
       "tyreGrip": 1.95,
-      "brakeTorqueNm": 8200,
+      "brakeTorqueNm": 12700,
       "brakeBiasFront": 0.6,
       "dragArea": 0.77,
       "downforceArea": 3.13,
@@ -287,7 +287,7 @@
       "specs": {
         "massKg": 1430,
         "downforceArea": 2.82,
-        "dragArea": 0.96
+        "dragArea": 0.95
       },
       "info": {
         "engine": "6.2 L V8, naturally aspirated (M159)",
@@ -374,7 +374,7 @@
         "tyreGrip": 1.72,
         "dragArea": 1.04,
         "downforceArea": 2.6,
-        "brakeTorqueNm": 9200,
+        "brakeTorqueNm": 14300,
         "topSpeedKmh": 352,
         "aspiration": "hybrid",
         "carbonBrakes": true,
@@ -420,7 +420,7 @@
       },
       "profile": "gt3_rear_f6",
       "specs": {
-        "dragArea": 0.99,
+        "dragArea": 0.98,
         "massKg": 1405
       },
       "info": {
@@ -441,7 +441,7 @@
       },
       "profile": "gt3_front_i6tt",
       "specs": {
-        "dragArea": 1.06,
+        "dragArea": 1.05,
         "massKg": 1420
       },
       "info": {
@@ -548,7 +548,7 @@
       "profile": "gt3_v10_na",
       "specs": {
         "powerKw": 370,
-        "dragArea": 1.11,
+        "dragArea": 1.1,
         "massKg": 1440
       },
       "info": {
@@ -593,7 +593,7 @@
       "profile": "gt3_mid_v8tt",
       "specs": {
         "downforceArea": 3.28,
-        "dragArea": 0.93,
+        "dragArea": 0.92,
         "massKg": 1410
       },
       "info": {
@@ -668,6 +668,41 @@
         "team": "Red Bull livery"
       }
     },
+    "porsche_911_gt3_r_rennsport": {
+      "name": "Porsche 911 GT3 R Rennsport",
+      "manufacturer": "Porsche",
+      "year": 2023,
+      "category": "GT3 Unrestricted",
+      "color": "#86b5df",
+      "pipeline": {
+        "realLengthM": 4.74
+      },
+      "profile": "gt3_rear_f6",
+      "specs": {
+        "_note": "The GT3 R without its Balance of Performance (77 cars): 456 kW at 9,400 rpm, 1,240 kg kerb (racing.porsche.com, IMSA 2023-11-01); here with driver and the 50 l reference fuel. The torque curve is the GT3 R's scaled to that power, the rev limit 200 rpm higher; a bigger wing and splitter (it races under no aero limits).",
+        "massKg": 1335,
+        "redlineRpm": 9400,
+        "limiterRpm": 9600,
+        "torqueCurve": [
+          [1000, 265],
+          [3000, 460],
+          [5000, 535],
+          [6500, 580],
+          [8000, 560],
+          [9400, 463],
+          [9700, 260]
+        ],
+        "downforceArea": 3.6,
+        "aeroBalanceFront": 0.41,
+        "topSpeedKmh": 300,
+        "dragArea": 0.93
+      },
+      "info": {
+        "engine": "4.2 L flat-six, naturally aspirated, 620 PS",
+        "gearbox": "6-speed sequential",
+        "team": "Porsche Motorsport (limited edition, track only)"
+      }
+    },
     "porsche_992_gt3_r": {
       "name": "Porsche 911 GT3 R (992)",
       "manufacturer": "Porsche",
@@ -680,7 +715,7 @@
       },
       "profile": "gt3_rear_f6",
       "specs": {
-        "dragArea": 0.99,
+        "dragArea": 0.98,
         "massKg": 1405
       },
       "info": {
@@ -741,7 +776,7 @@
         "weightFront": 0.5,
         "topSpeedKmh": 278,
         "_note": "Lexus: 5.4 L V8 (enlarged RC F unit), 500+ hp, six-speed sequential, ~1,300 kg; race weight estimated like the BoP cars (+ driver and fuel).",
-        "dragArea": 0.81
+        "dragArea": 0.8
       },
       "info": {
         "engine": "5.4 L V8, naturally aspirated",
@@ -847,7 +882,7 @@
           [8300, 240]
         ],
         "_note": "Ferrari: 3.0 L twin-turbo 120° V6, 600 hp and 710 Nm before BoP, 6-speed sequential, 1,250 kg; SRO 2024 BoP 1,305 kg, boost table to 8,100 rpm.",
-        "dragArea": 0.97
+        "dragArea": 0.96
       },
       "info": {
         "engine": "3.0 L twin-turbo 120° V6",
@@ -917,7 +952,7 @@
           [8500, 250]
         ],
         "_note": "Lamborghini: the road car's 4.0 L twin-turbo V8 without the hybrid, race turbos, longer wheelbase and wider track than the Huracán GT3; debut at the 2026 Sebring 12 Hours (Pfaff). Weight, gearbox and length are estimates.",
-        "dragArea": 0.96
+        "dragArea": 0.95
       },
       "info": {
         "engine": "4.0 L twin-turbo V8",
@@ -959,7 +994,7 @@
       "profile": "gt3_front_i6tt",
       "specs": {
         "massKg": 1420,
-        "dragArea": 1.06
+        "dragArea": 1.05
       },
       "info": {
         "engine": "3.0 L twin-turbo straight-six (P58)",

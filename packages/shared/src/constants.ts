@@ -1,5 +1,5 @@
 export const GAME_NAME = 'APEX GHOST';
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 export const MAX_PLAYERS = 12;
 /** Lap-count sessions (tests and tools only): timed laps after the out lap. */
@@ -10,6 +10,11 @@ export const DEFAULT_SESSION_MINUTES = 10;
 /** Race after qualifying: laps the host can choose (0 = qualifying only). */
 export const RACE_LAP_CHOICES = [0, 3, 5, 10, 15] as const;
 export const DEFAULT_RACE_LAPS = 5;
+/** A timed race instead (GT World Challenge Sprint races run 60 min, the Endurance Cup 3 h): minutes the host can
+ * choose (0 = the race goes by laps). */
+export const RACE_MINUTE_CHOICES = [0, 10, 20, 30, 45, 60] as const;
+/** Free practice before qualifying (minutes; 0 = none), as a race weekend opens. */
+export const PRACTICE_MINUTE_CHOICES = [0, 10, 20, 30] as const;
 /** Qualifying results on screen before the race loads. */
 export const QUALI_TO_RACE_MS = 20_000;
 export const MAX_SPECTATORS = 30;

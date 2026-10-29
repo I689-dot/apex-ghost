@@ -3,6 +3,10 @@ import { INTERP_DELAY_MS, MAX_EXTRAPOLATION_MS, SNAP_DISTANCE_M, copyCarState, m
 const BUF = 32;
 /** A stamp this far off the stream is a clock jump, not a late packet. */
 const RESYNC_MS = 3000;
+/** Drawn in the present (a driver's view): predicted at most this far past the newest sample (ms), then held. */
+const PREDICT_MAX_MS = 500;
+/** Prediction steps over that span (the path is integrated, not a straight line). */
+const PREDICT_STEPS = 8;
 
 /** Output of sampling a remote car at render time. */
 export interface RemoteSample extends CarState {
@@ -13,10 +17,15 @@ export interface RemoteSample extends CarState {
 }
 
 /**
- * Snapshot interpolation for one remote car.
- * Renders INTERP_DELAY_MS in the past, Hermite-interpolates position using the sent velocities,
- * slerps orientation, extrapolates briefly when packets are late, and hides corrections with a
- * decaying error offset (or snaps when far off).
+ * One remote car, from its stream of samples.
+ *  - Watching (delay INTERP_DELAY_MS): drawn in the past, Hermite-interpolated between samples with the sent
+ *    velocities, orientation slerped, extrapolated briefly when packets are late. Smoothest, and nothing to compare.
+ *  - Driving (delay 0): drawn where it is now. A car drawn 150 ms (plus the network's delay) in the past is ~10 m
+ *    behind its real place at 250 km/h, and the two drivers of a close fight each saw the other where he had been:
+ *    both saw him behind, or both in front, never the same race. Racing sims predict the others to the present
+ *    (dead reckoning): from the newest sample along a curved path (its yaw rate turns the velocity) with its
+ *    measured acceleration, so both screens agree on who is ahead to within the prediction error (decimetres).
+ * Corrections when a new sample disagrees are hidden with a decaying error offset (or a snap when far off).
  */
 export class RemoteCarBuffer {
   private states: CarState[] = Array.from({ length: BUF }, makeCarState);
@@ -61,10 +70,10 @@ export class RemoteCarBuffer {
     return this.count ? this.states[this.head].t : 0;
   }
 
-  /** Sample at `serverNow - delay`. `dt` (s) drives the error decay. */
-  sample(serverNow: number, dt: number): RemoteSample | null {
+  /** Sample at `serverNow - delayMs` (0: the present). `dt` (s) drives the error decay. */
+  sample(serverNow: number, dt: number, delayMs = INTERP_DELAY_MS): RemoteSample | null {
     if (!this.count) return null;
-    const t = serverNow - INTERP_DELAY_MS;
+    const t = serverNow - delayMs;
     const o = this.out;
     const newest = this.states[this.head];
     o.staleMs = t - newest.t;
@@ -97,14 +106,21 @@ export class RemoteCarBuffer {
       o.t = t;
     } else {
       // older than everything (just joined) or newer than the newest: hold / extrapolate
-      const base = t < this.states[(this.head - this.count + 1 + BUF) % BUF].t ? this.states[(this.head - this.count + 1 + BUF) % BUF] : newest;
+      const oldest = this.states[(this.head - this.count + 1 + BUF) % BUF];
+      const base = t < oldest.t ? oldest : newest;
       copyCarState(o, base);
-      const ahead = Math.min(Math.max(0, t - base.t), MAX_EXTRAPOLATION_MS) / 1000;
+      const ahead = Math.min(Math.max(0, t - base.t), delayMs === 0 ? PREDICT_MAX_MS : MAX_EXTRAPOLATION_MS) / 1000;
       o.extrapolating = ahead > 0;
-      o.px += base.vx * ahead;
-      o.py += base.vy * ahead;
-      o.pz += base.vz * ahead;
-      integrateRotation(o, base.wx * ahead, base.wy * ahead, base.wz * ahead);
+      if (ahead > 0) {
+        // acceleration along the path, from the last two samples (braking from 250 km/h is ~2.5 g: 0.5 m in 200 ms)
+        let acc = 0;
+        if (base === newest && this.count > 1) {
+          const prev = this.states[(this.head - 1 + BUF) % BUF];
+          const span = (newest.t - prev.t) / 1000;
+          if (span > 0.01 && span < 0.3) acc = (Math.hypot(newest.vx, newest.vz) - Math.hypot(prev.vx, prev.vz)) / span;
+        }
+        predict(o, base, ahead, Math.max(-35, Math.min(15, acc)) * 0.8);
+      }
       o.t = t;
     }
 
@@ -128,7 +144,8 @@ export class RemoteCarBuffer {
         this.errZ = tz;
       }
     }
-    const decay = Math.exp(-dt / 0.12);
+    // a prediction is corrected over a little longer: its errors are larger and a quick snap reads as a twitch
+    const decay = Math.exp(-dt / (delayMs === 0 ? 0.18 : 0.12));
     this.errX *= decay;
     this.errY *= decay;
     this.errZ *= decay;
@@ -147,6 +164,38 @@ export class RemoteCarBuffer {
     this.hasLast = false;
     this.errX = this.errY = this.errZ = 0;
   }
+}
+
+/**
+ * Dead reckoning over `ahead` s: the velocity turns at the sampled yaw rate (a car in a corner follows an arc, not
+ * its tangent: 0.6 m off at 200 ms in a 100 m corner at 200 km/h) and its speed changes at `acc` (m/s², along the
+ * path, never through zero). Height follows the vertical speed; the orientation integrates the angular velocity.
+ */
+function predict(o: CarState, b: CarState, ahead: number, acc: number): void {
+  const h = ahead / PREDICT_STEPS;
+  const speed = Math.hypot(b.vx, b.vz);
+  let x = 0;
+  let z = 0;
+  let vx = b.vx;
+  let vz = b.vz;
+  for (let i = 0; i < PREDICT_STEPS; i++) {
+    const tm = (i + 0.5) * h;
+    const a = b.wy * tm;
+    const k = speed > 0.5 ? Math.max(0, 1 + (acc * tm) / speed) : 1;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    // rotation about +Y by a: (x, z) → (x cos a + z sin a, −x sin a + z cos a)
+    vx = (b.vx * c + b.vz * s) * k;
+    vz = (-b.vx * s + b.vz * c) * k;
+    x += vx * h;
+    z += vz * h;
+  }
+  o.px = b.px + x;
+  o.py = b.py + b.vy * ahead;
+  o.pz = b.pz + z;
+  o.vx = vx;
+  o.vz = vz;
+  integrateRotation(o, b.wx * ahead, b.wy * ahead, b.wz * ahead);
 }
 
 function hermite(o: CarState, a: CarState, b: CarState, u: number, span: number): void {

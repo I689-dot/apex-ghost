@@ -57,10 +57,10 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   const row = (label: string, ctrl: HTMLElement, hint?: string) =>
     h('div.set-row', {}, h('div', {}, h('span', { text: label }), hint ? h('small', { text: hint }) : null), ctrl);
 
-  const graphics = h(
+  const general = h(
     'section',
     {},
-    h('h3', { text: t('Language') }),
+    h('h3.keep', { text: t('Language') }),
     row(
       'Language / Idioma',
       select(settings.language, LANGUAGES, (v) => {
@@ -69,6 +69,38 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
         changed();
       }),
     ),
+  );
+
+  general.append(
+    h('h3', { text: t('Display') }),
+    row(
+      t('Speed units'),
+      select(
+        settings.units,
+        [
+          ['kmh', 'km/h'],
+          ['mph', 'mph'],
+        ],
+        (v) => {
+          settings.units = v;
+          changed();
+        },
+      ),
+    ),
+    row(
+      t('Performance overlay'),
+      toggle(settings.showPerf, (v) => {
+        settings.showPerf = v;
+        changed();
+      }),
+      t('Frame time, network and draw calls in a corner'),
+    ),
+  );
+
+  const presetNote = h('p.muted.preset-note', { text: t(PRESET_NOTE[settings.quality]) });
+  const graphics = h(
+    'section',
+    {},
     h('h3', { text: t('Graphics') }),
     row(
       t('Quality preset'),
@@ -82,6 +114,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
         ],
         (v) => {
           settings.quality = v;
+          presetNote.textContent = t(PRESET_NOTE[v]);
           changed();
         },
       ),
@@ -109,6 +142,13 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       t('Lowers resolution briefly to stay above 45 fps'),
     ),
     ...(IS_APP ? [frameRateRow()] : []),
+    presetNote,
+  );
+
+  const camera = h(
+    'section',
+    {},
+    h('h3', { text: t('Camera') }),
     row(
       t('Field of view'),
       range(
@@ -152,13 +192,6 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
         },
       ),
       t('Forward / back'),
-    ),
-    row(
-      t('Performance overlay'),
-      toggle(settings.showPerf, (v) => {
-        settings.showPerf = v;
-        changed();
-      }),
     ),
   );
 
@@ -233,20 +266,6 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
         settings.manualGearbox = v;
         changed();
       }),
-    ),
-    row(
-      t('Speed units'),
-      select(
-        settings.units,
-        [
-          ['kmh', 'km/h'],
-          ['mph', 'mph'],
-        ],
-        (v) => {
-          settings.units = v;
-          changed();
-        },
-      ),
     ),
   );
 
@@ -458,6 +477,43 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     }),
   );
 
+  // tabs: one section at a time (the five side by side were a wall of rows, cut off on smaller screens)
+  const tabs: [string, string, HTMLElement][] = [
+    ['general', t('General'), general],
+    ['graphics', t('Graphics'), graphics],
+    ['camera', t('Camera'), camera],
+    ['driving', t('Driving'), assists],
+    ['sound', t('Sound'), sound],
+    ['controls', IS_APP ? t('Touch') : t('Controls'), IS_APP ? touchSettingsSection() : controls],
+    ['controller', t('Controller'), pad],
+  ];
+  let current = tabs.some(([k]) => k === lastTab()) ? lastTab() : 'general';
+  const body = h('div.settings-body');
+  const buttons = new Map<string, HTMLElement>();
+  const show = (key: string) => {
+    current = key;
+    const tab = tabs.find(([k]) => k === key) ?? tabs[0];
+    body.replaceChildren(tab[2]);
+    for (const [k, b] of buttons) {
+      b.classList.toggle('on', k === key);
+      b.setAttribute('aria-selected', String(k === key));
+    }
+    try {
+      localStorage.setItem(TAB_KEY, key);
+    } catch {
+      /* ignore */
+    }
+  };
+  const tabBar = h(
+    'div.settings-tabs',
+    { role: 'tablist' },
+    ...tabs.map(([k, label]) => {
+      const b = h('button.settings-tab', { type: 'button', role: 'tab', text: label, onclick: () => show(k) });
+      buttons.set(k, b);
+      return b;
+    }),
+  );
+
   const panel: HTMLElement = h(
     'div.modal',
     { onclick: (e: Event) => e.target === panel && onClose() },
@@ -465,10 +521,30 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       'div.modal-card.settings',
       {},
       h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { text: '✕', title: t('Close'), onclick: onClose })),
-      h('div.settings-grid', {}, graphics, assists, sound, IS_APP ? touchSettingsSection() : controls, pad),
+      tabBar,
+      body,
     ),
   );
+  show(current);
   return panel;
+}
+
+/** What each preset changes, under the preset menu. */
+const PRESET_NOTE: Record<QualityPreset, string> = {
+  low: 'Low: no shadows or post-processing, short view distance. For integrated graphics and phones.',
+  medium: 'Medium: sun shadows, 3D grass near the track, the full cockpit.',
+  high: 'High: soft shadows, ambient occlusion, bloom, reflections on the track, longer view distance.',
+  ultra: 'Ultra: everything at its best, regardless of performance: 4K shadows, the densest grass and forest, the farthest view.',
+};
+
+/** The tab shown when the panel last closed (a per-browser convenience). */
+const TAB_KEY = 'apexghost.settingsTab';
+function lastTab(): string {
+  try {
+    return localStorage.getItem(TAB_KEY) ?? 'general';
+  } catch {
+    return 'general';
+  }
 }
 
 /** Phone app: 60 Hz, or the 90 / 120 / 144 Hz modes of the screen (filled in once the phone has answered). */

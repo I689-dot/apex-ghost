@@ -12,6 +12,7 @@ import {
 import { SERVER_URL } from '../config';
 import { getSession, setSession } from '../settings';
 import { LocalSocket, isLocalCode } from './localRoom';
+import { account } from './account';
 
 export type ConnState = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -124,7 +125,16 @@ export class Connection {
     this.ws = ws;
     ws.onopen = () => {
       this.reconnectAttempt = 0;
-      this.sendJson({ t: 'hello', v: PROTOCOL_VERSION, nick: this.nick, session: this.spectate ? null : getSession(this.code), spectate: this.spectate });
+      // signed in (and online: the offline room keeps no records): the room records my laps and results
+      const token = !this.spectate && !isLocalCode(this.code) ? account()?.token : undefined;
+      this.sendJson({
+        t: 'hello',
+        v: PROTOCOL_VERSION,
+        nick: this.nick,
+        session: this.spectate ? null : getSession(this.code),
+        spectate: this.spectate,
+        ...(token ? { account: token } : {}),
+      });
     };
     ws.onmessage = (e) => {
       if (typeof e.data === 'string') {

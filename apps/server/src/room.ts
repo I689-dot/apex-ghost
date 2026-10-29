@@ -32,6 +32,7 @@ import {
   nicknameKey,
   parseClientMsg,
   planWeather,
+  weatherAt,
   sanitizeNickname,
   shuffle,
   type CarState,
@@ -71,7 +72,24 @@ export interface RoomEnv {
   /** All layouts by id (the default included); missing → only the default. */
   tracks?: Record<string, TrackRaceData>;
   carIds: ReadonlySet<string> | null;
+  /** Signed-in drivers' laps and results, for their records (the Worker writes them to the accounts database). */
+  record?(e: RecordEvent): void;
 }
+
+/** What the room records for a signed-in driver: a valid timed lap, or where they finished a session. */
+export type RecordEvent =
+  | { kind: 'lap'; token: string; trackId: string; carId: string; lapMs: number; sectors: number[]; session: string; wet: boolean }
+  | {
+      kind: 'result';
+      token: string;
+      trackId: string;
+      carId: string;
+      session: string;
+      position: number;
+      entrants: number;
+      bestLapMs: number | null;
+      totalMs: number | null;
+    };
 
 export interface PersistedPlayer {
   id: string;
@@ -85,6 +103,8 @@ export interface PersistedPlayer {
   bot: boolean;
   /** Starting tyres (display; the physics runs on each client). */
   tyre?: TyreChoice;
+  /** Signed in: the account token (records). */
+  account?: string;
 }
 
 export interface PersistedRoom {
@@ -95,6 +115,8 @@ export interface PersistedRoom {
   players: PersistedPlayer[];
   sessionMinutes?: number;
   raceLaps?: number;
+  raceMinutes?: number;
+  practiceMinutes?: number;
   isPublic?: boolean;
   conditions?: Conditions;
   rules?: RaceRules;
@@ -108,6 +130,9 @@ interface Player extends PersistedPlayer {
   slot: number;
   lastDamageAt: number;
   lastPacketAt: number;
+  /** Bumps relayed in the current 1 s window (contact rule), and when that window started. */
+  bumps?: number;
+  bumpWindow?: number;
 }
 
 const ID_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';
@@ -145,8 +170,13 @@ export class RoomCore {
   private loadDeadline: number | null = null;
   finishDeadline: number | null = null;
   sessionMinutes = DEFAULT_SESSION_MINUTES;
-  /** Race after qualifying (0 = qualifying only). */
+  /** Race after qualifying (0 = qualifying only, unless timed). */
   raceLaps = DEFAULT_RACE_LAPS;
+  /** A timed race instead (minutes; 0 = by laps), and free practice before qualifying (minutes; 0 = none). */
+  raceMinutes = 0;
+  practiceMinutes = 0;
+  /** After the results on screen: the session that loads at raceAt. */
+  private nextSession: 'qualifying' | 'race' = 'race';
   /** Listed in the public room list. */
   isPublic = false;
   /** The host's rules (contact, pit window, fuel, race control). */
@@ -185,6 +215,8 @@ export class RoomCore {
     this.hostId = s.hostId;
     this.raceId = s.raceId;
     this.sessionMinutes = s.sessionMinutes ?? DEFAULT_SESSION_MINUTES;
+    this.raceMinutes = s.raceMinutes ?? 0;
+    this.practiceMinutes = s.practiceMinutes ?? 0;
     this.raceLaps = s.raceLaps ?? DEFAULT_RACE_LAPS;
     this.isPublic = !!s.isPublic;
     this.rules = { ...DEFAULT_RULES, ...(s.rules ?? {}) };
@@ -213,10 +245,12 @@ export class RoomCore {
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
       raceLaps: this.raceLaps,
+      raceMinutes: this.raceMinutes,
+      practiceMinutes: this.practiceMinutes,
       isPublic: this.isPublic,
       conditions: this.conditions,
       rules: this.rules,
-      players: [...this.players.values()].map(({ id, nick, session, carId, ready, joinedAt, waiting, bot, tyre }) => ({
+      players: [...this.players.values()].map(({ id, nick, session, carId, ready, joinedAt, waiting, bot, tyre, account }) => ({
         id,
         nick,
         session,
@@ -226,6 +260,7 @@ export class RoomCore {
         waiting,
         bot,
         tyre,
+        ...(account ? { account } : {}),
       })),
     });
   }
@@ -261,6 +296,8 @@ export class RoomCore {
       raceId: this.raceId,
       sessionMinutes: this.sessionMinutes,
       raceLaps: this.raceLaps,
+      raceMinutes: this.raceMinutes,
+      practiceMinutes: this.practiceMinutes,
       isPublic: this.isPublic,
       spectators: this.spectators.size,
       conditions: this.conditions,
@@ -373,6 +410,7 @@ export class RoomCore {
         }
         existing.conn = conn;
         existing.disconnectedAt = null;
+        if (msg.account) existing.account = msg.account;
         this.connPlayer.set(conn.id, existing.id);
         this.sendWelcome(existing);
         this.broadcastRoom();
@@ -402,6 +440,7 @@ export class RoomCore {
       slot: -1,
       lastDamageAt: 0,
       lastPacketAt: 0,
+      ...(msg.account ? { account: msg.account } : {}),
     };
     this.players.set(p.id, p);
     this.connPlayer.set(conn.id, p.id);
@@ -518,6 +557,21 @@ export class RoomCore {
       case 'setRaceLaps':
         if (p.id !== this.hostId || this.phase !== 'lobby') return;
         this.raceLaps = msg.laps;
+        // laps or minutes: choosing one clears the other
+        if (msg.laps > 0) this.raceMinutes = 0;
+        this.persist();
+        this.broadcastRoom();
+        return;
+      case 'setRaceMinutes':
+        if (p.id !== this.hostId || this.phase !== 'lobby') return;
+        this.raceMinutes = msg.minutes;
+        if (msg.minutes > 0) this.raceLaps = 0;
+        this.persist();
+        this.broadcastRoom();
+        return;
+      case 'setPractice':
+        if (p.id !== this.hostId || this.phase !== 'lobby') return;
+        this.practiceMinutes = msg.minutes;
         this.persist();
         this.broadcastRoom();
         return;
@@ -542,6 +596,23 @@ export class RoomCore {
         this.handleRaceEvents(ev, who, now);
         if (this.tracker?.allDone()) this.endRace();
         return;
+      }
+      case 'bump': {
+        // contact rule: the hit, for whoever simulates the car that was hit (a bot: the host)
+        if (!this.race?.rules.contact || (this.phase !== 'racing' && this.phase !== 'countdown')) return;
+        const from = msg.from !== undefined ? (p.id === this.hostId ? this.players.get(msg.from) : undefined) : p;
+        const to = this.players.get(msg.to);
+        if (!from || !to || (msg.from !== undefined && !from.bot) || from.id === to.id) return;
+        if (this.race.slots[from.id] === undefined || this.race.slots[to.id] === undefined) return;
+        const now = this.env.now();
+        if (now - (p.bumpWindow ?? 0) >= 1000) {
+          p.bumpWindow = now;
+          p.bumps = 0;
+        }
+        if ((p.bumps = (p.bumps ?? 0) + 1) > 30) return;
+        const dest = to.bot ? this.players.get(this.hostId ?? '') : to;
+        if (!dest || dest.id === p.id) return;
+        return this.send(dest, { t: 'bump', from: from.id, to: to.id, ix: msg.ix, iy: msg.iy, iz: msg.iz, ty: msg.ty });
       }
       case 'removeBot': {
         const b = this.players.get(msg.id);
@@ -657,7 +728,9 @@ export class RoomCore {
       this.broadcastRoom();
       return;
     }
-    this.launch(entrants, this.raceGrid);
+    // after free practice: qualifying (a new random grid: its out lap makes the grid not matter); after it the race
+    if (this.nextSession === 'qualifying') this.launch(entrants, undefined, 'qualifying');
+    else this.launch(entrants, this.raceGrid);
   }
 
   /** End of the briefing: everyone connected is done (or the time is up). */
@@ -671,11 +744,12 @@ export class RoomCore {
       this.broadcastRoom();
       return;
     }
-    this.launch(entrants);
+    // a weekend opens with free practice when the host set one
+    this.launch(entrants, undefined, this.practiceMinutes > 0 ? 'practice' : 'qualifying');
   }
 
-  /** Load a session: qualifying (random grid: it does not matter, the out lap is untimed) or the race (grid = `raceGrid`). */
-  private launch(entrants: Player[], raceGrid?: string[]): void {
+  /** Load a session: practice / qualifying (random grid: it does not matter, the out lap is untimed) or the race (grid = `raceGrid`). */
+  private launch(entrants: Player[], raceGrid?: string[], timed: 'practice' | 'qualifying' = 'qualifying'): void {
     const now = this.env.now();
     this.raceId++;
     const seed = Math.floor(this.env.random() * 0xffffffff) >>> 0;
@@ -696,10 +770,11 @@ export class RoomCore {
       weather: planWeather(cond.seed, cond),
       grid,
       slots,
-      sessionMs: raceGrid ? 0 : this.sessionMinutes * 60_000,
+      sessionMs: raceGrid ? 0 : (timed === 'practice' ? this.practiceMinutes : this.sessionMinutes) * 60_000,
       trackId: this.tracks()[cond.trackId] ? cond.trackId : this.env.track.id,
-      kind: raceGrid ? 'race' : 'qualifying',
+      kind: raceGrid ? 'race' : timed,
       laps: this.raceLaps,
+      ...(raceGrid && this.raceMinutes > 0 ? { raceMs: this.raceMinutes * 60_000 } : {}),
       rules: { ...this.rules },
     };
     this.phase = 'loading';
@@ -723,7 +798,11 @@ export class RoomCore {
     this.tracker = new RaceTracker(
       this.tracks()[this.race.trackId] ?? this.env.track,
       this.startAt,
-      this.race.kind === 'race' ? { raceLaps: this.race.laps, pitWindow: this.race.rules.pitWindow } : { sessionMs: this.race.sessionMs },
+      this.race.kind === 'race'
+        ? this.race.raceMs
+          ? { raceMs: this.race.raceMs, pitWindow: this.race.rules.pitWindow }
+          : { raceLaps: this.race.laps, pitWindow: this.race.rules.pitWindow }
+        : { sessionMs: this.race.sessionMs },
     );
     for (const id of this.race.grid) this.tracker.addPlayer(id);
     // race control: flags in qualifying, the full procedures (FCY, safety car, penalties) in the race
@@ -799,6 +878,20 @@ export class RoomCore {
       // race control's events can be about any car, not just the one whose packet was processed
       const p = this.players.get(e.type === 'flag' ? sender.id : e.playerId) ?? sender;
       if (e.type === 'lap' || e.type === 'penalty') this.lastStandingsAt = 0; // the timing screen updates at once
+      // a signed-in driver's valid timed lap: their records (practice and qualifying laps too, the race's as well)
+      if (e.type === 'lap' && e.valid && !e.outLap && p.account && p.carId && this.race && this.env.record) {
+        const wet = weatherAt(this.race.weather, Math.max(0, (now - (this.startAt ?? now)) / 1000)).wetness > 0.3;
+        this.env.record({
+          kind: 'lap',
+          token: p.account,
+          trackId: this.race.trackId,
+          carId: p.carId,
+          lapMs: e.lapMs,
+          sectors: e.sectors,
+          session: this.race.kind,
+          wet,
+        });
+      }
       if (e.type === 'lap')
         this.broadcast({
           t: 'lap',
@@ -875,13 +968,33 @@ export class RoomCore {
         penaltyMs: s.penaltyMs,
       };
     });
+    // signed-in drivers' results (a driver who set no time in a timed session has no result)
+    if (this.env.record)
+      for (const s of st) {
+        const pl = this.players.get(s.id);
+        if (!pl?.account || !pl.carId || (s.bestLapMs === null && s.finishedMs === null)) continue;
+        this.env.record({
+          kind: 'result',
+          token: pl.account,
+          trackId: this.race.trackId,
+          carId: pl.carId,
+          session: this.race.kind,
+          position: s.position,
+          entrants: st.length,
+          bestLapMs: s.bestLapMs,
+          totalMs: s.finishedMs,
+        });
+      }
     // after qualifying, the race: grid in qualifying order (drivers without a time at the back)
-    const raceNext = this.race.kind === 'qualifying' && this.raceLaps > 0 && st.some((x) => !x.dnf || x.bestLapMs !== null);
-    this.raceAt = raceNext ? this.env.now() + QUALI_TO_RACE_MS : null;
+    // the weekend goes on: after free practice qualifying, after qualifying the race (by laps or by time)
+    const raceNext = this.race.kind === 'qualifying' && (this.raceLaps > 0 || this.raceMinutes > 0) && st.some((x) => !x.dnf || x.bestLapMs !== null);
+    const qualiNext = this.race.kind === 'practice';
+    this.nextSession = qualiNext ? 'qualifying' : 'race';
+    this.raceAt = raceNext || qualiNext ? this.env.now() + QUALI_TO_RACE_MS : null;
     this.raceGrid = raceNext ? st.map((x) => x.id) : [];
     this.broadcast({ t: 'results', raceId: this.race.raceId, kind: this.race.kind, rows, fastestLap: fastest, raceAt: this.raceAt });
     // back to the lobby for a rematch with the same code (or, after qualifying, to the race)
-    this.phase = raceNext ? 'results' : 'lobby';
+    this.phase = raceNext || qualiNext ? 'results' : 'lobby';
     this.race = null;
     this.tracker = null;
     this.rc = null;

@@ -81,20 +81,55 @@ export class PitLaneMonitor {
   measureBoxes(probe: WallProbe): void {
     if (this.geo.boxShift) return;
     const pts = this.lane.points;
-    const shift = this.boxes().map(([a, b]) => {
+    // The garage front over the box: rays every half metre along it at two heights, the nearest tenth of the hits.
+    // Rays through an open garage door go deep into the building (or find nothing): the median of five of them put
+    // the first Nürburgring boxes 7–15 m across, inside the garages, where the front was 4.4 m away
+    // (tools/sim/pitboxes.ts); rays between a lane's points find the pillars between the doors.
+    const raw = this.boxes().map(([a, b]) => {
       const d: number[] = [];
       for (let i = a; i <= b; i++) {
+        const j = Math.min(pts.length - 1, i + 1);
         const [ax, az] = this.geo.away[i];
-        const h = probe(pts[i][0], pts[i][1], pts[i][2], ax, az, 25);
-        if (h !== null) d.push(h);
+        const n = Math.max(1, Math.round(Math.hypot(pts[j][0] - pts[i][0], pts[j][2] - pts[i][2]) / 0.5));
+        for (let s = 0; s < n; s++) {
+          const f = s / n;
+          for (const lift of [0, 0.9]) {
+            const h = probe(
+              pts[i][0] + (pts[j][0] - pts[i][0]) * f,
+              pts[i][1] + (pts[j][1] - pts[i][1]) * f + lift,
+              pts[i][2] + (pts[j][2] - pts[i][2]) * f,
+              ax,
+              az,
+              25,
+            );
+            if (h !== null) d.push(h);
+          }
+        }
       }
-      if (d.length < (b - a + 1) / 2) return null;
+      if (!d.length) return null;
       d.sort((x, y) => x - y);
-      return Math.min(15, Math.max(0, d[Math.floor(d.length / 2)] - GARAGE_GAP - HALF));
+      return d[Math.floor(d.length / 10)];
     });
-    const found = shift.filter((x): x is number => x !== null).sort((x, y) => x - y);
-    const typical = found.length ? found[Math.floor(found.length / 2)] : 0;
-    this.geo.boxShift = shift.map((x) => x ?? typical);
+    // a post or a sign in front of one box is not the garage front: the median of each box and its neighbours
+    const shift = raw.map((x, k) => {
+      const w = raw
+        .slice(Math.max(0, Math.min(k - 1, raw.length - 3)), Math.max(0, Math.min(k - 1, raw.length - 3)) + 3)
+        .filter((v): v is number => v !== null);
+      if (x === null || !w.length) return x === null ? null : Math.min(15, Math.max(0, x - GARAGE_GAP - HALF));
+      w.sort((p, q) => p - q);
+      return Math.min(15, Math.max(0, Math.min(x, w[Math.floor(w.length / 2)] + 1.5) - GARAGE_GAP - HALF));
+    });
+    // a box with no wall found takes its neighbours' (garage fronts run in a smooth line)
+    this.geo.boxShift = shift.map((x, k) => {
+      if (x !== null) return x;
+      let lo = k - 1;
+      let hi = k + 1;
+      while (lo >= 0 && shift[lo] === null) lo--;
+      while (hi < shift.length && shift[hi] === null) hi++;
+      const l = lo >= 0 ? shift[lo] : null;
+      const r = hi < shift.length ? shift[hi] : null;
+      return l !== null && r !== null ? l + ((r - l) * (k - lo)) / (hi - lo) : (l ?? r ?? 0);
+    });
   }
 
   /** The box shift (m towards the garages) at lane point i (0 outside the boxes or before measureBoxes). */

@@ -15,3 +15,9 @@ tools/e2e/out/
 
 # car model downloads (third-party licences, ~0.5 GB): converted into apps/client/public/assets/cars by the pipeline
 CARS-MODELS/
+
+# server secrets for wrangler dev (the database URL): never committed
+.dev.vars
+
+# the user's source models (third-party licences): converted into apps/client/public/assets by the pipeline
+MODELS/

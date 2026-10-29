@@ -39,6 +39,11 @@ export class Environment {
   private rainMat: THREE.ShaderMaterial;
   /** 0 day … 1 full night. */
   night = 0;
+  /** The largest shadow map this GPU should get (half its texture limit: Ultra's 8192 needs 16384-capable GPUs). */
+  private maxShadowMap = 4096;
+  private shadowSize(q: QualityConfig): number {
+    return Math.min(q.shadowMapSize, this.maxShadowMap);
+  }
   sunElevation = 0;
   private envTarget: THREE.WebGLRenderTarget | null = null;
   /** Reflection environment; assigned per material (cars always, track on High/Ultra). */
@@ -65,8 +70,9 @@ export class Environment {
     scene.add(this.skyDome.mesh);
     scene.fog = this.fog;
 
+    this.maxShadowMap = Math.max(2048, renderer.capabilities.maxTextureSize / 2);
     this.sun.castShadow = quality.shadows;
-    this.sun.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
+    this.sun.shadow.mapSize.set(this.shadowSize(quality), this.shadowSize(quality));
     const r = quality.shadowRange;
     const cam = this.sun.shadow.camera;
     cam.left = -r;
@@ -219,7 +225,7 @@ export class Environment {
     }
     this.sun.target.position.copy(focus);
     // snap the shadow camera to texels to avoid shimmering
-    const texel = (this.quality.shadowRange * 2) / this.quality.shadowMapSize;
+    const texel = (this.quality.shadowRange * 2) / this.shadowSize(this.quality);
     this.sun.target.position.x = Math.round(this.sun.target.position.x / texel) * texel;
     this.sun.target.position.z = Math.round(this.sun.target.position.z / texel) * texel;
     this.sun.position.x += this.sun.target.position.x - focus.x;
@@ -335,7 +341,7 @@ export class Environment {
 
   setQuality(q: QualityConfig): void {
     this.quality = q;
-    this.sun.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
+    this.sun.shadow.mapSize.set(this.shadowSize(q), this.shadowSize(q));
     this.sun.shadow.map?.dispose();
     this.sun.shadow.map = null;
     this.skyDome.setDetail(q.cloudDetail);

@@ -135,6 +135,13 @@ html.mobile-app .modal-card {
 html.mobile-app .settings-grid {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
+html.mobile-app .settings-body {
+  height: calc(100vh - 150px - var(--sa-t) - var(--sa-b));
+}
+html.mobile-app .settings-tab {
+  font-size: 0.95rem;
+  padding: 0.45rem 0.7rem;
+}
 
 /* --------------------------------------------------------------- HUD --- */
 html.mobile-app .hud-tl {

@@ -1,6 +1,8 @@
 name = "apex-ghost-server"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
+# the accounts database driver (postgres) needs Node's APIs and TCP sockets
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [[durable_objects.bindings]]

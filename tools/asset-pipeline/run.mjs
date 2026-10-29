@@ -94,12 +94,12 @@ async function inventory() {
   await run(USD_PYTHON, ['tools/asset-pipeline/inventory.py'], 'inventory');
 }
 
-/** The biggest .glb / .gltf / .obj under a folder (a download's model, whatever its folder layout). */
+/** The biggest .glb / .gltf / .obj / .usdc (an unpacked .usdz) under a folder (a download's model, whatever its folder layout). */
 function modelIn(dir) {
   let best = null;
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const f = path.join(dir, e.name);
-    const cand = e.isDirectory() ? modelIn(f) : /\.(glb|gltf|obj)$/i.test(e.name) ? f : null;
+    const cand = e.isDirectory() ? modelIn(f) : /\.(glb|gltf|obj|usdc)$/i.test(e.name) ? f : null;
     if (cand && (!best || statSync(cand).size > statSync(best).size)) best = cand;
   }
   return best;
