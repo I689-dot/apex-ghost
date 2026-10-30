@@ -2,6 +2,7 @@ import { serviceTime, type ServicePlan, type Zones } from '../game/pitService';
 import { COMPOUNDS, type CompoundId } from '../physics/tyres';
 import { h } from './dom';
 import { uiAsset } from './images';
+import { ICONS } from './icons';
 import { t } from '../i18n';
 
 export interface PitMenuInfo {
@@ -65,7 +66,7 @@ export class PitMenu {
                 })
               : t('Keep the current set'),
           },
-          comp ? h('img', { src: uiAsset(`tyre_${id}.webp`), alt: comp.letter, draggable: 'false' }) : h('i', { text: '↺' }),
+          comp ? h('img', { src: uiAsset(`tyre_${id}.webp`), alt: comp.letter, draggable: 'false' }) : h('i', { html: ICONS.reset }),
           h('span', { text: comp ? comp.name : t('Keep') }),
           h('small', { text: `${i + 1}` }),
         );

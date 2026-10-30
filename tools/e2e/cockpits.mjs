@@ -31,7 +31,8 @@ for (let i = from; i <= to; i++) {
   try {
     await page.goto(URL);
     await page.click('button:has-text("Create room")');
-    await page.waitForSelector('.car-card');
+    await page.waitForSelector('.lb-steps');
+    await page.click('.lb-step >> nth=4');
     await page.click(`.car-card >> nth=${i}`);
     await page.waitForTimeout(600);
     await page.click('.lobby-actions button:has-text("Ready")');

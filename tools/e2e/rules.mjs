@@ -47,8 +47,8 @@ await page.goto(URL);
 await page.waitForSelector('.menu');
 await page.waitForTimeout(2500);
 await page.click('button.solo');
-await page.waitForSelector('.car-card', { timeout: 30_000 });
-await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
+await page.waitForSelector('.lb-steps', { timeout: 30_000 });
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
 // the four rules, through the lobby's switches
 for (const label of ['Car contact', 'Mandatory pit stop', 'Fuel and refuelling', 'Race control']) {
   await page.click(`.rules label:has-text("${label}") input`);
@@ -62,6 +62,7 @@ await page.evaluate(() => {
 await page.waitForTimeout(500);
 await shot('1-lobby');
 console.log('  rules:', (await page.evaluate(() => JSON.stringify(window.__app.room.rules))) ?? '?');
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');

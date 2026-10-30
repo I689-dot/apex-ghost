@@ -45,7 +45,8 @@ for (let k = 0; k < 4; k++) {
 await page.waitForSelector('button:has-text("Create room")', { timeout: 60_000 });
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 await page.click('button:has-text("Create room")');
-await page.waitForSelector('.car-card');
+await page.waitForSelector('.lb-steps');
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=16');
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(300);

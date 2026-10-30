@@ -104,7 +104,7 @@ const settingsInit = () => {
 
   if (!args.includes('--skip-race')) {
     await page.tap('button.solo');
-    await page.waitForSelector('.car-card', { timeout: 60_000 });
+    await page.waitForSelector('.lb-steps', { timeout: 60_000 });
     await page.waitForTimeout(2000);
     await page.screenshot({ path: path.join(out, 'mobile-06-app-lobby.png') });
     await page.tap('.car-card >> nth=0');

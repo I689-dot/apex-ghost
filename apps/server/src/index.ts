@@ -99,7 +99,7 @@ export default {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (url.pathname === '/health') return json({ ok: true });
-    const am = url.pathname.match(/^\/api\/(?:account\/)?(register|login|logout|me|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/);
+    const am = url.pathname.match(/^\/api\/(?:account\/)?(register|login|logout|delete|me|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/);
     if (am) return accountApi(req, env, am[1]);
 
     if (url.pathname === '/api/rooms' && req.method === 'GET') {

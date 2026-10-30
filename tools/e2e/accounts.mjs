@@ -60,7 +60,7 @@ console.log('  friends: request sent, accepted, A shown online in the menu');
 // A opens a room; B sees it on the friends list and joins from there
 await a.click('.mm-tabs button[data-tab="play"]');
 await a.click('button:has-text("Create room")');
-await a.waitForSelector('.car-card', { timeout: 30_000 });
+await a.waitForSelector('.lb-steps', { timeout: 30_000 });
 const code = await a.evaluate(() => window.__app.conn.code);
 await b.bringToFront();
 await b.waitForSelector(`.friend:has-text("In lobby ${code}")`, { timeout: 40_000 }).catch(async () => {
@@ -72,18 +72,19 @@ await b.waitForSelector(`.friend:has-text("In lobby ${code}")`, { timeout: 40_00
   await fail(`B does not see A in lobby ${code}: API ${seen} · panel: ${shown}`);
 });
 await b.click(`.friend:has-text("In lobby ${code}") button:has-text("Join")`);
-await b.waitForSelector('.car-card', { timeout: 30_000 }).catch(() => fail('B could not join from the friends list'));
+await b.waitForSelector('.lb-steps', { timeout: 30_000 }).catch(() => fail('B could not join from the friends list'));
 const nicks = await a.evaluate(() => window.__app.room.players.map((p) => p.nick));
 console.log(`  B joined ${code} from the friends list; room: ${nicks.join(', ')}`);
 if (!nicks.includes(`e2eB${tag}`)) await fail('B is not in the room');
 
 if (LAP) {
-  await a.selectOption('.prep .prep-row:nth-of-type(1) select', 'zandvoort');
-  await a.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
+  await a.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', 'zandvoort']);
+  await a.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
   for (const [p, n] of [
     [a, 0],
     [b, 1],
   ]) {
+    await p.click('.lb-step >> nth=4');
     await p.click(`.car-card >> nth=${n}`);
     await p.click('.lobby-actions button:has-text("Ready")');
   }

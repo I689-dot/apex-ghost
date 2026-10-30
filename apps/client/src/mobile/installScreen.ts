@@ -1,6 +1,7 @@
 import { h } from '../ui/dom';
 import { t } from '../i18n';
 import { uiAsset } from '../ui/images';
+import { ICONS } from '../ui/icons';
 import { APK_BETA_PATH, APK_PATH, APK_URL, isIOS } from './platform';
 
 const apkHref = (): string => `${import.meta.env.BASE_URL}${APK_PATH}`;
@@ -14,7 +15,7 @@ function betaLink(): HTMLElement {
     h(
       'a.install-btn.small',
       { href: betaHref(), download: 'apex-ghost-beta.apk', type: 'application/vnd.android.package-archive' },
-      h('span.install-ico', { text: '⬇' }),
+      h('span.install-ico', { html: ICONS.download }),
       h('b', { text: t('Try the beta') }),
     ),
     h('p.muted', {
@@ -37,7 +38,7 @@ export function installScreen(): HTMLElement {
     h(
       'a.install-btn',
       { href: apkHref(), download: 'apex-ghost.apk', type: 'application/vnd.android.package-archive' },
-      h('span.install-ico', { text: '⬇' }),
+      h('span.install-ico', { html: ICONS.download }),
       h('span', {}, h('b', { text: t('Install the app') }), h('small', { text: t('Android 7 or newer · APK') })),
     ),
     h('p.install-help', { text: t('After the download, open the file and allow your browser to install apps when Android asks.') }),
@@ -66,7 +67,7 @@ async function openGetApp(): Promise<void> {
     h(
       'div.modal-card.get-app-card',
       {},
-      h('header', {}, h('h2', { text: t('APEX GHOST on your phone') }), h('button.icon', { text: '✕', title: t('Close'), onclick: close })),
+      h('header', {}, h('h2', { text: t('APEX GHOST on your phone') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: close })),
       h(
         'div.get-app-body',
         {},
@@ -78,7 +79,7 @@ async function openGetApp(): Promise<void> {
           h(
             'a.install-btn.small',
             { href: apkHref(), download: 'apex-ghost.apk' },
-            h('span.install-ico', { text: '⬇' }),
+            h('span.install-ico', { html: ICONS.download }),
             h('b', { text: t('Download the APK') }),
           ),
           h('p.muted', { text: t('Touch or tilt steering, phone graphics, the same rooms and solo races. Android 7 or newer.') }),

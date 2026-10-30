@@ -37,10 +37,11 @@ await page.goto(URL);
 await page.waitForSelector('.menu');
 await page.waitForTimeout(1500);
 await page.click('button.solo');
-await page.waitForSelector('.car-card', { timeout: 30_000 });
-if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);
-await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
-await page.selectOption('.prep .prep-row:nth-of-type(3) select', TIME);
+await page.waitForSelector('.lb-steps', { timeout: 30_000 });
+if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', TRACK]);
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', TIME]);
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=0');
 for (let i = 0; i < 3; i++) {
   await page.click('button.add-bot');

@@ -69,8 +69,9 @@ for (let i = 0; i < 6 && !reached; i++) {
 }
 check(reached, `D-pad moves the menu focus (now on "${await focused()}")`);
 await press(0);
-await page.waitForSelector('.car-card', { timeout: 30_000 });
+await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 check(true, 'A pressed "Play solo" → lobby');
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=0');
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(300);

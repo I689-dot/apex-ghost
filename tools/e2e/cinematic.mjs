@@ -28,16 +28,17 @@ await page.addInitScript((q) => {
 await page.goto(URL);
 await page.waitForSelector('.menu', { timeout: 30_000 });
 await page.click('button:has-text("Create room")');
-await page.waitForSelector('.car-card', { timeout: 30_000 });
+await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 // clear midday weather so the shots are comparable
-await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear').catch(() => {});
-await page.selectOption('.prep .prep-row:nth-of-type(3) select', 'midday').catch(() => {});
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']).catch(() => {});
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', 'midday']).catch(() => {});
 await page.waitForTimeout(500);
 for (let i = 0; i < 3; i++) {
   await page.click('button.add-bot');
   await page.waitForTimeout(300);
 }
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=0');
 await page.waitForTimeout(800);
 await page.click('.lobby-actions button:has-text("Ready")');

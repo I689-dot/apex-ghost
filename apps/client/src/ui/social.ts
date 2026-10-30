@@ -2,6 +2,7 @@ import type { CarEntry, FriendEntry, Presence, RecordRow, UserStats } from '@ape
 import { h } from './dom';
 import { t } from '../i18n';
 import * as acc from '../net/account';
+import { ICONS } from './icons';
 
 /**
  * The menu's account parts: sign in / create an account (nickname + password), the friends list with where each
@@ -16,16 +17,49 @@ export interface TrackChoice {
 
 /* --------------------------------------------------------------- sign in --- */
 
-export function signInModal(onDone: () => void): HTMLElement {
-  const nick = h('input', { type: 'text', maxlength: 16, placeholder: t('Nickname'), autocomplete: 'username', spellcheck: 'false' });
-  const pw = h('input', { type: 'password', maxlength: 72, placeholder: t('Password'), autocomplete: 'current-password' });
-  const err = h('div.form-error');
+/**
+ * Sign in / create an account: one mode at a time (a switch at the top), labelled fields, a button that shows the
+ * password as typed, one action. Enter submits.
+ */
+export function signInModal(onDone: () => void, mode: 'login' | 'register' = 'login'): HTMLElement {
+  const nick = h('input.auth-input', { type: 'text', maxlength: 16, placeholder: t('Your nickname'), autocomplete: 'username', spellcheck: 'false' });
+  const pw = h('input.auth-input', { type: 'password', maxlength: 72, placeholder: t('Password'), autocomplete: 'current-password' });
+  const eye = h('button.auth-eye', { type: 'button', html: ICONS.eye, title: t('Show password'), 'aria-label': t('Show password'), 'aria-pressed': 'false' });
+  eye.addEventListener('click', () => {
+    const show = pw.type === 'password';
+    pw.type = show ? 'text' : 'password';
+    eye.innerHTML = show ? ICONS.eyeOff : ICONS.eye;
+    const label = show ? t('Hide password') : t('Show password');
+    eye.title = label;
+    eye.setAttribute('aria-label', label);
+    eye.setAttribute('aria-pressed', String(show));
+    pw.focus();
+  });
+  const err = h('div.form-error.auth-error');
+  const lead = h('p.auth-lead');
+  const hint = h('span.auth-hint');
+  const submit = h('button.primary.auth-submit', { type: 'submit' });
+  const tabLogin = h('button.auth-tab', { type: 'button', text: t('Sign in'), onclick: () => setMode('login') });
+  const tabRegister = h('button.auth-tab', { type: 'button', text: t('Create account'), onclick: () => setMode('register') });
+  const setMode = (m: 'login' | 'register') => {
+    mode = m;
+    tabLogin.classList.toggle('on', m === 'login');
+    tabRegister.classList.toggle('on', m === 'register');
+    lead.textContent =
+      m === 'login'
+        ? t('Welcome back. Sign in to play online with your friends.')
+        : t('Just a nickname and a password. Your laps and results are kept, and friends can find you.');
+    hint.textContent = m === 'register' ? t('4 to 72 characters') : '';
+    submit.textContent = m === 'login' ? t('Sign in') : t('Create account');
+    pw.autocomplete = m === 'login' ? 'current-password' : 'new-password';
+    err.textContent = '';
+  };
   const close = () => modal.remove();
-  const go = async (create: boolean) => {
+  const go = async () => {
     err.textContent = '';
     card.classList.add('busy');
     try {
-      if (create) await acc.register(nick.value, pw.value);
+      if (mode === 'register') await acc.register(nick.value, pw.value);
       else await acc.login(nick.value, pw.value);
       close();
       onDone();
@@ -35,23 +69,42 @@ export function signInModal(onDone: () => void): HTMLElement {
       card.classList.remove('busy');
     }
   };
-  pw.addEventListener('keydown', (e) => e.key === 'Enter' && void go(false));
   const card = h(
-    'div.modal-card.sign-in',
-    {},
-    h('header', {}, h('h2', { text: t('Your account') }), h('button.icon', { text: '✕', title: t('Close'), onclick: close })),
-    h('p.muted', { text: t('Just a nickname and a password. Your laps and results are kept, and friends can find you.') }),
-    nick,
-    pw,
-    err,
+    'form.auth-card',
+    {
+      onsubmit: (e: Event) => {
+        e.preventDefault();
+        void go();
+      },
+    },
     h(
-      'div.sign-in-actions',
+      'header.auth-head',
       {},
-      h('button.primary', { text: t('Sign in'), onclick: () => void go(false) }),
-      h('button', { text: t('Create account'), onclick: () => void go(true) }),
+      h('div', {}, h('span.auth-kicker', { text: 'APEX GHOST' }), h('h2', { text: t('Your account') })),
+      h('button.auth-close', { type: 'button', html: ICONS.close, title: t('Close'), 'aria-label': t('Close'), onclick: close }),
     ),
+    h('div.auth-tabs', {}, tabLogin, tabRegister),
+    lead,
+    h('label.auth-field', {}, h('span', { text: t('Nickname') }), nick),
+    h('label.auth-field', {}, h('span', {}, t('Password'), hint), h('div.auth-pw', {}, pw, eye)),
+    err,
+    submit,
+    h('p.auth-foot', { text: t('Online play needs an account. Solo races work without one.') }),
   );
-  const modal: HTMLElement = h('div.modal', { onclick: (e: Event) => e.target === modal && close() }, card);
+  setMode(mode);
+  const modal: HTMLElement = h('div.modal.auth-modal', { onclick: (e: Event) => e.target === modal && close() }, card);
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || !modal.isConnected) return;
+    e.stopPropagation();
+    close();
+  };
+  window.addEventListener('keydown', onKey, true);
+  new MutationObserver((_, obs) => {
+    if (!modal.isConnected) {
+      window.removeEventListener('keydown', onKey, true);
+      obs.disconnect();
+    }
+  }).observe(document.body, { childList: true });
   queueMicrotask(() => nick.focus());
   return modal;
 }
@@ -146,7 +199,7 @@ export function friendsPanel(tracks: () => TrackChoice[], join: (code: string) =
         {},
         ...actions,
         f.status === 'friend'
-          ? h('button.icon.small', { text: '✕', title: t('Remove friend'), onclick: () => void acc.removeFriend(f.id).then(refresh) })
+          ? h('button.icon.small', { html: ICONS.close, title: t('Remove friend'), onclick: () => void acc.removeFriend(f.id).then(refresh) })
           : null,
       ),
     );
@@ -306,7 +359,7 @@ export function recordsModal(tracks: TrackChoice[], cars: CarEntry[], startTrack
   const card = h(
     'div.modal-card.records',
     {},
-    h('header', {}, h('h2', { text: t('Records') }), h('button.icon', { text: '✕', title: t('Close'), onclick: close })),
+    h('header', {}, h('h2', { text: t('Records') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: close })),
     h('div.records-grid', {}, h('section', {}, h('h3', { text: t('Lap records') }), filters, body), h('section', {}, career)),
   );
   const modal: HTMLElement = h('div.modal', { onclick: (e: Event) => e.target === modal && close() }, card);

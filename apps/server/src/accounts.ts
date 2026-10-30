@@ -16,7 +16,7 @@ import { NICK_MAX, NICK_MIN, type AccountUser, type FriendEntry, type RecordRow,
 import type { RecordEvent } from './room';
 
 export type AccountOp =
-  'register' | 'login' | 'logout' | 'me' | 'friends' | 'friends/add' | 'friends/accept' | 'friends/remove' | 'presence' | 'records' | 'stats';
+  'register' | 'login' | 'logout' | 'delete' | 'me' | 'friends' | 'friends/add' | 'friends/accept' | 'friends/remove' | 'presence' | 'records' | 'stats';
 
 /** An HTTP status and the JSON body (as text: RPC carries it unchanged). */
 export interface AccountReply {
@@ -160,6 +160,9 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
         case 'logout':
           if (token) this.sql.exec('delete from tokens where token = ?', token);
           return { status: 200, body: { ok: true } };
+        case 'delete':
+          await this.deleteAccount(token, body);
+          return { status: 200, body: { ok: true } };
         case 'me': {
           const u = this.userOf(token);
           return u ? { status: 200, body: { user: u } } : { status: 401, body: { error: 'Sign in first.' } };
@@ -288,6 +291,21 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     if (!u || !sameHash(await hashPassword(pw, u.salt), u.pass_hash)) throw new HttpError(401, 'Wrong nickname or password.');
     this.sql.exec('update users set last_seen = ? where id = ?', Date.now(), u.id);
     return { token: this.newToken(u.id), user: { id: u.id, nick: u.nick } };
+  }
+
+  /** Delete my account and everything of it (friends, laps, results): signed in, and the password again. */
+  private async deleteAccount(token: string | null, body: Record<string, unknown>): Promise<void> {
+    const me = this.requireUser(token);
+    const pw = checkPassword(body.password);
+    const u = this.rows<{ pass_hash: string; salt: string }>('select pass_hash, salt from users where id = ?', me.id)[0];
+    if (!u || !sameHash(await hashPassword(pw, u.salt), u.pass_hash)) throw new HttpError(401, 'Wrong password.');
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec('delete from tokens where user_id = ?', me.id);
+      this.sql.exec('delete from friends where user_id = ?1 or friend_id = ?1', me.id);
+      this.sql.exec('delete from laps where user_id = ?', me.id);
+      this.sql.exec('delete from results where user_id = ?', me.id);
+      this.sql.exec('delete from users where id = ?', me.id);
+    });
   }
 
   /** Friends and requests (presence filled in by the Worker, from the DirectoryDO). */

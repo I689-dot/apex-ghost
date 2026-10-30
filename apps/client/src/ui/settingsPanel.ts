@@ -11,6 +11,7 @@ import {
   type QualityPreset,
 } from '../settings';
 import { h } from './dom';
+import { ICONS } from './icons';
 import { LANGUAGES, setLang, t } from '../i18n';
 import { IS_APP } from '../mobile/platform';
 import { applyFrameRate, frameRateChoices } from '../mobile/refreshRate';
@@ -546,7 +547,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     h(
       'div.modal-card.settings',
       {},
-      h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { text: '✕', title: t('Close'), onclick: onClose })),
+      h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: onClose })),
       tabBar,
       body,
     ),

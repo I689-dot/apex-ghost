@@ -60,14 +60,15 @@ await page.addInitScript(
 );
 await page.goto(`${URL}/?app=${APP ? 1 : 0}`);
 await page.click('button:has-text("Create room")');
-await page.waitForSelector('.car-card');
+await page.waitForSelector('.lb-steps');
 await page.waitForTimeout(800);
-if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);
+if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', TRACK]);
 // each choice goes through the room and re-renders the lobby: wait for it before the next one
-await page.selectOption('.prep .prep-row:nth-of-type(2) select', WEATHER);
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', WEATHER]);
 await page.waitForTimeout(600);
-await page.selectOption('.prep .prep-row:nth-of-type(3) select', TIME);
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', TIME]);
 await page.waitForTimeout(600);
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=16');
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(400);

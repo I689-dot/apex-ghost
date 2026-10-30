@@ -1,5 +1,5 @@
 import { h } from './dom';
-import { uiAsset } from './images';
+import { cssUrl } from './images';
 
 /** One shot of the reel: a photo with a camera move, or a car sweeping in over a blurred photo. */
 export interface ReelShot {
@@ -31,7 +31,7 @@ export function cinematicReel(
   const el = h('div.reel', { style: `--shot: ${shotMs}ms` });
   if (opts.bars !== false) el.classList.add('bars');
   const items = shots.map((s) => {
-    const shot = h(`div.reel-shot.m-${s.move}`, { style: `--img: url(${uiAsset(s.photo)})` });
+    const shot = h(`div.reel-shot.m-${s.move}`, { style: `--img: ${cssUrl(s.photo)}` });
     if (s.move === 'car' && s.car) {
       const car = h('img.reel-car', { src: s.car, alt: '', draggable: 'false' });
       car.addEventListener('error', () => car.remove());

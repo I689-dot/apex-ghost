@@ -52,12 +52,13 @@ const shot = (name) => page.screenshot({ path: path.join(out, `${name}.png`), ti
 
 await page.goto(URL);
 await page.click('button:has-text("Create room")');
-await page.waitForSelector('.car-card', { timeout: 30_000 });
+await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (WEATHER) {
-  await page.selectOption('.prep .prep-row:nth-of-type(2) select', WEATHER);
+  await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', WEATHER]);
   await page.waitForTimeout(500);
 }
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=16');
 await page.waitForTimeout(800);
 for (let i = 0; i < BOTS; i++) {

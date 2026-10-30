@@ -1,4 +1,5 @@
 import { h } from '../ui/dom';
+import { ICONS } from '../ui/icons';
 import { t } from '../i18n';
 import { settings, type ControlAction } from '../settings';
 import { touchInput } from '../physics/input';
@@ -33,13 +34,13 @@ export class TouchControls {
 
   constructor() {
     this.knob = h('div.tc-knob');
-    this.steerPad = h('div.tc-steer', {}, h('div.tc-arrow.l', { text: '◀' }), this.knob, h('div.tc-arrow.r', { text: '▶' }));
+    this.steerPad = h('div.tc-steer', {}, h('div.tc-arrow.l', { html: ICONS.left }), this.knob, h('div.tc-arrow.r', { html: ICONS.right }));
     this.tiltBar = h('div.tc-tilt', {}, h('i'), h('span', { text: t('TILT') }));
     this.brake = this.pedal('tc-brake', t('BRAKE'), (v) => (touchInput.brake = v));
     this.throttle = this.pedal('tc-throttle', t('GAS'), (v) => (touchInput.throttle = v));
     this.left = h('div.tc-left');
     this.right = h('div.tc-right');
-    this.skip = h('button.tc-btn.tc-skip', { text: t('Skip intro ▸') });
+    this.skip = h('button.tc-btn.tc-skip', { text: t('Skip intro') });
     this.skip.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       dispatchKey('Enter', 'Enter', true);
@@ -52,7 +53,7 @@ export class TouchControls {
       this.tap('tc-pause', 'II', 'pause', t('Pause menu')),
       this.hold('tc-timing', t('TIMES'), 'timing'),
       this.hold('tc-look', t('BACK'), 'lookBack', t('Look back')),
-      this.tap('tc-reset', '↺', 'resetCar', t('Reset to track')),
+      this.tap('tc-reset', ICONS.reset, 'resetCar', t('Reset to track')),
       this.tap('tc-cam', 'CAM', 'camera', t('Change camera')),
       this.gearboxBtn,
     );
@@ -63,7 +64,7 @@ export class TouchControls {
       this.tap('tc-down', '−', 'shiftDown', t('Shift down')),
       this.hold('tc-hb', t('HB'), 'handbrake', t('Handbrake')),
     );
-    const spec = h('div.tc-spec', {}, this.specBtn('◀', 'ArrowLeft'), this.specBtn('▶', 'ArrowRight'));
+    const spec = h('div.tc-spec', {}, this.specBtn(ICONS.left, 'ArrowLeft'), this.specBtn(ICONS.right, 'ArrowRight'));
     this.el = h('div.touch-controls', {}, top, this.left, h('div.tc-right-wrap', {}, gears, this.right), this.skip, spec);
     this.bindSteer();
     this.layout();
@@ -127,7 +128,8 @@ export class TouchControls {
 
   /** A button that taps a bound key once. */
   private tap(cls: string, label: string, action: ControlAction, title?: string): HTMLElement {
-    const b = h(`button.tc-btn.${cls}`, { text: label, title, 'aria-label': title ?? label });
+    const icon = label.startsWith('<svg');
+    const b = h(`button.tc-btn.${cls}`, { [icon ? 'html' : 'text']: label, title, 'aria-label': title ?? (icon ? cls : label) });
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       pressAction(action, true);
@@ -141,7 +143,8 @@ export class TouchControls {
 
   /** A button that holds a bound key while touched. */
   private hold(cls: string, label: string, action: ControlAction, title?: string): HTMLElement {
-    const b = h(`button.tc-btn.${cls}`, { text: label, title, 'aria-label': title ?? label });
+    const icon = label.startsWith('<svg');
+    const b = h(`button.tc-btn.${cls}`, { [icon ? 'html' : 'text']: label, title, 'aria-label': title ?? (icon ? cls : label) });
     let held = false;
     const release = () => {
       if (!held) return;
@@ -163,7 +166,7 @@ export class TouchControls {
   }
 
   private specBtn(label: string, key: 'ArrowLeft' | 'ArrowRight'): HTMLElement {
-    const b = h('button.tc-btn', { text: label });
+    const b = h('button.tc-btn', { html: label });
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       dispatchKey(key, key, true);

@@ -24,9 +24,10 @@ const mk = async (nick) => {
 };
 const host = await mk('Hosty');
 await host.click('button:has-text("Create room")');
-await host.waitForSelector('.car-card');
+await host.waitForSelector('.lb-steps');
 await host.check('.switch-row input');
-await host.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
+await host.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
+await host.click('.lb-step >> nth=4');
 await host.click('.car-card >> nth=0');
 for (let i = 0; i < 3; i++) {
   await host.click('button.add-bot');

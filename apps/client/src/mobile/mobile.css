@@ -196,7 +196,7 @@ html.mobile-app .hud-bl {
   transform-origin: top left;
 }
 html.mobile-app .hud-reset {
-  font-size: 0; /* "Press R…": the ↺ button does it */
+  font-size: 0; /* "Press R…": the reset button does it */
 }
 html.mobile-app .countdown {
   transform: scale(0.75);

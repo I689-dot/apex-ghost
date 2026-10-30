@@ -66,16 +66,18 @@ const mk = async (nick) => {
 
 const host = await mk('Hosty');
 await host.click('button:has-text("Create room")');
-await host.waitForSelector('.car-card');
+await host.waitForSelector('.lb-steps');
 const code = await host.evaluate(() => window.__app.conn.code);
 await host.click('.rules label:has-text("Car contact") input');
 await host.evaluate(() => window.__app.conn.sendJson({ t: 'setSession', minutes: 5 }));
+await host.click('.lb-step >> nth=4');
 await host.click('.car-card >> nth=0');
 await host.click('.lobby-actions button:has-text("Ready")');
 const guest = await mk('Guesty');
 await guest.fill('input.code-input', code);
 await guest.click('.menu-card button:has-text("Join")');
-await guest.waitForSelector('.car-card', { timeout: 30_000 });
+await guest.waitForSelector('.lb-steps', { timeout: 30_000 });
+await guest.click('.lb-step >> nth=4');
 await guest.click('.car-card >> nth=1');
 await guest.click('.lobby-actions button:has-text("Ready")');
 await host.waitForTimeout(800);

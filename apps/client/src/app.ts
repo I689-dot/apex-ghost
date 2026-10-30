@@ -1,5 +1,5 @@
 import { GameAudio } from './audio/audio';
-import { heroUrl, uiAsset } from './ui/images';
+import { cssUrl, heroUrl, uiAsset } from './ui/images';
 import { COMPOUNDS, type CompoundId } from './physics/tyres';
 import { SETUP, WING, recommendSetup } from './game/carSetup';
 import { FUEL, TYRE_PRESSURE, idealColdPsi } from './physics/vehicle';
@@ -45,8 +45,11 @@ import { mobileAppLink } from './mobile/installScreen';
 import * as acc from './net/account';
 import { friendsPanel, recordsModal, signInModal } from './ui/social';
 import { cinematicReel, trackReel } from './ui/reel';
+import { ICONS } from './ui/icons';
+import { trackOutline } from './ui/trackMap';
 
 type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 'results';
+type LobbyStep = 'circuit' | 'conditions' | 'session' | 'rules' | 'car';
 
 const hp = (kw: number) => Math.round(kw * 1.341);
 
@@ -176,7 +179,7 @@ export class App {
     this.setBackdrop('hero');
     // signed in: your nickname is the account's
     const signedIn = acc.account();
-    const nick = h('input', {
+    const nick = h('input.mm-nick', {
       type: 'text',
       maxlength: 16,
       placeholder: t('Your nickname'),
@@ -279,12 +282,12 @@ export class App {
         if (!on && this.screen === 'menu') this.showMenu(error);
       });
     const signIn = () => document.body.append(signInModal(() => this.showMenu()));
-    const locked = (text: string) => h('div.mm-lock', {}, h('span.mm-lock-icon', { text: '🔒' }), h('span', { text }));
+    const locked = (text: string) => h('div.mm-lock', {}, h('span.mm-lock-icon', { html: ICONS.lock }), h('span', { text }));
     /** A big mode tile, as in the F1 / GT menus: a photo, a title, one line, and what it does. */
     const tile = (cls: string, photo: string, kicker: string, title: string, sub: string, onclick: (() => void) | null, extra?: HTMLElement | null) =>
       h(
         `button.mm-tile.${cls}`,
-        { onclick: onclick ?? (() => signIn()), style: `--photo: url(${uiAsset(photo)})`, 'aria-disabled': onclick ? null : 'true' },
+        { onclick: onclick ?? (() => signIn()), style: `--photo: ${cssUrl(photo)}`, 'aria-disabled': onclick ? null : 'true' },
         h('span.mm-tile-kicker', { text: kicker }),
         h('span.mm-tile-title', { text: title }),
         h('span.mm-tile-sub', { text: sub }),
@@ -400,8 +403,8 @@ export class App {
           'div.mm-profile',
           {},
           h('span.mm-avatar', { text: initials }),
-          h('div.mm-who', {}, h('b', { text: signedIn.user.nick }), h('span.mm-status.on', { text: t('Online') })),
-          h('button.ghost.small', {
+          h('div.mm-who', {}, h('b.mm-name', { text: signedIn.user.nick }), h('span.mm-status.on', { text: t('Online') })),
+          h('button.mm-profile-btn.ghost', {
             text: t('Sign out'),
             onclick: async () => {
               await acc.logout().catch(() => {});
@@ -413,8 +416,8 @@ export class App {
           'div.mm-profile',
           {},
           h('span.mm-avatar.off', { text: initials }),
-          h('div.mm-who', {}, nick, h('span.mm-status', { text: t('Offline · solo only') })),
-          h('button.small', { text: t('Sign in'), onclick: signIn }),
+          h('label.mm-who', { title: t('Your nickname for solo races') }, nick, h('span.mm-status', { text: t('Offline · solo only') })),
+          h('button.mm-profile-btn.primary', { text: t('Sign in'), onclick: signIn }),
         );
     this.setUi(
       h(
@@ -768,6 +771,256 @@ export class App {
     );
   }
 
+  /** The lobby's current step (per room: a guest starts on the car, the host on the circuit). */
+  private lobbyStep: { room: string; step: LobbyStep } | null = null;
+
+  /**
+   * The session set up one step at a time, as in ACC / GT7 / F1 lobbies: circuit (cards with each layout's outline,
+   * a large preview), conditions, session, rules, car. The host edits; everyone else sees the choices. Each step's
+   * tab carries a summary of its choice.
+   */
+  private lobbySetup(room: RoomSnapshot, isHost: boolean, carPane: HTMLElement, carName: string | null): HTMLElement[] {
+    const c = room.conditions;
+    const edit = isHost && room.phase === 'lobby';
+    if (this.lobbyStep?.room !== room.code) this.lobbyStep = { room: room.code, step: isHost ? 'circuit' : 'car' };
+    const step = this.lobbyStep.step;
+    const go = (s: LobbyStep) => {
+      if (this.lobbyStep) this.lobbyStep.step = s;
+      this.renderLobby();
+    };
+    const send = (patch: Record<string, unknown>) => this.conn?.sendJson({ t: 'setConditions', ...patch } as ClientMsg);
+    const tracks = this.trackIndex.length ? this.trackIndex : [{ id: c.trackId, name: 'Nürburgring GP', length: 5148, turns: 15 } as TrackIndexEntry];
+    const track = tracks.find((tr) => tr.id === c.trackId) ?? tracks[0];
+    const plan = planWeather(c.seed, c);
+    const w0 = weatherAt(plan, 0);
+    const temp0 = temperatures(plan, w0, track?.map);
+    const rules = room.rules ?? { contact: false, pitWindow: false, fuel: false, raceControl: false };
+    const raceKey = (room.raceMinutes ?? 0) > 0 ? `T${room.raceMinutes}` : `L${room.raceLaps}`;
+    const raceLabel = (k: string) => {
+      const n = Number(k.slice(1));
+      return k[0] === 'T' ? t('Race: {m} min + 1 lap', { m: n }) : n === 0 ? t('Qualifying only') : t('Race: {n} laps', { n });
+    };
+    const rerender = () => {
+      if (this.screen === 'lobby') this.renderLobby();
+    };
+
+    /** Choice chips (the host picks; everyone else sees the choice lit). */
+    const chips = <T extends string | number>(value: T, options: [T, string][], on: (v: T) => void) =>
+      h(
+        `div.lb-chips${edit ? '' : '.ro'}`,
+        { role: 'radiogroup' },
+        ...options.map(([v, label]) =>
+          h(`button.lb-chip${v === value ? '.on' : ''}`, {
+            type: 'button',
+            role: 'radio',
+            'aria-checked': String(v === value),
+            text: label,
+            disabled: !edit && v !== value,
+            onclick: () => edit && v !== value && on(v),
+          }),
+        ),
+      );
+    /** A switch with a title and what it does. */
+    const toggle = (on: boolean, title: string, help: string, set: ((v: boolean) => void) | null) =>
+      h(
+        `button.lb-toggle${on ? '.on' : ''}`,
+        { type: 'button', role: 'switch', 'aria-checked': String(on), disabled: !set, onclick: () => set?.(!on) },
+        h('span.lb-toggle-text', {}, h('b', { text: title }), h('small', { text: help })),
+        h('span.lb-switch', {}, h('i')),
+      );
+    const field = (label: string, ctrl: HTMLElement) => h('div.lb-field', {}, h('h4', { text: label }), ctrl);
+
+    // --- the steps
+    const ruleItems: [keyof RaceRules, string, string][] = [
+      ['contact', t('Car contact'), t('Cars collide and take damage (off: ghost cars that pass through each other)')],
+      ['pitWindow', t('Mandatory pit stop'), t('Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint')],
+      ['fuel', t('Fuel and refuelling'), t('Engines burn fuel, you choose your fuel load, stops can refuel (endurance)')],
+      ['raceControl', t('Race control'), t('Yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties')],
+    ];
+    const rulesOn = ruleItems.filter(([k]) => rules[k]).length;
+    const steps: [LobbyStep, string, string][] = [
+      ['circuit', t('Circuit'), t(track?.name ?? '')],
+      ['conditions', t('Conditions'), `${t(WEATHER_LABEL[plan.kind])} · ${formatHour(plan.startHour)}`],
+      ['session', t('Session'), raceLabel(raceKey)],
+      ['rules', t('Rules'), rulesOn ? t('{n} of {max} on', { n: rulesOn, max: ruleItems.length }) : t('Ghost cars')],
+      ['car', t('Car'), carName ?? t('Pick a car')],
+    ];
+    const at = steps.findIndex(([k]) => k === step);
+
+    let pane: HTMLElement;
+    if (step === 'circuit') {
+      const preview = trackOutline(track.id, rerender);
+      const sfx = track.map && track.map !== 'nurburgring' ? `_${track.map}` : '';
+      pane = h(
+        'div.lb-circuit',
+        {},
+        h(
+          'div.trk-preview',
+          { style: `--photo: ${cssUrl(track.map === 'zandvoort' ? `photo_aerial${sfx}.webp` : 'photo_grid.webp')}` },
+          h('div.trk-preview-map', { html: preview ?? '' }),
+          h(
+            'div.trk-preview-info',
+            {},
+            h('span.lb-kicker', { text: edit ? t('Selected circuit') : t('The host chose') }),
+            h('h2', { text: t(track.name) }),
+            h(
+              'div.trk-facts',
+              {},
+              h('span', {}, h('b', { text: `${(track.length / 1000).toFixed(2)} km` }), h('small', { text: t('Lap length') })),
+              track.turns ? h('span', {}, h('b', { text: String(track.turns) }), h('small', { text: t('Turns') })) : null,
+              h('span', {}, h('b', { text: track.map === 'zandvoort' ? 'NL' : 'DE' }), h('small', { text: t('Country') })),
+            ),
+          ),
+        ),
+        h(
+          'div.trk-list',
+          {},
+          ...tracks.map((tr) =>
+            h(
+              `button.trk-card${tr.id === track.id ? '.on' : ''}`,
+              {
+                type: 'button',
+                'data-id': tr.id,
+                disabled: !edit && tr.id !== track.id,
+                onclick: () => edit && tr.id !== track.id && send({ trackId: tr.id }),
+              },
+              h('span.trk-card-map', { html: trackOutline(tr.id, rerender) ?? '' }),
+              h('span.trk-card-name', { text: t(tr.name) }),
+              h('span.trk-card-sub', { text: `${(tr.length / 1000).toFixed(2)} km${tr.turns ? ` · ${t('{n} turns', { n: tr.turns })}` : ''}` }),
+            ),
+          ),
+        ),
+      );
+    } else if (step === 'conditions') {
+      const change = plan.change
+        ? t('{weather} from about minute {min}', { weather: t(WEATHER_LABEL[plan.change.to]), min: Math.max(1, Math.round(plan.change.atSec / 60)) })
+        : t('Stable conditions');
+      const state = w0.wetness > 0.3 ? 'wet' : w0.wetness > 0.05 ? 'damp' : 'dry';
+      pane = h(
+        'div.lb-grid',
+        {},
+        h(
+          'div.lb-col',
+          {},
+          field(
+            t('Weather'),
+            chips(c.weather, [['random', t('Random')], ...WEATHER_KINDS.map((k) => [k, t(WEATHER_LABEL[k])] as [string, string])] as [string, string][], (v) =>
+              send({ weather: v }),
+            ),
+          ),
+          field(
+            t('Time of day'),
+            chips(c.time, Object.entries(TIME_LABEL).map(([k, v]) => [k, t(v)]) as [string, string][], (v) => send({ time: v })),
+          ),
+          field(
+            t('Weather changes'),
+            chips(
+              c.changes,
+              [
+                ['random', t('Possible')],
+                ['off', t('Stable')],
+                ['on', t('Changing')],
+              ],
+              (v) => send({ changes: v }),
+            ),
+          ),
+        ),
+        h(
+          'div.lb-forecast',
+          {},
+          h('span.lb-kicker', { text: t('Forecast') }),
+          h('h3', { text: `${t(WEATHER_LABEL[plan.kind])} · ${formatHour(plan.startHour)}` }),
+          h('p', { text: t(`${state} track`) }),
+          h('p', { text: change }),
+          h(
+            'div.trk-facts',
+            {},
+            h('span', {}, h('b', { text: `${Math.round(temp0.airC)} °C` }), h('small', { text: t('Air') })),
+            h('span', {}, h('b', { text: `${Math.round(temp0.trackC)} °C` }), h('small', { text: t('Track') })),
+          ),
+          edit ? h('button.ghost.small', { text: t('New forecast'), onclick: () => send({ reroll: true }) }) : null,
+        ),
+      );
+    } else if (step === 'session') {
+      pane = h(
+        'div.lb-col',
+        {},
+        field(
+          t('Free practice'),
+          chips(
+            room.practiceMinutes ?? 0,
+            PRACTICE_MINUTE_CHOICES.map((m) => [m, m === 0 ? t('No practice') : t('{m} min', { m })] as [number, string]),
+            (v) => this.conn?.sendJson({ t: 'setPractice', minutes: Number(v) }),
+          ),
+        ),
+        field(
+          t('Qualifying'),
+          chips(
+            room.sessionMinutes,
+            SESSION_MINUTES.map((m) => [m, t('{m} min', { m })] as [number, string]),
+            (v) => this.conn?.sendJson({ t: 'setSession', minutes: Number(v) }),
+          ),
+        ),
+        field(
+          t('Race'),
+          chips(
+            raceKey,
+            [...RACE_LAP_CHOICES.map((n) => `L${n}`), ...RACE_MINUTE_CHOICES.filter((m) => m > 0).map((m) => `T${m}`)].map(
+              (k) => [k, raceLabel(k)] as [string, string],
+            ),
+            (v) => {
+              const n = Number(v.slice(1));
+              if (v[0] === 'T') this.conn?.sendJson({ t: 'setRaceMinutes', minutes: n });
+              else {
+                this.conn?.sendJson({ t: 'setRaceMinutes', minutes: 0 });
+                this.conn?.sendJson({ t: 'setRaceLaps', laps: n });
+              }
+            },
+          ),
+        ),
+        isLocalCode(room.code)
+          ? null
+          : field(
+              t('Room'),
+              toggle(
+                room.isPublic,
+                t('Public room'),
+                t('Public: listed, anyone can join or watch'),
+                edit ? (v) => this.conn?.sendJson({ t: 'setPublic', isPublic: v }) : null,
+              ),
+            ),
+      );
+    } else if (step === 'rules') {
+      pane = h(
+        'div.lb-toggles',
+        {},
+        ...ruleItems.map(([k, label, help]) => toggle(rules[k], label, help, edit ? (v) => this.conn?.sendJson({ t: 'setRules', rules: { [k]: v } }) : null)),
+      );
+    } else pane = carPane;
+
+    const nav = h(
+      'nav.lb-steps',
+      {},
+      ...steps.map(([k, label, sum], i) =>
+        h(
+          `button.lb-step${k === step ? '.on' : ''}${i < at ? '.done' : ''}`,
+          { type: 'button', onclick: () => go(k) },
+          h('span.lb-step-n', { text: String(i + 1).padStart(2, '0') }),
+          h('span.lb-step-text', {}, h('b', { text: label }), h('small', { text: sum })),
+        ),
+      ),
+    );
+    const prev = steps[at - 1];
+    const next = steps[at + 1];
+    const foot = h(
+      'div.lb-foot',
+      {},
+      prev ? h('button.ghost', { type: 'button', html: `${ICONS.left} ${t(prev[1])}`, onclick: () => go(prev[0]) }) : h('span'),
+      next ? h('button.primary.lb-next', { type: 'button', html: `${t(next[1])} ${ICONS.right}`, onclick: () => go(next[0]) }) : h('span'),
+    );
+    return [nav, h(`div.lb-pane.lb-pane-${step}`, {}, pane), foot];
+  }
+
   /** The host's rules (switches for the host in the lobby, a summary for everyone else). */
   private rulesPanel(room: RoomSnapshot, edit: boolean): HTMLElement {
     const rules = room.rules ?? { contact: false, pitWindow: false, fuel: false, raceControl: false };
@@ -1019,10 +1272,10 @@ export class App {
             title: t('{name} tyres', { name: t(COMPOUNDS[p.tyre ?? 'medium'].name) }),
             alt: '',
           }),
-          h('span.car', { text: p.carId ? (cars.find((c) => c.id === p.carId)?.name ?? p.carId) : p.waiting ? t('next race') : 'choosing…' }),
+          h('span.car', { text: p.carId ? (cars.find((c) => c.id === p.carId)?.name ?? p.carId) : p.waiting ? t('next race') : t('choosing…') }),
           h(`span.ready${p.ready ? '.on' : ''}`, { text: p.connected ? (p.ready ? t('READY') : '') : t('OFFLINE') }),
           p.bot && isHost && room.phase === 'lobby'
-            ? h('button.remove-bot', { text: '✕', title: t('Remove this bot'), onclick: () => this.conn?.sendJson({ t: 'removeBot', id: p.id }) })
+            ? h('button.remove-bot', { html: ICONS.close, title: t('Remove this bot'), onclick: () => this.conn?.sendJson({ t: 'removeBot', id: p.id }) })
             : null,
         ),
       ),
@@ -1092,7 +1345,7 @@ export class App {
         )
       : h('div.spec', {}, h('h2', { text: t('Pick a car') }));
     const readyBtn = h(`button${mine?.ready ? '.on' : ''}`, {
-      text: mine?.ready ? t('Ready ✓') : t('Ready'),
+      text: t('Ready'),
       disabled: !mine?.carId || room.phase !== 'lobby' || mine.waiting,
       onclick: () => this.conn?.sendJson({ t: 'ready', ready: !mine?.ready }),
     });
@@ -1139,7 +1392,12 @@ export class App {
           h('button.ghost', { text: t('Leave'), onclick: () => this.leave() }),
         ),
       ),
-      h('main.lobby-main', {}, banner, h('div.lobby-top', {}, this.prepPanel(room, isHost), spec), grid),
+      h(
+        'main.lobby-main.lb',
+        {},
+        banner,
+        ...this.lobbySetup(room, isHost, h('div.lb-car', {}, spec, grid), mine?.carId ? (cars.find((c) => c.id === mine.carId)?.name ?? null) : null),
+      ),
     );
     // keep scroll position of the car grid across re-renders
     const oldGrid = this.lobbyEl?.querySelector('.car-grid');
@@ -1296,11 +1554,7 @@ export class App {
         h('p.muted', { text: t('The conditions are final. Set up your car for them; the session loads when everyone is ready.') }),
         h('h3', { text: t('Drivers') }),
         drivers,
-        h(
-          `button.primary${done ? '.on' : ''}`,
-          { disabled: done, onclick: () => this.conn?.sendJson({ t: 'briefed' }) },
-          done ? t('Ready ✓') : t('Ready to go'),
-        ),
+        h(`button.primary${done ? '.on' : ''}`, { disabled: done, onclick: () => this.conn?.sendJson({ t: 'briefed' }) }, done ? t('Ready') : t('Ready to go')),
       ),
       h('main.lobby-main', {}, h('div.lobby-top', {}, this.prepPanel(room, false, true))),
     );

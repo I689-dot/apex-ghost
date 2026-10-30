@@ -39,8 +39,8 @@ await page.goto(URL);
 await page.waitForSelector('.menu');
 await page.waitForTimeout(2000);
 await page.click('button.solo');
-await page.waitForSelector('.car-card', { timeout: 30_000 });
-await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
+await page.waitForSelector('.lb-steps', { timeout: 30_000 });
+await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
 for (const label of ['Car contact', 'Race control']) {
   await page.click(`.rules label:has-text("${label}") input`);
   await page.waitForTimeout(250);
@@ -49,6 +49,7 @@ await page.evaluate(() => {
   window.__app.conn.sendJson({ t: 'setSession', minutes: 1 });
   window.__app.conn.sendJson({ t: 'setRaceLaps', laps: 3 });
 });
+await page.click('.lb-step >> nth=4');
 await page.click('.car-card >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');
