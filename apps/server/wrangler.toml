@@ -1,7 +1,6 @@
 name = "apex-ghost-server"
 main = "src/index.ts"
 compatibility_date = "2024-12-01"
-# the accounts database driver (postgres) needs Node's APIs and TCP sockets
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
@@ -13,6 +12,10 @@ class_name = "RoomDO"
 name = "DIRECTORY"
 class_name = "DirectoryDO"
 
+[[durable_objects.bindings]]
+name = "ACCOUNTS"
+class_name = "AccountsDO"
+
 # Free plan: Durable Objects must be SQLite-backed.
 [[migrations]]
 tag = "v1"
@@ -22,6 +25,11 @@ new_sqlite_classes = ["RoomDO"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["DirectoryDO"]
+
+# accounts, friends and records (accounts.ts)
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["AccountsDO"]
 
 [observability]
 enabled = false

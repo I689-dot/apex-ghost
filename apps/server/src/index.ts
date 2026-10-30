@@ -5,7 +5,7 @@
  *   GET  /api/rooms/:code/ws → WebSocket into the room's Durable Object
  *   GET  /health
  *   /api/account/register|login|logout|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats
- *       → accounts.ts (Supabase Postgres, DATABASE_URL secret); presence lives in the DirectoryDO
+ *       → accounts.ts (AccountsDO, its own SQLite database); presence lives in the DirectoryDO
  * One Durable Object per room (idFromName(code)); WebSocket Hibernation API.
  */
 import { DurableObject } from 'cloudflare:workers';
@@ -13,15 +13,19 @@ import { generateRoomCode, normalizeRoomCode, type RoomSummary, type TrackRaceDa
 import trackRace from '@apex/shared/generated/track-race.json';
 import tracksRace from '@apex/shared/generated/tracks-race.json';
 import carIdList from '@apex/shared/generated/car-ids.json';
-import { isPresence, type Presence } from '@apex/shared';
+import { isPresence, type AccountUser, type FriendEntry, type Presence } from '@apex/shared';
 import { RoomCore, type Conn, type PersistedRoom, type RecordEvent } from './room';
-import * as acc from './accounts';
+import { AccountsDO, type AccountOp } from './accounts';
+
+export { AccountsDO };
 
 export interface Env {
   ROOMS: DurableObjectNamespace<RoomDO>;
   DIRECTORY: DurableObjectNamespace<DirectoryDO>;
-  /** The accounts database (wrangler secret / .dev.vars); without it accounts are off. */
-  DATABASE_URL?: string;
+  /** Accounts, friends and records (accounts.ts). */
+  ACCOUNTS: DurableObjectNamespace<AccountsDO>;
+  /** "1": online play without an account (the local dev server's .dev.vars). */
+  OPEN_ONLINE?: string;
 }
 
 const TRACK = trackRace as unknown as TrackRaceData;
@@ -39,90 +43,64 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 const directory = (env: Env) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
-/** Accounts, friends, presence and records (accounts.ts). */
-async function accountApi(req: Request, env: Env, ctx: ExecutionContext, path: string): Promise<Response> {
-  const sql = acc.db(env);
-  if (!sql) return json({ error: 'Accounts are not available on this server.' }, 503);
-  try {
-    const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
-    const q = new URL(req.url).searchParams;
-    const presence = async (ids: string[]): Promise<Record<string, Presence>> => {
-      const r = await directory(env).fetch('https://directory/presence-of', { method: 'POST', body: JSON.stringify({ ids }) });
-      return (await r.json()) as Record<string, Presence>;
-    };
-    switch (`${req.method} ${path}`) {
-      case 'POST register':
-        return json(await acc.register(sql, body), 201);
-      case 'POST login':
-        return json(await acc.login(sql, body));
-      case 'POST logout':
-        await acc.logout(sql, req);
-        return json({ ok: true });
-      case 'GET me': {
-        const u = await acc.userOf(sql, req);
-        return u ? json({ user: u }) : json({ error: 'Sign in first.' }, 401);
-      }
-      case 'GET friends':
-        return json({ friends: await acc.friends(sql, req, presence) });
-      case 'POST friends/add':
-        await acc.addFriend(sql, req, body);
-        return json({ ok: true });
-      case 'POST friends/accept':
-        await acc.acceptFriend(sql, req, body);
-        return json({ ok: true });
-      case 'POST friends/remove':
-        await acc.removeFriend(sql, req, body);
-        return json({ ok: true });
-      case 'POST presence': {
-        // a heartbeat: where I am now (kept in memory by the directory, ~90 s)
-        const u = await acc.presenceUser(sql, req);
-        if (!u) return json({ error: 'Sign in first.' }, 401);
-        if (!isPresence(body.presence)) return json({ error: 'Bad presence.' }, 400);
-        await directory(env).fetch('https://directory/presence', { method: 'POST', body: JSON.stringify({ id: u.id, presence: body.presence }) });
-        return json({ ok: true });
-      }
-      case 'GET records':
-        return json({ rows: await acc.records(sql, req, q) });
-      case 'GET stats':
-        return json({ stats: await acc.stats(sql, req, q) });
-      default:
-        return json({ error: 'Not found' }, 404);
-    }
-  } catch (e) {
-    if (e instanceof acc.HttpError) return json({ error: e.message }, e.status);
-    console.error('[accounts]', e);
-    return json({ error: 'Account server error, try again.' }, 500);
-  } finally {
-    ctx.waitUntil(sql.end({ timeout: 2 }));
+const accounts = (env: Env) => env.ACCOUNTS.get(env.ACCOUNTS.idFromName('accounts'));
+const bearer = (req: Request) => req.headers.get('Authorization')?.match(/^Bearer ([0-9a-f]{48})$/)?.[1] ?? null;
+
+/** Accounts, friends, presence and records (accounts.ts: the AccountsDO). */
+async function accountApi(req: Request, env: Env, path: string): Promise<Response> {
+  const op = path as AccountOp;
+  const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
+  const query = Object.fromEntries(new URL(req.url).searchParams);
+  const reads: AccountOp[] = ['me', 'friends', 'records', 'stats'];
+  if ((req.method === 'GET') !== reads.includes(op)) return json({ error: 'Not found' }, 404);
+  if (op === 'presence' && !isPresence(body.presence)) return json({ error: 'Bad presence.' }, 400);
+  const token = bearer(req);
+  const reply = await accounts(env).api(op, token, body, query);
+  const r = { status: reply.status, body: JSON.parse(reply.json) as unknown };
+  if (r.status !== 200) return json(r.body, r.status);
+  if (op === 'presence') {
+    // a heartbeat: where I am now (kept in memory by the directory, ~90 s)
+    const u = (r.body as { user: AccountUser }).user;
+    await directory(env).fetch('https://directory/presence', { method: 'POST', body: JSON.stringify({ id: u.id, presence: body.presence }) });
+    return json({ ok: true });
   }
+  if (op === 'friends') {
+    // friends' presence lives in the directory's memory
+    const list = (r.body as { friends: FriendEntry[] }).friends;
+    const ids = list.filter((f) => f.status === 'friend').map((f) => f.id);
+    if (ids.length) {
+      const res = await directory(env).fetch('https://directory/presence-of', { method: 'POST', body: JSON.stringify({ ids }) });
+      const pres = (await res.json()) as Record<string, Presence>;
+      for (const f of list) f.presence = pres[f.id] ?? null;
+    }
+    return json({ friends: list });
+  }
+  return json(r.body, r.status);
 }
 
 /**
  * Online play is for signed-in drivers only (offline play needs no server): creating a room and connecting to one
- * need an account token, so strangers can't use up the free plan's requests. Without an accounts database (local
- * development) anyone may play.
+ * need an account token, so strangers can't use up the free plan's requests. OPEN_ONLINE=1 (the local dev server's
+ * .dev.vars) lets anyone in.
  */
-async function mayPlayOnline(req: Request, env: Env, ctx: ExecutionContext, token: string | null): Promise<boolean> {
-  const sql = acc.db(env);
-  if (!sql) return true;
+async function mayPlayOnline(env: Env, token: string | null): Promise<boolean> {
+  if (env.OPEN_ONLINE === '1') return true;
+  if (!token) return false;
   try {
-    const auth = token ? new Request(req.url, { headers: { Authorization: `Bearer ${token}` } }) : req;
-    return (await acc.userOf(sql, auth)) !== null;
+    return (await accounts(env).userOf(token)) !== null;
   } catch (e) {
     console.error('[accounts]', e);
     return false;
-  } finally {
-    ctx.waitUntil(sql.end({ timeout: 2 }));
   }
 }
 
 export default {
-  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(req: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (url.pathname === '/health') return json({ ok: true });
     const am = url.pathname.match(/^\/api\/(?:account\/)?(register|login|logout|me|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/);
-    if (am) return accountApi(req, env, ctx, am[1]);
+    if (am) return accountApi(req, env, am[1]);
 
     if (url.pathname === '/api/rooms' && req.method === 'GET') {
       const res = await env.DIRECTORY.get(env.DIRECTORY.idFromName('directory')).fetch('https://directory/list');
@@ -130,7 +108,7 @@ export default {
     }
 
     if (url.pathname === '/api/rooms' && req.method === 'POST') {
-      if (!(await mayPlayOnline(req, env, ctx, null))) return json({ error: 'Sign in to play online.' }, 401);
+      if (!(await mayPlayOnline(env, bearer(req)))) return json({ error: 'Sign in to play online.' }, 401);
       for (let attempt = 0; attempt < 8; attempt++) {
         const code = generateRoomCode();
         const stub = env.ROOMS.get(env.ROOMS.idFromName(code));
@@ -152,7 +130,7 @@ export default {
         pair[1].close(4000, 'room_not_found');
         return new Response(null, { status: 101, webSocket: pair[0] });
       }
-      if (!(await mayPlayOnline(req, env, ctx, url.searchParams.get('t')))) {
+      if (!(await mayPlayOnline(env, url.searchParams.get('t')))) {
         const pair = new WebSocketPair();
         pair[1].accept();
         pair[1].send(JSON.stringify({ t: 'error', code: 'sign_in', message: 'Sign in to play online.', fatal: true }));
@@ -239,14 +217,10 @@ export class RoomDO extends DurableObject<Env> {
         await Promise.resolve();
         const batch = this.records;
         this.records = [];
-        const sql = acc.db(this.env);
-        if (!sql) return;
         try {
-          await acc.writeRecords(sql, batch);
+          await this.env.ACCOUNTS.get(this.env.ACCOUNTS.idFromName('accounts')).writeRecords(batch);
         } catch (err) {
           console.error('[records]', err);
-        } finally {
-          await sql.end({ timeout: 2 });
         }
       })(),
     );

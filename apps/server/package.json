@@ -9,8 +9,7 @@
     "typecheck": "tsc -p . --noEmit"
   },
   "dependencies": {
-    "@apex/shared": "workspace:*",
-    "postgres": "3.4.5"
+    "@apex/shared": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241218.0",

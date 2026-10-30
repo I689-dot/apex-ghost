@@ -4,7 +4,7 @@
  * the other to be friends, the other accepts; the first opens a room and the second must see "In lobby <code>" on
  * their friends list and join it from there. With --lap the room runs a qualifying on Zandvoort with both cars on
  * the AI, and the first timed lap must turn up in the records (the server records laps itself). Needs `pnpm dev`
- * with the accounts database (apps/server/.dev.vars). The accounts made are named e2e<number>.
+ * (the accounts live in the server's AccountsDO). The accounts made are named e2e<number>.
  *
  *   CHROME=/path/to/chrome node tools/e2e/accounts.mjs [--url http://127.0.0.1:5173] [--lap]
  */
@@ -34,11 +34,14 @@ const mk = async (nick) => {
   await page.waitForSelector('.menu');
   await page.waitForTimeout(1000);
   // create the account from the menu
-  await page.click('button:has-text("Sign in / create account")');
+  await page.click('.mm-profile button:has-text("Sign in")');
   await page.fill('.sign-in input[type=text]', nick);
   await page.fill('.sign-in input[type=password]', 'secret1');
   await page.click('.sign-in button:has-text("Create account")');
-  await page.waitForSelector(`.account-bar:has-text("Signed in as ${nick}")`, { timeout: 15_000 }).catch(() => fail(`${nick} could not create an account`));
+  await page.waitForSelector(`.mm-profile:has-text("${nick}")`, { timeout: 15_000 }).catch(() => fail(`${nick} could not create an account`));
+  // the friends list is on its own tab of the menu
+  await page.click('.mm-tabs button[data-tab="friends"]');
+  await page.waitForSelector('.friends');
   return page;
 };
 const a = await mk(`e2eA${tag}`);
@@ -49,11 +52,13 @@ await a.fill('.friends input', `e2eB${tag}`);
 await a.click('.friends button:has-text("Add")');
 await a.waitForSelector('.friend:has-text("Request sent")', { timeout: 10_000 }).catch(() => fail('no "Request sent"'));
 await b.reload();
+await b.click('.mm-tabs button[data-tab="friends"]');
 await b.waitForSelector('.friend:has-text("Wants to be your friend")', { timeout: 15_000 }).catch(() => fail('B sees no request'));
 await b.click('.friend button:has-text("Accept")');
 await b.waitForSelector(`.friend:has-text("e2eA${tag}") >> text=Online`, { timeout: 15_000 }).catch(() => fail('B does not see A online'));
 console.log('  friends: request sent, accepted, A shown online in the menu');
 // A opens a room; B sees it on the friends list and joins from there
+await a.click('.mm-tabs button[data-tab="play"]');
 await a.click('button:has-text("Create room")');
 await a.waitForSelector('.car-card', { timeout: 30_000 });
 const code = await a.evaluate(() => window.__app.conn.code);
