@@ -69,7 +69,7 @@ await page.addInitScript(() => {
   }).observe(document, { subtree: true, childList: true, characterData: true });
 });
 await page.goto(URL);
-await page.waitForSelector('.menu-card', { timeout: 30_000 });
+await page.waitForSelector('.menu', { timeout: 30_000 });
 await page.waitForTimeout(4000);
 await shot('01-menu');
 let apiRequests = 0;
@@ -80,7 +80,7 @@ page.on('websocket', (ws) => {
   if (/\/api\//.test(ws.url())) apiRequests++;
 });
 if (args.includes('--solo')) await page.click('button.solo');
-else await page.click('button.primary:has-text("Create room")');
+else await page.click('button:has-text("Create room")');
 await page.waitForSelector('.lobby', { timeout: 30_000 });
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.waitForTimeout(2500);

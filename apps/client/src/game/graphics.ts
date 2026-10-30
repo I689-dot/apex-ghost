@@ -22,7 +22,8 @@ const HdrClampShader = {
       gl_FragColor = vec4(clamp(c.rgb, 0.0, uMax), c.a);
     }`,
 };
-import { QUALITY, detectQuality, saveSettings, settings, type QualityConfig } from '../settings';
+import { detectQuality, qualityConfig, saveSettings, settings, type QualityConfig } from '../settings';
+import { TaaPass } from './taa';
 
 /**
  * A light filmic grade after tone mapping (High/Ultra), as a broadcast camera's look: a little more contrast
@@ -45,6 +46,8 @@ const GradeShader = {
 };
 import { t } from '../i18n';
 
+const _size = new THREE.Vector2();
+
 /** Owns the WebGL renderer and the (cheap) post-processing chain. */
 export class Graphics {
   readonly renderer: THREE.WebGLRenderer;
@@ -53,6 +56,7 @@ export class Graphics {
   private composer: EffectComposer | null = null;
   private renderPass: RenderPass | N8AOPass | null = null;
   private bloom: UnrealBloomPass | null = null;
+  private taa: TaaPass | null = null;
   private scene: THREE.Scene | null = null;
   private camera: THREE.Camera | null = null;
   /** Dynamic resolution multiplier (0.6..1) on top of the user's resolution scale. */
@@ -75,7 +79,7 @@ export class Graphics {
       settings.qualityAuto = false;
       saveSettings(settings);
     }
-    this.quality = QUALITY[settings.quality];
+    this.quality = qualityConfig();
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, context: gl, antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -101,7 +105,10 @@ export class Graphics {
   get pixelRatio(): number {
     // Ultra supersamples: above the display's own resolution, scaled down by the browser (the cleanest edges there
     // are, on thin things above all: fences, grass, wires)
-    return Math.min(window.devicePixelRatio, this.quality.pixelRatioCap) * this.quality.superSample * settings.resolutionScale * this.dynScale;
+    const pr = Math.min(window.devicePixelRatio, this.quality.pixelRatioCap) * this.quality.superSample * settings.resolutionScale * this.dynScale;
+    // at most ~8K worth of pixels (a 4K screen at 2× would exceed the GPU's largest render buffer)
+    const maxPr = Math.sqrt((3840 * 2160 * 4) / Math.max(1, window.innerWidth * window.innerHeight));
+    return Math.min(pr, maxPr);
   }
 
   setScene(scene: THREE.Scene, camera: THREE.Camera): void {
@@ -112,13 +119,20 @@ export class Graphics {
 
   /** Switch the camera without rebuilding the post-processing chain (cinematic ↔ cockpit). */
   setCamera(camera: THREE.Camera): void {
+    this.taa?.unjitter();
     this.camera = camera;
     if (this.renderPass) this.renderPass.camera = camera;
+    this.taa?.setCamera(camera);
     this.resize();
   }
 
+  /** Your car's position (TAA reprojects it with its own motion: it moves with the camera); null: none. */
+  setMotionAnchor(pos: THREE.Vector3 | null): void {
+    this.taa?.setCar(pos);
+  }
+
   applyQuality(): void {
-    this.quality = QUALITY[settings.quality];
+    this.quality = qualityConfig();
     this.dynScale = 1;
     this.resize();
     this.rebuildPipeline();
@@ -127,24 +141,30 @@ export class Graphics {
   private rebuildPipeline(): void {
     // EffectComposer.dispose frees its own targets, not its passes' (AO, bloom, SMAA buffers leaked on every
     // quality change)
+    this.taa?.unjitter();
     for (const p of this.composer?.passes ?? []) p.dispose();
     this.composer?.dispose();
     this.composer = null;
+    this.taa = null;
     if (!this.scene || !this.camera) return;
     const q = this.quality;
     this.renderer.shadowMap.enabled = q.shadows;
     this.renderer.shadowMap.type = q.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const aa = q.antialias;
     // Low/Medium: render straight to the (natively multisampled) canvas, tone mapping in the material shaders
-    if (!q.bloom) return;
-    // with AO the scene is drawn by N8AO (no hardware MSAA; SMAA smooths the edges): a multisampled target would only
-    // cost bandwidth on every pass
-    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: q.antialias === 'msaa' && !q.ao ? 4 : 0 });
+    if (!q.bloom && !q.ao && !q.grade && (aa === 'native' || aa === 'msaa')) return;
+    const taa = aa === 'taa';
+    // with AO the scene is drawn by N8AO (no hardware MSAA; SMAA or TAA smooths the edges): a multisampled target
+    // would only cost bandwidth on every pass. TAA reads the scene's depth: the targets carry a depth texture.
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: aa === 'msaa' && !q.ao ? 4 : 0 });
+    if (taa && !q.ao) rt.depthTexture = new THREE.DepthTexture(size.x, size.y, THREE.UnsignedIntType);
     const composer = new EffectComposer(this.renderer, rt);
     composer.setPixelRatio(1);
+    let ao: N8AOPass | null = null;
     if (q.ao) {
       // ambient occlusion renders the scene itself (replaces RenderPass); half resolution keeps it ~1–2 ms
-      const ao = new N8AOPass(this.scene, this.camera, size.x, size.y);
+      ao = new N8AOPass(this.scene, this.camera, size.x, size.y);
       ao.configuration.aoRadius = 1.2; // metres: dashboard details, wheel arches, kerbs
       ao.configuration.distanceFalloff = 1;
       ao.configuration.intensity = 2.2;
@@ -154,6 +174,14 @@ export class Graphics {
       this.renderPass = ao;
     } else this.renderPass = new RenderPass(this.scene, this.camera);
     composer.addPass(this.renderPass);
+    if (taa) {
+      // right after the scene, while its depth is at hand (it scrubs NaN/Inf itself)
+      const aoPass = ao as unknown as { beautyRenderTarget?: THREE.WebGLRenderTarget } | null;
+      this.taa = new TaaPass(this.camera, size.x, size.y, () =>
+        aoPass ? (aoPass.beautyRenderTarget?.depthTexture ?? null) : composer.readBuffer.depthTexture,
+      );
+      composer.addPass(this.taa);
+    }
     composer.addPass(new ShaderPass(HdrClampShader));
     if (q.bloom) {
       // the threshold is in linear HDR (before tone mapping): a clear sky is 1.5–3 there, so 0.92 bloomed the whole
@@ -162,8 +190,8 @@ export class Graphics {
       this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.32, 0.45, 4);
       composer.addPass(this.bloom);
     } else this.bloom = null;
-    // N8AO renders without hardware MSAA: smooth the edges with SMAA (its docs recommend it)
-    if (q.ao) composer.addPass(new SMAAPass(size.x, size.y));
+    // N8AO renders without hardware MSAA: smooth the edges with SMAA (its docs recommend it); or SMAA chosen
+    if ((q.ao && aa !== 'taa') || aa === 'smaa') composer.addPass(new SMAAPass(size.x, size.y));
     composer.addPass(new OutputPass());
     if (q.grade) composer.addPass(new ShaderPass(GradeShader));
     composer.setSize(size.x, size.y);
@@ -180,6 +208,7 @@ export class Graphics {
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     this.composer?.setSize(size.x, size.y);
     this.bloom?.setSize(size.x / 2, size.y / 2);
+    this.taa?.reset();
     if (this.camera instanceof THREE.PerspectiveCamera) {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
@@ -189,8 +218,14 @@ export class Graphics {
   render(): void {
     if (this.contextLost || !this.scene || !this.camera) return;
     this.renderer.info.reset();
-    if (this.composer) this.composer.render();
-    else this.renderer.render(this.scene, this.camera);
+    if (this.composer) {
+      if (this.taa) {
+        const size = this.renderer.getDrawingBufferSize(_size);
+        this.taa.jitter(size.x, size.y);
+      }
+      this.composer.render();
+      this.taa?.unjitter();
+    } else this.renderer.render(this.scene, this.camera);
   }
 
   /**
@@ -199,8 +234,9 @@ export class Graphics {
    */
   trackFrame(dtMs: number, now: number): void {
     this.frameTimes[this.frameIdx++ % this.frameTimes.length] = dtMs;
-    // react quickly when too slow (1.5 s), cautiously when there is headroom (4 s)
-    if (!settings.dynamicResolution || now - this.lastDynChange < 1500 || this.frameIdx < this.frameTimes.length) return;
+    // react quickly when too slow (1.5 s), cautiously when there is headroom (4 s); never on Ultra, which is about
+    // picture quality only
+    if (!settings.dynamicResolution || settings.quality === 'ultra' || now - this.lastDynChange < 1500 || this.frameIdx < this.frameTimes.length) return;
     let sum = 0;
     for (const t of this.frameTimes) sum += t;
     const avg = sum / this.frameTimes.length;

@@ -147,7 +147,9 @@ export type ErrorCode =
   | 'not_ready'
   | 'bad_message'
   | 'version_mismatch'
-  | 'kicked';
+  | 'kicked'
+  /** Online play needs an account (offline play does not). */
+  | 'sign_in';
 
 /* ------------------------------------------------------ client → server --- */
 
@@ -367,6 +369,8 @@ export const FLAG_HANDBRAKE = 16;
 export const FLAG_SMOKE = 32;
 /** All four wheels beyond the track limits (grass, gravel, sand): the lap is invalid. */
 export const FLAG_OFF_TRACK = 64;
+/** Touched by another car in the last second (contact rule): excursions, resets and rejoins after it are waived. */
+export const FLAG_HIT = 128;
 
 /** One car state sample. Reused objects; never allocate per frame. */
 export interface CarState {

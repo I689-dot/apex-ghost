@@ -18,12 +18,12 @@ const mk = async (nick) => {
     nick,
   );
   await page.goto(URL);
-  await page.waitForSelector('.menu-card');
+  await page.waitForSelector('.menu');
   await page.waitForTimeout(2000);
   return page;
 };
 const host = await mk('Hosty');
-await host.click('button.primary:has-text("Create room")');
+await host.click('button:has-text("Create room")');
 await host.waitForSelector('.car-card');
 await host.check('.switch-row input');
 await host.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');

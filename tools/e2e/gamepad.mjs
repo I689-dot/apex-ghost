@@ -59,7 +59,7 @@ const press = async (i) => {
 const focused = () => page.evaluate(() => (document.activeElement?.textContent || document.activeElement?.tagName || '').trim());
 
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(1500);
 // menu: D-pad down until "Play solo", then A
 let reached = false;

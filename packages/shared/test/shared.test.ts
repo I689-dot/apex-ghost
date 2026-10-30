@@ -478,6 +478,40 @@ describe('race logic (server-authoritative laps)', () => {
     expect(tr.players.get('p')?.pitStops).toBe(1);
   });
 
+  it('waives track limits, resets and rejoins that follow a hit by another car', () => {
+    const track = ovalTrack(R, 12);
+    const tr = new RaceTracker(track, 0, 4);
+    tr.addPlayer('v');
+    const ev: RaceEvent[] = [];
+    let t = drive(tr, 'v', 0, -10, L + 1, 50, 0, 50, ev);
+    // use up the three warnings, so the next excursion would cost time
+    for (let k = 0; k < 3; k++) t = drive(tr, 'v', t, L + 1 + k * 200, L + 200 + k * 200, 60, 0, 50, ev, [L + 50 + k * 200, L + 60 + k * 200]);
+    ev.length = 0;
+    // hit (FLAG_HIT samples for a moment), pushed off at full speed: no penalty
+    const [hx, hy, hz] = ovalPos(R, L + 602, 0);
+    tr.ingest('v', t, hx, hy, hz, false, ev, false, true);
+    t += 50;
+    t = drive(tr, 'v', t, L + 605, L + 900, 60, 0, 50, ev, [L + 610, L + 630]);
+    // and a reset right after it: no penalty either
+    const g = track.gates[(tr.players.get('v')?.nextGate ?? 1) - 1];
+    tr.ingest('v', t + 50, g.p[0], g.p[1], g.p[2], true, ev);
+    const pens = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
+    expect(pens.map((e) => [e.reason, e.ms, e.contact])).toEqual([
+      ['track-limits', 0, true],
+      ['reset', 0, true],
+    ]);
+    expect(tr.players.get('v')?.lapPenaltyMs).toBe(0);
+    // long after the hit, the same excursion costs time again
+    t = drive(tr, 'v', t + 100, g.s + L + 1, g.s + L + 1 + 60 * (PENALTY.contactGraceMs / 1000 + 2), 60, 0, 50, ev);
+    ev.length = 0;
+    const s0 = g.s + L + 1 + 60 * (PENALTY.contactGraceMs / 1000 + 2);
+    drive(tr, 'v', t, s0, s0 + 100, 60, 0, 50, ev, [s0 + 20, s0 + 40]);
+    const later = ev.find((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>;
+    expect(later).toMatchObject({ reason: 'track-limits' });
+    expect(later.contact).toBeUndefined();
+    expect(later.ms).toBeGreaterThan(0);
+  });
+
   it('only accepts resets near the last checkpoint', () => {
     const track = ovalTrack(R, 12);
     const tr = new RaceTracker(track, 0, 3);

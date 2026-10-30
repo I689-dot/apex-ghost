@@ -3,7 +3,14 @@ import type { CarEntry } from '@apex/shared';
 import type { VehicleTelemetry } from '../physics/vehicle';
 import { settings } from '../settings';
 
-const PITCH = -0.07; // ≈4° down, like a driver looking at the road ahead
+const PITCH = -0.055; // ≈3° down, like a driver looking at the road ahead
+/**
+ * The game eye sits ahead of and above the real driver's eyes, as in F1 / ACC / GT7 cockpit views: the road and the
+ * cars ahead fill the screen, the top of the wheel rim and the dash stay at the bottom edge (a real seat position
+ * with a narrow screen shows mostly dashboard). Forward along the car (m), and up when the roof allows.
+ */
+const EYE_FORWARD = 0.2;
+const EYE_UP = 0.02;
 
 /**
  * Cockpit camera with subtle, motion-sickness-friendly head movement:
@@ -110,9 +117,12 @@ export class CockpitCamera {
 
   applySeat(): void {
     this.eyeX = this.eye.x;
-    this.eyeY = this.eye.y + this.autoRaise + settings.seatHeight;
-    this.eyeZ = this.eye.z + settings.seatForward;
+    this.eyeY = this.eye.y + this.autoRaise + this.gameUp + settings.seatHeight;
+    this.eyeZ = this.eye.z + EYE_FORWARD + settings.seatForward;
   }
+
+  /** Part of EYE_UP that fits under this car's roof (autoSeat measures it). */
+  private gameUp = EYE_UP;
 
   /**
    * Measures, against the real car model, how far below the horizon the dash/hood blocks the view,
@@ -120,8 +130,6 @@ export class CockpitCamera {
    * Runs once while loading.
    */
   autoSeat(car: THREE.Object3D): void {
-    // an eye set by hand per car is already clear of the dash (and raising it put some under the roof)
-    if (this.entry.cockpitCamera.tuned) return;
     car.updateMatrixWorld(true);
     const meshes: THREE.Object3D[] = [];
     car.traverse((o) => {
@@ -152,13 +160,28 @@ export class CockpitCamera {
       const hit = ray.intersectObjects(meshes, false)[0];
       return hit ? hit.distance : 1;
     };
+    // the game eye's lift, as far as the roof allows (keep 9 cm under it)
+    const fwd = this.eye.z + EYE_FORWARD;
+    const roomAt = (y: number) => {
+      toWorld(this.eye.x, y, fwd, origin);
+      ray.set(origin, dir.set(0, 1, 0).transformDirection(car.matrixWorld));
+      ray.far = 1;
+      const hit = ray.intersectObjects(meshes, false)[0];
+      return hit ? hit.distance : 1;
+    };
+    this.gameUp = Math.max(0, Math.min(EYE_UP, roomAt(this.eye.y) - 0.09));
+    // an eye set by hand per car is already clear of the dash (and raising it put some under the roof)
+    if (this.entry.cockpitCamera.tuned) {
+      this.applySeat();
+      return;
+    }
     // road visible from ~10 m: the view at -5.5° (straight ahead and slightly left/right) must be clear
     const clear = (y: number) => !blocked(y, -5.5, 0) && !blocked(y, -5.5, -8) && !blocked(y, -5.5, 8);
     let raise = 0;
     for (let dy = 0; dy <= 0.14 + 1e-6; dy += 0.02) {
-      if (headroom(this.eye.y + dy) < 0.08) break;
+      if (headroom(this.eye.y + this.gameUp + dy) < 0.08) break;
       raise = dy;
-      if (clear(this.eye.y + dy)) break;
+      if (clear(this.eye.y + this.gameUp + dy)) break;
     }
     this.autoRaise = raise;
     this.applySeat();

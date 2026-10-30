@@ -149,6 +149,23 @@ describe('drive-through penalties', () => {
 });
 
 describe('race control', () => {
+  it('no yellow flag for a car that has not got going (still on the grid, the bots leave it one by one)', () => {
+    const tr = new RaceTracker(track, 0, { raceLaps: 10 });
+    tr.addPlayer('a');
+    tr.addPlayer('b');
+    const rc = new RaceControl(tr, true);
+    // b sits on the grid for 20 s after the start while a drives off
+    let ta = 0;
+    let tb = 0;
+    while (tb < 20_000) {
+      tb = stand(tr, 'b', tb, L - 30, 500);
+      ta = drive(tr, 'a', ta, (ta / 1000) * 50 - 10, ((ta + 500) / 1000) * 50 - 10, 50);
+      rc.update(Math.max(ta, tb));
+    }
+    expect(rc.state.yellows).toEqual([]);
+    expect(rc.state.course).toBe('green');
+  });
+
   it('yellow flag, then full-course yellow for a car that stays stopped, then green when the track is clear', () => {
     const tr = new RaceTracker(track, 0, { raceLaps: 10 });
     tr.addPlayer('a');

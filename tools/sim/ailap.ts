@@ -18,6 +18,8 @@ import type { Controls } from '../../apps/client/src/physics/input.ts';
 import { AiDriver, BOT_ASSISTS, carLimits, profileLapTime, racingLineFor, speedProfile } from '../../apps/client/src/game/ai.ts';
 import { nearestCenterlineIndex } from '../../packages/shared/src/index.ts';
 import { TrackLimits, beyondLimitsNow } from '../../apps/client/src/game/trackLimits.ts';
+import { cutWallsAcrossLine } from '../../apps/client/src/game/wallCut.ts';
+import { RoadPatches } from '../../apps/client/src/game/roadPatches.ts';
 import { RaceTracker } from '../../packages/shared/src/race.ts';
 import { loadTrack, trackArg } from './trackfile.mjs';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../../apps/client/src/physics/tyres.ts';
@@ -71,8 +73,10 @@ function makeWorld() {
       o += 12;
       const pos = new Float32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + nv * 12));
       o += nv * 12;
-      const idx = new Uint32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + ni * 4));
+      let idx = new Uint32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + ni * 4));
       o += ni * 4;
+      // as the game does: walls across this layout's lap line are cut (wallCut.ts)
+      if (track.collision.surfaces[si] === 'wall') idx = cutWallsAcrossLine(pos, idx, track);
       const c = world.createCollider(RAPIER.ColliderDesc.trimesh(pos, idx));
       surf.set(c.handle, track.collision.surfaces[si]);
     }
@@ -89,6 +93,16 @@ function setup() {
   const { world, surf } = makeWorld();
   const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
   const excl: { body?: RAPIER.RigidBody } = {};
+  // the game's smoothed pit lane and rough stretches (roadPatches.ts)
+  const down = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+  const patches = useTrack
+    ? RoadPatches.build(loaded.track as TrackData, (x, yTop, z, maxD) => {
+        down.origin = { x, y: yTop, z };
+        const h = world.castRay(down, maxD, true);
+        if (!h || surf.get(h.collider.handle) === 'wall') return null;
+        return yTop - h.timeOfImpact;
+      })
+    : null;
   const ground: GroundQuery = {
     cast(ox, oy, oz, dx, dy, dz, maxDist, out: GroundHit) {
       ray.origin = { x: ox, y: oy, z: oz };
@@ -105,6 +119,7 @@ function setup() {
       out.ny = y;
       out.nz = z;
       out.surface = surf.get(hit.collider.handle) ?? 'asphalt';
+      if (out.surface !== 'wall') patches?.apply(ox, oy, oz, dx, dy, dz, maxDist, out);
       return out;
     },
   };
@@ -180,6 +195,12 @@ for (const skill of skills) {
   // HEATLOG=1: where each axle's tyre heat comes from on the flying laps (J): drive/brake slip, cornering slip, rolling
   const heat = { long: [0, 0], lat: [0, 0], roll: [0, 0] };
   const limits = new TrackLimits();
+  // SEGLOG=1: per 20 m of the flying lap, the bot's speed against its own target, braking it did not need (target
+  // above its speed) and steering reversals (weaving)
+  const seg = new Map<
+    number,
+    { v: number; vt: number; n: number; needless: number; lift: number; rev: number; lastD: number; lastSt: number; brake: number }
+  >();
   // two minutes per GP-length lap; long layouts (the Nordschleife) get proportionally more
   for (let i = 0; i < Math.max(120, track.length / 40) * 240 * LAPS && laps.length < LAPS; i++) {
     const pr0 = tr.players.get('ai');
@@ -193,13 +214,30 @@ for (const skill of skills) {
     }
     step(s, c);
     s.events.drainContactForceEvents(() => wallHits++);
+    if (process.env.SEGLOG && laps.length >= 1 && hint >= 0) {
+      const b = Math.floor(track.cumS[hint] / 20) * 20;
+      let e = seg.get(b);
+      if (!e) seg.set(b, (e = { v: 0, vt: 0, n: 0, needless: 0, lift: 0, rev: 0, lastD: 0, lastSt: c.steer, brake: 0 }));
+      const v = s.v.telemetry.speed;
+      e.v += v;
+      e.vt += ai.dbgVt;
+      e.n++;
+      if (c.brake > 0.05) e.brake += DT;
+      if (c.brake > 0.05 && ai.dbgVt > v + 1) e.needless += DT;
+      // lifting off the throttle with the target well above the speed (not traction-limited: TC is not cutting)
+      else if (c.throttle < 0.6 && c.brake < 0.05 && ai.dbgVt > v + 4 && !s.v.telemetry.tcActive) e.lift += DT;
+      const d = c.steer - e.lastSt;
+      if (Math.abs(d) > 0.004 && Math.sign(d) !== Math.sign(e.lastD) && e.lastD !== 0) e.rev++;
+      if (Math.abs(d) > 0.004) e.lastD = d;
+      e.lastSt = c.steer;
+    }
     const logWin = process.env.SLIPLOG?.split(',').map(Number);
     const sHere = track.cumS[Math.max(0, hint)];
     if (logWin && (logWin.length < 2 ? i % 60 === 0 : sHere >= logWin[0] && sHere <= logWin[1] && i % 6 === 0)) {
       const w = s.v.wheels;
       console.log(
         `    t ${t.toFixed(1)} s ${track.cumS[Math.max(0, hint)].toFixed(0)} v ${(s.v.telemetry.speed * 3.6).toFixed(0)} thr ${c.throttle.toFixed(2)} brk ${c.brake.toFixed(2)} st ${c.steer.toFixed(2)} ` +
-          `alpha F ${((w[0].slipAngle * 180) / Math.PI).toFixed(1)} R ${((w[2].slipAngle * 180) / Math.PI).toFixed(1)} kappa R ${w[2].slipRatio.toFixed(3)} slip ${((s.v.telemetry.slipBody * 180) / Math.PI).toFixed(1)} surf ${w.map((x) => (x.contact ? x.surface[0] : '-')).join('')} tc ${s.v.telemetry.tcActive} vt ${(ai.dbgVt * 3.6).toFixed(0)}`,
+          `alpha F ${((w[0].slipAngle * 180) / Math.PI).toFixed(1)} R ${((w[2].slipAngle * 180) / Math.PI).toFixed(1)} kappa R ${w[2].slipRatio.toFixed(3)} slip ${((s.v.telemetry.slipBody * 180) / Math.PI).toFixed(1)} surf ${w.map((x) => (x.contact ? x.surface[0] : '-')).join('')} tc ${s.v.telemetry.tcActive} vt ${(ai.dbgVt * 3.6).toFixed(0)} at ${s.v.body.translation().x.toFixed(1)},${s.v.body.translation().z.toFixed(1)}`,
       );
     }
     t += DT;
@@ -307,6 +345,23 @@ for (const skill of skills) {
           tyreAtLap.push(`${((w[0].temp + w[1].temp) / 2).toFixed(0)}/${((w[2].temp + w[3].temp) / 2).toFixed(0)}`);
         }
     }
+  }
+  if (process.env.SEGLOG) {
+    const rows = [...seg.entries()].sort((a, b) => a[0] - b[0]);
+    let lost = 0;
+    for (const [b, e] of rows) {
+      const v = e.v / e.n;
+      const vt = e.vt / e.n;
+      const dt = e.n * DT;
+      // time lost against the bot's own target over these 20 m
+      const loss = dt - 20 / Math.max(1, vt);
+      lost += Math.max(0, loss);
+      if (e.needless > 0.05 || e.lift > 0.15 || e.rev > 6)
+        console.log(
+          `    ${String(b).padStart(5)} m  v ${(v * 3.6).toFixed(0).padStart(3)} target ${(vt * 3.6).toFixed(0).padStart(3)} km/h  brake ${e.brake.toFixed(2)} s needless ${e.needless.toFixed(2)} s lift ${e.lift.toFixed(2)} s  steer reversals ${e.rev}  lost ${loss.toFixed(2)} s`,
+        );
+    }
+    console.log(`    time behind the bot's own target: ${lost.toFixed(1)} s`);
   }
   const pr = tr.players.get('ai');
   if (splits.length) console.log(`  splits (lap m: race s) ${splits.join(' ')}`);

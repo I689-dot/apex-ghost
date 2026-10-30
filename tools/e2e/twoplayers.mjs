@@ -59,13 +59,13 @@ const mk = async (nick) => {
     };
   }, LAG);
   await page.goto(URL);
-  await page.waitForSelector('.menu-card');
+  await page.waitForSelector('.menu');
   await page.waitForTimeout(1500);
   return page;
 };
 
 const host = await mk('Hosty');
-await host.click('button.primary:has-text("Create room")');
+await host.click('button:has-text("Create room")');
 await host.waitForSelector('.car-card');
 const code = await host.evaluate(() => window.__app.conn.code);
 await host.click('.rules label:has-text("Car contact") input');

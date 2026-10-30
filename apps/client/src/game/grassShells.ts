@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { TrackData } from '@apex/shared';
 import type { QualityConfig } from '../settings';
 import { addWindUniforms } from './vegetation';
+import type { GrassMask } from './grassMask';
 
 /**
  * Mown grass with depth on the verges (shell texturing, as racing games grow short lawns): the lawn near the camera is
@@ -21,7 +22,7 @@ import { addWindUniforms } from './vegetation';
  */
 
 const SHELL_H = 0.075;
-const MAX_SHELLS = 16;
+const MAX_SHELLS = 24;
 const CELL = 24;
 const NEAR_TRACK = 110;
 /** The shell radius for the lawn's ground shader (0: no shells, no darkening). */
@@ -97,7 +98,7 @@ export class GrassShells {
   private lastN = -1;
 
   /** Shells over the lawn of these meshes near the racing line (null: no lawn). */
-  static build(trackRoot: THREE.Object3D, lawn: Set<THREE.Material>, track: TrackData): GrassShells | null {
+  static build(trackRoot: THREE.Object3D, lawn: Set<THREE.Material>, track: TrackData, mask: GrassMask | null = null): GrassShells | null {
     if (!lawn.size) return null;
     // cells within NEAR_TRACK of the centreline
     const near = new Set<number>();
@@ -141,6 +142,8 @@ export class GrassShells {
         }
         const ck = key(cx / 3, cz / 3);
         if (!near.has(ck)) continue;
+        // under a grandstand or building: no blades (they showed over the stands' floors)
+        if (mask?.covers(cx / 3, cz / 3)) continue;
         let g = byCell.get(ck);
         if (!g) byCell.set(ck, (g = { p: [], n: [], uv: [] }));
         for (let k = 0; k < 3; k++) {
@@ -197,7 +200,9 @@ export class GrassShells {
           `// lowest layer first
 float apxL = (float(gl_InstanceID) + 1.0) / apxShellN;
 vec4 apxWp = modelMatrix * vec4(transformed, 1.0);
-apxWp.xyz += normalize(mat3(modelMatrix) * objectNormal) * apxL * ${SHELL_H.toFixed(3)};
+// straight up, not along the vertex normal: two lawn meshes meeting with different normals opened a crack in the
+// layers (a dark line across the verge)
+apxWp.y += apxL * ${SHELL_H.toFixed(3)};
 // the tips sway in the wind
 float apxS = sin(apxWindTime * 1.9 + apxWp.x * 0.7 + apxWp.z * 0.45) + 0.5 * sin(apxWindTime * 3.3 + apxWp.z * 1.3);
 apxWp.xz += vec2(0.8, 0.5) * apxS * 0.006 * apxWind * apxL * apxL;

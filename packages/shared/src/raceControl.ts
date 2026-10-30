@@ -220,7 +220,8 @@ export class RaceControl {
       else if (this.inPit.delete(p.id)) this.pitExitAt.set(p.id, t);
       const live = p.hasPos && !p.dnf && p.finishedMs === null && t - p.lt < RACE_CONTROL.staleMs;
       if (live && !p.inPit) cars.push(p);
-      if (!live || p.inPit || p.speed > RACE_CONTROL.stoppedMs) this.stoppedSince.delete(p.id);
+      // a car still on the grid or waiting at the pit exit has not got going: not an incident (PlayerRaceState.rolling)
+      if (!live || p.inPit || !p.rolling || p.speed > RACE_CONTROL.stoppedMs) this.stoppedSince.delete(p.id);
       else if (!this.stoppedSince.has(p.id)) this.stoppedSince.set(p.id, t);
     }
 

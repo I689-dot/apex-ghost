@@ -38,7 +38,7 @@ await page.addInitScript(() => {
   );
 });
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(1200);
 await page.click('button.solo');
 await page.waitForSelector('.car-card', { timeout: 30_000 });

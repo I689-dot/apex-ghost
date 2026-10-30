@@ -41,7 +41,7 @@ const step = async (on, off, arg) => {
   if (process.env.DEBUG) console.log('  prompt:', await page.textContent('.pad-prompt'));
 };
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.click('.menu-foot button');
 await page.waitForSelector('.pad-setup');
 await page.waitForTimeout(300);

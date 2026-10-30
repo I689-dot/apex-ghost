@@ -31,7 +31,7 @@ const mk = async (nick) => {
     localStorage.setItem('apexghost.settings.v1', JSON.stringify({ nickname: 'x', quality: 'low', qualityAuto: false, language: 'en', camera: 'chase' }));
   });
   await page.goto(URL);
-  await page.waitForSelector('.menu-card');
+  await page.waitForSelector('.menu');
   await page.waitForTimeout(1000);
   // create the account from the menu
   await page.click('button:has-text("Sign in / create account")');
@@ -54,7 +54,7 @@ await b.click('.friend button:has-text("Accept")');
 await b.waitForSelector(`.friend:has-text("e2eA${tag}") >> text=Online`, { timeout: 15_000 }).catch(() => fail('B does not see A online'));
 console.log('  friends: request sent, accepted, A shown online in the menu');
 // A opens a room; B sees it on the friends list and joins from there
-await a.click('button.primary:has-text("Create room")');
+await a.click('button:has-text("Create room")');
 await a.waitForSelector('.car-card', { timeout: 30_000 });
 const code = await a.evaluate(() => window.__app.conn.code);
 await b.bringToFront();

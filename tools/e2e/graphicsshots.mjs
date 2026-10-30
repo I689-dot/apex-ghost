@@ -59,7 +59,7 @@ await page.addInitScript(
   [QUALITY],
 );
 await page.goto(`${URL}/?app=${APP ? 1 : 0}`);
-await page.click('button.primary:has-text("Create room")');
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card');
 await page.waitForTimeout(800);
 if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);

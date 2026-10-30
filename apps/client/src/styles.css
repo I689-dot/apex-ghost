@@ -2873,3 +2873,730 @@ button.pit-tyre.on {
     grid-template-columns: 1fr;
   }
 }
+
+/* the virtual rear-view mirror (game/mirror.ts) takes the top centre: the session clock and banners move below it */
+body.mirror-on {
+  --mirror-h: calc(min(34vw, 560px) / 4.2 + 14px);
+}
+body.mirror-on .hud-finish {
+  top: calc(14px + var(--mirror-h));
+}
+body.mirror-on .hud-pit {
+  top: calc(52px + var(--mirror-h));
+}
+body.mirror-on .hud-flag {
+  top: calc(86px + var(--mirror-h));
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * Main menu (app.ts showMenu), laid out like the F1 / Gran Turismo menus: a top bar (logo, tabs, the driver), big photo
+ * tiles for the modes, a strip of key hints at the bottom. Online tiles are locked until you sign in.
+ * ---------------------------------------------------------------------------------------------------------------- */
+.menu.mm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0;
+  padding: 0;
+  height: 100%;
+  max-width: none;
+  overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(8, 9, 12, 0.88) 0%, rgba(8, 9, 12, 0.25) 26%, rgba(8, 9, 12, 0.35) 62%, rgba(8, 9, 12, 0.95) 100%),
+    radial-gradient(120% 80% at 85% 20%, transparent 40%, rgba(8, 9, 12, 0.6) 100%);
+}
+.mm.busy {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.mm-top {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 14px clamp(16px, 4vw, 56px);
+  background: rgba(10, 11, 14, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.mm-top .logo {
+  font-size: 1.9rem;
+  margin: 0;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+.mm-top .logo::after {
+  display: none;
+}
+.mm-tabs {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mm-tabs button {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 10px 16px 8px;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  min-height: 0;
+}
+.mm-tabs button:hover {
+  color: var(--text);
+  background: none;
+}
+.mm-tabs button.on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.mm-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+}
+.mm-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  background: linear-gradient(135deg, var(--accent), #8a0f19);
+  color: #fff;
+  flex: none;
+}
+.mm-avatar.off {
+  background: linear-gradient(135deg, #3a3e46, #22252b);
+}
+.mm-who {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  min-width: 0;
+}
+.mm-who b {
+  font-family: var(--display);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+.mm-who input {
+  width: 140px;
+  padding: 3px 8px;
+  font-size: 0.95rem;
+  min-height: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+.mm-status {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mm-status.on {
+  color: var(--good);
+}
+.mm-status.on::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--good);
+  margin-right: 6px;
+  box-shadow: 0 0 8px var(--good);
+}
+.mm-hero {
+  padding: clamp(24px, 6vh, 64px) clamp(16px, 4vw, 56px) 18px;
+}
+.mm-kicker {
+  font-family: var(--display);
+  letter-spacing: 0.22em;
+  font-size: 0.9rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.mm-hero h1 {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2.4rem, 6vw, 4.6rem);
+  line-height: 0.95;
+  letter-spacing: 0.02em;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+}
+.mm-body {
+  padding: 0 clamp(16px, 4vw, 56px) 24px;
+  min-height: 0;
+}
+.mm-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.6vw, 22px);
+  max-width: 1400px;
+}
+.mm-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  text-align: left;
+  min-height: clamp(220px, 38vh, 420px);
+  padding: 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  background: #111;
+  isolation: isolate;
+  cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.mm-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--photo) center / cover no-repeat;
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.mm-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.55) 62%, rgba(0, 0, 0, 0.92) 100%);
+}
+.mm-tile:hover,
+.mm-tile:focus-visible {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--accent),
+    0 0 30px rgba(255, 45, 61, 0.25);
+  background: #111;
+}
+.mm-tile:hover::before {
+  transform: scale(1.06);
+}
+.mm-tile-kicker {
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-size: 0.8rem;
+  color: var(--accent);
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border-left: 3px solid var(--accent);
+}
+.mm-tile-title {
+  margin-top: 8px;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(1.6rem, 2.6vw, 2.5rem);
+  line-height: 1;
+  color: #fff;
+}
+.mm-tile-sub {
+  margin-top: 8px;
+  min-height: 2.7em;
+  font-family: var(--body);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 34ch;
+  line-height: 1.35;
+}
+.mm-tile[aria-disabled='true']::before {
+  filter: grayscale(0.85) brightness(0.55);
+}
+.mm-tile[aria-disabled='true']:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.mm-lock {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.mm-online {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  max-width: 1400px;
+  align-items: start;
+}
+.mm-panel,
+.mm-online .menu-card.rooms,
+.mm-body .menu-card.friends {
+  background: rgba(14, 15, 19, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px 22px;
+  max-width: 640px;
+  margin: 0;
+}
+.mm-online .menu-card.rooms {
+  max-width: none;
+}
+.mm-panel h3 {
+  margin: 0 0 12px;
+  font-family: var(--display);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 1.2rem;
+}
+.mm-wide {
+  width: 100%;
+  margin-top: 12px;
+}
+.mm-gate p {
+  margin: 0 0 16px;
+  line-height: 1.45;
+}
+.mm-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px clamp(16px, 4vw, 56px);
+  background: rgba(10, 11, 14, 0.78);
+  border-top: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.mm-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.mm-keys kbd {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text);
+}
+.mm-keys span {
+  margin-right: 10px;
+}
+@media (max-width: 600px) {
+  .mm-top {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .mm-tabs {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .mm-tiles,
+  .mm-online {
+    grid-template-columns: 1fr;
+  }
+  .mm-tile {
+    min-height: 170px;
+  }
+  .mm-keys {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * Intro reel (ui/reel.ts): letterboxed camera moves over the circuit photos, the car sweeping in, title cards.
+ * ---------------------------------------------------------------------------------------------------------------- */
+.reel {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  pointer-events: none;
+}
+.reel-shot {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.reel-shot::before {
+  content: '';
+  position: absolute;
+  inset: -8%;
+  background: var(--img) center / cover no-repeat;
+  will-change: transform;
+}
+.reel-shot.on {
+  opacity: 1;
+}
+.reel-shot.on.m-pan::before {
+  animation: reel-pan calc(var(--shot) + 1s) linear both;
+}
+.reel-shot.on.m-push::before {
+  animation: reel-push calc(var(--shot) + 1s) cubic-bezier(0.3, 0, 0.6, 1) both;
+}
+.reel-shot.on.m-rise::before {
+  animation: reel-rise calc(var(--shot) + 1s) cubic-bezier(0.25, 0, 0.5, 1) both;
+}
+.reel-shot.m-car::before {
+  filter: blur(10px) brightness(0.45) saturate(1.2);
+  transform: scale(1.1);
+}
+.reel-shot.on.m-car::before {
+  animation: reel-car-bg calc(var(--shot) + 1s) linear both;
+}
+@keyframes reel-pan {
+  from {
+    transform: scale(1.12) translateX(4%);
+  }
+  to {
+    transform: scale(1.12) translateX(-4%);
+  }
+}
+@keyframes reel-push {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.2) translateY(-1.5%);
+  }
+}
+@keyframes reel-rise {
+  from {
+    transform: scale(1.22) translateY(5%) rotate(-1.2deg);
+  }
+  to {
+    transform: scale(1.08) translateY(-2%) rotate(0.6deg);
+  }
+}
+@keyframes reel-car-bg {
+  from {
+    transform: scale(1.15) translateX(3%);
+  }
+  to {
+    transform: scale(1.15) translateX(-3%);
+  }
+}
+.reel-car {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: min(78vw, 1100px);
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 30px 40px rgba(0, 0, 0, 0.7));
+}
+.reel-shot.on .reel-car {
+  animation: reel-car-in calc(var(--shot) + 1s) cubic-bezier(0.15, 0.85, 0.25, 1) both;
+}
+@keyframes reel-car-in {
+  0% {
+    transform: translate(10%, -50%) scale(0.92);
+    opacity: 0;
+    filter: blur(14px) drop-shadow(0 30px 40px rgba(0, 0, 0, 0.7));
+  }
+  22% {
+    opacity: 1;
+    filter: blur(0) drop-shadow(0 30px 40px rgba(0, 0, 0, 0.7));
+  }
+  100% {
+    transform: translate(-56%, -50%) scale(1.02);
+    opacity: 1;
+    filter: blur(0) drop-shadow(0 30px 40px rgba(0, 0, 0, 0.7));
+  }
+}
+.reel-streak {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.35) 48%, rgba(255, 45, 61, 0.25) 52%, transparent 65%);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+.reel-shot.on .reel-streak {
+  animation: reel-streak 1.6s 0.25s ease-out both;
+}
+@keyframes reel-streak {
+  from {
+    transform: translateX(-70%);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(70%);
+    opacity: 0;
+  }
+}
+.reel-caption {
+  position: absolute;
+  left: clamp(16px, 5vw, 72px);
+  bottom: calc(13vh + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.reel-kicker {
+  align-self: flex-start;
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  font-size: 0.85rem;
+  color: #fff;
+  background: var(--accent);
+  padding: 3px 10px;
+}
+.reel-title {
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 0.95;
+  color: #fff;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.7);
+}
+.reel-shot.on .reel-kicker {
+  animation: reel-wipe 0.6s 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.reel-shot.on .reel-title {
+  animation: reel-wipe 0.7s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes reel-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+    transform: translateX(-20px);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+    transform: none;
+  }
+}
+.reel.bars::before,
+.reel.bars::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 11vh;
+  background: #000;
+  z-index: 3;
+}
+.reel.bars::before {
+  top: 0;
+}
+.reel.bars::after {
+  bottom: 0;
+}
+.reel-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  z-index: 2;
+}
+.reel-grain {
+  position: absolute;
+  inset: -50%;
+  z-index: 2;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: reel-grain 0.6s steps(4) infinite;
+}
+@keyframes reel-grain {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-3%, 2%);
+  }
+  50% {
+    transform: translate(2%, -3%);
+  }
+  75% {
+    transform: translate(-2%, -1%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reel-shot::before,
+  .reel-car,
+  .reel-streak,
+  .reel-grain {
+    animation: none !important;
+  }
+}
+/* the race loading screen over the reel: the card sits low, in the letterbox's frame */
+.loading.with-reel {
+  background: none;
+}
+.loading.with-reel .load-card {
+  background: rgba(10, 11, 14, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+/* boot intro: full screen, skippable */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #000;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.8s ease;
+}
+.intro.out {
+  opacity: 0;
+}
+.intro-logo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 4;
+  pointer-events: none;
+}
+.intro-logo .logo {
+  font-size: clamp(3rem, 9vw, 7rem);
+  animation: intro-logo 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes intro-logo {
+  0% {
+    opacity: 0;
+    letter-spacing: 0.6em;
+    filter: blur(8px);
+  }
+  40% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  80% {
+    opacity: 1;
+    letter-spacing: 0.08em;
+  }
+  100% {
+    opacity: 0;
+    letter-spacing: 0.06em;
+  }
+}
+.intro-skip {
+  position: absolute;
+  right: clamp(16px, 4vw, 48px);
+  bottom: calc(11vh + 16px);
+  z-index: 4;
+  font-family: var(--display);
+  letter-spacing: 0.18em;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+.watch-reel,
+.lobby-reel {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+.loading.with-reel {
+  place-items: end center;
+  padding-bottom: calc(11vh + 18px);
+}
+.loading.with-reel > .reel {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.loading.with-reel .reel-caption {
+  top: calc(11vh + 18px);
+  bottom: auto;
+}
+/* phones in landscape (short screens): a compact menu */
+@media (max-height: 560px) {
+  .mm-top {
+    padding: 6px 16px;
+    gap: 12px;
+  }
+  .mm-top .logo {
+    font-size: 1.3rem;
+  }
+  .mm-tabs button {
+    font-size: 0.95rem;
+    padding: 6px 10px 5px;
+  }
+  .mm-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 0.85rem;
+  }
+  .mm-hero {
+    padding: 10px 16px 8px;
+  }
+  .mm-hero h1 {
+    font-size: 1.9rem;
+  }
+  .mm-kicker {
+    font-size: 0.7rem;
+  }
+  .mm-body {
+    padding: 0 16px 10px;
+  }
+  .mm-tile {
+    min-height: 0;
+    height: calc(100vh - 190px);
+    max-height: 240px;
+    padding: 12px 14px;
+  }
+  .mm-tile-title {
+    font-size: 1.35rem;
+  }
+  .mm-tile-sub {
+    font-size: 0.78rem;
+    min-height: 0;
+  }
+  .mm-tile-kicker {
+    font-size: 0.65rem;
+  }
+  .mm-lock {
+    top: 8px;
+    right: 8px;
+    font-size: 0.72rem;
+    padding: 4px 8px;
+  }
+  .mm-foot {
+    padding: 6px 16px;
+  }
+  .mm-keys {
+    display: none;
+  }
+}
+body.mirror-on .hud-msg {
+  top: calc(18% + var(--mirror-h) * 0.55 + 28px);
+}

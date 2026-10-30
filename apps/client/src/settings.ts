@@ -94,6 +94,8 @@ export interface Settings {
   language: Lang;
   quality: QualityPreset;
   qualityAuto: boolean;
+  /** Individual graphics settings on top of the preset (unset: the preset's). */
+  graphics: GraphicsOverrides;
   resolutionScale: number;
   dynamicResolution: boolean;
   /** Phone app: display refresh rate asked for (60, or the screen's 90 / 120 / 144 Hz). */
@@ -106,6 +108,8 @@ export interface Settings {
   manualGearbox: boolean;
   /** Driving view: from the seat, or chase cameras behind the car. */
   camera: CameraMode;
+  /** Virtual rear-view mirror at the top of the screen. */
+  mirror: boolean;
   units: 'kmh' | 'mph';
   /** Racing-line assist: off, braking zones and corners only, or the whole lap. */
   racingLine: 'off' | 'corners' | 'full';
@@ -141,15 +145,17 @@ export const DEFAULT_SETTINGS: Settings = {
   language: defaultLang(),
   quality: 'medium',
   qualityAuto: true,
+  graphics: {},
   resolutionScale: 1,
   dynamicResolution: true,
   refreshRate: 60,
-  fov: 72,
+  fov: 58,
   seatHeight: 0,
   seatForward: 0,
   assists: { abs: true, tc: 1, stability: false, steering: false },
   manualGearbox: false,
   camera: 'cockpit',
+  mirror: true,
   units: 'kmh',
   racingLine: 'corners',
   showPerf: false,
@@ -197,6 +203,9 @@ export function loadSettings(): Settings {
     merged.audio = { ...DEFAULT_SETTINGS.audio, ...(s.audio ?? {}) };
     merged.pad = { ...DEFAULT_SETTINGS.pad, ...(s.pad ?? {}) };
     merged.carSetup = { ...DEFAULT_SETTINGS.carSetup, ...(s.carSetup ?? {}) };
+    merged.graphics = { ...(s.graphics ?? {}) };
+    // the old default (72°, a very wide view: the dash filled half the screen) moves to the new one
+    if (s.fov === 72) merged.fov = DEFAULT_SETTINGS.fov;
     return merged;
   } catch {
     return structuredClone(DEFAULT_SETTINGS);
@@ -245,8 +254,11 @@ export interface QualityConfig {
   shadowRange: number;
   pixelRatioCap: number;
   bloom: boolean;
-  /** 'msaa': multisampled post-processing target (High/Ultra); otherwise the canvas' native MSAA is used. */
-  antialias: 'native' | 'msaa';
+  /**
+   * 'native': the canvas' own MSAA (no post-processing); 'msaa': a multisampled post-processing target; 'smaa':
+   * SMAA on the final image; 'taa': temporal anti-aliasing (game/taa.ts), the smoothest on distant detail.
+   */
+  antialias: AntiAlias;
   /** Reflection environment on track surfaces too (cars always get it). */
   envOnTrack: boolean;
   /** Buildings and trackside objects cast sun shadows (cars always do). */
@@ -293,6 +305,8 @@ export interface QualityConfig {
   /** Share of the scattered trees drawn as 3D trees / as far cards (0..1). */
   forestNearDensity: number;
   forestDensity: number;
+  /** The rear-view mirror is redrawn every n-th frame. */
+  mirrorEvery: number;
 }
 
 export const QUALITY: Record<QualityPreset, QualityConfig> = {
@@ -337,6 +351,7 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     forestFar: 700,
     forestNearDensity: 0.0,
     forestDensity: 0.45,
+    mirrorEvery: 2,
   },
   medium: {
     shadowMapSize: 2048,
@@ -379,6 +394,7 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     forestFar: 1100,
     forestNearDensity: 0.8,
     forestDensity: 0.6,
+    mirrorEvery: 2,
   },
   high: {
     shadowMapSize: 2048,
@@ -421,52 +437,101 @@ export const QUALITY: Record<QualityPreset, QualityConfig> = {
     forestFar: 1400,
     forestNearDensity: 1,
     forestDensity: 0.7,
+    mirrorEvery: 1,
   },
+  // Ultra: picture quality only, whatever it costs (the user's rule): 2× supersampling with TAA on top (the
+  // smoothest distant edges and textures), full-resolution AO, the longest view and the most grass and trees
   ultra: {
     shadowMapSize: 8192,
     shadows: true,
-    // measured on the dev machine's Vega 8 (render ms): Ultra before 90; with 1.5× supersampling and full-res High
-    // AO 439 (unplayable even on a strong GPU); 1.25× and Medium AO at half resolution 163
-    superSample: 1.25,
-    aoQuality: 'Medium',
-    aoFullRes: false,
-    carLodScale: 2.5,
+    superSample: 2,
+    aoQuality: 'High',
+    aoFullRes: true,
+    carLodScale: 4,
     grade: true,
-    shadowRange: 150,
+    shadowRange: 200,
     pixelRatioCap: 2,
     bloom: true,
-    antialias: 'msaa',
+    antialias: 'taa',
     envOnTrack: true,
     sceneryShadows: true,
     pbrScenery: true,
-    treeDistance: 1200,
-    sceneryDistance: 3000,
-    detailDistance: 800,
-    barrierDistance: 3500,
-    rainParticles: 14000,
+    treeDistance: 2000,
+    sceneryDistance: 4500,
+    detailDistance: 1400,
+    barrierDistance: 5000,
+    rainParticles: 18000,
     ao: true,
     cockpitDetail: true,
     remoteDetail: true,
     crowd: 1,
     cloudDetail: 2,
-    grassShells: 14,
-    grassShellRadius: 44,
-    grassBladeRadius: 80,
-    grassBlades: 18,
-    grassDensity: 12,
-    grassBand: 20,
+    grassShells: 20,
+    grassShellRadius: 60,
+    grassBladeRadius: 110,
+    grassBlades: 22,
+    grassDensity: 16,
+    grassBand: 26,
     ownHeadlightSpots: true,
     ownHeadlightShadows: true,
     treeShadows: true,
     softShadows: true,
     anisotropy: 16,
-    envMapSize: 512,
-    forestNear: 150,
-    forestFar: 2200,
+    envMapSize: 1024,
+    forestNear: 220,
+    forestFar: 3000,
     forestNearDensity: 1,
-    forestDensity: 0.9,
+    forestDensity: 1,
+    mirrorEvery: 1,
   },
 };
+
+export type AntiAlias = 'native' | 'msaa' | 'smaa' | 'taa';
+
+/**
+ * Settings → Graphics, one by one: each group takes its values from the preset named (Low … Ultra), or the main
+ * preset's when unset. Anti-aliasing and supersampling are set directly.
+ */
+export const GRAPHICS_GROUPS = {
+  shadows: ['shadowMapSize', 'shadows', 'shadowRange', 'softShadows', 'sceneryShadows', 'treeShadows', 'ownHeadlightShadows'],
+  ao: ['ao', 'aoQuality', 'aoFullRes'],
+  textures: ['anisotropy', 'envMapSize', 'pbrScenery', 'envOnTrack'],
+  viewDistance: ['sceneryDistance', 'detailDistance', 'barrierDistance', 'carLodScale'],
+  trees: ['treeDistance', 'forestNear', 'forestFar', 'forestNearDensity', 'forestDensity'],
+  grass: ['grassShells', 'grassShellRadius', 'grassBladeRadius', 'grassBlades', 'grassDensity', 'grassBand'],
+  clouds: ['cloudDetail'],
+  crowd: ['crowd'],
+  effects: ['bloom', 'grade', 'rainParticles'],
+} as const satisfies Record<string, readonly (keyof QualityConfig)[]>;
+export type GraphicsGroup = keyof typeof GRAPHICS_GROUPS;
+
+export type GraphicsOverrides = Partial<Record<GraphicsGroup, QualityPreset>> & {
+  antialias?: AntiAlias;
+  /** Render resolution × the display's (1 = native, 2 = 4× the pixels, scaled down). */
+  superSample?: number;
+};
+
+let cached: { key: string; q: QualityConfig } | null = null;
+
+/**
+ * The graphics in effect: the preset with the individual settings over it. The same object while nothing changes
+ * (parts of the game rebuild when it is a different one).
+ */
+export function qualityConfig(): QualityConfig {
+  const key = `${settings.quality}|${JSON.stringify(settings.graphics)}`;
+  if (cached?.key === key) return cached.q;
+  const q: QualityConfig = { ...QUALITY[settings.quality] };
+  const o = settings.graphics;
+  for (const g of Object.keys(GRAPHICS_GROUPS) as GraphicsGroup[]) {
+    const from = o[g];
+    if (!from || !QUALITY[from]) continue;
+    for (const k of GRAPHICS_GROUPS[g]) (q as unknown as Record<string, unknown>)[k] = QUALITY[from][k];
+  }
+  if (o.antialias) q.antialias = o.antialias;
+  if (o.superSample) q.superSample = o.superSample;
+  cached = { key, q };
+  return q;
+}
 
 /** First-launch guess from the GPU renderer string. */
 export function detectQuality(gl: WebGL2RenderingContext | null): QualityPreset {

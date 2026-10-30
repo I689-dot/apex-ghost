@@ -1,0 +1,7 @@
+Surface detail maps (packed: R = albedo detail, G/B = normal x/y) made from CC0 (public domain) materials by
+ambientCG (https://ambientcg.com):
+
+  asphalt_detail.jpg   Asphalt031  https://ambientcg.com/view?id=Asphalt031
+  concrete_detail.jpg  Concrete034 https://ambientcg.com/view?id=Concrete034
+
+CC0 1.0 Universal: no attribution required; credited here anyway.

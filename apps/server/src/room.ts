@@ -17,6 +17,7 @@ import {
   FLAG_GRACE_MS,
   RECONNECT_GRACE_MS,
   FLAG_OFF_TRACK,
+  FLAG_HIT,
   FLAG_RESET,
   DEFAULT_RULES,
   RaceControl,
@@ -850,7 +851,7 @@ export class RoomCore {
       const s = this.scratch[i];
       // future timestamps are forged; old ones are accepted for backfill after a reconnect
       if (s.t > now + MAX_CLOCK_SKEW_MS || s.t < now - RECONNECT_GRACE_MS - 10_000) continue;
-      this.tracker.ingest(p.id, s.t, s.px, s.py, s.pz, (s.flags & FLAG_RESET) !== 0, ev, (s.flags & FLAG_OFF_TRACK) !== 0);
+      this.tracker.ingest(p.id, s.t, s.px, s.py, s.pz, (s.flags & FLAG_RESET) !== 0, ev, (s.flags & FLAG_OFF_TRACK) !== 0, (s.flags & FLAG_HIT) !== 0);
     }
     if (this.rc && now - this.lastRcAt >= 200) {
       this.lastRcAt = now;

@@ -19,7 +19,7 @@ await page.addInitScript(() => {
   localStorage.setItem('apexghost.settings.v1', JSON.stringify({ nickname: 'Scan', quality: 'low', qualityAuto: false, language: 'en' }));
 });
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(1200);
 await page.click('button.solo');
 await page.waitForSelector('.car-card', { timeout: 30_000 });

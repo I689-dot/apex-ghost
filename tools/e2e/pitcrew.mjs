@@ -28,7 +28,7 @@ await page.addInitScript((q) => {
   localStorage.setItem('apexghost.settings.v1', JSON.stringify({ nickname: 'Crew', quality: q, qualityAuto: false, language: 'en', dynamicResolution: false }));
 }, QUALITY);
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(1500);
 await page.click('button.solo');
 await page.waitForSelector('.car-card', { timeout: 30_000 });

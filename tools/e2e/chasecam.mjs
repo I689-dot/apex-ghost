@@ -20,7 +20,7 @@ const check = (ok, what) => {
   if (!ok) fails++;
 };
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(1500);
 await page.click('button:has-text("Play solo")');
 await page.waitForSelector('.car-card', { timeout: 30_000 });

@@ -43,7 +43,7 @@ const settingsInit = () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await page.addInitScript(settingsInit);
   await page.goto(URL);
-  await page.waitForSelector('.menu-card', { timeout: 30_000 });
+  await page.waitForSelector('.menu', { timeout: 30_000 });
   await page.waitForTimeout(1500);
   check(await page.isVisible('.menu-foot .get-app'), 'desktop menu shows "Get the mobile app"');
   await page.screenshot({ path: path.join(out, 'mobile-01-desktop-menu.png') });
@@ -88,7 +88,7 @@ const settingsInit = () => {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.addInitScript(settingsInit);
   await page.goto(APP_URL);
-  await page.waitForSelector('.menu-card', { timeout: 60_000 });
+  await page.waitForSelector('.menu', { timeout: 60_000 });
   await page.waitForTimeout(2500);
   check(await page.evaluate(() => document.documentElement.classList.contains('mobile-app')), 'app mode (html.mobile-app)');
   check(!(await page.isVisible('.menu-foot .get-app')), 'no "Get the mobile app" link inside the app');

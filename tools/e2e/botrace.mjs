@@ -51,7 +51,7 @@ await page.addInitScript((q) => {
 const shot = (name) => page.screenshot({ path: path.join(out, `${name}.png`), timeout: 120_000 });
 
 await page.goto(URL);
-await page.click('button.primary:has-text("Create room")');
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (WEATHER) {

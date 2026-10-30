@@ -7,6 +7,7 @@ import {
   FLAG_HANDBRAKE,
   FLAG_HEADLIGHTS,
   FLAG_OFF_TRACK,
+  FLAG_HIT,
   FLAG_RESET,
   FLAG_REVERSE,
   FLAG_SMOKE,
@@ -54,7 +55,7 @@ import { RemoteCarBuffer } from '../net/remote';
 import { DamageState } from '../physics/damage';
 import { InputSmoother, Keyboard } from '../physics/input';
 import { FUEL, PROXY_GROUPS, Vehicle, trackRubber } from '../physics/vehicle';
-import { CAMERA_MODES, QUALITY, saveSettings, settings } from '../settings';
+import { CAMERA_MODES, saveSettings, settings } from '../settings';
 import { Hud } from '../ui/hud';
 import { loadCarModel, loadTrackFile, type Progress } from './assets';
 import { AiDriver, BOT_ASSISTS } from './ai';
@@ -71,6 +72,8 @@ import { PitMenu } from '../ui/pitMenu';
 import { TimingScreen } from '../ui/timingScreen';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../physics/tyres';
 import { RacingLineFx } from './racingLineFx';
+import { RearMirror } from './mirror';
+import { GrassMask } from './grassMask';
 import { TrackLimits, beyondLimitsNow } from './trackLimits';
 import { CAR_LOD, CarVisual, cockpitGlass } from './carVisual';
 import { renderTopView } from './topView';
@@ -279,6 +282,8 @@ export class RaceSession {
   private liveDelta: number | null = null;
   private trackerEvents: RaceEvent[] = [];
   private racingLine: RacingLineFx | null = null;
+  /** Virtual rear-view mirror at the top of the screen (Settings → Camera). */
+  private mirror: RearMirror | null = null;
   /** Air and track temperature and air density now (temperatures() in the shared weather code). */
   air: Temperatures = { airC: 20, trackC: 25, airDensity: 1.2 };
   private roadWear: RoadWear | null = null;
@@ -328,6 +333,8 @@ export class RaceSession {
   private carColliders = new Set<number>();
   /** Contact rule: when two cars were last seen touching in this world ("victim|other" → performance.now()). */
   private lastContact = new Map<string, number>();
+  /** Contact rule: when each car simulated here was last touched by another (performance.now()), for FLAG_HIT. */
+  private hitAt = new Map<string, number>();
   /** Fuel burnt per lap: an estimate until a lap has been measured. */
   private fuelPerLap = 0;
   private fuelAtLap: number | null = null;
@@ -427,15 +434,23 @@ export class RaceSession {
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
     this.world.timestep = FIXED_DT;
     this.events = new RAPIER.EventQueue(true);
-    this.track.buildColliders(RAPIER, this.world, trackRes.collision);
+    this.track.buildColliders(RAPIER, this.world, trackRes.collision, this.trackData);
     // ray casts only see colliders once the query structure is built: placing the cars on the ground needs it
     this.world.updateSceneQueries();
-    // blades on the verges near the racing line
-    this.shells = GrassShells.build(this.track.root, this.track.lawnMaterials, this.trackData);
+    this.track.buildSmoothSurfaces(this.world, this.trackData);
+    // blades on the verges near the racing line, kept off the ground under grandstands and buildings
+    const grassMask = GrassMask.build(this.track.chunks, this.trackData, this.track.groundMaterials);
+    grassMask.publish();
+    this.shells = GrassShells.build(this.track.root, this.track.lawnMaterials, this.trackData, grassMask);
     if (this.shells) this.scene.add(this.shells.root);
     const q = this.gfx.quality;
     if (q.grassBladeRadius > 0) {
-      this.blades = GrassBlades.build(this.trackData, this.track.groundQuery(this.world), { blades: q.grassBlades, perM2: q.grassDensity, band: q.grassBand });
+      this.blades = GrassBlades.build(
+        this.trackData,
+        this.track.groundQuery(this.world),
+        { blades: q.grassBlades, perM2: q.grassDensity, band: q.grassBand },
+        grassMask,
+      );
       if (this.blades) this.scene.add(this.blades.mesh);
     }
     // spectators on the stands
@@ -480,6 +495,10 @@ export class RaceSession {
     }
     this.cockpit = new CockpitCamera(myEntry, this.myVisual.object, settings.fov);
     this.cockpit.autoSeat(this.myVisual.object);
+    if (!this.spectator) {
+      this.mirror = new RearMirror(this.myVisual.object, myEntry.dims);
+      this.mirror.every = this.gfx.quality.mirrorEvery;
+    }
     this.cockpit.camera.add(this.windshield.mesh, this.windshield.crack);
     this.snapshotPose();
     this.prevPos.copy(this.currPos);
@@ -976,8 +995,8 @@ export class RaceSession {
     this.cockpit.setFov(settings.fov);
     this.cockpit.applySeat();
     this.racingLine?.setMode(this.spectator ? 'off' : settings.racingLine);
-    this.gfx.quality = QUALITY[settings.quality];
     this.gfx.applyQuality();
+    if (this.mirror) this.mirror.every = this.gfx.quality.mirrorEvery;
     this.env.setQuality(this.gfx.quality);
     this.track.applyQuality(this.gfx.quality);
     if (!this.gfx.quality.envOnTrack) for (const m of this.track.materials()) m.envMap = null;
@@ -1357,6 +1376,8 @@ export class RaceSession {
     cockpitGlass.value = viewCam === this.cockpit.camera ? 1 : 0;
     this.myVisual.setInside(viewCam === this.cockpit.camera);
 
+    if (!this.spectator) this.racingLine?.update(this.loc.index, Math.max(0, this.vehicle.telemetry.forwardSpeed));
+
     // remote ghosts (with the contact rule they were placed before the physics)
     if (!this.contact) for (const r of this.remotes.values()) this.updateRemote(r, serverNow, dt);
     else for (const r of this.remotes.values()) if (r.bot) this.updateRemote(r, serverNow, dt);
@@ -1399,7 +1420,14 @@ export class RaceSession {
     this.editor?.update(this.kb);
     this.kb.endFrame();
     const tRender = performance.now();
+    this.gfx.setMotionAnchor(this.spectator || this.cinematic ? null : this.myVisual.object.position);
     this.gfx.render();
+    const mirror = this.mirror;
+    if (mirror) {
+      mirror.visible = settings.mirror && !this.cinematic && !this.gfx.contextLost && this.cockpit.lookingForward && !this.kb.held('lookBack');
+      document.body.classList.toggle('mirror-on', mirror.visible);
+      mirror.render(this.gfx.renderer, this.scene);
+    }
     const tEnd = performance.now();
     if (IS_DEV) {
       const w = window as unknown as { __timings?: Record<string, number>; __apex?: unknown };
@@ -1506,8 +1534,12 @@ export class RaceSession {
    * what the stand-ins took from them is added to the bump for their owners.
    */
   private afterContacts(): void {
-    for (const [, v] of this.simulated()) if (this.touchingCar(v.collider)) v.limitCarContact();
     const now = performance.now();
+    for (const [id, v] of this.simulated())
+      if (this.touchingCar(v.collider)) {
+        v.limitCarContact();
+        this.hitAt.set(id, now);
+      }
     for (const r of this.remotes.values()) {
       const body = r.body;
       const c = r.collider;
@@ -1583,6 +1615,7 @@ export class RaceSession {
     if (performance.now() - (this.lastContact.get(`${m.to}|${m.from}`) ?? -1e9) < BUMP_DEDUPE_MS) return;
     v.body.applyImpulse({ x: m.ix, y: 0, z: m.iz }, true);
     v.body.applyTorqueImpulse({ x: 0, y: m.ty, z: 0 }, true);
+    this.hitAt.set(m.to, performance.now());
     if (v === this.vehicle) {
       const j = Math.hypot(m.ix, m.iz);
       if (j > 1) this.impactDamage(j * 0.6, m.ix / j, 0, m.iz / j);
@@ -2014,7 +2047,10 @@ export class RaceSession {
     let cap = Infinity;
     let block: { along: number; lat: number } | null = null;
     let beside = false;
-    const check = (ox: number, oz: number, speed: number) => {
+    const check = (ox: number, oy: number, oz: number, speed: number, ofx: number, ofz: number) => {
+      // not the same piece of road: a car on the other leg of a hairpin (driving the other way) or on a bridge /
+      // underpass looked like a car ahead, and the bots braked for nothing; a stopped car is avoided whichever way
+      if (Math.abs(oy - p.y) > 2.5 || (speed > 5 && ofx * fx + ofz * fz < 0.3)) return;
       const dx = ox - p.x;
       const dz = oz - p.z;
       const along = dx * fx + dz * fz;
@@ -2027,13 +2063,20 @@ export class RaceSession {
       if (along <= 3 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
       if (!block || along < block.along) block = { along, lat };
     };
+    const fwd = (qx: number, qy: number, qz: number, qw: number): [number, number] => [2 * (qx * qz + qy * qw), 1 - 2 * (qx * qx + qy * qy)];
     for (const o of this.remotes.values()) {
       if (o === r) continue;
       const op = o.bot ? o.bot.vehicle.body.translation() : o.visual.object.position;
-      check(op.x, op.z, o.vel.length());
+      const oq = o.bot ? o.bot.vehicle.body.rotation() : o.visual.object.quaternion;
+      const [ofx, ofz] = fwd(oq.x, oq.y, oq.z, oq.w);
+      check(op.x, op.y, op.z, o.vel.length(), ofx, ofz);
     }
-    const me = this.vehicle.body.translation();
-    check(me.x, me.z, this.vehicle.telemetry.speed);
+    if (!this.spectator) {
+      const me = this.vehicle.body.translation();
+      const mq = this.vehicle.body.rotation();
+      const [mfx, mfz] = fwd(mq.x, mq.y, mq.z, mq.w);
+      check(me.x, me.y, me.z, this.vehicle.telemetry.speed, mfx, mfz);
+    }
     // the safety car: queue behind it, seen from far enough to stop behind it (the 40 m of a car ahead were too
     // short from 250 km/h to its 150, and the bots ran into it)
     const sc = this.sc;
@@ -2090,14 +2133,20 @@ export class RaceSession {
           `[limits] ${this.names.get(r.id)} at ${this.trackData.cumS[b.hint].toFixed(0)} m (index ${b.hint}) lateral ${lat.toFixed(1)} edge ${edge.toFixed(1)} wheels ${surf}`,
         );
       }
+      if (this.recentlyHit(r.id)) f |= FLAG_HIT;
       s.flags = f;
-      this.localTracker?.ingest(r.id, s.t, s.px, s.py, s.pz, (f & FLAG_RESET) !== 0, undefined, (f & FLAG_OFF_TRACK) !== 0);
+      this.localTracker?.ingest(r.id, s.t, s.px, s.py, s.pz, (f & FLAG_RESET) !== 0, undefined, (f & FLAG_OFF_TRACK) !== 0, (f & FLAG_HIT) !== 0);
       if (++b.pendingCount >= STATES_PER_PACKET) {
         const len = encodeBotStates(this.sendBuf, r.slot, b.seq++, b.pending, b.pendingCount);
         this.conn.sendBinary(this.sendBuf, len);
         b.pendingCount = 0;
       }
     }
+  }
+
+  /** Touched by another car in the last second (FLAG_HIT: the tracker waives what follows a hit). */
+  private recentlyHit(id: string): boolean {
+    return performance.now() - (this.hitAt.get(id) ?? -1e9) < 1000;
   }
 
   /** Store the body pose after a physics step (for render interpolation). */
@@ -2162,11 +2211,12 @@ export class RaceSession {
     _v1.set(0, 0, 1).applyQuaternion(this.currRot);
     this.track.locate(s.px, s.py, s.pz, _v1.x, _v1.z, this.loc);
     if (this.limits.update(1 / STATE_HZ, beyondLimitsNow(v, this.trackData, this.loc.index, this.loc.lateral))) f |= FLAG_OFF_TRACK;
+    if (this.recentlyHit(this.me)) f |= FLAG_HIT;
     s.flags = f;
     // mirror the server's gate logic locally (resets, the live delta and instant track-limit warnings)
     const ev = this.trackerEvents;
     ev.length = 0;
-    this.localTracker?.ingest(this.me, s.t, s.px, s.py, s.pz, (f & FLAG_RESET) !== 0, ev, (f & FLAG_OFF_TRACK) !== 0);
+    this.localTracker?.ingest(this.me, s.t, s.px, s.py, s.pz, (f & FLAG_RESET) !== 0, ev, (f & FLAG_OFF_TRACK) !== 0, (f & FLAG_HIT) !== 0);
     this.updateLapDelta(s.t, ev);
     this.pendingCount++;
     if (this.pendingCount >= STATES_PER_PACKET) {
@@ -2197,7 +2247,11 @@ export class RaceSession {
       } else if (e.type === 'penalty' && e.playerId === this.me && e.ms === 0) {
         // a warning, or off without gaining anything
         this.flash(
-          e.warning ? t('Track limits: warning {n} of {max}', { n: e.warning, max: PENALTY.limitsWarnings }) : t('Off track: no advantage, no penalty'),
+          e.contact
+            ? t('Hit by another car: no penalty')
+            : e.warning
+              ? t('Track limits: warning {n} of {max}', { n: e.warning, max: PENALTY.limitsWarnings })
+              : t('Off track: no advantage, no penalty'),
           2200,
         );
         if (e.warning) this.snd?.chime('invalid');
@@ -2629,21 +2683,27 @@ export class RaceSession {
     this.chaseYaw += dYaw * (1 - Math.exp(-dt * (far ? 4.5 : 6)));
     this.chaseY += (o.position.y - this.chaseY) * (1 - Math.exp(-dt * 7));
     const kmh = speed * 3.6;
-    const dist = (far ? 8.2 : 5.4) + Math.min(1, kmh / 250) * (far ? 1.0 : 0.7);
-    const height = far ? 2.7 : 1.85;
+    const fast = Math.min(1, kmh / 250);
+    // framed as in GT7 / F1 25: the car in the lower third, the road and the next corner above it
+    const dist = (far ? 8.6 : 5.9) + fast * (far ? 1.1 : 0.8);
+    const height = far ? 2.9 : 2.0;
     const yaw = back ? this.chaseYaw + Math.PI : this.chaseYaw;
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
-    cam.position.set(o.position.x - fx * dist, this.chaseY + height, o.position.z - fz * dist);
-    const ahead = far ? 3 : 4;
-    cam.lookAt(o.position.x + fx * ahead, this.chaseY + (far ? 0.55 : 0.6), o.position.z + fz * ahead);
-    const fov = (far ? 55 : 60) + Math.min(1, kmh / 250) * 7;
+    // a touch of sideways sway with the cornering g (the camera lags the car into the corner)
+    const side = THREE.MathUtils.clamp(dYaw * 2.2, -0.45, 0.45) * (back ? 0 : 1);
+    this.chaseSide += (side - this.chaseSide) * (1 - Math.exp(-dt * 3));
+    cam.position.set(o.position.x - fx * dist - fz * this.chaseSide, this.chaseY + height, o.position.z - fz * dist + fx * this.chaseSide);
+    const ahead = far ? 9 : 10;
+    cam.lookAt(o.position.x + fx * ahead, this.chaseY + (far ? 0.75 : 0.95), o.position.z + fz * ahead);
+    const fov = (far ? 54 : 58) + fast * 7;
     if (Math.abs(cam.fov - fov) > 0.05 || cam.aspect !== window.innerWidth / window.innerHeight) {
       cam.fov = fov;
       cam.aspect = window.innerWidth / window.innerHeight;
       cam.updateProjectionMatrix();
     }
   }
+  private chaseSide = 0;
   private specCamInit = false;
 
   /** ←/→ change car; 1–9 the car in that position. */
@@ -2830,6 +2890,8 @@ export class RaceSession {
     window.removeEventListener('keydown', this.onSpectatorKey);
     this.snd?.dispose();
     this.closePitMenu();
+    this.mirror?.dispose();
+    document.body.classList.remove('mirror-on');
     this.kb.dispose();
     this.perf?.dispose();
     this.editor?.dispose();

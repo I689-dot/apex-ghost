@@ -31,9 +31,9 @@ await page.addInitScript(() =>
   localStorage.setItem('apexghost.settings.v1', JSON.stringify({ nickname: 'Scan', quality: 'medium', qualityAuto: false, language: 'en', showPerf: false })),
 );
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(3000);
-await page.click('button.primary:has-text("Create room")');
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card');
 if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);
 await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');

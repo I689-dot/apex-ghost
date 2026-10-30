@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { TrackData } from '@apex/shared';
 import type { GroundHit, GroundQuery } from '../physics/vehicle';
 import { lawnDetail, lawnMean } from './track';
+import type { GrassMask } from './grassMask';
 
 /**
  * Real blades over the verge's lawn (High/Ultra), on top of the shells (grassShells.ts). Shells make a dense mown
@@ -218,7 +219,7 @@ export class GrassBlades {
           // shaded at the root (the blades shade each other), lighter and drier at the tips; darker when wet
           vec3 gLawn = texture2D(uLawn, vGrassXZ / 3.2).rgb * 0.65 + texture2D(uLawn, mat2(0.8, -0.6, 0.6, 0.8) * vGrassXZ / 11.3 + 0.37).rgb * 0.35;
           diffuseColor.rgb *= mix(vec3(1.0), gLawn / max(uLawnMean, vec3(0.02)), 0.75);
-          diffuseColor.rgb *= mix(0.58, 1.05, pow(vGrassH, 0.8));
+          diffuseColor.rgb *= mix(0.7, 1.08, pow(vGrassH, 0.8));
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 1.06, 0.8), vGrassDry * vGrassH * 0.35);
           diffuseColor.rgb *= 1.0 - 0.28 * uWet;`,
         )
@@ -241,7 +242,7 @@ export class GrassBlades {
   }
 
   /** Blades on this layout's verges (null: no grass found). */
-  static build(track: TrackData, ground: GroundQuery, detail: BladeDetail): GrassBlades | null {
+  static build(track: TrackData, ground: GroundQuery, detail: BladeDetail, mask: GrassMask | null = null): GrassBlades | null {
     const r = rng(4242);
     const cl = track.centerline;
     const n = cl.length / 3;
@@ -307,10 +308,12 @@ export class GrassBlades {
       const tz = dz / seg;
       for (let a = 0; a < seg; a += 1) {
         for (const side of [1, -1]) {
-          const edge = (side > 0 ? (track.limitL?.[i] ?? track.widthL[i]) : (track.limitR?.[i] ?? track.widthR[i])) + 0.5;
+          // clear of the white line and the kerb: blades right on it read as black specks over the paint
+          const edge = (side > 0 ? (track.limitL?.[i] ?? track.widthL[i]) : (track.limitR?.[i] ?? track.widthR[i])) + 0.9;
           for (let off = edge; off < edge + band; off += 1) {
             const x = cl[i * 3] + tx * a + tz * off * side;
             const z = cl[i * 3 + 2] + tz * a - tx * off * side;
+            if (mask?.covers(x, z)) continue;
             if (!ground.cast(x, cl[i * 3 + 1] + 4, z, 0, -1, 0, 12, hit) || hit.surface !== 'grass' || hit.ny < 0.8) continue;
             // thicker right at the edge, where the driver looks
             const far = (off - edge) / band;
@@ -318,6 +321,7 @@ export class GrassBlades {
             for (let k = 0; k < here; k++) {
               const px = x + r() - 0.5;
               const pz = z + r() - 0.5;
+              if (mask?.covers(px, pz)) continue;
               // mown near the track; past ~60 % of the strip more and more of it uncut
               const kind = far < 0.25 ? 0 : far < 0.6 ? (r() < 0.8 ? 1 : 0) : r() < (far - 0.5) * 1.4 ? 2 : 1;
               const py = hit.py - (hit.nx * (px - x) + hit.nz * (pz - z)) / Math.max(0.5, hit.ny) - 0.01;

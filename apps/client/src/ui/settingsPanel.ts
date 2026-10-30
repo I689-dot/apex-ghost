@@ -1,4 +1,15 @@
-import { ACTION_LABEL, CONTROL_ACTIONS, DEFAULT_BINDINGS, DEFAULT_SETTINGS, saveSettings, settings, type ControlAction, type QualityPreset } from '../settings';
+import {
+  ACTION_LABEL,
+  CONTROL_ACTIONS,
+  DEFAULT_BINDINGS,
+  DEFAULT_SETTINGS,
+  saveSettings,
+  settings,
+  type AntiAlias,
+  type ControlAction,
+  type GraphicsGroup,
+  type QualityPreset,
+} from '../settings';
 import { h } from './dom';
 import { LANGUAGES, setLang, t } from '../i18n';
 import { IS_APP } from '../mobile/platform';
@@ -98,6 +109,7 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
   );
 
   const presetNote = h('p.muted.preset-note', { text: t(PRESET_NOTE[settings.quality]) });
+  const detailSelects: HTMLSelectElement[] = [];
   const graphics = h(
     'section',
     {},
@@ -114,6 +126,9 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
         ],
         (v) => {
           settings.quality = v;
+          // a preset sets everything: the individual settings below go back to it
+          settings.graphics = {};
+          for (const sel of detailSelects) sel.value = '';
           presetNote.textContent = t(PRESET_NOTE[v]);
           changed();
         },
@@ -143,12 +158,23 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     ),
     ...(IS_APP ? [frameRateRow()] : []),
     presetNote,
+    h('h3', { text: t('Graphics in detail') }),
+    h('p.muted.preset-note', { text: t('Each setting follows the preset unless you change it here.') }),
+    ...graphicsDetailRows(row, detailSelects, changed),
   );
 
   const camera = h(
     'section',
     {},
     h('h3', { text: t('Camera') }),
+    row(
+      t('Rear-view mirror'),
+      toggle(settings.mirror, (v) => {
+        settings.mirror = v;
+        changed();
+      }),
+      t('What is behind you, at the top of the screen'),
+    ),
     row(
       t('Field of view'),
       range(
@@ -568,4 +594,88 @@ function frameRateRow(): HTMLElement {
     h('div', {}, h('span', { text: t('Frame rate') }), h('small', { text: t('90 / 120 / 144 Hz on phones that have it: smoother, uses more battery') })),
     sel,
   );
+}
+
+/** Settings → Graphics in detail: anti-aliasing, supersampling, and each group from Low to Ultra (or the preset's). */
+function graphicsDetailRows(
+  row: (label: string, ctrl: HTMLElement, hint?: string) => HTMLElement,
+  selects: HTMLSelectElement[],
+  changed: () => void,
+): HTMLElement[] {
+  const levels: [string, string][] = [
+    ['', t('Preset')],
+    ['low', t('Low')],
+    ['medium', t('Medium')],
+    ['high', t('High')],
+    ['ultra', t('Ultra')],
+  ];
+  const sel = (value: string, options: [string, string][], set: (v: string) => void) => {
+    const s = h(
+      'select',
+      { onchange: () => set(s.value) },
+      ...options.map(([v, l]) => h('option', { value: v, text: l, selected: v === value })),
+    ) as HTMLSelectElement;
+    selects.push(s);
+    return s;
+  };
+  const g = settings.graphics;
+  const group = (key: GraphicsGroup, label: string, hint: string) =>
+    row(
+      t(label),
+      sel(g[key] ?? '', levels, (v) => {
+        if (v) g[key] = v as QualityPreset;
+        else delete g[key];
+        changed();
+      }),
+      t(hint),
+    );
+  return [
+    row(
+      t('Anti-aliasing'),
+      sel(
+        g.antialias ?? '',
+        [
+          ['', t('Preset')],
+          ['native', t('MSAA (fast)')],
+          ['msaa', t('MSAA 4×')],
+          ['smaa', t('SMAA')],
+          ['taa', t('TAA (smoothest)')],
+        ],
+        (v) => {
+          if (v) g.antialias = v as AntiAlias;
+          else delete g.antialias;
+          changed();
+        },
+      ),
+      t('TAA smooths jagged distant edges, fences and shimmering textures best'),
+    ),
+    row(
+      t('Supersampling'),
+      sel(
+        g.superSample ? String(g.superSample) : '',
+        [
+          ['', t('Preset')],
+          ['1', t('Off')],
+          ['1.25', '1.25×'],
+          ['1.5', '1.5×'],
+          ['2', t('2× (4 × the pixels)')],
+        ],
+        (v) => {
+          if (v) g.superSample = Number(v);
+          else delete g.superSample;
+          changed();
+        },
+      ),
+      t('Renders above your screen resolution and scales down: the sharpest, cleanest picture, at a big cost'),
+    ),
+    group('shadows', 'Shadows', 'Shadow sharpness and how far they reach'),
+    group('ao', 'Ambient occlusion', 'Soft contact shadows in corners and under cars'),
+    group('textures', 'Textures and reflections', 'Texture filtering at grazing angles, reflections'),
+    group('viewDistance', 'View distance', 'How far buildings, barriers and detailed cars are drawn'),
+    group('trees', 'Trees', 'Forest density and distance'),
+    group('grass', 'Grass', 'The 3D lawn and grass blades on the verges'),
+    group('clouds', 'Clouds', 'Flat, lit, or with deep self-shadowing'),
+    group('crowd', 'Spectators', 'People on the grandstands'),
+    group('effects', 'Effects', 'Bloom, colour grade and rain'),
+  ];
 }

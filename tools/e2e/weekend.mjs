@@ -18,9 +18,9 @@ await page.addInitScript(() =>
   localStorage.setItem('apexghost.settings.v1', JSON.stringify({ nickname: 'Weekend', quality: 'low', qualityAuto: false, language: 'en' })),
 );
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(2500);
-await page.click(args.includes('--online') ? 'button.primary:has-text("Create room")' : 'button.solo');
+await page.click(args.includes('--online') ? 'button:has-text("Create room")' : 'button.solo');
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
 await page.evaluate((laps) => {

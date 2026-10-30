@@ -42,9 +42,9 @@ for (let k = 0; k < 4; k++) {
   await grab('boot');
   await page.waitForTimeout(250);
 }
-await page.waitForSelector('button.primary:has-text("Create room")', { timeout: 60_000 });
+await page.waitForSelector('button:has-text("Create room")', { timeout: 60_000 });
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-await page.click('button.primary:has-text("Create room")');
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card');
 await page.click('.car-card >> nth=16');
 await page.click('.lobby-actions button:has-text("Ready")');

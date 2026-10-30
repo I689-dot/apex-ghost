@@ -24,7 +24,7 @@ html.mobile-app button {
 }
 
 /* ------------------------------------------------------------- menus --- */
-html.mobile-app .menu {
+html.mobile-app .menu:not(.mm) {
   grid-template-columns: minmax(300px, 380px) 1fr;
   grid-template-rows: auto auto 1fr auto;
   column-gap: 1.2rem;
@@ -33,7 +33,7 @@ html.mobile-app .menu {
   -webkit-overflow-scrolling: touch;
   background: linear-gradient(90deg, rgba(13, 14, 17, 0.92) 0%, rgba(13, 14, 17, 0.7) 45%, rgba(13, 14, 17, 0.25) 100%);
 }
-html.mobile-app .menu > * {
+html.mobile-app .menu:not(.mm) > * {
   grid-column: 1;
 }
 html.mobile-app .brand {
@@ -57,7 +57,7 @@ html.mobile-app .menu-card {
   padding: 0.9rem 1rem;
   gap: 0.5rem;
 }
-html.mobile-app .menu > :nth-child(3) {
+html.mobile-app .menu:not(.mm) > :nth-child(3) {
   /* the live room list: right column on a landscape phone */
   grid-column: 2;
   grid-row: 1 / span 3;
@@ -65,7 +65,21 @@ html.mobile-app .menu > :nth-child(3) {
   max-height: calc(100vh - 30px);
   overflow-y: auto;
 }
-html.mobile-app .menu-foot {
+/* the main menu (styles.css .mm): clear of the notch and the rounded corners */
+html.mobile-app .mm-top,
+html.mobile-app .mm-hero,
+html.mobile-app .mm-body,
+html.mobile-app .mm-foot {
+  padding-left: calc(16px + var(--sa-l));
+  padding-right: calc(16px + var(--sa-r));
+}
+html.mobile-app .mm-top {
+  padding-top: calc(6px + var(--sa-t));
+}
+html.mobile-app .mm-foot {
+  padding-bottom: calc(6px + var(--sa-b));
+}
+html.mobile-app .menu:not(.mm) .menu-foot {
   grid-column: 1 / span 2;
   padding-top: 0.6rem;
 }

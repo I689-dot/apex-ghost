@@ -29,6 +29,8 @@ export type RaceEvent =
       noAdvantage?: boolean;
       /** Race control: a drive-through to serve (ms is 0 until it is converted into time). */
       driveThrough?: boolean;
+      /** Waived: the car had just been hit by another one (pushed off, spun, reset or rejoined after it). */
+      contact?: boolean;
     }
   | { type: 'sector'; playerId: string; sector: number; ms: number }
   | { type: 'finish'; playerId: string; totalMs: number }
@@ -84,6 +86,9 @@ export const PENALTY = {
   missedStopMs: 90_000,
   /** A pit-lane pass that stops longer than this is a stop, not a drive-through. */
   driveThroughMaxStopMs: 1500,
+  /** Hit by another car this recently (ms): leaving the track, resetting or rejoining past a checkpoint is not
+   * penalised (the car was pushed off, it gained nothing). */
+  contactGraceMs: 12_000,
 };
 
 /**
@@ -141,6 +146,10 @@ export interface PlayerRaceState {
   offMinSpeed: number;
   /** Track-limits warnings used this session. */
   limitWarnings: number;
+  /** Last time the car was reported hit by another car (FLAG_HIT samples), server ms. */
+  hitAt: number;
+  /** Has got going (over 15 m/s) since the start or its last pit stop: only then can it be "stopped on track". */
+  rolling: boolean;
   /** Speed from the last two samples (m/s). */
   speed: number;
   /** The lap in progress is an out lap (from the grid or from the pits): never timed. */
@@ -283,6 +292,7 @@ export class RaceTracker {
     // completes a race lap)
     if (!this.near(p, this.track.pitEntryS, -60, 450)) return out;
     p.inPit = true;
+    p.rolling = false;
     p.pitStops++;
     p.pitLap = p.laps + 1;
     p.pitInMs = t;
@@ -413,6 +423,8 @@ export class RaceTracker {
       offSpeed0: 0,
       offMinSpeed: 0,
       limitWarnings: 0,
+      hitAt: -1e12,
+      rolling: false,
       speed: 0,
       outLap: true,
       inPit: false,
@@ -461,13 +473,16 @@ export class RaceTracker {
    * `offTrack` = all four wheels beyond the track limits in this sample.
    * Returns events (laps, sectors, finish). Allocation only happens when an event fires.
    */
-  ingest(id: string, t: number, x: number, y: number, z: number, reset: boolean, out: RaceEvent[] = [], offTrack = false): RaceEvent[] {
+  ingest(id: string, t: number, x: number, y: number, z: number, reset: boolean, out: RaceEvent[] = [], offTrack = false, hit = false): RaceEvent[] {
     const p = this.players.get(id);
     if (!p || p.dnf || p.finishedMs !== null) return out;
     if (t < this.startMs - 10_000) return out;
+    if (hit) p.hitAt = Math.max(p.hitAt, t);
     if (p.hasPos && t > p.lt) {
       p.speed = Math.hypot(x - p.lx, z - p.lz) / ((t - p.lt) / 1000);
       if (p.inPit && p.speed < 1) p.stoppedMs += t - p.lt;
+      // a teleport (reset) is no proof of moving
+      if (!p.inPit && !reset && t >= this.startMs && p.speed > 15 && p.speed < 120) p.rolling = true;
     }
     if (t >= this.startMs && !p.inPit) {
       if (offTrack) {
@@ -506,7 +521,10 @@ export class RaceTracker {
       }
       p.resets++;
       p.offSince = null;
-      if (t >= this.startMs && !p.outLap) this.addPenalty(p, 'reset', PENALTY.resetMs, out);
+      if (t >= this.startMs && !p.outLap) {
+        if (this.wasHit(p, t)) out.push({ type: 'penalty', playerId: id, reason: 'reset', ms: 0, lapPenaltyMs: p.lapPenaltyMs, contact: true });
+        else this.addPenalty(p, 'reset', PENALTY.resetMs, out);
+      }
       this.place(p, t, x, y, z, true);
       return out;
     }
@@ -552,7 +570,9 @@ export class RaceTracker {
         const skipped = wrapDelta(tr.gates[p.nextGate].s, g.s, tr.length);
         const counts = !p.outLap && p.passed >= 0;
         for (let k = p.nextGate; k !== gi; k = (k + 1) % n) this.onGate(p, k, tc, out);
-        if (counts) this.addPenalty(p, 'shortcut', Math.round((PENALTY.shortcutBaseMs + PENALTY.shortcutPerMeterMs * Math.max(0, skipped)) / 100) * 100, out);
+        if (counts && this.wasHit(p, tc)) out.push({ type: 'penalty', playerId: p.id, reason: 'shortcut', ms: 0, lapPenaltyMs: p.lapPenaltyMs, contact: true });
+        else if (counts)
+          this.addPenalty(p, 'shortcut', Math.round((PENALTY.shortcutBaseMs + PENALTY.shortcutPerMeterMs * Math.max(0, skipped)) / 100) * 100, out);
       }
       this.onGate(p, gi, tc, out);
       if (p.finishedMs !== null) break;
@@ -639,6 +659,11 @@ export class RaceTracker {
     p.nextGate = (gi + 1) % n;
   }
 
+  /** Hit by another car within PENALTY.contactGraceMs of t. */
+  private wasHit(p: PlayerRaceState, t: number): boolean {
+    return t - p.hitAt < PENALTY.contactGraceMs;
+  }
+
   private addPenalty(p: PlayerRaceState, reason: PenaltyReason, ms: number, out: RaceEvent[]): void {
     if (p.outLap || ms <= 0) return;
     p.lapPenaltyMs += ms;
@@ -670,10 +695,16 @@ export class RaceTracker {
    */
   private closeExcursion(p: PlayerRaceState, out: RaceEvent[]): void {
     if (p.offSince === null) return;
-    const dur = Math.max(0, p.offLast - p.offSince) / 1000;
+    const since = p.offSince;
+    const dur = Math.max(0, p.offLast - since) / 1000;
     p.offSince = null;
     if (p.outLap) return;
     const base = { type: 'penalty' as const, playerId: p.id, reason: 'track-limits' as const, ms: 0, lapPenaltyMs: p.lapPenaltyMs };
+    // pushed off: hit shortly before leaving the track, or while off
+    if (p.hitAt >= since - PENALTY.contactGraceMs && p.hitAt <= p.offLast) {
+      out.push({ ...base, contact: true });
+      return;
+    }
     if (p.offSpeed0 > 5 && p.offMinSpeed < p.offSpeed0 * (1 - PENALTY.noAdvantageSlowdown)) {
       out.push({ ...base, noAdvantage: true });
       return;

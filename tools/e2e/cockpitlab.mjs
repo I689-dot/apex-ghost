@@ -45,7 +45,7 @@ for (const i of list) {
   }, FOV);
   try {
     await page.goto(URL);
-    await page.click('button.primary:has-text("Create room")');
+    await page.click('button:has-text("Create room")');
     await page.waitForSelector('.car-card');
     await page.click(`.car-card >> nth=${i}`);
     await page.waitForTimeout(600);

@@ -97,6 +97,25 @@ async function accountApi(req: Request, env: Env, ctx: ExecutionContext, path: s
   }
 }
 
+/**
+ * Online play is for signed-in drivers only (offline play needs no server): creating a room and connecting to one
+ * need an account token, so strangers can't use up the free plan's requests. Without an accounts database (local
+ * development) anyone may play.
+ */
+async function mayPlayOnline(req: Request, env: Env, ctx: ExecutionContext, token: string | null): Promise<boolean> {
+  const sql = acc.db(env);
+  if (!sql) return true;
+  try {
+    const auth = token ? new Request(req.url, { headers: { Authorization: `Bearer ${token}` } }) : req;
+    return (await acc.userOf(sql, auth)) !== null;
+  } catch (e) {
+    console.error('[accounts]', e);
+    return false;
+  } finally {
+    ctx.waitUntil(sql.end({ timeout: 2 }));
+  }
+}
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
@@ -111,6 +130,7 @@ export default {
     }
 
     if (url.pathname === '/api/rooms' && req.method === 'POST') {
+      if (!(await mayPlayOnline(req, env, ctx, null))) return json({ error: 'Sign in to play online.' }, 401);
       for (let attempt = 0; attempt < 8; attempt++) {
         const code = generateRoomCode();
         const stub = env.ROOMS.get(env.ROOMS.idFromName(code));
@@ -130,6 +150,13 @@ export default {
         pair[1].accept();
         pair[1].send(JSON.stringify({ t: 'error', code: 'room_not_found', message: 'Invalid room code.', fatal: true }));
         pair[1].close(4000, 'room_not_found');
+        return new Response(null, { status: 101, webSocket: pair[0] });
+      }
+      if (!(await mayPlayOnline(req, env, ctx, url.searchParams.get('t')))) {
+        const pair = new WebSocketPair();
+        pair[1].accept();
+        pair[1].send(JSON.stringify({ t: 'error', code: 'sign_in', message: 'Sign in to play online.', fatal: true }));
+        pair[1].close(4001, 'sign_in');
         return new Response(null, { status: 101, webSocket: pair[0] });
       }
       const stub = env.ROOMS.get(env.ROOMS.idFromName(code));

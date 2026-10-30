@@ -46,8 +46,8 @@ await page.addInitScript(() => {
   localStorage.removeItem('apexghost.devWeatherSeed');
 });
 await page.goto(URL);
-await page.waitForSelector('.menu-card', { timeout: 30_000 });
-await page.click('button.primary:has-text("Create room")');
+await page.waitForSelector('.menu', { timeout: 30_000 });
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (TRACK) await page.selectOption('.prep .prep-row:nth-of-type(1) select', TRACK);

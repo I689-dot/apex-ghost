@@ -7,6 +7,9 @@ import type { QualityConfig } from '../settings';
 import type { CardTree, Forest } from './forest';
 import { VEG_BASE } from './vegetation';
 import { SHELL_GROUND } from './grassShells';
+import { STRUCTURE_MASK, STRUCTURE_PUSH } from './grassMask';
+import { cutWallsAcrossLine } from './wallCut';
+import { RoadPatches } from './roadPatches';
 
 type R = typeof RAPIER;
 
@@ -153,19 +156,111 @@ export function lawnDetail(): THREE.Texture {
 }
 
 /**
+ * Photo-scanned surface detail (CC0, ambientCG: Asphalt031 for the racing asphalt, Concrete034 for walls, stands and
+ * buildings; tools: see assets/textures/LICENSE.txt): one map each, R = albedo detail around mid-grey, G/B = the
+ * normal's x/y. Layered in world space over the map's own 256 px tiles, which turn to flat grey mush within metres:
+ * the aggregate of the asphalt, its glints and its relief, the grain and blotches of concrete.
+ */
+const TEX_BASE = `${import.meta.env.BASE_URL}assets/textures/`;
+const photoDetails = new Map<string, { value: THREE.Texture }>();
+function photoDetail(name: string): { value: THREE.Texture } {
+  let u = photoDetails.get(name);
+  if (u) return u;
+  const flat = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
+  flat.needsUpdate = true;
+  u = { value: flat as THREE.Texture };
+  photoDetails.set(name, u);
+  const slot = u;
+  new THREE.TextureLoader().load(`${TEX_BASE}${name}.jpg`, (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.anisotropy = 16;
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    slot.value = tex;
+  });
+  return u;
+}
+
+/** Walls, stands, buildings: concrete grain (full) and metal (half), triplanar in world space. */
+const STRUCT_DETAIL_RE =
+  /^(building|concrete_0|walls_new|wall_|openstand|stairs|gs_roof|garage_0|sound_barriers|box_struct|marshal|timetower|rockwall|medical|tuv|paddock)/i;
+const METAL_DETAIL_RE = /^(galvanized|grail|metal_white|metals_|metal_wall|gantry|fence_green|fences_b|box_fence)/i;
+
+function addStructureDetail(m: THREE.MeshStandardMaterial, strength: number): void {
+  const base = m.onBeforeCompile;
+  const baseKey = m.customProgramCacheKey.bind(m);
+  m.onBeforeCompile = (sh, r) => {
+    base.call(m, sh, r);
+    sh.uniforms.apxConc = photoDetail('concrete_detail');
+    sh.vertexShader = sh.vertexShader
+      .replace('void main() {', 'varying vec3 vApxSW;\nvarying vec3 vApxSN;\nvoid main() {')
+      .replace(
+        '#include <worldpos_vertex>',
+        '#include <worldpos_vertex>\nvApxSW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvApxSN = normalize(mat3(modelMatrix) * objectNormal);',
+      );
+    sh.fragmentShader = sh.fragmentShader
+      .replace('void main() {', 'uniform sampler2D apxConc;\nvarying vec3 vApxSW;\nvarying vec3 vApxSN;\nvec2 apxSDn = vec2(0.0);\nvoid main() {')
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+{
+  vec3 w = pow(abs(normalize(vApxSN)), vec3(4.0));
+  w /= (w.x + w.y + w.z);
+  vec3 p = vApxSW / 1.9;
+  vec3 tx = texture2D(apxConc, p.zy).rgb;
+  vec3 ty = texture2D(apxConc, p.xz).rgb;
+  vec3 tz = texture2D(apxConc, p.xy).rgb;
+  vec3 t = tx * w.x + ty * w.y + tz * w.z;
+  // large, soft blotches (weathering) over the fine grain
+  vec3 q = vApxSW / 7.3;
+  float big = texture2D(apxConc, q.xz + q.y * 0.37).r * w.y + texture2D(apxConc, q.zy).r * w.x + texture2D(apxConc, q.xy).r * w.z;
+  diffuseColor.rgb *= 1.0 + ((t.r - 0.5) * 1.1 + (big - 0.5) * 0.9) * ${strength.toFixed(2)};
+  apxSDn = (t.gb * 2.0 - 1.0) * ${(strength * 0.8).toFixed(2)};
+}`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+{
+  // the grain's relief, fading out with distance (sub-pixel there)
+  float fade = 1.0 - smoothstep(25.0, 90.0, length(vViewPosition));
+  vec3 n = normalize(vApxSN);
+  vec3 tA = normalize(abs(n.y) < 0.9 ? cross(n, vec3(0.0, 1.0, 0.0)) : cross(n, vec3(1.0, 0.0, 0.0)));
+  vec3 tB = cross(n, tA);
+  normal = normalize(normal + mat3(viewMatrix) * (tA * apxSDn.x + tB * apxSDn.y) * fade);
+}`,
+      );
+  };
+  m.customProgramCacheKey = () => `${baseKey()}-struct${strength}`;
+}
+
+/**
  * Macro variation (as racing games break texture tiling): the colour is modulated by two octaves of smooth
  * value noise in world space, metres to tens of metres across, plus a slight dry/lush hue drift on grass. Paved
  * surfaces get a weaker, greyer version (patches of newer and older asphalt).
  */
-function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue: boolean, detail = 0, kind: 'grass' | 'gravel' | 'paved' = 'paved'): void {
+function addMacroVariation(
+  m: THREE.MeshStandardMaterial,
+  strength: number,
+  hue: boolean,
+  detail = 0,
+  kind: 'grass' | 'gravel' | 'paved' | 'asphalt' = 'paved',
+): void {
+  const asphalt = kind === 'asphalt';
   const grass = kind === 'grass';
   // detail tile sizes (m): fine and coarse
   const [fine, coarse] = grass ? [3.2, 11.3] : kind === 'gravel' ? [0.32, 1.25] : [1.6, 7.3];
   m.onBeforeCompile = (sh) => {
-    if (detail > 0) sh.uniforms.apxDetail = { value: grass ? lawnDetail() : kind === 'gravel' ? gravelDetail() : pavedDetail() };
+    if (detail > 0)
+      sh.uniforms.apxDetail = asphalt ? photoDetail('asphalt_detail') : { value: grass ? lawnDetail() : kind === 'gravel' ? gravelDetail() : pavedDetail() };
     if (detail > 0 && grass) {
       sh.uniforms.apxDetailMean = lawnMean;
       sh.uniforms.apxShellGround = SHELL_GROUND;
+    }
+    if (hue) {
+      sh.uniforms.apxStruct = STRUCTURE_MASK.tex;
+      sh.uniforms.apxStructRect = STRUCTURE_MASK.rect;
     }
     sh.vertexShader = sh.vertexShader
       .replace('void main() {', 'varying vec3 vApxW;\nvoid main() {')
@@ -176,12 +271,28 @@ function addMacroVariation(m: THREE.MeshStandardMaterial, strength: number, hue:
         `varying vec3 vApxW;
 ${detail > 0 ? 'uniform sampler2D apxDetail;' : ''}
 ${detail > 0 && grass ? 'uniform vec3 apxDetailMean;\nuniform float apxShellGround;' : ''}
+${hue ? 'uniform sampler2D apxStruct;\nuniform vec4 apxStructRect;\nuniform mat4 projectionMatrix;' : ''}
+${asphalt ? 'vec2 apxADn = vec2(0.0);\nfloat apxAAlb = 0.0;' : ''}
 float apxHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float apxNoise(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(apxHash(i), apxHash(i + vec2(1.0, 0.0)), f.x), mix(apxHash(i + vec2(0.0, 1.0)), apxHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 void main() {`,
+      )
+      .replace(
+        '#include <logdepthbuf_fragment>',
+        hue
+          ? `#include <logdepthbuf_fragment>
+{
+  // under a grandstand or building (grassMask.ts): drawn further back, so the structure sunk into this ground wins
+  vec2 apxSu = (vApxW.xz - apxStructRect.xy) * apxStructRect.zw;
+  float apxIn = all(greaterThanEqual(apxSu, vec2(0.0))) && all(lessThan(apxSu, vec2(1.0))) ? texture2D(apxStruct, apxSu).r : 0.0;
+  vec3 apxVp = -vViewPosition;
+  vec4 apxClip = projectionMatrix * vec4(apxVp * (1.0 + ${STRUCTURE_PUSH.toFixed(2)} * apxIn / max(length(apxVp), 0.1)), 1.0);
+  gl_FragDepth = apxIn > 0.5 ? clamp(apxClip.z / apxClip.w * 0.5 + 0.5, 0.0, 1.0) : gl_FragCoord.z;
+}`
+          : '#include <logdepthbuf_fragment>',
       )
       .replace(
         '#include <map_fragment>',
@@ -209,14 +320,36 @@ void main() {`,
   diffuseColor.rgb *= vec3(0.93, 1.03, 0.86);
   // under the 3D blades near the camera (grassShells.ts): soil and shade between them
   if (apxShellGround > 0.0) diffuseColor.rgb *= 1.0 - 0.12 * (1.0 - smoothstep(apxShellGround * 0.5, apxShellGround, distance(vApxW, cameraPosition)));`
-      : detail > 0
-        ? `float g = texture2D(apxDetail, wp / ${fine.toFixed(2)}).r * 0.6 + texture2D(apxDetail, wp / ${coarse.toFixed(2)} + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};`
-        : ''
+      : asphalt && detail > 0
+        ? `// photo asphalt (Asphalt031): the aggregate at two scales, its relief and its glints
+  vec3 a1 = texture2D(apxDetail, wp / 3.8).rgb;
+  vec3 a2 = texture2D(apxDetail, mat2(0.8, -0.6, 0.6, 0.8) * wp / 11.3 + 0.41).rgb;
+  apxAAlb = (a1.r * 0.62 + a2.r * 0.38) - 0.5;
+  diffuseColor.rgb *= 1.0 + apxAAlb * ${(detail * 4.5).toFixed(2)};
+  apxADn = (vec2(a1.g, a1.b) * 0.62 + vec2(a2.g, a2.b) * 0.38) * 2.0 - 1.0;`
+        : detail > 0
+          ? `float g = texture2D(apxDetail, wp / ${fine.toFixed(2)}).r * 0.6 + texture2D(apxDetail, wp / ${coarse.toFixed(2)} + 0.37).r * 0.4; diffuseColor.rgb *= 1.0 + (g - 0.5) * ${(detail * 2).toFixed(2)};`
+          : ''
   }
 }`,
       );
+    if (asphalt)
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          '#include <roughnessmap_fragment>',
+          // the stones polished by tyres catch the light, the binder between them stays matt
+          '#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * (1.0 - apxAAlb * 0.55), 0.04, 1.0);',
+        )
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>
+{
+  float fade = 1.0 - smoothstep(18.0, 70.0, length(vViewPosition));
+  normal = normalize(normal + mat3(viewMatrix) * vec3(apxADn.x, 0.0, -apxADn.y) * 0.55 * fade);
+}`,
+        );
   };
-  m.customProgramCacheKey = () => `macro-${strength}-${hue}-${detail}-${kind}`;
+  m.customProgramCacheKey = () => `macro-${strength}-${hue}-${detail}-${kind}-s`;
 }
 
 /**
@@ -297,6 +430,8 @@ export class Track {
   excludeBody: RAPIER.RigidBody | undefined;
   /** The mown grass of the verges and infields (grassShells.ts grows blades on it). */
   readonly lawnMaterials = new Set<THREE.MeshStandardMaterial>();
+  /** Every ground surface (grass, gravel, terrain, paving): not structures (grassMask.ts). */
+  readonly groundMaterials = new Set<THREE.Material>();
   /** Procedural forest around the circuit (null when the map has none or it failed to load). */
   forest: Forest | null = null;
 
@@ -436,7 +571,15 @@ export class Track {
           const det = /^top2/i.test(sm.name) ? 0 : isGrass ? 0.28 : isGravel ? 0.42 : 0.16;
           addMacroVariation(sm, 0.22, isGrass || /top2/i.test(sm.name), det, isGrass ? 'grass' : isGravel ? 'gravel' : 'paved');
           if (isGrass && det > 0) t.lawnMaterials.add(sm);
-        } else if (PAVED_MAT_RE.test(sm.name)) addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : 0.22);
+          t.groundMaterials.add(sm);
+        } else if (PAVED_MAT_RE.test(sm.name)) {
+          const asph = /^asph/i.test(sm.name);
+          addMacroVariation(sm, 0.08, false, /^(paddock_roof|ponyva)/i.test(sm.name) ? 0.12 : asph ? 0.2 : 0.22, asph ? 'asphalt' : 'paved');
+          t.groundMaterials.add(sm);
+        }
+        if (ROAD_MAT_RE.test(sm.name)) t.groundMaterials.add(sm);
+        if (STRUCT_DETAIL_RE.test(sm.name) && !sm.transparent) addStructureDetail(sm, 0.5);
+        else if (METAL_DETAIL_RE.test(sm.name) && !sm.transparent && sm.alphaTest === 0) addStructureDetail(sm, 0.25);
         applyDecalLayer(sm);
       }
       const first = mats[0] as THREE.MeshStandardMaterial | undefined;
@@ -452,9 +595,11 @@ export class Track {
   }
 
   /** Build Rapier trimesh colliders; one per surface sub-mesh. */
-  buildColliders(R: R, world: RAPIER.World, meshes: CollisionMesh[]): void {
+  buildColliders(R: R, world: RAPIER.World, meshes: CollisionMesh[], layout?: TrackData): void {
     for (const m of meshes) {
-      const desc = R.ColliderDesc.trimesh(m.positions, m.indices)
+      // walls across this layout's own lap line (a road the map closes for another layout) are not there
+      const idx = layout && m.surface === 'wall' ? cutWallsAcrossLine(m.positions, m.indices, layout) : m.indices;
+      const desc = R.ColliderDesc.trimesh(m.positions, idx)
         .setCollisionGroups(m.surface === 'wall' ? WALL_GROUPS : TRACK_GROUPS)
         .setFriction(m.surface === 'wall' ? 0.25 : 0.8)
         .setRestitution(m.surface === 'wall' ? 0.15 : 0.0);
@@ -469,6 +614,25 @@ export class Track {
   }
 
   /** Ground query for the wheels (excludes `excludeBody`, the local car). */
+  /** Smoothed driving surfaces over the pit lane and the layout's rough stretches (roadPatches.ts). */
+  private patches: RoadPatches | null = null;
+
+  buildSmoothSurfaces(world: RAPIER.World, td: TrackData): void {
+    const ray = this.ray;
+    if (!ray) return;
+    this.patches = RoadPatches.build(td, (x, yTop, z, maxD) => {
+      ray.origin.x = x;
+      ray.origin.y = yTop;
+      ray.origin.z = z;
+      ray.dir.x = 0;
+      ray.dir.y = -1;
+      ray.dir.z = 0;
+      const hit = world.castRay(ray, maxD, true, undefined, RAY_GROUPS);
+      if (!hit || this.colliderSurface.get(hit.collider.handle) === 'wall') return null;
+      return yTop - hit.timeOfImpact;
+    });
+  }
+
   groundQuery(world: RAPIER.World): GroundQuery {
     return {
       cast: (ox, oy, oz, dx, dy, dz, maxDist, out: GroundHit) => {
@@ -499,6 +663,7 @@ export class Track {
         out.ny = ny;
         out.nz = nz;
         out.surface = this.colliderSurface.get(hit.collider.handle) ?? 'asphalt';
+        if (out.surface !== 'wall') this.patches?.apply(ox, oy, oz, dx, dy, dz, maxDist, out);
         return out;
       },
     };

@@ -16,32 +16,7 @@ export interface TrackChoice {
 
 /* --------------------------------------------------------------- sign in --- */
 
-/** The account line of the menu: who you are, or the way to sign in. */
-export function accountBar(onChange: () => void): HTMLElement {
-  const a = acc.account();
-  if (a)
-    return h(
-      'div.account-bar',
-      {},
-      h('span.account-dot'),
-      h('span', { text: t('Signed in as {nick}', { nick: a.user.nick }) }),
-      h('button.ghost.small', {
-        text: t('Sign out'),
-        onclick: async () => {
-          await acc.logout().catch(() => {});
-          onChange();
-        },
-      }),
-    );
-  return h(
-    'div.account-bar',
-    {},
-    h('span.muted', { text: t('Sign in to keep your records and add friends') }),
-    h('button.small', { text: t('Sign in / create account'), onclick: () => document.body.append(signInModal(onChange)) }),
-  );
-}
-
-function signInModal(onDone: () => void): HTMLElement {
+export function signInModal(onDone: () => void): HTMLElement {
   const nick = h('input', { type: 'text', maxlength: 16, placeholder: t('Nickname'), autocomplete: 'username', spellcheck: 'false' });
   const pw = h('input', { type: 'password', maxlength: 72, placeholder: t('Password'), autocomplete: 'current-password' });
   const err = h('div.form-error');

@@ -37,8 +37,8 @@ await page.addInitScript((q) => {
   localStorage.setItem('apexghost.noAudio', '1');
 }, QUALITY);
 await page.goto(APP ? `${URL}/?app=1` : URL);
-await page.waitForSelector('.menu-card');
-await page.click('button.primary:has-text("Create room")');
+await page.waitForSelector('.menu');
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card');
 const TIME = opt('time', '');
 const WEATHER = opt('weather', '');

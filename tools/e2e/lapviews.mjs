@@ -41,7 +41,7 @@ await page.addInitScript((q) => {
   );
 }, QUALITY);
 await page.goto(URL);
-await page.click('button.primary:has-text("Create room")');
+await page.click('button:has-text("Create room")');
 await page.waitForSelector('.car-card');
 await page.selectOption('.prep .prep-row:nth-of-type(2) select', 'clear');
 await page.selectOption('.prep .prep-row:nth-of-type(3) select', 'midday');

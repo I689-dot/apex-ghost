@@ -44,7 +44,7 @@ await page.addInitScript(() => {
 const shot = (name) => page.screenshot({ path: path.join(out, `${name}.png`), timeout: 120_000 }).catch(() => {});
 
 await page.goto(URL);
-await page.waitForSelector('.menu-card');
+await page.waitForSelector('.menu');
 await page.waitForTimeout(2500);
 await page.click('button.solo');
 await page.waitForSelector('.car-card', { timeout: 30_000 });

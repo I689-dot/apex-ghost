@@ -36,7 +36,7 @@ await page.addInitScript(() => {
 });
 const shot = (n) => page.screenshot({ path: path.join(out, `es-${n}.png`) });
 await page.goto(URL);
-await page.waitForSelector('.menu-card', { timeout: 30_000 });
+await page.waitForSelector('.menu', { timeout: 30_000 });
 await page.waitForTimeout(3000);
 await shot('1-menu');
 await page.click('button.primary:has-text("Crear sala")');

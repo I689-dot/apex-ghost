@@ -18,7 +18,7 @@ for (const [w, hgt] of [
     const page = await browser.newPage({ viewport: { width: w, height: hgt } });
     await page.addInitScript((l) => localStorage.setItem('apexghost.settings.v1', JSON.stringify({ nickname: 'Checker', language: l })), lang);
     await page.goto(URL);
-    await page.waitForSelector('.menu-card');
+    await page.waitForSelector('.menu');
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `tools/e2e/out/menu-${w}x${hgt}-${lang}.png` });
     const bad = await page.evaluate(() => {

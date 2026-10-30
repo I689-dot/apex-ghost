@@ -43,7 +43,8 @@ import { getLang, t } from './i18n';
 import { IS_APP } from './mobile/platform';
 import { mobileAppLink } from './mobile/installScreen';
 import * as acc from './net/account';
-import { accountBar, friendsPanel, recordsModal } from './ui/social';
+import { friendsPanel, recordsModal, signInModal } from './ui/social';
+import { cinematicReel, trackReel } from './ui/reel';
 
 type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 'results';
 
@@ -114,6 +115,21 @@ export class App {
 
   private audio: GameAudio | null = null;
   private backdropEl: HTMLElement | null = null;
+  /** The intro reel behind the waiting screens (a race in progress you join next, watching between sessions). */
+  private waitReel: { key: string; dispose: () => void } | null = null;
+
+  private setWaitReel(trackId: string | null): void {
+    const key = trackId ?? '';
+    if (this.waitReel?.key === key) return;
+    this.waitReel?.dispose();
+    this.waitReel = null;
+    if (!trackId) return;
+    const entry = this.trackIndex.find((tr) => tr.id === trackId);
+    const r = cinematicReel(trackReel(entry?.map, t(entry?.name ?? ''), null, t('NEXT RACE')), { loop: true, bars: false, shotMs: 5200 });
+    r.el.classList.add('lobby-reel');
+    document.getElementById('app')?.prepend(r.el);
+    this.waitReel = { key, dispose: r.dispose };
+  }
 
   /**
    * Full-screen photo behind the menus (in-engine shots of the circuit, tools/e2e/photos.mjs); null in races.
@@ -156,6 +172,7 @@ export class App {
     this.setPause(false);
     this.setCountdown('', '');
     this.teardownConnection();
+    this.setWaitReel(null);
     this.setBackdrop('hero');
     // signed in: your nickname is the account's
     const signedIn = acc.account();
@@ -170,7 +187,7 @@ export class App {
     });
     const code = h('input.code-input', { type: 'text', maxlength: 7, placeholder: t('ROOM CODE'), autocomplete: 'off', spellcheck: 'false' });
     const err = h('div.form-error', { text: error });
-    const busy = (b: boolean) => form.classList.toggle('busy', b);
+    const busy = (b: boolean) => document.querySelector('.mm')?.classList.toggle('busy', b);
     const readNick = (): string | null => {
       const r = sanitizeNickname(nick.value);
       if (!r.ok) {
@@ -253,60 +270,179 @@ export class App {
     };
     code.addEventListener('input', () => (code.value = code.value.toUpperCase()));
     code.addEventListener('keydown', (e) => e.key === 'Enter' && void joinIt());
-    const form = h(
-      'div.menu-card',
-      {},
-      accountBar(() => this.showMenu()),
-      h('label', { text: t('Nickname') }),
-      nick,
-      h('button.primary', { text: t('Create room'), onclick: () => void create() }),
-      h('button.ghost.solo', {
-        text: t('Play solo (offline)'),
-        title: t('Alone or with AI cars, in this browser: nothing goes through the online server'),
-        onclick: () => void solo(),
-      }),
-      h('div.or', { text: t('or join friends') }),
+    // online play is for signed-in drivers (the server refuses the others: no account, no server use); the local
+    // dev server has no accounts, so dev builds may play online without one
+    // (and when the server keeps no accounts at all, it lets everyone in: so does the menu, once it knows)
+    const online = !!signedIn || import.meta.env.DEV || acc.accountsEnabled() === false;
+    if (!online && acc.accountsEnabled() === null)
+      void acc.probeAccounts().then((on) => {
+        if (!on && this.screen === 'menu') this.showMenu(error);
+      });
+    const signIn = () => document.body.append(signInModal(() => this.showMenu()));
+    const locked = (text: string) => h('div.mm-lock', {}, h('span.mm-lock-icon', { text: '🔒' }), h('span', { text }));
+    /** A big mode tile, as in the F1 / GT menus: a photo, a title, one line, and what it does. */
+    const tile = (cls: string, photo: string, kicker: string, title: string, sub: string, onclick: (() => void) | null, extra?: HTMLElement | null) =>
       h(
-        'div.join-row',
-        {},
-        code,
-        h('button', { text: t('Join'), onclick: () => void joinIt() }),
-        h('button.ghost', { text: t('Watch'), title: t('Spectate this room'), onclick: () => void watchIt() }),
-      ),
-      err,
+        `button.mm-tile.${cls}`,
+        { onclick: onclick ?? (() => signIn()), style: `--photo: url(${uiAsset(photo)})`, 'aria-disabled': onclick ? null : 'true' },
+        h('span.mm-tile-kicker', { text: kicker }),
+        h('span.mm-tile-title', { text: title }),
+        h('span.mm-tile-sub', { text: sub }),
+        extra ?? null,
+      );
+    let tab: 'play' | 'online' | 'friends' = 'play';
+    const body = h('div.mm-body');
+    const tabs = h('nav.mm-tabs');
+    const renderTab = () => {
+      for (const b of tabs.querySelectorAll('button')) b.classList.toggle('on', b.getAttribute('data-tab') === tab);
+      if (tab === 'play')
+        body.replaceChildren(
+          h(
+            'div.mm-tiles',
+            {},
+            tile('solo', 'photo_grid.webp', t('OFFLINE'), t('Play solo (offline)'), t('Race the AI on any circuit. No account, no server.'), () => void solo()),
+            tile(
+              'online',
+              'photo_pole.webp',
+              t('ONLINE'),
+              t('Create room'),
+              t('Your own lobby: invite friends with the room code, add AI cars.'),
+              online ? () => void create() : null,
+              online ? null : locked(t('Sign in to play online')),
+            ),
+            tile(
+              'join',
+              'photo_straight.webp',
+              t('ONLINE'),
+              t('Join friends'),
+              t('A room code from a friend, or a live public session.'),
+              online
+                ? () => {
+                    tab = 'online';
+                    renderTab();
+                  }
+                : null,
+              online ? null : locked(t('Sign in to play online')),
+            ),
+          ),
+          err,
+        );
+      else if (tab === 'online')
+        body.replaceChildren(
+          online
+            ? h(
+                'div.mm-online',
+                {},
+                h(
+                  'div.mm-panel.mm-join',
+                  {},
+                  h('h3', { text: t('Join with a code') }),
+                  h(
+                    'div.join-row',
+                    {},
+                    code,
+                    h('button.primary', { text: t('Join'), onclick: () => void joinIt() }),
+                    h('button.ghost', { text: t('Watch'), title: t('Spectate this room'), onclick: () => void watchIt() }),
+                  ),
+                  h('button.mm-wide', { text: t('Create room'), onclick: () => void create() }),
+                  err,
+                ),
+                this.roomList(joinCode, watchIt),
+              )
+            : h(
+                'div.mm-panel.mm-gate',
+                {},
+                h('h3', { text: t('Online needs an account') }),
+                h('p.muted', { text: t('Sign in to create rooms, join friends and watch live sessions. Solo races work without one.') }),
+                h('button.primary', { text: t('Sign in / create account'), onclick: signIn }),
+              ),
+        );
+      else
+        body.replaceChildren(
+          signedIn
+            ? friendsPanel(
+                () => this.trackIndex,
+                (c) => void joinCode(c),
+                (c) => void watchIt(c),
+              )
+            : h(
+                'div.mm-panel.mm-gate',
+                {},
+                h('h3', { text: t('Friends') }),
+                h('p.muted', { text: t('Sign in to add friends, see where they are and join their lobbies.') }),
+                h('button.primary', { text: t('Sign in / create account'), onclick: signIn }),
+              ),
+        );
+    };
+    const tabBtn = (id: typeof tab, label: string) =>
+      h('button', {
+        'data-tab': id,
+        text: label,
+        onclick: () => {
+          tab = id;
+          renderTab();
+        },
+      });
+    tabs.append(
+      tabBtn('play', t('Play')),
+      tabBtn('online', t('Online')),
+      tabBtn('friends', t('Friends')),
+      h('button', {
+        text: t('Records'),
+        onclick: () => document.body.append(recordsModal(this.trackIndex, this.cars?.cars ?? [], this.trackIndex.find((x) => x.default)?.id ?? '')),
+      }),
+      h('button', { text: t('Settings'), onclick: () => this.openSettings() }),
     );
+    // the driver: account chip (signed in) or the nickname for offline play and a sign-in button
+    const initials = (signedIn?.user.nick ?? settings.nickname ?? '?').slice(0, 2).toUpperCase() || '?';
+    const profile = signedIn
+      ? h(
+          'div.mm-profile',
+          {},
+          h('span.mm-avatar', { text: initials }),
+          h('div.mm-who', {}, h('b', { text: signedIn.user.nick }), h('span.mm-status.on', { text: t('Online') })),
+          h('button.ghost.small', {
+            text: t('Sign out'),
+            onclick: async () => {
+              await acc.logout().catch(() => {});
+              this.showMenu();
+            },
+          }),
+        )
+      : h(
+          'div.mm-profile',
+          {},
+          h('span.mm-avatar.off', { text: initials }),
+          h('div.mm-who', {}, nick, h('span.mm-status', { text: t('Offline · solo only') })),
+          h('button.small', { text: t('Sign in'), onclick: signIn }),
+        );
     this.setUi(
       h(
-        'div.menu',
+        'div.menu.mm',
         {},
+        h('header.mm-top', {}, h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })), tabs, profile),
+        h('div.mm-hero', {}, h('span.mm-kicker', { text: t('GT3 · Nürburgring · Zandvoort · Nordschleife') }), h('h1', { text: t('Ready to race') })),
+        body,
         h(
-          'div.brand',
+          'footer.mm-foot',
           {},
-          h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-          h('p', { text: t('Online sim racing for friends · Nürburgring · Zandvoort') }),
-        ),
-        form,
-        this.roomList(joinCode, watchIt),
-        signedIn
-          ? friendsPanel(
-              () => this.trackIndex,
-              (c) => void joinCode(c),
-              (c) => void watchIt(c),
-            )
-          : null,
-        h(
-          'div.menu-foot',
-          {},
-          h('button.ghost', { text: t('Settings'), onclick: () => this.openSettings() }),
-          h('button.ghost', {
-            text: t('Records'),
-            onclick: () => document.body.append(recordsModal(this.trackIndex, this.cars?.cars ?? [], this.trackIndex.find((x) => x.default)?.id ?? '')),
-          }),
-          h('span.muted', { text: t('Keyboard: W/S throttle & brake · A/D steer · Space handbrake · Esc menu') }),
+          h(
+            'span.mm-keys',
+            {},
+            h('kbd', { text: 'W/S' }),
+            h('span', { text: t('Throttle / brake') }),
+            h('kbd', { text: 'A/D' }),
+            h('span', { text: t('Steer') }),
+            h('kbd', { text: 'V' }),
+            h('span', { text: t('Camera') }),
+            h('kbd', { text: 'Esc' }),
+            h('span', { text: t('Menu') }),
+          ),
           IS_APP ? null : mobileAppLink(),
         ),
       ),
     );
+    renderTab();
     if (!nick.value) nick.focus();
   }
 
@@ -847,6 +983,8 @@ export class App {
     if (!room || !this.conn) return;
     if (this.screen === 'lobby') this.setBackdrop('straight', room.conditions.trackId); // follows the host's track choice
     const mine = this.myInfo();
+    // waiting for the race in progress to end: the circuit's reel plays behind the lobby
+    this.setWaitReel(this.screen === 'lobby' && mine?.waiting ? room.conditions.trackId : null);
     // the safety car is race control's, nobody's to drive
     const cars = (this.cars?.cars ?? []).filter((c) => c.role !== 'safety');
     const browsing = cars.find((c) => c.id === (this.browsing ?? mine?.carId)) ?? cars.find((c) => c.id === mine?.carId) ?? null;
@@ -1060,6 +1198,7 @@ export class App {
     if (!room) return;
     this.screen = 'watch';
     this.setBackdrop('aerial', room.conditions.trackId);
+    this.setWaitReel(room.conditions.trackId);
     const cars = this.cars?.cars ?? [];
     const track = this.trackIndex.find((x) => x.id === room.conditions.trackId);
     const phase: Record<string, string> = {
@@ -1111,6 +1250,7 @@ export class App {
     const room = this.room;
     if (!room || !this.conn) return;
     this.screen = 'briefing';
+    this.setWaitReel(null);
     const mine = this.myInfo();
     const cars = this.cars?.cars ?? [];
     if (mine && mine.tyre !== settings.carSetup.tyre) this.conn.sendJson({ t: 'setTyre', tyre: settings.carSetup.tyre });
@@ -1192,6 +1332,7 @@ export class App {
     this.screen = 'loading';
     this.pendingRace = race;
     this.pendingStartAt = startAt;
+    this.setWaitReel(null);
     this.setBackdrop('aerial', race.trackId);
     this.session?.dispose();
     const w0 = weatherAt(race.weather, 0);
@@ -1269,6 +1410,20 @@ export class App {
         tip,
       ),
     );
+    // the TV intro plays while the world loads: the circuit, your car, the grid
+    const trackEntry = this.trackIndex.find((tr) => tr.id === race.trackId);
+    const myCar = this.cars.cars.find((c) => c.id === this.room?.players.find((p) => p.id === this.me)?.carId);
+    const reel = cinematicReel(
+      trackReel(
+        trackEntry?.map,
+        t(trackEntry?.name ?? ''),
+        myCar ? { url: heroUrl(myCar), name: myCar.name } : null,
+        race.kind === 'race' ? t('RACE') : t('QUALIFYING'),
+      ),
+      { loop: true, shotMs: 4600 },
+    );
+    loadingEl.prepend(reel.el);
+    loadingEl.classList.add('with-reel');
     this.setUi(loadingEl);
     const session = new RaceSession(
       this.gfx,
@@ -1295,6 +1450,7 @@ export class App {
       });
     } catch (e) {
       clearInterval(tipTimer);
+      reel.dispose();
       console.error(e);
       session.dispose();
       this.session = null;
@@ -1326,7 +1482,10 @@ export class App {
     const lift = () => {
       if (++frames < 4) return void requestAnimationFrame(lift);
       loadingEl.classList.add('out');
-      setTimeout(() => loadingEl.remove(), 700);
+      setTimeout(() => {
+        reel.dispose();
+        loadingEl.remove();
+      }, 700);
     };
     requestAnimationFrame(lift);
   }

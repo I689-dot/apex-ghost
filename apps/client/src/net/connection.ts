@@ -43,10 +43,12 @@ export async function listPublicRooms(): Promise<RoomSummary[]> {
 export async function createRoom(): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(`${SERVER_URL}/api/rooms`, { method: 'POST' });
+    const token = account()?.token;
+    res = await fetch(`${SERVER_URL}/api/rooms`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} });
   } catch {
     throw new RoomError('network', 'Cannot reach the game server. Check your connection.');
   }
+  if (res.status === 401) throw new RoomError('server', 'Sign in to play online.');
   if (!res.ok) throw new RoomError('server', `Server error (${res.status}). Try again.`);
   const body = (await res.json()) as { code?: string };
   if (!body.code) throw new RoomError('server', 'Server returned no room code.');
@@ -115,7 +117,9 @@ export class Connection {
 
   private url(): string {
     const base = SERVER_URL.replace(/^http/, 'ws');
-    return `${base}/api/rooms/${encodeURIComponent(this.code)}/ws`;
+    // online play is for signed-in drivers: the server checks the account token before the room is reached
+    const token = account()?.token;
+    return `${base}/api/rooms/${encodeURIComponent(this.code)}/ws${token ? `?t=${token}` : ''}`;
   }
 
   private open(): void {

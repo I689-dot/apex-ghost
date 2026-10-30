@@ -800,6 +800,8 @@ async function writeTracks(mapOut, render) {
       baseIdx.set(`${baseLayout.centerline[i * 3].toFixed(2)},${baseLayout.centerline[i * 3 + 2].toFixed(2)}`, i);
   const onBase = (b, i) => baseIdx.get(`${b.centerline[i * 3].toFixed(2)},${b.centerline[i * 3 + 2].toFixed(2)}`);
   for (const b of bases) fixHeights(b, surf, baseLayout ? (i) => onBase(b, i) !== undefined : null);
+  // stretches whose collision is rough (overlapping road meshes at the junctions): the game smooths them (roadPatches.ts)
+  for (const b of bases) if (MAP.smoothRoad?.[b.id]) b.smoothRoad = MAP.smoothRoad[b.id];
   // track limits from the painted white lines (track_limits.mjs)
   const rawTrack = path.join(mapOut, 'map_track.glb');
   if (existsSync(rawTrack)) {

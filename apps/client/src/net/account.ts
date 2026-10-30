@@ -77,6 +77,27 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   return data;
 }
 
+/**
+ * Does the server keep accounts? Online play needs one only then (the server lets everyone in when its accounts
+ * database is off): a GET of `me` without a token answers 503 when they are off, 401 when they are on. Asked once.
+ * null until known.
+ */
+let accountsOn: boolean | null = null;
+let accountsProbe: Promise<boolean> | null = null;
+export function accountsEnabled(): boolean | null {
+  return accountsOn;
+}
+export function probeAccounts(): Promise<boolean> {
+  accountsProbe ??= fetch(`${SERVER_URL}/api/account/me`)
+    .then((r) => (accountsOn = r.status !== 503))
+    .catch(() => {
+      // unreachable: keep online locked for the signed-out (offline play still works); ask again next time
+      accountsProbe = null;
+      return true;
+    });
+  return accountsProbe;
+}
+
 export async function register(nick: string, password: string): Promise<void> {
   save(await api<Account>('account/register', { nick, password }));
 }

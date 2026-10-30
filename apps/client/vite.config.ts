@@ -7,7 +7,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * `vite build --mode app` (pnpm app:web): the mobile app's web bundle (apps/mobile wraps dist/app).
- * Code, the Basis transcoder, the menu photos and the vegetation (trees, grass, ~1.2 MB) are bundled; cars, maps and sounds (~200 MB) are loaded
+ * Code, the Basis transcoder, the menu photos, the vegetation (trees, grass, ~1.2 MB) and the surface detail maps (0.7 MB) are bundled; cars, maps and sounds (~200 MB) are loaded
  * from the website at runtime (.env.app: VITE_ASSET_BASE), so the public folder is not copied.
  */
 function appPublicFiles(outDir: string): Plugin {
@@ -15,7 +15,7 @@ function appPublicFiles(outDir: string): Plugin {
     name: 'apex-app-public',
     apply: 'build',
     closeBundle() {
-      for (const dir of ['libs', 'assets/ui', 'assets/vegetation']) {
+      for (const dir of ['libs', 'assets/ui', 'assets/vegetation', 'assets/textures']) {
         const src = path.join(here, 'public', dir);
         if (existsSync(src)) cpSync(src, path.join(outDir, dir), { recursive: true });
       }
