@@ -49,7 +49,10 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		card.add_child(UIKit.label(r.nick, 18, UIKit.TEXT, false, 700))
 		var t_text: String = (fmt_time(_total(r)) if shown == 0 else "+%.3f" % (float(r.get("gapMs", 0)) / 1000.0)) if race else fmt_time(r.bestLapMs)
 		card.add_child(UIKit.label(t_text, 15, UIKit.MUTED))
-		podium.add_child(UIW.panel(card))
+		var pp := UIW.panel(card)
+		pp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pp.custom_minimum_size = Vector2(200, 0)
+		podium.add_child(pp)
 		shown += 1
 	col.add_child(podium)
 	col.add_child(UIW.muted(I18n.t("Race time includes penalties: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).") if race else I18n.t("Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).")))

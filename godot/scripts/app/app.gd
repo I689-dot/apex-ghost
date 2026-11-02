@@ -555,6 +555,9 @@ func _autotest() -> void:
 		render_lobby()
 		await get_tree().create_timer(0.3).timeout
 		await shot.call("lobby_" + step)
+	if OS.get_environment("AUTODRIVE") != "":
+		send({"t": "setSession", "minutes": 5})
+		send({"t": "setRaceLaps", "laps": 0})
 	send({"t": "selectCar", "carId": CarsDb.selectable()[0].id})
 	send({"t": "addBot"})
 	send({"t": "addBot"})
@@ -570,6 +573,21 @@ func _autotest() -> void:
 		if screen == "race":
 			break
 	await shot.call("loaded")
+	if OS.get_environment("AUTODRIVE") != "":
+		# the AI drives my car through the whole session: the results screen, the career, the lobby after it
+		session.autodrive = AiDriver.new(session.track_data, session.vehicle, 0.95, 0.0)
+		var t0 := Time.get_ticks_msec()
+		var n := 0
+		while screen != "results" and Time.get_ticks_msec() - t0 < 9 * 60 * 1000:
+			await get_tree().create_timer(30.0).timeout
+			n += 1
+			await shot.call("drive_%02d" % n)
+			print("t=%ds screen=%s speed=%d" % [(Time.get_ticks_msec() - t0) / 1000, screen, int(session.vehicle.telemetry.speed * 3.6) if session != null else -1])
+		await get_tree().create_timer(2.0).timeout
+		await shot.call("results")
+		print("results reached: ", screen == "results")
+		get_tree().quit()
+		return
 	await get_tree().create_timer(10.0).timeout
 	await shot.call("race")
 	await get_tree().create_timer(6.0).timeout

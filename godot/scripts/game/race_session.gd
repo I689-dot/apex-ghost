@@ -201,6 +201,8 @@ var rs := {"flag": "", "pitDue": false, "fuelLow": false, "fuelCrit": false, "ty
 
 var _acc_time := 0.0
 var _ui_acc := 0.0
+## Dev: a driver for my car (tests: the AI drives it).
+var autodrive: AiDriver = null
 
 func _init(race_setup: Dictionary, room_snapshot: Dictionary, my_id: String, cars: Dictionary, connection: Connection, callbacks: Dictionary, watching: bool = false) -> void:
 	race = race_setup
@@ -920,6 +922,8 @@ func _physics_inner(dt: float) -> void:
 	var race_t: float = server_now - start_at if start_at != null else -INF
 	# the keys, touch and pad into the controls of my car (the physics-step filters run inside the Vehicle)
 	var controls := smoother.update(dt, kb, vehicle.telemetry.forwardSpeed, vehicle.is_reverse())
+	if autodrive != null and race_t >= 0.0:
+		controls = autodrive.update(FIXED_DT, true, vehicle.weather_grip * vehicle.tyre_grip_avg(), -1.0)
 	if paused:
 		controls.throttle = 0.0
 		controls.steer = 0.0
