@@ -1,10 +1,10 @@
 # Godot migration checklist (every source file must be ported; nothing skipped)
 
-Legend: [ ] todo, [x] done
+Legend: [ ] todo, [~] partly, [x] done
 
 ## apps/client/src
 - [ ] apps/client/src/app.ts
-- [ ] apps/client/src/career.ts
+- [x] apps/client/src/career.ts
 - [x] apps/client/src/championship.ts
 - [x] apps/client/src/config.ts
 - [x] apps/client/src/i18n.ts
@@ -14,12 +14,12 @@ Legend: [ ] todo, [x] done
 
 ## apps/client/src/game
 - [x] apps/client/src/game/ai.ts
-- [ ] apps/client/src/game/assets.ts
+- [x] apps/client/src/game/assets.ts
 - [ ] apps/client/src/game/atmosphere.ts
 - [x] apps/client/src/game/carSetup.ts
-- [ ] apps/client/src/game/carVisual.ts
+- [x] apps/client/src/game/carVisual.ts
 - [ ] apps/client/src/game/cinematic.ts
-- [ ] apps/client/src/game/cockpit.ts
+- [x] apps/client/src/game/cockpit.ts
 - [ ] apps/client/src/game/crashFx.ts
 - [ ] apps/client/src/game/crowd.ts
 - [ ] apps/client/src/game/dashDisplay.ts
@@ -46,7 +46,7 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/game/sky.ts
 - [ ] apps/client/src/game/taa.ts
 - [ ] apps/client/src/game/topView.ts
-- [ ] apps/client/src/game/track.ts
+- [~] apps/client/src/game/track.ts (scene, collision, culling, wetness, lights done; surface shaders pending)
 - [ ] apps/client/src/game/trackEditor.ts
 - [x] apps/client/src/game/trackLimits.ts
 - [ ] apps/client/src/game/tvCameras.ts
@@ -56,7 +56,7 @@ Legend: [ ] todo, [x] done
 ## apps/client/src/physics
 - [x] apps/client/src/physics/damage.ts
 - [x] apps/client/src/physics/drivetrain.ts
-- [ ] apps/client/src/physics/input.ts (Controls class done; key/touch/pad InputSmoother pending)
+- [x] apps/client/src/physics/input.ts
 - [x] apps/client/src/physics/keyboardDriver.ts
 - [x] apps/client/src/physics/steeringLock.ts
 - [x] apps/client/src/physics/tire.ts

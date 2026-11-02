@@ -26,7 +26,11 @@ for (const f of walk(process.argv[2])) {
   // Godot's WebP reader fails on some of these files' textures: re-encode them as PNG
   const webp = doc.getRoot().listTextures().filter((t) => t.getMimeType() === 'image/webp');
   for (const t of webp) t.setImage(new Uint8Array(await sharp(Buffer.from(t.getImage())).png().toBuffer())).setMimeType('image/png');
-  if (!webp.length && !used.some((e) => names.includes(e.extensionName))) continue;
+  // Godot turns a node whose name ends in "_wheel" into a VehicleWheel3D (an import hint): the steering wheel is
+  // renamed (the game looks for "steering_rim")
+  const rim = doc.getRoot().listNodes().filter((n) => n.getName() === 'steering_wheel');
+  for (const n of rim) n.setName('steering_rim');
+  if (!webp.length && !rim.length && !used.some((e) => names.includes(e.extensionName))) continue;
   // Godot reads neither: decode the meshopt buffers (done by the reader), turn quantized attributes into floats
   if (used.some((e) => names.includes(e.extensionName))) await doc.transform(dequantize());
   for (const e of used) if (names.includes(e.extensionName)) e.dispose();
