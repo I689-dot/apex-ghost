@@ -33,13 +33,13 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/lapDelta.ts
 - [ ] apps/client/src/game/mirror.ts
 - [ ] apps/client/src/game/perf.ts
-- [ ] apps/client/src/game/pitCrew.ts
+- [x] apps/client/src/game/pitCrew.ts
 - [x] apps/client/src/game/pitLane.ts
 - [x] apps/client/src/game/pitService.ts
 - [ ] apps/client/src/game/preview.ts
 - [ ] apps/client/src/game/racingLineFx.ts
-- [ ] apps/client/src/game/racingLinePrep.ts
-- [ ] apps/client/src/game/racingLineWorker.ts
+- [x] apps/client/src/game/racingLinePrep.ts
+- [x] apps/client/src/game/racingLineWorker.ts (thread in racing_line_prep.gd)
 - [x] apps/client/src/game/roadPatches.ts
 - [ ] apps/client/src/game/roadWear.ts
 - [ ] apps/client/src/game/session.ts
@@ -64,13 +64,13 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/physics/vehicle.ts
 
 ## apps/client/src/audio
-- [ ] apps/client/src/audio/audio.ts
-- [ ] apps/client/src/audio/engine-worklet.d.ts
-- [ ] apps/client/src/audio/engine-worklet.js
-- [ ] apps/client/src/audio/engineBank.ts
-- [ ] apps/client/src/audio/engineProfiles.ts
+- [x] apps/client/src/audio/audio.ts
+- [~] apps/client/src/audio/engine-worklet.d.ts (recorded-loop engine only; no procedural layer)
+- [~] apps/client/src/audio/engine-worklet.js (recorded-loop engine only; no procedural layer)
+- [x] apps/client/src/audio/engineBank.ts
+- [x] apps/client/src/audio/engineProfiles.ts
 - [ ] apps/client/src/audio/radio.ts
-- [ ] apps/client/src/audio/sessionAudio.ts
+- [x] apps/client/src/audio/sessionAudio.ts
 
 ## apps/client/src/input
 - [ ] apps/client/src/input/gamepad.ts
@@ -95,7 +95,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [ ] apps/client/src/ui/icons.ts
 - [ ] apps/client/src/ui/images.ts
 - [x] apps/client/src/ui/overlays.ts
-- [ ] apps/client/src/ui/pitMenu.ts
+- [x] apps/client/src/ui/pitMenu.ts
 - [ ] apps/client/src/ui/reel.ts
 - [ ] apps/client/src/ui/settingsPanel.ts
 - [ ] apps/client/src/ui/social.ts
