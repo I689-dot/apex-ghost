@@ -27,6 +27,7 @@ var hide_rain := false
 var night := 0.0
 var sun_elevation := 0.0
 var sun_dir := Vector3(0, 1, 0)
+var _sky_acc := 100.0
 var _time := 0.0
 var _last_sun := Vector3(0, -2, 0)
 var _last_haze := -1.0
@@ -59,8 +60,9 @@ func _init(weather_plan: Dictionary, q: Dictionary) -> void:
 	_apply_post(q)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
+	# the radiance map (ambient light and reflections) is redone every frame, from a cheap cubemap-pass of the sky shader
 	sky.process_mode = Sky.PROCESS_MODE_REALTIME
-	sky.radiance_size = Sky.RADIANCE_SIZE_128
+	sky.radiance_size = Sky.RADIANCE_SIZE_256
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -189,16 +191,29 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	var disc: Color = Color(st.r, st.g, st.b) * (60.0 * sun_illum * (1.0 - overcast * 0.95) * (1.0 - w.fog))
 	var cloud_sun := Color(st.r, st.g, st.b) * (2.6 * sun_illum * (1.0 - overcast * 0.55))
 	var cloud_amb := (_zenith * 0.9 + _horizon_away * 0.55).lerp(grey * 0.95, overcast * 0.7) + Color(0.006, 0.008, 0.014) * night
-	sky_mat.set_shader_parameter("uSun", sun_v)
-	sky_mat.set_shader_parameter("uSunDisc", Vector3(disc.r, disc.g, disc.b))
-	sky_mat.set_shader_parameter("uCloudSun", Vector3(cloud_sun.r, cloud_sun.g, cloud_sun.b))
-	sky_mat.set_shader_parameter("uCloudAmb", Vector3(cloud_amb.r, cloud_amb.g, cloud_amb.b))
-	sky_mat.set_shader_parameter("uCover", minf(0.97, 0.12 + overcast * 0.85 + w.fog * 0.2))
-	sky_mat.set_shader_parameter("uCirrus", (1.0 - overcast) * 0.8)
-	sky_mat.set_shader_parameter("uFogMix", heavy_fog)
-	sky_mat.set_shader_parameter("uFogColor", Vector3(fog_away.r, fog_away.g, fog_away.b))
-	sky_mat.set_shader_parameter("uNight", night)
-	sky_mat.set_shader_parameter("uTime", _time + (int(plan.seed) % 1000) * 7.0)
+	RenderingServer.global_shader_parameter_set("sky_time", _time + (int(plan.seed) % 1000) * 7.0)
+	_sky_acc += dt
+	var push_sky := _sky_acc > 1.5
+	if push_sky:
+		_sky_acc = 0.0
+	if push_sky:
+		sky_mat.set_shader_parameter("uSun", sun_v)
+	if push_sky:
+		sky_mat.set_shader_parameter("uSunDisc", Vector3(disc.r, disc.g, disc.b))
+	if push_sky:
+		sky_mat.set_shader_parameter("uCloudSun", Vector3(cloud_sun.r, cloud_sun.g, cloud_sun.b))
+	if push_sky:
+		sky_mat.set_shader_parameter("uCloudAmb", Vector3(cloud_amb.r, cloud_amb.g, cloud_amb.b))
+	if push_sky:
+		sky_mat.set_shader_parameter("uCover", minf(0.97, 0.12 + overcast * 0.85 + w.fog * 0.2))
+	if push_sky:
+		sky_mat.set_shader_parameter("uCirrus", (1.0 - overcast) * 0.8)
+	if push_sky:
+		sky_mat.set_shader_parameter("uFogMix", heavy_fog)
+	if push_sky:
+		sky_mat.set_shader_parameter("uFogColor", Vector3(fog_away.r, fog_away.g, fog_away.b))
+	if push_sky:
+		sky_mat.set_shader_parameter("uNight", night)
 
 	# rain
 	_rain.visible = w.rain > 0.01 and not hide_rain

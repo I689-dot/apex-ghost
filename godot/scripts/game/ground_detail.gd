@@ -49,6 +49,8 @@ static func use_spa_lawn(sm: StandardMaterial3D) -> void:
 
 ## The overlay of a ground material by its name, as the web game picks it (null: none).
 static func apply(sm: StandardMaterial3D) -> void:
+	# the overlay is a second pass over every ground triangle: High and Ultra only (phones run Medium)
+	var overlays: bool = Settings.data.quality == "high" or Settings.data.quality == "ultra"
 	var nm := sm.resource_name
 	var ground := RegEx.create_from_string("(?i)^(grass|top2|terrain_fill|astroturf|sand|gravel)").search(nm) != null or nm == "grass_fill"
 	var paved := RegEx.create_from_string("(?i)^(asph|conc_|pavement|pits|concrete|paddock_roof|ponyva|tiles)").search(nm) != null
@@ -58,11 +60,13 @@ static func apply(sm: StandardMaterial3D) -> void:
 		var top2 := RegEx.create_from_string("(?i)^top2").search(nm) != null
 		# the satellite terrain (top2) is only seen from afar: no close-up detail there; stones need contrast
 		var det := 0.0 if top2 else (0.28 if is_grass else (0.42 if is_gravel else 0.16))
-		sm.next_pass = overlay("grass" if is_grass else ("gravel" if is_gravel else "paved"), 0.22, is_grass or top2, det)
+		if overlays:
+			sm.next_pass = overlay("grass" if is_grass else ("gravel" if is_gravel else "paved"), 0.22, is_grass or top2, det)
 		# (Spa's own side and extension grass keep their dried-out textures out: they read as bare patches on the banks)
 		if is_grass and det > 0.0 and RegEx.create_from_string("(?i)^grass_spa$").search(nm) == null:
 			use_spa_lawn(sm)
 	elif paved:
 		var asph := RegEx.create_from_string("(?i)^asph").search(nm) != null
 		var det := 0.12 if RegEx.create_from_string("(?i)^(paddock_roof|ponyva)").search(nm) != null else (0.2 if asph else 0.22)
-		sm.next_pass = overlay("asphalt" if asph else "paved", 0.08, false, det)
+		if overlays:
+			sm.next_pass = overlay("asphalt" if asph else "paved", 0.08, false, det)

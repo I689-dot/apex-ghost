@@ -6,8 +6,9 @@ extends Node3D
 ## RemoteCarBuffer), cameras and the HUD. Optional subsystems (cinematic, pit crews, TV cameras, audio, radio, grass,
 ## forest ...) are plain fields that stay null until their module attaches: every use is guarded.
 
-const FIXED_DT := 1.0 / 120.0
-const STEPS_PER_SAMPLE := 120 / 20 # PHYSICS_HZ / STATE_HZ
+## The physics step: 120 Hz (a phone runs 60: the sim holds its lap time within 0.3 %, see tests/ailap.gd).
+var FIXED_DT := 1.0 / float(Engine.physics_ticks_per_second)
+var STEPS_PER_SAMPLE := maxi(1, Engine.physics_ticks_per_second / 20) # physics Hz / STATE_HZ
 const MAX_FRAME_DT := 0.1
 ## How far a bot moves over to pass a slower car (m).
 const PASS_OFFSET := 3.6
@@ -21,7 +22,7 @@ const PROXY_PULL_MS := 12.0
 const BUMP_MIN := 300.0
 const BUMP_SEND_MS := 60.0
 const BUMP_DEDUPE_MS := 500.0
-const RESCUE_STEPS := 12
+var RESCUE_STEPS := maxi(1, Engine.physics_ticks_per_second / 10)
 const FCY_MS := 80.0 / 3.6
 ## Maps whose pit lane gets our own surface: Zandvoort's model draws it near-white.
 const PIT_SURFACE_MAPS := ["zandvoort"]
@@ -199,6 +200,7 @@ var timing: TimingScreen
 var rs := {"flag": "", "pitDue": false, "fuelLow": false, "fuelCrit": false, "tyresCold": false, "rain": false, "mins": {}, "spotL": false, "spotR": false, "aheadPit": "", "behindPit": "", "leader": "", "lastPos": 0, "startPos": 0, "gapAhead": null, "gapBehind": null, "checked": false}
 
 var _acc_time := 0.0
+var _ui_acc := 0.0
 
 func _init(race_setup: Dictionary, room_snapshot: Dictionary, my_id: String, cars: Dictionary, connection: Connection, callbacks: Dictionary, watching: bool = false) -> void:
 	race = race_setup
@@ -897,6 +899,11 @@ static func fill_state(s: CarState, v: Vehicle, server_now: float, headlights: b
 func _physics_process(dt: float) -> void:
 	if not running or vehicle == null:
 		return
+	Prof.b("S.physics")
+	_physics_inner(dt)
+	Prof.e("S.physics")
+
+func _physics_inner(dt: float) -> void:
 	var server_now := conn.server_now()
 	var race_t: float = server_now - start_at if start_at != null else -INF
 	# the keys, touch and pad into the controls of my car (the physics-step filters run inside the Vehicle)
@@ -907,7 +914,9 @@ func _physics_process(dt: float) -> void:
 	vehicle.controls = controls
 	if spectator:
 		vehicle.frozen = true
+	Prof.b("bots")
 	step_bots(race_t)
+	Prof.e("bots")
 	if contact:
 		move_kinematics(dt)
 		after_contacts()
@@ -1499,6 +1508,12 @@ func _input(e: InputEvent) -> void:
 func _process(dt: float) -> void:
 	if not running or vehicle == null:
 		return
+	Prof.frame()
+	Prof.b("S.process")
+	_process_inner(dt)
+	Prof.e("S.process")
+
+func _process_inner(dt: float) -> void:
 	dt = minf(dt, MAX_FRAME_DT)
 	var server_now := conn.server_now()
 	var race_t: float = server_now - start_at if start_at != null else -INF
@@ -1608,7 +1623,9 @@ func _process(dt: float) -> void:
 		update_remote(r, server_now, dt, cam_pos)
 
 	# environment
+	Prof.b("env")
 	env.update(dt, weather, view_cam, vehicle.global_position, car_vel)
+	Prof.e("env")
 	if crash_fx != null:
 		crash_fx.update(dt)
 	# aerial shots see the whole circuit: distance culling (meant for the cockpit) would leave holes
@@ -1618,7 +1635,9 @@ func _process(dt: float) -> void:
 		if forest != null:
 			forest.update(cam_pos, q)
 	else:
+		Prof.b("track.vis")
 		track.update_visibility(cam_pos, q)
+		Prof.e("track.vis")
 	if windshield != null and not spectator:
 		windshield.update_fx(dt, weather.rain, v.telemetry.speed, get_viewport().get_visible_rect().size.aspect(), 1.0 - env.night * 0.8, cockpit.looking_forward and not outside and not pit_cam_on and not tv_on)
 		windshield.set_crack(damage.zones[0], cockpit.looking_forward and not outside and not pit_cam_on and not tv_on)
@@ -1626,11 +1645,19 @@ func _process(dt: float) -> void:
 		shells.update_shells(cam_pos, q, cinematic != null and cinematic.aerial)
 	if blades != null:
 		blades.update_blades(cam_pos, 0.0 if cinematic != null and cinematic.aerial else float(q.grassBladeRadius))
+	Prof.b("audio")
 	update_audio(dt, view_cam)
+	Prof.e("audio")
 	update_wake()
 	update_ghost(server_now)
 
-	update_race_ui(server_now, race_t, dt)
+	# the HUD's numbers and tables at 30 Hz: the eye cannot tell, the phone's CPU can
+	_ui_acc += dt
+	if _ui_acc >= 1.0 / 30.0 - 0.002:
+		Prof.b("ui")
+		update_race_ui(server_now, race_t, _ui_acc)
+		Prof.e("ui")
+		_ui_acc = 0.0
 	update_pit(server_now)
 	update_limiters(server_now)
 	update_bot_pits(server_now)

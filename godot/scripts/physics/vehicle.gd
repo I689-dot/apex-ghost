@@ -331,6 +331,11 @@ func _touching_car() -> bool:
 	return false
 
 func _physics_process(dt: float) -> void:
+	Prof.b("vehicle")
+	_phys_inner(dt)
+	Prof.e("vehicle")
+
+func _phys_inner(dt: float) -> void:
 	if not auto_step or ground == null:
 		return
 	if _touching_car():
@@ -345,6 +350,7 @@ func _cast(origin: Vector3, dir: Vector3, max_dist: float) -> Dictionary:
 
 ## One fixed physics step (before the physics server steps).
 func step(dt: float, c: Controls) -> void:
+	Prof.start()
 	# safety net: a solver blow-up must never lose the car
 	var gt := global_transform
 	if not (is_finite(gt.origin.x) and is_finite(gt.origin.y) and is_finite(gt.origin.z)):
@@ -380,6 +386,7 @@ func step(dt: float, c: Controls) -> void:
 	if frozen:
 		linear_velocity = Vector3(v.x * 0.8, v.y, v.z * 0.8)
 
+	Prof.mark("v.pre")
 	# ---------------------------------------------------- gear logic
 	var dt2 := drivetrain
 	var throttle_in := c.throttle
@@ -456,6 +463,7 @@ func step(dt: float, c: Controls) -> void:
 	wheels[2].steer = 0.0
 	wheels[3].steer = 0.0
 
+	Prof.mark("v.gear_assist_steer")
 	# ---------------------------------------------------- suspension
 	var contacts := 0
 	var rumble := 0.0
@@ -505,6 +513,7 @@ func step(dt: float, c: Controls) -> void:
 			fs += w.flat_spot * 2600.0 * minf(1.0, speed / 25.0) * pow(maxf(0.0, cos(w.angle)), 16.0)
 		w.fz = maxf(0.0, fs)
 
+	Prof.mark("v.suspension")
 	# ---------------------------------------------------- drivetrain
 	var driven_omega := 0.0
 	var n_driven := 0
@@ -530,6 +539,7 @@ func step(dt: float, c: Controls) -> void:
 	_split_axle(0, 1, axle_torque * front_split)
 	_split_axle(2, 3, axle_torque * (1.0 - front_split))
 
+	Prof.mark("v.drivetrain")
 	# ---------------------------------------------------- brakes
 	tel.absActive = false
 	var brake_total: float = float(s.brakeTorqueNm) * brake
@@ -558,6 +568,7 @@ func step(dt: float, c: Controls) -> void:
 		var cool: float = (BT.coolBase + BT.coolPerMs * speed) * (w.brake_temp - ambient_c)
 		w.brake_temp += ((heat - cool) / BT.heatCapacity) * dt
 
+	Prof.mark("v.brakes")
 	# ---------------------------------------------------- tyres
 	var SUB := 4
 	var h_sub := dt / SUB
@@ -665,6 +676,7 @@ func step(dt: float, c: Controls) -> void:
 		var fw := wf * fx_t + wl * fy_t + nrm * fz
 		apply_force(fw, w.cp + u * 0.12 - p)
 
+	Prof.mark("v.tyres")
 	# ---------------------------------------------------- aero
 	var beta := atan2(absf(v_l), absf(v_f)) if absf(v_f) > 8.0 else 0.0
 	var yaw_keep: float = maxf(CH.yawMin, 1.0 - CH.yawLoss * beta * beta)

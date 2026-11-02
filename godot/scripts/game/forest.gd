@@ -51,6 +51,7 @@ static func ensure_globals() -> void:
 		_globals = true
 		RenderingServer.global_shader_parameter_add("wind_time", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 		RenderingServer.global_shader_parameter_add("wind_strength", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)
+		RenderingServer.global_shader_parameter_add("sky_time", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 		RenderingServer.global_shader_parameter_add("shell_ground", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 
 ## Wind strength (0 calm … ~2 storm), from the weather.
@@ -353,7 +354,7 @@ func _build_far() -> void:
 		var z0: float = grid.oz + (c / grid.nx) * cell
 		mmi.custom_aabb = AABB(Vector3(x0, ymin[c] - 2.0, z0), Vector3(cell, ymax[c] - ymin[c] + 4.0, cell))
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mmi.position = Vector3.ZERO
+		mmi.layers = 2  # not in the rear-view mirror
 		add_child(mmi)
 		_far_nodes[c] = mmi
 
@@ -368,6 +369,7 @@ func _build_near() -> void:
 		mmi.multimesh = mm
 		mmi.custom_aabb = AABB(Vector3(-20000, -2000, -20000), Vector3(40000, 4000, 40000))
 		mmi.name = "forest_near_%d" % k
+		mmi.layers = 2
 		add_child(mmi)
 		_near.append(mmi)
 		_tmp.append(PackedFloat32Array())

@@ -45,7 +45,7 @@ static func default_settings() -> Dictionary:
 		"nickname": "", "language": I18n.default_lang(), "quality": "medium", "qualityAuto": true, "graphics": {},
 		"resolutionScale": 1.0, "dynamicResolution": true, "refreshRate": 60, "fov": 58, "seatHeight": 0.0, "seatForward": 0.0,
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,
-		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "showPerf": false,
+		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "showPerf": true,
 		"headMovement": 1.0, "cameraShake": 1.0,
 		"overlays": {"relative": true, "inputs": true, "spotter": true, "deltaBar": true, "trackMap": true},
 		"audio": {"master": 0.8, "engine": 0.9, "effects": 0.8, "ambience": 0.6, "radio": 0.9, "opponents": 0.9, "tyres": 0.9, "chimes": true},
@@ -129,6 +129,10 @@ func quality_config() -> Dictionary:
 		q.antialias = o.antialias
 	if o.has("superSample"):
 		q.superSample = o.superSample
+	# a phone's GPU: the far forest closer and thinner (the impostor cards are most of the draw calls)
+	if OS.has_feature("mobile") and data.quality != "high" and data.quality != "ultra":
+		q.forestFar = minf(float(q.forestFar), 650.0)
+		q.forestDensity = float(q.forestDensity) * 0.8
 	_cached_key = key
 	_cached_q = q
 	return q

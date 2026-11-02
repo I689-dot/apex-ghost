@@ -103,6 +103,7 @@ static func build(track_root: Node3D, lawn: Array, track: Dictionary) -> GrassSh
 		mmi.custom_aabb = AABB(lo - Vector3(0, 0.2, 0), (hi - lo) + Vector3(0, SHELL_H + 0.4, 0))
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mmi.visible = false
+		mmi.layers = 2
 		out.add_child(mmi)
 		var sc := ShellCell.new()
 		sc.node = mmi

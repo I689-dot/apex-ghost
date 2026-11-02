@@ -21,12 +21,14 @@ func _init(car_object: Node3D, dims: Dictionary) -> void:
 	viewport = SubViewport.new()
 	viewport.size = Vector2i(560, 133)
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	viewport.msaa_3d = Viewport.MSAA_2X
+	viewport.msaa_3d = Viewport.MSAA_DISABLED
 	camera = Camera3D.new()
 	camera.fov = 30.0
 	camera.near = 0.4
 	camera.far = 600.0
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	# the world without the far scenery: forest, crowd, grass, racing line (those sit on layer 2)
+	camera.cull_mask = 1
 	viewport.add_child(camera)
 	add_child(viewport)
 	rect = TextureRect.new()
@@ -60,7 +62,7 @@ func _process(_dt: float) -> void:
 	var r := screen_rect(get_viewport().get_visible_rect().size)
 	rect.position = r.position
 	rect.size = r.size
-	var px := Vector2i(maxi(64, int(r.size.x * 1.5)), maxi(16, int(r.size.y * 1.5)))
+	var px := Vector2i(maxi(64, int(r.size.x)), maxi(16, int(r.size.y)))
 	if viewport.size != px:
 		viewport.size = px
 	camera.global_transform = _anchor.global_transform * Transform3D(Basis(Vector3.RIGHT, -0.045), Vector3.ZERO)

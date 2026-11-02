@@ -4,6 +4,7 @@ extends Control
 
 var conn: Connection = null
 var remotes := Callable()
+var graphics: Graphics = null
 var _times := PackedFloat32Array()
 var _idx := 0
 var _acc := 0.0
@@ -11,11 +12,15 @@ var _frames := 0
 var _text := ""
 var _label := Label.new()
 
+func _ready() -> void:
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+
 func _init() -> void:
 	_times.resize(120)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	position = Vector2(8, 120)
 	custom_minimum_size = Vector2(260, 140)
+	position = Vector2(8, 120)
 	_label.add_theme_font_size_override("font_size", 13)
 	_label.add_theme_color_override("font_color", Color.WHITE)
 	_label.add_theme_color_override("font_outline_color", Color.BLACK)
@@ -45,15 +50,17 @@ func _process(dt: float) -> void:
 	var mem := OS.get_static_memory_usage() / 1048576.0
 	var tex := Performance.get_monitor(Performance.RENDER_TEXTURE_MEM_USED) / 1048576.0
 	var vid := Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0
-	_text = "FPS %d  max %.1f ms\ndraws %d  tris %dk\nmem %d MB  tex %d MB  vram %d MB\nping %d ms  loss %.1f %%" % [
+	_text = "FPS %d  max %.1f ms\ndraws %d  tris %dk\nmem %d MB  tex %d MB  vram %d MB\nping %d ms  loss %.1f %%  scale %.2f" % [
 		roundi(fps), mx, int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME) / 1000.0), roundi(mem), roundi(tex), roundi(vid),
-		roundi(conn.rtt) if conn != null else 0, (lost * 100.0 / (recv + lost)) if recv + lost > 0 else 0.0]
+		roundi(conn.rtt) if conn != null else 0, (lost * 100.0 / (recv + lost)) if recv + lost > 0 else 0.0, graphics.dyn_scale if graphics != null else 1.0]
+	var vp := get_viewport().get_viewport_rid()
+	_text += "\nrender cpu %.1f gpu %.1f ms\n%s" % [RenderingServer.viewport_get_measured_render_time_cpu(vp) + RenderingServer.get_frame_setup_time_cpu(), RenderingServer.viewport_get_measured_render_time_gpu(vp), Prof.top]
 	_label.text = _text
 	queue_redraw()
 
 func _draw() -> void:
-	var base := Vector2(0, 80)
+	var base := Vector2(0, 190)
 	draw_rect(Rect2(base, Vector2(240, 60)), Color(0, 0, 0, 0.45))
 	for ms in [16.7, 25.0, 33.3]:
 		var y: float = base.y + 60.0 - (ms / 50.0) * 60.0

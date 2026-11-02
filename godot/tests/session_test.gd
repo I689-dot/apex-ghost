@@ -59,9 +59,24 @@ func _run() -> void:
 	var shot_dir := OS.get_environment("SHOT_DIR")
 	var elapsed := 0.0
 	var next_shot := 0.0
+	var rids := {"main": get_viewport().get_viewport_rid(), "mirror": session.mirror.viewport.get_viewport_rid() if session.mirror != null else RID(), "sky_lut": session.env.lut_viewport.get_viewport_rid()}
+	for k in rids:
+		if rids[k].is_valid():
+			RenderingServer.viewport_set_measure_render_time(rids[k], true)
+	var gpu := {}
+	var proc := 0.0
+	var phys := 0.0
+	var frames := 0
 	while elapsed < seconds:
 		await get_tree().process_frame
 		elapsed += get_process_delta_time()
+		if elapsed > seconds * 0.5:
+			proc += Performance.get_monitor(Performance.TIME_PROCESS)
+			phys += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+			frames += 1
+			for k in rids:
+				if rids[k].is_valid():
+					gpu[k] = gpu.get(k, 0.0) + RenderingServer.viewport_get_measured_render_time_gpu(rids[k])
 		if shot_dir != "" and elapsed >= next_shot:
 			next_shot += 2.0
 			get_viewport().get_texture().get_image().save_png("%s/session_%02d.png" % [shot_dir, int(elapsed)])
@@ -78,6 +93,9 @@ func _run() -> void:
 	if session.shells != null:
 		var c0 = session.shells.cells[0]
 		print("visible cells: ", session.shells.cells.filter(func(c): return c.node.visible).size(), " cell0 ", c0.x, " ", c0.z, " cam ", session.get_viewport().get_camera_3d().global_position, " car ", session.vehicle.global_position, " vis ", session.shells.visible, " n ", session.shells._last_n)
+	print("avg process ms: ", proc / maxf(1, frames) * 1000.0, " physics ms/frame: ", phys / maxf(1, frames) * 1000.0, " fps ", Engine.get_frames_per_second(), " draws ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
+	for k in gpu:
+		print("gpu ms ", k, ": ", gpu[k] / maxf(1, frames))
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
 	session.dispose()
 	get_tree().quit()

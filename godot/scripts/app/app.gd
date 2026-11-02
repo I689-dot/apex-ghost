@@ -43,6 +43,9 @@ var perf: PerfOverlay = null
 var graphics: Graphics = null
 
 func _ready() -> void:
+	# a phone's CPU: the vehicle model runs at 60 Hz (the lap time holds within 0.3 % of 120 Hz)
+	if OS.has_feature("mobile"):
+		Engine.physics_ticks_per_second = 60
 	Settings.data.language = Settings.data.get("language", I18n.default_lang())
 	I18n.set_lang(Settings.data.language)
 	get_tree().root.theme = UIKit.build_theme()
@@ -355,6 +358,7 @@ func _process(_dt: float) -> void:
 		perf = null
 	if perf != null:
 		perf.conn = conn
+		perf.graphics = graphics
 		perf.remotes = func(): return session.remotes.values().map(func(r): return r.buffer) if session != null else []
 	if screen == "briefing" and _brief_clock != null and is_instance_valid(_brief_clock) and conn != null and room.get("briefingUntil") != null:
 		var left := maxf(0.0, room.briefingUntil - conn.server_now())

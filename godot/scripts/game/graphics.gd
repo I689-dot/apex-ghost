@@ -13,6 +13,7 @@ var _last_change := 0.0
 
 func _ready() -> void:
 	_times.resize(45)
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 	if Settings.data.qualityAuto:
 		Settings.data.quality = Settings.detect_quality()
 		Settings.data.qualityAuto = false
@@ -37,8 +38,9 @@ func _apply_scale() -> void:
 	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	vp.scaling_3d_scale = clampf(s, 0.4, 2.0)
 
-## Feed frame times; lowers / raises the render resolution to hold ~90 % of the display rate (54 fps at 60 Hz, 108 at
-## 120 Hz), rarely and with hysteresis. Never on Ultra, which is about picture quality only.
+## Feed the GPU's time for the frame; lowers / raises the render resolution to keep it within the display's frame budget
+## (16.7 ms at 60 Hz), rarely and with hysteresis. Only the GPU counts: a CPU-bound frame gains nothing from fewer
+## pixels. Never on Ultra, which is about picture quality only.
 func track_frame(dt_ms: float) -> void:
 	var now := Time.get_ticks_msec() as float
 	_times[_idx % _times.size()] = dt_ms
@@ -50,10 +52,11 @@ func track_frame(dt_ms: float) -> void:
 		sum += t
 	var avg := sum / _times.size()
 	var hz := maxf(60.0, float(Settings.data.refreshRate))
+	var budget := 1000.0 / hz
 	var next := dyn_scale
-	if avg > 1000.0 / (hz * 0.9):
+	if avg > budget * 0.85:
 		next = maxf(0.6, dyn_scale - 0.1)
-	elif avg < 1000.0 / (hz * 0.97) and dyn_scale < 1.0 and now - _last_change > 4000.0:
+	elif avg < budget * 0.55 and dyn_scale < 1.0 and now - _last_change > 4000.0:
 		next = minf(1.0, dyn_scale + 0.1)
 	if not is_equal_approx(next, dyn_scale):
 		dyn_scale = next
@@ -61,5 +64,5 @@ func track_frame(dt_ms: float) -> void:
 		_idx = 0  # judge the new resolution on fresh frames
 		_apply_scale()
 
-func _process(dt: float) -> void:
-	track_frame(dt * 1000.0)
+func _process(_dt: float) -> void:
+	track_frame(RenderingServer.viewport_get_measured_render_time_gpu(get_viewport().get_viewport_rid()))

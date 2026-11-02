@@ -152,6 +152,7 @@ static func build(root: Node3D, track: Dictionary, density: float) -> MultiMeshI
 		mm.set_instance_custom_data(i, Color(variant, 0, 0, 0))
 	var out := MultiMeshInstance3D.new()
 	out.name = "crowd"
+	out.layers = 2
 	out.multimesh = mm
 	out.custom_aabb = AABB(Vector3(-20000, -2000, -20000), Vector3(40000, 4000, 40000))
 	out.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

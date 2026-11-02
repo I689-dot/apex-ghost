@@ -113,6 +113,7 @@ func _mesh(pos: PackedVector3Array, uv: PackedVector2Array, uv2: PackedVector2Ar
 	mi.mesh = mesh
 	mi.custom_aabb = AABB(Vector3(-20000, -2000, -20000), Vector3(40000, 4000, 40000))
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.layers = 2
 	return mi
 
 func set_mode(mode: String) -> void:

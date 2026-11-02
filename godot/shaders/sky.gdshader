@@ -12,7 +12,8 @@ uniform vec3 uCloudSun : source_color = vec3(1.0);
 uniform vec3 uCloudAmb : source_color = vec3(0.5);
 uniform float uCover = 0.3;
 uniform float uCirrus = 0.5;
-uniform float uTime = 0.0;
+// the cloud drift is a global: the sky's radiance map (ambient light, reflections) is not re-rendered every frame for it
+global uniform float sky_time;
 uniform float uFogMix = 0.0;
 uniform vec3 uFogColor : source_color = vec3(0.7);
 uniform float uNight = 0.0;
@@ -64,8 +65,11 @@ void sky() {
 	float disc = smoothstep(0.99996, 0.999985, mu);
 	vec3 col = sky_c + uSunDisc * disc * (0.6 + 0.4 * smoothstep(0.99996, 0.99999, mu));
 	float cloudA = 0.0;
-	if (dir.y > 0.0) {
-		vec2 wind = vec2(9.0, 3.5) * uTime;
+	if (AT_CUBEMAP_PASS) {
+		// the radiance map (ambient light and reflections) is redone every frame: no cloud march in it, just their average tint
+		col = mix(col, uCloudAmb * 0.9 + uCloudSun * 0.12, uCover * 0.55 * smoothstep(0.0, 0.25, dir.y));
+	} else if (dir.y > 0.0) {
+		vec2 wind = vec2(9.0, 3.5) * sky_time;
 		// cumulus layer, 2 km up
 		float t = 2000.0 / max(dir.y, 0.02);
 		vec2 p = dir.xz * t + wind;
