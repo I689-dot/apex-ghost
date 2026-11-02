@@ -3,12 +3,12 @@
 Legend: [ ] todo, [~] partly, [x] done
 
 ## apps/client/src
-- [ ] apps/client/src/app.ts
+- [~] apps/client/src/app.ts (menu, lobby, briefing, loading, race, pause, results, championship, settings done; p2p hosting, reels, showroom pending)
 - [x] apps/client/src/career.ts
 - [x] apps/client/src/championship.ts
 - [x] apps/client/src/config.ts
 - [x] apps/client/src/i18n.ts
-- [ ] apps/client/src/main.ts
+- [~] apps/client/src/main.ts (scenes/main.tscn + scripts/app/app.gd; intro reel pending)
 - [x] apps/client/src/settings.ts
 - [ ] apps/client/src/styles.css
 
@@ -87,7 +87,7 @@ Legend: [ ] todo, [~] partly, [x] done
 ## apps/client/src/ui
 - [x] apps/client/src/ui/carLines.ts
 - [x] apps/client/src/ui/carStatus.ts
-- [ ] apps/client/src/ui/careerBlock.ts
+- [x] apps/client/src/ui/careerBlock.ts
 - [x] apps/client/src/ui/circuitMap.ts
 - [x] apps/client/src/ui/damagePanel.ts
 - [ ] apps/client/src/ui/dom.ts
@@ -97,8 +97,8 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/ui/overlays.ts
 - [x] apps/client/src/ui/pitMenu.ts
 - [ ] apps/client/src/ui/reel.ts
-- [ ] apps/client/src/ui/settingsPanel.ts
-- [ ] apps/client/src/ui/social.ts
+- [x] apps/client/src/ui/settingsPanel.ts
+- [x] apps/client/src/ui/social.ts
 - [x] apps/client/src/ui/timingScreen.ts
 - [ ] apps/client/src/ui/trackMap.ts
 
