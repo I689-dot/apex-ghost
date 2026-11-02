@@ -144,24 +144,25 @@ export class CockpitCamera {
     const origin = new THREE.Vector3();
     const dir = new THREE.Vector3();
     const toWorld = (x: number, y: number, z: number, out: THREE.Vector3) => out.set(x, y, z).applyMatrix4(car.matrixWorld);
-    const blocked = (y: number, pitchDeg: number, yawDeg: number): boolean => {
-      toWorld(this.eye.x, y, this.eye.z, origin);
+    // from where the eye really is (EYE_FORWARD ahead of the model's eye point)
+    const fwd = this.eye.z + EYE_FORWARD;
+    const blocked = (y: number, pitchDeg: number, yawDeg: number, far = 3.5): boolean => {
+      toWorld(this.eye.x, y, fwd, origin);
       const p = THREE.MathUtils.degToRad(pitchDeg);
       const yw = THREE.MathUtils.degToRad(yawDeg);
       dir.set(Math.sin(yw) * Math.cos(p), Math.sin(p), Math.cos(yw) * Math.cos(p)).transformDirection(car.matrixWorld);
       ray.set(origin, dir);
-      ray.far = 3.5;
+      ray.far = far;
       return ray.intersectObjects(meshes, false).length > 0;
     };
     const headroom = (y: number): number => {
-      toWorld(this.eye.x, y, this.eye.z, origin);
+      toWorld(this.eye.x, y, fwd, origin);
       ray.set(origin, dir.set(0, 1, 0).transformDirection(car.matrixWorld));
       ray.far = 1;
       const hit = ray.intersectObjects(meshes, false)[0];
       return hit ? hit.distance : 1;
     };
     // the game eye's lift, as far as the roof allows (keep 9 cm under it)
-    const fwd = this.eye.z + EYE_FORWARD;
     const roomAt = (y: number) => {
       toWorld(this.eye.x, y, fwd, origin);
       ray.set(origin, dir.set(0, 1, 0).transformDirection(car.matrixWorld));
@@ -170,18 +171,16 @@ export class CockpitCamera {
       return hit ? hit.distance : 1;
     };
     this.gameUp = Math.max(0, Math.min(EYE_UP, roomAt(this.eye.y) - 0.09));
-    // an eye set by hand per car is already clear of the dash (and raising it put some under the roof)
-    if (this.entry.cockpitCamera.tuned) {
-      this.applySeat();
-      return;
-    }
-    // road visible from ~10 m: the view at -5.5° (straight ahead and slightly left/right) must be clear
-    const clear = (y: number) => !blocked(y, -5.5, 0) && !blocked(y, -5.5, -8) && !blocked(y, -5.5, 8);
     let raise = 0;
-    for (let dy = 0; dy <= 0.14 + 1e-6; dy += 0.02) {
-      if (headroom(this.eye.y + this.gameUp + dy) < 0.08) break;
-      raise = dy;
-      if (clear(this.eye.y + this.gameUp + dy)) break;
+    // an eye set by hand per car is already clear of the dash (and raising it put some under the roof)
+    if (!this.entry.cockpitCamera.tuned) {
+      // road visible from ~10 m: the view at -5.5° (straight ahead and slightly left/right) must be clear
+      const clear = (y: number) => !blocked(y, -5.5, 0) && !blocked(y, -5.5, -8) && !blocked(y, -5.5, 8);
+      for (let dy = 0; dy <= 0.14 + 1e-6; dy += 0.02) {
+        if (headroom(this.eye.y + this.gameUp + dy) < 0.08) break;
+        raise = dy;
+        if (clear(this.eye.y + this.gameUp + dy)) break;
+      }
     }
     this.autoRaise = raise;
     this.applySeat();
@@ -192,10 +191,18 @@ export class CockpitCamera {
     this.camera.updateProjectionMatrix();
   }
 
+  /** An impact throws the head (car-local m/s, +X left, +Z forward): the neck spring brings it back. */
+  jolt(x: number, y: number, z: number): void {
+    this.offVel.x += x;
+    this.offVel.y += y;
+    this.offVel.z += z;
+  }
+
   update(dt: number, t: VehicleTelemetry, steer: number, look: { left: boolean; right: boolean; back: boolean }, yawRate: number): void {
     // head sway: a damped spring driven by accelerations (clamped, a few centimetres)
-    const ax = THREE.MathUtils.clamp(-t.latAccel * 0.0028, -0.045, 0.045);
-    const az = THREE.MathUtils.clamp(-t.longAccel * 0.0022, -0.035, 0.035);
+    const g = settings.headMovement;
+    const ax = THREE.MathUtils.clamp(-t.latAccel * 0.0028, -0.045, 0.045) * g;
+    const az = THREE.MathUtils.clamp(-t.longAccel * 0.0022, -0.035, 0.035) * g;
     const ay = 0;
     const k = 60;
     const c = 13;
@@ -206,7 +213,7 @@ export class CockpitCamera {
 
     // curb / rough-surface vibration
     this.shakeT += dt;
-    const shake = t.surfaceRumble * Math.min(1, t.speed / 25) * 0.004;
+    const shake = t.surfaceRumble * Math.min(1, t.speed / 25) * 0.004 * settings.cameraShake;
     const sx = Math.sin(this.shakeT * 71) * shake;
     const sy = Math.sin(this.shakeT * 53 + 1.3) * shake;
 
@@ -215,7 +222,8 @@ export class CockpitCamera {
     // look left/right/back (hold keys) and a little look-into-corner
     const target = look.back ? Math.PI : look.left ? 1.25 : look.right ? -1.25 : 0;
     this.lookYaw += (target - this.lookYaw) * Math.min(1, dt * 12);
-    const corner = THREE.MathUtils.clamp(steer * 0.35 + yawRate * 0.06, -0.18, 0.18);
+    const la = settings.lookToApex;
+    const corner = THREE.MathUtils.clamp((steer * 0.35 + yawRate * 0.06) * la, -0.18 * la, 0.18 * la);
     this.cornerYaw += (corner - this.cornerYaw) * Math.min(1, dt * 4);
     this.camera.rotation.set(PITCH, Math.PI + this.lookYaw + this.cornerYaw, 0);
     this.lookingForward = Math.abs(this.lookYaw) < 0.4;

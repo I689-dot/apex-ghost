@@ -87,6 +87,11 @@ export interface PitLane {
   boxFrom: number;
   boxTo: number;
   speedLimitKmh: number;
+  /**
+   * Index of the pit-out line (the speed limit's end) when the lane runs on past it as an exit road (Spa: the
+   * official pit lane ends at La Source, the road behind the barrier joins at Eau Rouge). Undefined: the lane's end.
+   */
+  outIndex?: number;
 }
 
 /** Horizontal side vector (pointing to the driver's left when facing `d`). */
@@ -163,6 +168,40 @@ export function progressAt(track: TrackRaceData, i: number, x: number, z: number
   if (s < 0) s += track.length;
   if (s >= track.length) s -= track.length;
   return s;
+}
+
+/** The centreline point at or before lap distance s (wrapped into the lap): a binary search of cumS. */
+export function indexAtDistance(track: Pick<TrackRaceData, 'length' | 'cumS'>, s: number): number {
+  const L = track.length;
+  s = ((s % L) + L) % L;
+  let lo = 0;
+  let hi = track.cumS.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi + 1) >> 1;
+    if (track.cumS[m] <= s) lo = m;
+    else hi = m - 1;
+  }
+  return lo;
+}
+
+/** Position and heading (yaw, atan2(dx, dz)) on the centreline at lap distance s, interpolated between its points. */
+export function pointAtDistance(
+  track: Pick<TrackRaceData, 'length' | 'cumS' | 'centerline'>,
+  s: number,
+  out: { x: number; y: number; z: number; yaw: number },
+): void {
+  const L = track.length;
+  s = ((s % L) + L) % L;
+  const n = track.cumS.length;
+  const i = indexAtDistance(track, s);
+  const j = (i + 1) % n;
+  const segLen = (j === 0 ? L : track.cumS[j]) - track.cumS[i];
+  const u = segLen > 0 ? (s - track.cumS[i]) / segLen : 0;
+  const cl = track.centerline;
+  out.x = cl[i * 3] + (cl[j * 3] - cl[i * 3]) * u;
+  out.y = cl[i * 3 + 1] + (cl[j * 3 + 1] - cl[i * 3 + 1]) * u;
+  out.z = cl[i * 3 + 2] + (cl[j * 3 + 2] - cl[i * 3 + 2]) * u;
+  out.yaw = Math.atan2(cl[j * 3] - cl[i * 3], cl[j * 3 + 2] - cl[i * 3 + 2]);
 }
 
 /** Forward-wrapped distance from s0 to s1 on a loop of length L, mapped into (-L/2, L/2]. */

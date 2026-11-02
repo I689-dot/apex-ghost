@@ -531,6 +531,48 @@ export class Forest {
     this.root.name = 'forest';
   }
 
+  private cellIndex: Map<number, [number, number]> | null = null;
+
+  /**
+   * Does a tree stand in the way from a to b? Each crown as an upright cylinder (40 % of the tree's height wide,
+   * from a quarter of the way up to its top), the segment sampled every 2 m. For the TV cameras' sightlines.
+   */
+  blocks(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean {
+    const g = this.meta;
+    const cells = (this.cellIndex ??= new Map(g.cells.map(([c, first, count]) => [c, [first, count]])));
+    const len = Math.hypot(bx - ax, by - ay, bz - az);
+    const steps = Math.max(1, Math.ceil(len / 2));
+    const seen = new Set<number>();
+    for (let k = 0; k <= steps; k++) {
+      const u = k / steps;
+      const px = ax + (bx - ax) * u;
+      const pz = az + (bz - az) * u;
+      const cx = Math.floor((px - g.origin[0]) / g.cell);
+      const cz = Math.floor((pz - g.origin[1]) / g.cell);
+      if (cx < 0 || cz < 0 || cx >= g.nx || cz >= g.nz) continue;
+      seen.add(cz * g.nx + cx);
+    }
+    for (const c of seen) {
+      const e = cells.get(c);
+      if (!e) continue;
+      for (let i = e[0]; i < e[0] + e[1]; i++) {
+        const h = this.s[i] * (this.type[i] === 0 ? SPRUCE_H : BEECH_H);
+        const r = h * 0.2 * this.slim[i];
+        // nearest point of the segment to the trunk (in plan), then whether it is inside the crown there
+        const dx = bx - ax;
+        const dz = bz - az;
+        const d2 = dx * dx + dz * dz || 1;
+        const u = Math.max(0, Math.min(1, ((this.x[i] - ax) * dx + (this.z[i] - az) * dz) / d2));
+        const ex = ax + dx * u - this.x[i];
+        const ez = az + dz * u - this.z[i];
+        if (ex * ex + ez * ez > r * r) continue;
+        const y = ay + (by - ay) * u;
+        if (y > this.y[i] + h * 0.25 && y < this.y[i] + h) return true;
+      }
+    }
+    return false;
+  }
+
   /** The map's scattered forest (if any) and its trackside trees (null when there are neither). */
   static async load(
     ref: ForestRef | undefined,

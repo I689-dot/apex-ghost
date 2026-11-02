@@ -31,7 +31,13 @@ import {
   type ServerMsg,
 } from '@apex/shared';
 import { Connection, RoomError, createRoom, listPublicRooms } from './net/connection';
-import { createLocalRoom, isLocalCode } from './net/localRoom';
+import { createLocalRoom, isHostedCode, isLocalCode } from './net/localRoom';
+import { steeringLockDeg } from './physics/steeringLock';
+import { hostRace, isP2pCode, stopHosting } from './net/p2p';
+import { LICENCE_COLOUR, LICENCE_NAME, addSession, levelOf, loadCareer, type CareerGain } from './career';
+import { careerBlock } from './ui/careerBlock';
+// coins (kept for later, off in the game for now): import { buyCar, carPrice, claimDaily, initGarage, ownsCar } from './career';
+import { loadChampionship, newChampionship, saveChampionship, scoreRace, standings, type Championship } from './championship';
 import { Graphics } from './game/graphics';
 import { Showroom } from './game/preview';
 import { RaceSession } from './game/session';
@@ -43,7 +49,7 @@ import { getLang, t } from './i18n';
 import { IS_APP } from './mobile/platform';
 import { mobileAppLink } from './mobile/installScreen';
 import * as acc from './net/account';
-import { friendsPanel, recordsModal, signInModal } from './ui/social';
+import { flagImg, friendsPanel, profileModal, recordsModal, signInModal } from './ui/social';
 import { cinematicReel, trackReel } from './ui/reel';
 import { ICONS } from './ui/icons';
 import { trackOutline } from './ui/trackMap';
@@ -52,8 +58,28 @@ type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 're
 type LobbyStep = 'circuit' | 'conditions' | 'session' | 'rules' | 'car';
 
 const hp = (kw: number) => Math.round(kw * 1.341);
+/** Maps with their own menu photos (photo_<shot>_<map>.webp, tools/e2e/photos.mjs) and their countries. */
+const MAP_PHOTOS = new Set(['zandvoort', 'spa']);
+const MAP_COUNTRY: Record<string, string> = { zandvoort: 'NL', spa: 'BE' };
+/** A circuit and its layouts: the Nordschleife's 24 h layout is the Nürburgring's, as its GP and short ones. */
+const CIRCUIT_NAME: Record<string, string> = { nurburgring: 'Nürburgring', zandvoort: 'Circuit Zandvoort', spa: 'Circuit de Spa-Francorchamps' };
+function circuitOf(tr: { id: string; map?: string }): string {
+  return tr.map === 'nordschleife' ? 'nurburgring' : (tr.map ?? tr.id);
+}
+function circuitsOf<T extends { id: string; map?: string; default?: boolean }>(tracks: T[]): [string, T[]][] {
+  const by = new Map<string, T[]>();
+  for (const tr of tracks) by.set(circuitOf(tr), [...(by.get(circuitOf(tr)) ?? []), tr]);
+  // each circuit's main layout first (the default, else the first listed)
+  return [...by.entries()].map(([k, ls]) => [k, [...ls].sort((a, b) => Number(!!b.default) - Number(!!a.default))]);
+}
 
 export class App {
+  /** The weekend so far, driver by driver (iRacing's Results & Stats): practice, qualifying, grid and race. */
+  private weekend = new Map<
+    string,
+    { nick: string; num: number | null; country: string | null; practice?: number; qualify?: number; qualifyMs?: number | null; grid?: number; race?: string }
+  >();
+  private profileLoaded = false;
   private ui: HTMLElement;
   private gfx: Graphics;
   private showroom: Showroom;
@@ -93,6 +119,8 @@ export class App {
     loadCarsFile()
       .then((c) => {
         this.cars = c;
+        // coins (off for now): the garage, the first time: the most affordable cars (career.ts)
+        // initGarage(c.cars.filter((x) => x.role !== 'safety'));
         if (this.screen === 'lobby') this.renderLobby();
       })
       .catch((e: Error) => this.fatal(e.message));
@@ -216,6 +244,29 @@ export class App {
         busy(false);
       }
     };
+    const host = async () => {
+      const n = readNick();
+      if (!n) return;
+      busy(true);
+      err.textContent = '';
+      try {
+        await this.join(await hostRace(), n);
+      } catch (e) {
+        err.textContent = t((e as Error).message);
+      } finally {
+        busy(false);
+      }
+    };
+    const hostPanel = () =>
+      h(
+        'div.mm-panel.mm-host',
+        {},
+        h('h3', { text: t('Race on the same Wi-Fi') }),
+        h('p.muted', {
+          text: t('Host the race on this device (a phone works): your friends join with its code and connect straight to you. No account needed.'),
+        }),
+        h('button.primary.mm-wide', { text: t('Host on this device'), onclick: () => void host() }),
+      );
     const solo = async () => {
       const n = readNick();
       if (!n) return;
@@ -241,6 +292,12 @@ export class App {
       busy(true);
       err.textContent = '';
       try {
+        // a race hosted on a device: straight to it (no account needed, as on a LAN)
+        const p2p = await isP2pCode(c);
+        if (!p2p && !online) {
+          err.textContent = t('Online needs an account');
+          return;
+        }
         await this.join(c, n);
       } catch (e) {
         err.textContent = t((e as Error).message);
@@ -281,6 +338,11 @@ export class App {
       void acc.probeAccounts().then((on) => {
         if (!on && this.screen === 'menu') this.showMenu(error);
       });
+    // the driver profile from the server, once a visit (signed in on another device, or before profiles existed)
+    if (signedIn && !this.profileLoaded) {
+      this.profileLoaded = true;
+      void acc.refreshProfile().then(() => this.screen === 'menu' && this.showMenu(error));
+    }
     const signIn = () => document.body.append(signInModal(() => this.showMenu()));
     const locked = (text: string) => h('div.mm-lock', {}, h('span.mm-lock-icon', { html: ICONS.lock }), h('span', { text }));
     /** A big mode tile, as in the F1 / GT menus: a photo, a title, one line, and what it does. */
@@ -303,10 +365,18 @@ export class App {
           h(
             'div.mm-tiles',
             {},
-            tile('solo', 'photo_grid.webp', t('OFFLINE'), t('Play solo (offline)'), t('Race the AI on any circuit. No account, no server.'), () => void solo()),
+            // each tile a different car and circuit (tools/e2e/photos.mjs: Spa, the Nürburgring, Zandvoort)
+            tile(
+              'solo',
+              'photo_hero_spa.webp',
+              t('OFFLINE'),
+              t('Play solo (offline)'),
+              t('Race the AI on any circuit. No account, no server.'),
+              () => void solo(),
+            ),
             tile(
               'online',
-              'photo_pole.webp',
+              'photo_hero.webp',
               t('ONLINE'),
               t('Create room'),
               t('Your own lobby: invite friends with the room code, add AI cars.'),
@@ -314,8 +384,18 @@ export class App {
               online ? null : locked(t('Sign in to play online')),
             ),
             tile(
+              'champ',
+              'photo_aerial_spa.webp',
+              t('OFFLINE'),
+              loadChampionship()
+                ? t('Championship · round {n}/{m}', { n: (loadChampionship()?.done ?? 0) + 1, m: loadChampionship()?.rounds.length ?? 0 })
+                : t('Championship'),
+              t('A season against the AI on every circuit, points as in F1.'),
+              () => this.championshipMenu(readNick),
+            ),
+            tile(
               'join',
-              'photo_straight.webp',
+              'photo_hero_zandvoort.webp',
               t('ONLINE'),
               t('Join friends'),
               t('A room code from a friend, or a live public session.'),
@@ -350,6 +430,7 @@ export class App {
                   h('button.mm-wide', { text: t('Create room'), onclick: () => void create() }),
                   err,
                 ),
+                hostPanel(),
                 this.roomList(joinCode, watchIt),
               )
             : h(
@@ -358,6 +439,10 @@ export class App {
                 h('h3', { text: t('Online needs an account') }),
                 h('p.muted', { text: t('Sign in to create rooms, join friends and watch live sessions. Solo races work without one.') }),
                 h('button.primary', { text: t('Sign in / create account'), onclick: signIn }),
+                hostPanel(),
+                h('h3', { text: t('Join a race hosted on a device') }),
+                h('div.join-row', {}, code, h('button.primary', { text: t('Join'), onclick: () => void joinIt() })),
+                err,
               ),
         );
       else
@@ -398,12 +483,36 @@ export class App {
     );
     // the driver: account chip (signed in) or the nickname for offline play and a sign-in button
     const initials = (signedIn?.user.nick ?? settings.nickname ?? '?').slice(0, 2).toUpperCase() || '?';
+    // the solo career on the driver chip: licence and Safety Rating, level (iRacing's licence badge, the games' level)
+    // coins (off for now): the daily bonus, once a day (the games' login reward), and the coins on the chip
+    // const daily = claimDaily();
+    // if (daily) setTimeout(() => toast(t('Daily bonus: +{n} coins', { n: daily.toLocaleString() }), 4500), 600);
+    const career = loadCareer();
+    // const coinsBadge = h('span.mm-coins', { title: t('Coins'), html: `${ICONS.coin}<b>${career.coins.toLocaleString()}</b>` });
+    const careerBadge = h(
+      'span.mm-career',
+      { title: `${t(LICENCE_NAME[career.licence])} · ${t('Safety Rating')} ${career.sr.toFixed(2)}` },
+      h('b.lic', { text: `${career.licence} ${career.sr.toFixed(2)}`, style: `background:${LICENCE_COLOUR[career.licence]}` }),
+      h('small', { text: t('Lv {n}', { n: levelOf(career.xp).level }) }),
+    );
     const profile = signedIn
       ? h(
           'div.mm-profile',
           {},
-          h('span.mm-avatar', { text: initials }),
-          h('div.mm-who', {}, h('b.mm-name', { text: signedIn.user.nick }), h('span.mm-status.on', { text: t('Online') })),
+          h('button.mm-avatar', {
+            text: signedIn.user.num ? String(signedIn.user.num) : initials,
+            title: t('Driver profile'),
+            style: signedIn.user.colour ? `background:${signedIn.user.colour}` : '',
+            onclick: () => document.body.append(profileModal(() => this.showMenu())),
+          }),
+          careerBadge,
+          // coinsBadge,
+          h(
+            'div.mm-who',
+            {},
+            h('b.mm-name', {}, flagImg(signedIn.user.country, 18), signedIn.user.abbr ? `${signedIn.user.nick} · ${signedIn.user.abbr}` : signedIn.user.nick),
+            h('button.mm-status.on.linkish', { text: t('Edit driver profile'), onclick: () => document.body.append(profileModal(() => this.showMenu())) }),
+          ),
           h('button.mm-profile-btn.ghost', {
             text: t('Sign out'),
             onclick: async () => {
@@ -416,6 +525,8 @@ export class App {
           'div.mm-profile',
           {},
           h('span.mm-avatar.off', { text: initials }),
+          careerBadge,
+          // coinsBadge,
           h('label.mm-who', { title: t('Your nickname for solo races') }, nick, h('span.mm-status', { text: t('Offline · solo only') })),
           h('button.mm-profile-btn.primary', { text: t('Sign in'), onclick: signIn }),
         );
@@ -424,7 +535,7 @@ export class App {
         'div.menu.mm',
         {},
         h('header.mm-top', {}, h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })), tabs, profile),
-        h('div.mm-hero', {}, h('span.mm-kicker', { text: t('GT3 · Nürburgring · Zandvoort · Nordschleife') }), h('h1', { text: t('Ready to race') })),
+        h('div.mm-hero', {}, h('span.mm-kicker', { text: t('GT3 · Nürburgring · Spa · Zandvoort') }), h('h1', { text: t('Ready to race') })),
         body,
         h(
           'footer.mm-foot',
@@ -479,11 +590,15 @@ export class App {
   }
 
   private teardownConnection(): void {
+    if (this.conn && isHostedCode(this.conn.code)) stopHosting();
     for (const off of this.offs) off();
     this.offs = [];
     this.conn?.close();
     this.conn = null;
     this.room = null;
+    this.filled = false;
+    this.aloneSince = 0;
+    clearTimeout(this.fillTimer);
     this.session?.dispose();
     this.session = null;
   }
@@ -504,6 +619,7 @@ export class App {
         break;
       case 'room':
         this.room = m.room;
+        this.autoFill();
         if (m.room.phase === 'briefing' && (this.screen === 'lobby' || this.screen === 'briefing')) this.renderBriefing();
         else if (this.screen === 'briefing') this.showLobby();
         else if (this.screen === 'lobby') this.renderLobby();
@@ -535,7 +651,43 @@ export class App {
 
   /* ---------------------------------------------------------------- lobby --- */
 
+  /** When the waiting online lobby began (you its host, alone in it), and whether the bots were already added. */
+  private aloneSince = 0;
+  private filled = false;
+  private fillTimer = 0;
+
+  /**
+   * Nobody joined an online room within 15 s: the host gets AI drivers (real-sounding names, server room.ts), as
+   * online games fill a lobby that is taking too long, up to 7 of them or the free cars. A player joining later still
+   * can (a bot gives its place up only if the host removes it).
+   */
+  private autoFill(): void {
+    const r = this.room;
+    const online = !!this.conn && !isLocalCode(r?.code ?? this.conn.code);
+    const host = r?.players.find((p) => p.id === this.me)?.host;
+    const humans = r?.players.filter((p) => !p.bot).length ?? 0;
+    const bots = r?.players.filter((p) => p.bot).length ?? 0;
+    if (!r || !online || !host || r.phase !== 'lobby' || humans > 1 || bots > 0 || this.spectating) {
+      if (!r || r.phase !== 'lobby' || humans > 1) this.aloneSince = 0;
+      clearTimeout(this.fillTimer);
+      return;
+    }
+    if (this.filled) return;
+    if (!this.aloneSince) this.aloneSince = performance.now();
+    clearTimeout(this.fillTimer);
+    const wait = Math.max(0, 15000 - (performance.now() - this.aloneSince));
+    this.fillTimer = window.setTimeout(() => {
+      const now = this.room;
+      if (!now || now.phase !== 'lobby' || now.players.filter((p) => !p.bot).length > 1 || now.players.some((p) => p.bot)) return;
+      this.filled = true;
+      for (let i = 0; i < 7; i++) this.conn?.sendJson({ t: 'addBot' });
+      toast(t('Nobody joined in 15 s: AI drivers added. Players can still join.'), 5000);
+    }, wait);
+  }
+
   private showLobby(): void {
+    // back in the lobby: the next session starts a new weekend
+    if (this.screen === 'results') this.weekend.clear();
     if (this.spectating) {
       this.session?.dispose();
       this.session = null;
@@ -856,7 +1008,7 @@ export class App {
         {},
         h(
           'div.trk-preview',
-          { style: `--photo: ${cssUrl(track.map === 'zandvoort' ? `photo_aerial${sfx}.webp` : 'photo_grid.webp')}` },
+          { style: `--photo: ${cssUrl(track.map && MAP_PHOTOS.has(track.map) ? `photo_aerial${sfx}.webp` : 'photo_grid.webp')}` },
           h('div.trk-preview-map', { html: preview ?? '' }),
           h(
             'div.trk-preview-info',
@@ -868,27 +1020,53 @@ export class App {
               {},
               h('span', {}, h('b', { text: `${(track.length / 1000).toFixed(2)} km` }), h('small', { text: t('Lap length') })),
               track.turns ? h('span', {}, h('b', { text: String(track.turns) }), h('small', { text: t('Turns') })) : null,
-              h('span', {}, h('b', { text: track.map === 'zandvoort' ? 'NL' : 'DE' }), h('small', { text: t('Country') })),
+              h('span', {}, h('b', { text: MAP_COUNTRY[track.map ?? ''] ?? 'DE' }), h('small', { text: t('Country') })),
             ),
+            // the circuit's layouts (the Nürburgring: GP, GP short, the 24 h Gesamtstrecke)
+            (() => {
+              const layouts = tracks.filter((tr) => circuitOf(tr) === circuitOf(track));
+              return layouts.length > 1
+                ? h(
+                    'div.trk-layouts',
+                    {},
+                    h('span.lb-kicker', { text: t('Layout') }),
+                    chips(
+                      track.id,
+                      layouts.map(
+                        (tr) => [tr.id, `${t(tr.name).replace(/^Nürburgring\s*/, '') || t(tr.name)} · ${(tr.length / 1000).toFixed(2)} km`] as [string, string],
+                      ),
+                      (v) => send({ trackId: v }),
+                    ),
+                  )
+                : null;
+            })(),
           ),
         ),
         h(
           'div.trk-list',
           {},
-          ...tracks.map((tr) =>
-            h(
-              `button.trk-card${tr.id === track.id ? '.on' : ''}`,
+          // one card a circuit; its layouts are chosen in the preview
+          ...circuitsOf(tracks).map(([key, layouts]) => {
+            const on = circuitOf(track) === key;
+            const shown = on ? track : layouts[0];
+            return h(
+              `button.trk-card${on ? '.on' : ''}`,
               {
                 type: 'button',
-                'data-id': tr.id,
-                disabled: !edit && tr.id !== track.id,
-                onclick: () => edit && tr.id !== track.id && send({ trackId: tr.id }),
+                'data-id': shown.id,
+                disabled: !edit && !on,
+                onclick: () => edit && !on && send({ trackId: layouts[0].id }),
               },
-              h('span.trk-card-map', { html: trackOutline(tr.id, rerender) ?? '' }),
-              h('span.trk-card-name', { text: t(tr.name) }),
-              h('span.trk-card-sub', { text: `${(tr.length / 1000).toFixed(2)} km${tr.turns ? ` · ${t('{n} turns', { n: tr.turns })}` : ''}` }),
-            ),
-          ),
+              h('span.trk-card-map', { html: trackOutline(shown.id, rerender) ?? '' }),
+              h('span.trk-card-name', { text: t(CIRCUIT_NAME[key] ?? shown.name) }),
+              h('span.trk-card-sub', {
+                text:
+                  layouts.length > 1
+                    ? t('{n} layouts', { n: layouts.length })
+                    : `${(shown.length / 1000).toFixed(2)} km${shown.turns ? ` · ${t('{n} turns', { n: shown.turns })}` : ''}`,
+              }),
+            );
+          }),
         ),
       );
     } else if (step === 'conditions') {
@@ -942,9 +1120,37 @@ export class App {
         ),
       );
     } else if (step === 'session') {
+      // formats as the sims offer them (ACC: quick race, sprint and endurance weekends, hotlap)
+      const FORMATS: [string, string, number, number, number, number][] = [
+        ['quick', t('Quick race'), 0, 10, 5, 0],
+        ['sprint', t('Sprint weekend'), 20, 15, 0, 30],
+        ['endurance', t('Endurance'), 30, 20, 0, 60],
+        ['hotlap', t('Hotlap'), 0, 30, 0, 0],
+      ];
+      const fmtNow =
+        FORMATS.find(
+          ([, , p, q, l, m]) =>
+            (room.practiceMinutes ?? 0) === p && room.sessionMinutes === q && (m ? room.raceMinutes === m : !room.raceMinutes && room.raceLaps === l),
+        )?.[0] ?? '';
       pane = h(
         'div.lb-col',
         {},
+        field(
+          t('Format'),
+          chips(
+            fmtNow,
+            FORMATS.map(([k, label]) => [k, label] as [string, string]),
+            (v) => {
+              const f = FORMATS.find(([k]) => k === v);
+              if (!f) return;
+              const [, , p, q, l, m] = f;
+              this.conn?.sendJson({ t: 'setPractice', minutes: p });
+              this.conn?.sendJson({ t: 'setSession', minutes: q });
+              this.conn?.sendJson({ t: 'setRaceMinutes', minutes: m });
+              if (!m) this.conn?.sendJson({ t: 'setRaceLaps', laps: l });
+            },
+          ),
+        ),
         field(
           t('Free practice'),
           chips(
@@ -1287,6 +1493,43 @@ export class App {
         const owner = room.carLocks[c.id];
         const takenBy = owner && owner !== this.me ? nameOf(owner) : null;
         const sel = mine?.carId === c.id;
+        // coins (off for now, kept for later): the garage's version of the card, prices and buying
+        // // the garage (career.ts): a car not bought yet shows its price; picking it offers to buy it
+        // const owned = ownsCar(c.id);
+        // const price = carPrice(c);
+        // return h(
+        //   `button.car-card${sel ? '.selected' : ''}${takenBy ? '.taken' : ''}${browsing?.id === c.id ? '.browsing' : ''}${owned ? '' : '.locked'}`,
+        //   {
+        //     disabled: !!takenBy || room.phase !== 'lobby',
+        //     title: takenBy ? t('Taken by {name}', { name: takenBy }) : owned ? c.name : t('{car}: {n} coins', { car: c.name, n: price.toLocaleString() }),
+        //     onmouseenter: () => this.previewSoon(c),
+        //     onmouseleave: () => this.previewSoon(browsing),
+        //     onclick: () => {
+        //       this.browsing = c.id;
+        //       if (!ownsCar(c.id)) {
+        //         const have = loadCareer().coins;
+        //         if (have < price) {
+        //           toast(
+        //             t('{car} costs {n} coins: you have {have}. Race to earn more.', { car: c.name, n: price.toLocaleString(), have: have.toLocaleString() }),
+        //             4500,
+        //           );
+        //           this.renderLobby();
+        //           return;
+        //         }
+        //         if (!confirm(t('Buy the {car} for {n} coins? (you have {have})', { car: c.name, n: price.toLocaleString(), have: have.toLocaleString() })))
+        //           return;
+        //         buyCar(c);
+        //         toast(t('{car} is yours!', { car: c.name }), 3500);
+        //       }
+        //       this.conn?.sendJson({ t: 'selectCar', carId: c.id });
+        //     },
+        //   },
+        //   h('img', { src: c.thumbnail, alt: '', loading: 'lazy', draggable: 'false' }),
+        //   h('span.cname', { text: c.name }),
+        //   h('span.cat', { text: c.category }),
+        //   takenBy ? h('span.owner', { text: takenBy }) : null,
+        //   owned ? null : h('span.price', { html: `${ICONS.coin}${price.toLocaleString()}` }),
+        // );
         return h(
           `button.car-card${sel ? '.selected' : ''}${takenBy ? '.taken' : ''}${browsing?.id === c.id ? '.browsing' : ''}`,
           {
@@ -1331,6 +1574,10 @@ export class App {
             h('dd', { text: `${browsing.specs.topSpeedKmh} km/h` }),
             h('dt', { text: t('Gears') }),
             h('dd', { text: String(browsing.specs.gears.length) }),
+            h('dt', { text: t('Steering lock') }),
+            h('dd', { text: `${steeringLockDeg(browsing.id)}°` }),
+            h('dt', { text: t('Power-to-weight') }),
+            h('dd', { text: `${(browsing.specs.massKg / hp(browsing.specs.powerKw)).toFixed(2)} kg/hp` }),
             ...(browsing.info
               ? [
                   h('dt', { text: t('Engine') }),
@@ -1365,15 +1612,17 @@ export class App {
       h(
         'aside.lobby-side',
         {},
-        isLocalCode(room.code)
-          ? h('div.room-code', {}, h('label', { text: t('Solo · offline') }))
-          : h(
-              'div.room-code',
-              {},
-              h('label', { text: t('ROOM CODE') }),
-              h('div.code', { text: room.code }),
-              h('button.ghost', { text: t('Copy'), onclick: copy }),
-            ),
+        isHostedCode(room.code)
+          ? h('div.room-code', {}, h('label', { text: t('HOSTED ON THIS DEVICE') }), h('div.code', { text: room.code }))
+          : isLocalCode(room.code)
+            ? h('div.room-code', {}, h('label', { text: t('Solo · offline') }))
+            : h(
+                'div.room-code',
+                {},
+                h('label', { text: t('ROOM CODE') }),
+                h('div.code', { text: room.code }),
+                h('button.ghost', { text: t('Copy'), onclick: copy }),
+              ),
         h('h3', { text: t('Drivers {n}/{max}', { n: room.players.length, max: MAX_PLAYERS }) }),
         players,
         isHost && room.phase === 'lobby'
@@ -1811,6 +2060,21 @@ export class App {
 
   private showResults(m: Extract<ServerMsg, { t: 'results' }>): void {
     this.setPause(false);
+    // the solo career (offline sessions): what this one gave, read before the session goes
+    let gain: CareerGain | null = null;
+    const stats = this.session?.careerStats();
+    if (stats && this.conn && isLocalCode(this.conn.code) && !this.spectating) {
+      const mine = m.rows.find((r) => r.id === this.me);
+      const ok = mine && (m.kind === 'race' ? !mine.dnf && mine.totalMs !== null : mine.bestLapMs !== null);
+      gain = addSession({
+        kind: m.kind === 'race' ? 'race' : m.kind === 'practice' ? 'practice' : 'qualifying',
+        ...stats,
+        position: ok && mine ? mine.position : 0,
+        field: m.rows.length,
+        start: (this.session?.race.grid.indexOf(this.me) ?? -1) + 1,
+        difficulty: settings.ai.difficulty,
+      });
+    }
     this.session?.dispose();
     this.session = null;
     this.screen = 'results';
@@ -1839,8 +2103,82 @@ export class App {
     const heads = race
       ? [t('Pos'), t('Driver'), t('Car'), t('Race time'), t('Gap'), t('Best lap'), t('Laps'), t('Penalties')]
       : [t('Pos'), t('Driver'), t('Car'), t('Best lap'), t('Gap'), t('Timed laps'), t('Penalties')];
+    // the weekend's record (Results & Stats): each session's positions, the grid from qualifying
+    for (const r of m.rows) {
+      const p = this.room?.players.find((x) => x.id === r.id);
+      const w = this.weekend.get(r.id) ?? { nick: r.nick, num: p?.num ?? null, country: p?.country ?? null };
+      const pos = classified(r) ? r.position : undefined;
+      if (m.kind === 'practice') w.practice = pos;
+      else if (m.kind === 'race') {
+        w.grid ??= w.qualify;
+        w.race = r.dnf ? t('DNF') : pos ? String(pos) : '–';
+      } else {
+        w.qualify = pos;
+        w.qualifyMs = r.bestLapMs;
+      }
+      this.weekend.set(r.id, w);
+    }
+    const weekendStats = this.weekendTable(race ? 'race' : m.kind === 'practice' ? 'practice' : 'qualify');
     // after qualifying: the race loads by itself, gridded in this order
     const next = m.raceAt !== null ? h('p.race-next') : null;
+    // a championship round (offline, on the round's circuit): scored, the table, the next round
+    let champBlock: HTMLElement | null = null;
+    let champNext: HTMLElement | null = null;
+    const champ = loadChampionship();
+    const champTrack = this.room?.conditions.trackId;
+    const myNick = this.room?.players.find((p) => p.id === this.me)?.nick ?? settings.nickname;
+    if (
+      race &&
+      champ &&
+      this.conn &&
+      isLocalCode(this.conn.code) &&
+      champTrack &&
+      (champ.rounds[champ.done] === champTrack || champ.lastScored === `${this.conn.code}-${m.raceId}`)
+    ) {
+      const fastest = m.fastestLap ? (m.rows.find((r) => r.id === m.fastestLap?.id)?.nick ?? null) : null;
+      scoreRace(
+        champ,
+        `${this.conn.code}-${m.raceId}`,
+        m.rows.map((r) => ({ nick: r.nick, carId: r.carId, classified: classified(r) })),
+        fastest,
+      );
+      const over = champ.done >= champ.rounds.length;
+      saveChampionship(over ? null : champ);
+      const table = standings(champ);
+      champBlock = h(
+        'div.champ-results',
+        {},
+        h('h3', {
+          text: over ? t('Championship final standings') : t('Championship after round {n} of {m}', { n: champ.done, m: champ.rounds.length }),
+        }),
+        h(
+          'ol.champ-table',
+          {},
+          ...table
+            .slice(0, 12)
+            .map((d, i) =>
+              h(
+                `li${d.nick === myNick ? '.me' : ''}`,
+                {},
+                h('span', { text: `${i + 1}. ${d.nick}` }),
+                h('small', { text: d.results.map((p) => (p ? `P${p}` : '–')).join(' ') }),
+                h('b', { text: String(d.points) }),
+              ),
+            ),
+        ),
+        over ? h('p.champ-winner', { text: t('{nick} is the champion!', { nick: table[0]?.nick ?? '' }) }) : null,
+      );
+      const nextTrack = champ.rounds[champ.done];
+      if (!over && nextTrack)
+        champNext = h('button.primary', {
+          text: t('Next round: {track}', { track: t(this.trackIndex.find((x) => x.id === nextTrack)?.name ?? nextTrack) }),
+          onclick: () => {
+            this.conn?.leave();
+            this.teardownConnection();
+            void this.startChampionshipRound(champ, myNick);
+          },
+        });
+    }
     clearInterval(this.resultsTimer);
     if (next && m.raceAt !== null) {
       const at = m.raceAt;
@@ -1891,10 +2229,213 @@ export class App {
                 text: t('Fastest lap: {nick} · {time}', { nick: m.rows.find((r) => r.id === m.fastestLap?.id)?.nick ?? '', time: fmtTime(m.fastestLap.ms) }),
               })
             : null,
-          next ?? h('button.primary', { text: t('Back to lobby'), onclick: () => this.showLobby() }),
+          gain ? this.careerBlock(gain) : null,
+          weekendStats,
+          champBlock,
+          next ?? champNext ?? h('button.primary', { text: t('Back to lobby'), onclick: () => this.showLobby() }),
         ),
       ),
     );
+  }
+
+  /** What a session gave the career (ui/careerBlock.ts). */
+  private careerBlock(g: CareerGain): HTMLElement {
+    return careerBlock(g);
+  }
+
+  /**
+   * Results & Stats (iRacing's): the weekend in one table, driver by driver, sorted by the session just run: the car
+   * number, the driver with the flag and country, practice and qualifying places (with the lap), the grid, the race.
+   */
+  private weekendTable(by: 'practice' | 'qualify' | 'race'): HTMLElement | null {
+    const rows = [...this.weekend.entries()];
+    const sessions = [
+      rows.some(([, w]) => w.practice !== undefined),
+      rows.some(([, w]) => w.qualify !== undefined),
+      rows.some(([, w]) => w.race !== undefined),
+    ];
+    if (sessions.filter(Boolean).length < 2) return null;
+    const key = (w: (typeof rows)[number][1]) => (by === 'race' ? Number(w.race) || 999 : by === 'qualify' ? (w.qualify ?? 999) : (w.practice ?? 999));
+    rows.sort((a, b) => key(a[1]) - key(b[1]));
+    return h(
+      'div.weekend-stats',
+      {},
+      h('h3', { text: t('Results & stats') }),
+      h(
+        'table',
+        {},
+        h('thead', {}, h('tr', {}, ...[t('#'), t('Driver'), t('Practice'), t('Qualify'), t('G'), t('Race')].map((x) => h('th', { text: x })))),
+        h(
+          'tbody',
+          {},
+          ...rows.map(([id, w]) =>
+            h(
+              `tr${id === this.me ? '.me' : ''}`,
+              {},
+              h('td.mono', { text: w.num ? `#${w.num}` : '' }),
+              h('td', {}, flagImg(w.country, 16), w.nick, w.country ? h('small.cc', { text: ` ${w.country}` }) : null),
+              h('td.mono', { text: w.practice ? `P${w.practice}` : '---' }),
+              h('td.mono', {}, w.qualify ? `P${w.qualify}` : '---', w.qualifyMs ? h('small', { text: `  ${fmtTime(w.qualifyMs)}` }) : null),
+              h('td.mono', { text: w.grid ? String(w.grid) : '' }),
+              h('td.mono', { text: w.race ?? '' }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /** The championship: carry on, start a new one (rounds, race length, how many AI drivers), or abandon it. */
+  private championshipMenu(readNick: () => string | null): void {
+    const cur = loadChampionship();
+    const close = () => modal.remove();
+    const tracks = this.trackIndex;
+    // one round a circuit, on its main layout (a layout is not another circuit)
+    const picks = new Set(circuitsOf(tracks).map(([, ls]) => ls[0].id));
+    let laps = 5;
+    let bots = 9;
+    const list = h(
+      'div.champ-tracks',
+      {},
+      ...circuitsOf(tracks).map(([key, ls]) => {
+        const tr = ls[0];
+        const cb = h('input', { type: 'checkbox', checked: picks.has(tr.id) });
+        cb.addEventListener('change', () => (cb.checked ? picks.add(tr.id) : picks.delete(tr.id)));
+        return h(
+          'label.champ-track',
+          {},
+          cb,
+          h('span', { text: t(CIRCUIT_NAME[key] ?? tr.name) }),
+          h('small', { text: `${(tr.length / 1000).toFixed(2)} km` }),
+        );
+      }),
+    );
+    const chipRow = (vals: number[], get: () => number, set: (v: number) => void, label: (v: number) => string) => {
+      const row = h('div.lb-chips.champ-chips');
+      const draw = () =>
+        row.replaceChildren(
+          ...vals.map((v) =>
+            h(`button.lb-chip${get() === v ? '.on' : ''}`, {
+              type: 'button',
+              text: label(v),
+              onclick: () => {
+                set(v);
+                draw();
+              },
+            }),
+          ),
+        );
+      draw();
+      return row;
+    };
+    const start = async () => {
+      const nick = readNick();
+      if (!nick || !picks.size) return;
+      const c = newChampionship(
+        circuitsOf(tracks)
+          .map(([, ls]) => ls[0].id)
+          .filter((id) => picks.has(id)),
+        laps,
+        10,
+        bots,
+      );
+      saveChampionship(c);
+      close();
+      await this.startChampionshipRound(c, nick);
+    };
+    const table = cur
+      ? h(
+          'ol.champ-table',
+          {},
+          ...standings(cur)
+            .slice(0, 10)
+            .map((d) => h('li', {}, h('span', { text: d.nick }), h('b', { text: `${d.points}` }))),
+        )
+      : null;
+    const card = h(
+      'div.auth-card.champ-card',
+      {},
+      h(
+        'header.auth-head',
+        {},
+        h('div', {}, h('span.auth-kicker', { text: t('OFFLINE') }), h('h2', { text: t('Championship') })),
+        h('button.auth-close', { type: 'button', html: ICONS.close, title: t('Close'), onclick: close }),
+      ),
+      cur
+        ? h(
+            'div',
+            {},
+            h('p.auth-lead', {
+              text: t('Round {n} of {m}: {track}.', {
+                n: cur.done + 1,
+                m: cur.rounds.length,
+                track: t(tracks.find((x) => x.id === cur.rounds[cur.done])?.name ?? ''),
+              }),
+            }),
+            table,
+            h('button.primary.auth-submit', {
+              type: 'button',
+              text: t('Continue'),
+              onclick: async () => {
+                const nick = readNick();
+                if (!nick) return;
+                close();
+                await this.startChampionshipRound(cur, nick);
+              },
+            }),
+            h('button.ghost', {
+              type: 'button',
+              text: t('Abandon and start a new one'),
+              onclick: () => {
+                saveChampionship(null);
+                close();
+                this.championshipMenu(readNick);
+              },
+            }),
+          )
+        : h(
+            'div',
+            {},
+            h('p.auth-lead', {
+              text: t(
+                'Qualifying and a race on each circuit, against the same AI drivers. Points for the top ten: 25, 18, 15, 12, 10, 8, 6, 4, 2, 1, and one for the fastest lap.',
+              ),
+            }),
+            h('span.champ-label', { text: t('Rounds') }),
+            list,
+            h('span.champ-label', { text: t('Race length') }),
+            chipRow(
+              [3, 5, 10, 15],
+              () => laps,
+              (v) => (laps = v),
+              (v) => t('{n} laps', { n: v }),
+            ),
+            h('span.champ-label', { text: t('AI drivers') }),
+            chipRow(
+              [5, 9, 11],
+              () => bots,
+              (v) => (bots = v),
+              (v) => String(v),
+            ),
+            h('button.primary.auth-submit', { type: 'button', text: t('Start the championship'), onclick: () => void start() }),
+          ),
+    );
+    const modal: HTMLElement = h('div.modal.auth-modal', { onclick: (e: Event) => e.target === modal && close() }, card);
+    document.body.append(modal);
+  }
+
+  /** A championship round: an offline room on the round's circuit, qualifying and the race set, the AI drivers in. */
+  private async startChampionshipRound(c: Championship, nick: string): Promise<void> {
+    const trackId = c.rounds[c.done];
+    if (!trackId) return;
+    await this.join(await createLocalRoom(), nick);
+    const send = (m: Parameters<Connection['sendJson']>[0]) => this.conn?.sendJson(m);
+    send({ t: 'setConditions', trackId });
+    send({ t: 'setPractice', minutes: 0 });
+    send({ t: 'setSession', minutes: c.qualiMinutes });
+    send({ t: 'setRaceMinutes', minutes: 0 });
+    send({ t: 'setRaceLaps', laps: c.raceLaps });
+    for (let i = 0; i < c.bots; i++) send({ t: 'addBot' });
   }
 
   /* ---------------------------------------------------------------- misc --- */

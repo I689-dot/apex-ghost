@@ -1,8 +1,13 @@
 import type { CarEntry, Standing, TrackData } from '@apex/shared';
-import type { TopView } from '../game/topView';
+import type { TopLines, TopView } from '../game/topView';
 import { settings } from '../settings';
 import type { CompoundId } from '../physics/tyres';
 import { CarStatus } from './carStatus';
+import { RaceOverlays, type RelativeRow } from './overlays';
+import { DamagePanel } from './damagePanel';
+import { CircuitMap, type MapCar } from './circuitMap';
+import { flagImg } from './social';
+import type { DamageState } from '../physics/damage';
 import { LazyText, fmtDelta, fmtTime, h } from './dom';
 import { t } from '../i18n';
 
@@ -17,6 +22,8 @@ export interface HudState {
   lapLabel: string;
   /** Time penalties on the lap in progress (ms). */
   lapPenaltyMs: number;
+  /** The lap in progress no longer counts (track limits or a cut: deleted, as in real sessions). */
+  lapInvalid?: boolean;
   /** Live delta to the personal best (ms), null without a reference lap. */
   liveDelta: number | null;
   position: number;
@@ -53,6 +60,10 @@ export interface HudState {
   fuelText: string;
   /** Less than two laps of fuel left. */
   fuelLow: boolean;
+  /** Pedals after their filters (0…1) and the steering (−1 right … +1 left of full lock), for the inputs overlay. */
+  throttle: number;
+  brake: number;
+  steer: number;
 }
 
 interface MapDot {
@@ -85,10 +96,14 @@ export class Hud {
   private rpmLeds: HTMLElement[] = [];
   private wrong: HTMLElement;
   private status = new CarStatus();
+  private overlays = new RaceOverlays();
+  private damagePanel = new DamagePanel();
+  private hudKey = '';
+  private circuitMap = new CircuitMap();
   private resetEl: HTMLElement;
   private lapTag: HTMLElement = h('label', { text: t('LAP') });
 
-  private lastPenalty = 0;
+  private lastPenalty = '';
   private board: HTMLElement;
   private boardKey = '';
   private map: HTMLCanvasElement;
@@ -138,6 +153,8 @@ export class Hud {
         {},
         h('div.hud-times', {}, this.lapTag, this.cur.el, h('label', { text: t('BEST') }), this.best.el, h('label', { text: t('LAST') }), this.last.el),
         this.delta.el,
+        this.overlays.deltaBar,
+        this.overlays.relative,
       ),
       h(
         'div.hud-bc',
@@ -146,8 +163,13 @@ export class Hud {
         h('div.hud-rpm', {}, this.rpmFill),
         h('div.hud-speedo', {}, this.gear.el, h('div.hud-sp', {}, this.speed.el, this.unit.el)),
         this.fuel.el,
+        this.overlays.inputs,
       ),
-      h('div.hud-br', {}, this.map),
+      h('div.hud-br', {}, this.map, this.circuitMap.el),
+      this.overlays.spotL,
+      this.overlays.spotR,
+      this.overlays.mirrorDelta,
+      this.damagePanel.el,
       h('div.hud-bl', {}, this.status.el),
       this.wrong,
       this.msg.el,
@@ -168,11 +190,18 @@ export class Hud {
 
   /** Cache the track outline as a path in world coordinates (metres, x right, z down). */
   /** Your car in the status instrument (its picture from above, its wheels and engine where they are). */
+  /** The damage report's line drawing of the car (game/topView.ts renderTopLines). */
+  setDamageCar(entry: CarEntry, lines: TopLines | null): void {
+    this.damagePanel.setCar(entry, lines);
+    this.status.setLines(entry, lines);
+  }
+
   setCar(entry: CarEntry, view: TopView | null): void {
     this.status.setCar(entry, view);
   }
 
   setTrack(t: TrackData): void {
+    this.circuitMap.setTrack(t, t.turns);
     const cl = t.centerline;
     const path = new Path2D();
     for (let i = 0; i < cl.length; i += 3) {
@@ -184,7 +213,8 @@ export class Hud {
     const pl = t.pitLane;
     if (pl) {
       const pp = new Path2D();
-      pl.points.forEach((p, i) => (i === 0 ? pp.moveTo(p[0], p[2]) : pp.lineTo(p[0], p[2])));
+      // the pit lane to its pit-out line (not the exit road beyond it)
+      pl.points.slice(0, (pl.outIndex ?? pl.points.length - 1) + 1).forEach((p, i) => (i === 0 ? pp.moveTo(p[0], p[2]) : pp.lineTo(p[0], p[2])));
       this.pitPath = pp;
       const bx = new Path2D();
       for (let i = pl.boxFrom; i <= pl.boxTo; i++) {
@@ -272,12 +302,19 @@ export class Hud {
       this.rpmLeds.forEach((l, i) => (l.className = i < lit ? (i < 4 ? 'g' : i < 8 ? 'r' : 'b') : ''));
     }
     this.lap.set(s.lapLabel);
-    if (s.lapPenaltyMs !== this.lastPenalty) {
-      this.lastPenalty = s.lapPenaltyMs;
+    const tagKey = `${s.lapPenaltyMs}|${s.lapInvalid ? 1 : 0}`;
+    if (tagKey !== this.lastPenalty) {
+      this.lastPenalty = tagKey;
       const pen = s.lapPenaltyMs > 0;
-      this.lapTag.textContent = pen ? `${t('PEN')} +${(s.lapPenaltyMs / 1000).toFixed(1)} s` : t('LAP');
-      this.lapTag.classList.toggle('invalid', pen);
-      this.cur.el.classList.toggle('invalid', pen);
+      this.lapTag.textContent = s.lapInvalid
+        ? pen
+          ? `${t('INVALID')} · +${(s.lapPenaltyMs / 1000).toFixed(0)} s`
+          : t('INVALID')
+        : pen
+          ? `${t('PEN')} +${(s.lapPenaltyMs / 1000).toFixed(1)} s`
+          : t('LAP');
+      this.lapTag.classList.toggle('invalid', pen || !!s.lapInvalid);
+      this.cur.el.classList.toggle('invalid', pen || !!s.lapInvalid);
     }
     this.pos.set(`${s.bestLapMs === null && !this.raceLaps ? '–' : s.position}/${s.total}`);
     this.cur.set(fmtTime(s.currentLapMs));
@@ -288,7 +325,7 @@ export class Hud {
     else {
       // tenths are enough while driving (hundredths flicker unreadably)
       this.delta.set(fmtDelta(Math.round(d / 10) * 10));
-      this.delta.el.className = `hud-delta ${d <= 0 ? 'good' : 'bad'}${s.lapPenaltyMs > 0 ? ' void' : ''}`;
+      this.delta.el.className = `hud-delta ${d <= 0 ? 'good' : 'bad'}${s.lapPenaltyMs > 0 || s.lapInvalid ? ' void' : ''}`;
     }
     this.wrong.classList.toggle('show', s.wrongWay);
     this.status.update(s.tyreTemps, s.damageZones, s.abs, s.tc, s.compound, s.tyreWear, s.brakeTemps);
@@ -304,7 +341,50 @@ export class Hud {
     }
     this.fuel.set(s.fuelText);
     this.fuel.el.classList.toggle('low', s.fuelLow);
+    // the inputs widget shows the gear and speed: the old speedometer only without it
+    this.el.classList.toggle('inputs-on', settings.overlays.inputs);
+    // the player's HUD (Settings → General): size, opacity, the parts shown
+    const hs = settings.hud;
+    const key = `${hs.scale}|${hs.opacity}|${hs.timing}|${hs.lapInfo}|${hs.tyres}|${hs.revLights}|${hs.messages}|${hs.map}`;
+    if (key !== this.hudKey) {
+      this.hudKey = key;
+      this.el.style.setProperty('--hud-scale', String(hs.scale));
+      this.el.style.setProperty('--hud-opacity', String(hs.opacity));
+      this.el.classList.toggle('no-timing', !hs.timing);
+      this.el.classList.toggle('no-lapinfo', !hs.lapInfo);
+      this.el.classList.toggle('no-tyres', !hs.tyres);
+      this.el.classList.toggle('no-revlights', !hs.revLights);
+      this.el.classList.toggle('no-messages', !hs.messages);
+      this.el.classList.toggle('no-map', !hs.map);
+    }
     this.resetEl.classList.toggle('show', s.resetHint);
+    this.overlays.update(
+      s.throttle,
+      s.brake,
+      s.steer,
+      s.liveDelta,
+      s.gear,
+      settings.units === 'mph' ? s.speedMs * 2.23694 : s.speedMs * 3.6,
+      settings.units === 'mph' ? 'mph' : 'km/h',
+    );
+  }
+
+  /** The damage report: after a hit, or while its key is held. */
+  updateDamage(d: DamageState, hold: boolean): void {
+    this.damagePanel.update(d, hold);
+  }
+
+  /** The circuit map's cars (~10 Hz): the full map (iRacing's) or the turning one, as set. */
+  setMapCars(cars: MapCar[]): void {
+    const full = settings.overlays.trackMap;
+    this.circuitMap.el.hidden = !full;
+    this.map.hidden = full;
+    if (full) this.circuitMap.draw(cars);
+  }
+
+  /** The relative box and the spotter (~10 Hz). */
+  setRelative(rows: RelativeRow[], left: boolean, right: boolean): void {
+    this.overlays.setRelative(rows, left, right);
   }
 
   /** Timing screen around the player's position: best lap for the leader, gaps for the others. */
@@ -313,49 +393,92 @@ export class Hud {
   /** A timed race: the board shows the lap, not "of how many". */
   timedRace = false;
 
+  /** Car colours (the tower's chips) and the starting order (positions gained or lost in a race). */
+  colors = new Map<string, string>();
+  gridOrder: string[] = [];
+
+  /**
+   * The tower's rows, as TV graphics and iRacing's standings show them: the top three, then you with two cars either
+   * side (one list when they meet), a divider where rows are skipped.
+   */
+  private towerRows(list: Standing[], me: string): (Standing | null)[] {
+    const i = Math.max(
+      0,
+      list.findIndex((x) => x.id === me),
+    );
+    const keep = new Set<number>([0, 1, 2]);
+    for (let k = i - 2; k <= i + 2; k++) if (k >= 0 && k < list.length) keep.add(k);
+    const idx = [...keep].filter((k) => k < list.length).sort((a, b) => a - b);
+    const out: (Standing | null)[] = [];
+    idx.forEach((k, j) => {
+      if (j > 0 && k !== idx[j - 1] + 1) out.push(null);
+      out.push(list[k]);
+    });
+    return out;
+  }
+
+  /** Drivers' countries and car numbers (their profiles). */
+  private drivers = new Map<string, { country: string | null; num: number | null }>();
+
+  setDriver(id: string, country: string | null, num: number | null): void {
+    this.drivers.set(id, { country, num });
+    this.overlays.drivers = this.drivers;
+  }
+
+  /** The car's colour, its number and its driver's flag, as TV timing towers show them. */
+  private chip(id: string): DocumentFragment {
+    const f = document.createDocumentFragment();
+    const d = this.drivers.get(id);
+    f.append(h('i.chip', { style: `background:${this.colors.get(id) ?? '#888'}` }));
+    if (d?.num) f.append(h('i.carnum', { text: String(d.num) }));
+    const flag = flagImg(d?.country, 16);
+    if (flag) f.append(flag);
+    return f;
+  }
+
   setBoard(list: Standing[], me: string, names: Map<string, string>): void {
     if (this.raceLaps) {
       this.setRaceBoard(list, me, names);
       return;
     }
-    const i = list.findIndex((x) => x.id === me);
-    const from = Math.max(0, Math.min(i - 2, list.length - 5));
-    const rows = list.slice(from, from + 5);
-    const key = rows.map((r) => `${r.id}${r.position}${r.bestLapMs ?? ''}${r.finishedMs ?? ''}${r.dnf}${r.inPit}${r.outLap}${r.lapPenaltyMs}`).join('|');
+    const rows = this.towerRows(list, me);
+    const key = rows
+      .map((r) => (r ? `${r.id}${r.position}${r.bestLapMs ?? ''}${r.finishedMs ?? ''}${r.dnf}${r.inPit}${r.outLap}${r.lapPenaltyMs}` : '-'))
+      .join('|');
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.board.replaceChildren(
       ...rows.map((r) =>
-        h(
-          `div.row${r.id === me ? '.me' : ''}`,
-          {},
-          h('b', { text: r.bestLapMs === null ? '–' : String(r.position) }),
-          h('span', {}, names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: t('PIT') }) : null),
-          h(`em${r.position === 1 && r.bestLapMs !== null ? '.p1' : ''}`, {
-            text:
-              r.bestLapMs === null
-                ? r.dnf
-                  ? t('DNF')
-                  : r.inPit
-                    ? t('PIT')
-                    : r.outLap
-                      ? t('OUT LAP')
-                      : r.lapPenaltyMs > 0
-                        ? `${t('PEN')} +${(r.lapPenaltyMs / 1000).toFixed(1)} s`
-                        : t('ON LAP')
-                : r.position === 1
-                  ? fmtTime(r.bestLapMs)
-                  : `+${((r.gapMs ?? 0) / 1000).toFixed(3)}`,
-          }),
-        ),
+        !r
+          ? h('div.gap')
+          : h(
+              `div.row${r.id === me ? '.me' : ''}`,
+              {},
+              h('b', { text: r.bestLapMs === null ? '–' : String(r.position) }),
+              h('span', {}, this.chip(r.id), names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: t('PIT') }) : null),
+              h(`em${r.position === 1 && r.bestLapMs !== null ? '.p1' : ''}`, {
+                text:
+                  r.bestLapMs === null
+                    ? r.dnf
+                      ? t('DNF')
+                      : r.inPit
+                        ? t('PIT')
+                        : r.outLap
+                          ? t('OUT LAP')
+                          : r.lapPenaltyMs > 0
+                            ? `${t('PEN')} +${(r.lapPenaltyMs / 1000).toFixed(1)} s`
+                            : t('ON LAP')
+                    : r.position === 1
+                      ? fmtTime(r.bestLapMs)
+                      : `+${((r.gapMs ?? 0) / 1000).toFixed(3)}`,
+              }),
+            ),
       ),
     );
   }
 
   private setRaceBoard(list: Standing[], me: string, names: Map<string, string>): void {
-    const i = list.findIndex((x) => x.id === me);
-    const from = Math.max(0, Math.min(i - 2, list.length - 5));
-    const rows = list.slice(from, from + 5);
+    const rows = this.towerRows(list, me);
     const leaderLaps = list[0]?.laps ?? 0;
     const text = (r: Standing) =>
       r.dnf
@@ -371,18 +494,32 @@ export class Hud {
             : leaderLaps - r.laps >= 2 || (leaderLaps - r.laps === 1 && (r.gapMs ?? 0) > 60_000)
               ? `+${leaderLaps - r.laps} ${t('LAP')}`
               : `+${((r.gapMs ?? 0) / 1000).toFixed(1)}`;
-    const key = rows.map((r) => `${r.id}${r.position}${text(r)}${r.inPit}`).join('|');
+    // places gained (+) or lost (−) since the start
+    const moved = (r: Standing) => {
+      const g = this.gridOrder.indexOf(r.id);
+      return g < 0 ? 0 : g + 1 - r.position;
+    };
+    const key = rows.map((r) => (r ? `${r.id}${r.position}${text(r)}${r.inPit}` : '-')).join('|');
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.board.replaceChildren(
       ...rows.map((r) =>
-        h(
-          `div.row${r.id === me ? '.me' : ''}`,
-          {},
-          h('b', { text: String(r.position) }),
-          h('span', {}, names.get(r.id) ?? '?', r.inPit ? h('i.pit', { text: t('PIT') }) : null),
-          h(`em${r.position === 1 ? '.p1' : ''}`, { text: text(r) }),
-        ),
+        !r
+          ? h('div.gap')
+          : h(
+              `div.row${r.id === me ? '.me' : ''}`,
+              {},
+              h('b', { text: String(r.position) }),
+              h(
+                'span',
+                {},
+                this.chip(r.id),
+                names.get(r.id) ?? '?',
+                moved(r) ? h(`s.${moved(r) > 0 ? 'up' : 'down'}`, { text: `${moved(r) > 0 ? '+' : '−'}${Math.abs(moved(r))}` }) : null,
+                r.inPit ? h('i.pit', { text: t('PIT') }) : null,
+              ),
+              h(`em${r.position === 1 ? '.p1' : ''}`, { text: text(r) }),
+            ),
       ),
     );
   }

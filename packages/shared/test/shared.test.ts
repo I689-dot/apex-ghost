@@ -343,55 +343,107 @@ describe('race logic (server-authoritative laps)', () => {
     expect(st.map((s) => s.position)).toEqual([1, 2, 3]);
   });
 
-  it('track limits, resets and shortcuts add time penalties; the lap still counts', () => {
+  it('practice / qualifying: track limits, a cut or a reset delete the lap (no time added)', () => {
     const track = ovalTrack(R, 12);
     const tr = new RaceTracker(track, 0, 4);
-    tr.addPlayer('x');
+    tr.addPlayer('q');
     const ev: RaceEvent[] = [];
-    let t = drive(tr, 'x', 0, -10, L + 1, 50, 0, 50, ev);
-    // timed lap 1: one excursion at full speed: warning 1 (the first three of the session are warnings)
-    t = drive(tr, 'x', t, L + 1, 2 * L + 6, 60, 0, 50, ev, [L + 100, L + 110]);
-    expect(ev.filter((e) => e.type === 'penalty').map((e) => (e as { warning?: number }).warning)).toEqual([1]);
+    let t = drive(tr, 'q', 0, -10, L + 1, 50, 0, 50, ev);
+    // timed lap 1: one excursion, even a slow one: the lap is deleted
+    t = drive(tr, 'q', t, L + 1, L + 300, 60, 0, 50, ev, [L + 100, L + 110]);
+    t = drive(tr, 'q', t, L + 300, 2 * L + 6, 60, 0, 50, ev, [L + 400, L + 420]);
+    const pens = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
+    // announced once per lap
+    expect(pens.map((e) => [e.reason, e.ms, e.invalidated])).toEqual([['track-limits', 0, true]]);
+    const lap1 = ev.find((e) => e.type === 'lap' && !e.outLap) as Extract<RaceEvent, { type: 'lap' }>;
+    expect(lap1).toMatchObject({ valid: false, best: false, penaltyMs: 0 });
+    expect(tr.players.get('q')?.bestLapMs).toBeNull();
+    // lap 2 clean: valid, the best
     ev.length = 0;
-    // lap 2: warnings 2 and 3, then a penalty
-    t = drive(tr, 'x', t, 2 * L + 6, 2 * L + 200, 60, 0, 50, ev, [2 * L + 50, 2 * L + 60]);
-    t = drive(tr, 'x', t, 2 * L + 200, 2 * L + 400, 60, 0, 50, ev, [2 * L + 250, 2 * L + 260]);
-    t = drive(tr, 'x', t, 2 * L + 400, 2 * L + 600, 60, 0, 50, ev, [2 * L + 450, 2 * L + 470]);
-    // off but slowing hard (grass): no advantage, no penalty
-    t = drive(tr, 'x', t, 2 * L + 600, 2 * L + 650, 60, 0, 50, ev);
-    t = drive(tr, 'x', t, 2 * L + 650, 2 * L + 700, 30, 0, 50, ev, [2 * L + 650, 2 * L + 680]);
-    t = drive(tr, 'x', t, 2 * L + 700, 3 * L + 6, 60, 0, 50, ev);
-    const pen = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
-    expect(pen.map((e) => e.warning ?? null)).toEqual([2, 3, null, null]);
-    expect(pen[2]).toMatchObject({ reason: 'track-limits' });
-    expect(pen[2].ms).toBeGreaterThanOrEqual(PENALTY.limitsBaseMs);
-    expect(pen[2].ms).toBeLessThanOrEqual(PENALTY.limitsMaxMs);
-    expect(pen[3]).toMatchObject({ noAdvantage: true, ms: 0 });
-    const laps = ev.filter((e) => e.type === 'lap') as Extract<RaceEvent, { type: 'lap' }>[];
-    expect(laps[0]).toMatchObject({ valid: true, penaltyMs: pen[2].ms });
-    // lap 3: a reset (+5 s), then a cut across the inside skipping checkpoints (+5 s + 0.05 s/m)
-    t = drive(tr, 'x', t, 3 * L + 6, 3 * L + 400, 50, 0, 50, ev);
-    const g = track.gates[(tr.players.get('x')?.nextGate ?? 1) - 1];
+    t = drive(tr, 'q', t, 2 * L + 6, 3 * L + 6, 60, 0, 50, ev);
+    expect(ev.find((e) => e.type === 'lap')).toMatchObject({ valid: true, best: true });
+    // lap 3: a reset deletes it
     ev.length = 0;
-    tr.ingest('x', t + 50, g.p[0], g.p[1], g.p[2], true, ev);
-    expect(ev).toContainEqual(expect.objectContaining({ type: 'penalty', reason: 'reset', ms: PENALTY.resetMs }));
-    t += 100;
-    const sG = g.s + 3 * L;
-    t = drive(tr, 'x', t, sG + 1, sG + 60, 50, 0, 50, ev);
-    // swing 40 m inside (outside the gates' half-width) and back, smoothly
-    for (let s = sG + 60; s <= sG + 200; s += 2.5) {
-      const lat = 40 * Math.sin((Math.PI * (s - sG - 60)) / 140);
-      const [x, y, z] = ovalPos(R, s, lat);
-      tr.ingest('x', t, x, y, z, false, ev);
+    t = drive(tr, 'q', t, 3 * L + 6, 3 * L + 400, 50, 0, 50, ev);
+    const g = track.gates[(tr.players.get('q')?.nextGate ?? 1) - 1];
+    tr.ingest('q', t + 50, g.p[0], g.p[1], g.p[2], true, ev);
+    expect(ev).toContainEqual(expect.objectContaining({ type: 'penalty', reason: 'reset', ms: 0, invalidated: true }));
+    drive(tr, 'q', t + 100, g.s + 3 * L + 1, 4 * L + 6, 50, 0, 50, ev);
+    expect(ev.find((e) => e.type === 'lap')).toMatchObject({ valid: false, penaltyMs: 0 });
+  });
+
+  it('the race: three warnings (the third with the black and white flag), then 5 s each; a spin is no strike', () => {
+    const track = ovalTrack(R, 12);
+    const tr = new RaceTracker(track, 0, { raceLaps: 5 });
+    tr.addPlayer('r');
+    const ev: RaceEvent[] = [];
+    let t = drive(tr, 'r', 0, -10, 1, 50, 0, 50, ev);
+    for (let k = 0; k < 4; k++) t = drive(tr, 'r', t, 1 + k * 200, 200 + k * 200, 60, 0, 50, ev, [50 + k * 200, 60 + k * 200]);
+    // a spin into the gravel: off, and slowed right down
+    t = drive(tr, 'r', t, 801, 850, 60, 0, 50, ev);
+    t = drive(tr, 'r', t, 850, 870, 6, 0, 50, ev, [850, 868]);
+    const pens = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
+    expect(pens.map((e) => [e.warning ?? null, e.blackWhite ?? false, e.ms, e.noAdvantage ?? false])).toEqual([
+      [1, false, 0, false],
+      [2, false, 0, false],
+      [3, true, 0, false],
+      [null, false, PENALTY.limitsPenaltyMs, false],
+      [null, false, 0, true],
+    ]);
+    expect(tr.players.get('r')?.penaltyMs).toBe(PENALTY.limitsPenaltyMs);
+  });
+
+  it('a cut across the inside is a cut even though the car is slower off the track; running wide is not', () => {
+    // a tight oval whose checkpoints are wide enough to let a cut through them (as gates are on real circuits)
+    const r = 60;
+    const L2 = 2 * Math.PI * r;
+    const base = ovalTrack(r, 12);
+    const track = { ...base, gates: base.gates.map((g) => ({ ...g, hw: 70 })), minLapMs: 1000 };
+    const tr = new RaceTracker(track, 0, { raceLaps: 5 });
+    tr.addPlayer('c');
+    const ev: RaceEvent[] = [];
+    const go = (fromS: number, toS: number, speed: number, lat = 0, off = false) => {
+      for (let s2 = fromS; s2 <= toS; s2 += speed * 0.05) {
+        const [x, y, z] = ovalPos(r, s2, lat);
+        tr.ingest('c', t, x, y, z, false, ev, off);
+        t += 50;
+      }
+    };
+    let t = 0;
+    go(-10, 40, 40);
+    // straight across 3 rad of the circle (180 m of track, a 120 m chord), through the grass at 25 m/s (from 40)
+    const a0 = 40 / r;
+    const a1 = a0 + 3;
+    const P = (a: number) => [r * Math.sin(a), 0, -r * Math.cos(a) + r];
+    const [x0, , z0] = P(a0);
+    const [x1, , z1] = P(a1);
+    const chord = Math.hypot(x1 - x0, z1 - z0);
+    for (let d = 2; d < chord; d += 25 * 0.05) {
+      const f = d / chord;
+      tr.ingest('c', t, x0 + (x1 - x0) * f, 0, z0 + (z1 - z0) * f, false, ev, true);
       t += 50;
     }
-    t = drive(tr, 'x', t, sG + 201, 4 * L + 6, 50, 0, 50, ev);
-    const cut = ev.find((e) => e.type === 'penalty' && e.reason === 'shortcut') as Extract<RaceEvent, { type: 'penalty' }> | undefined;
-    expect(cut).toBeDefined();
-    expect(cut?.ms).toBeGreaterThan(PENALTY.shortcutBaseMs);
-    const last = ev.filter((e) => e.type === 'lap').pop() as Extract<RaceEvent, { type: 'lap' }>;
-    expect(last).toMatchObject({ valid: true, outLap: false });
-    expect(last.penaltyMs).toBe(PENALTY.resetMs + (cut?.ms ?? 0));
+    go(a1 * r + 1, a1 * r + 60, 40);
+    let pens = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
+    expect(pens).toHaveLength(1);
+    expect(pens[0].reason).toBe('track-limits');
+    expect(pens[0].ms).toBeGreaterThanOrEqual(PENALTY.cutMs);
+    expect(pens[0].gainMs).toBeGreaterThan(0);
+    expect(tr.players.get('c')?.lapInvalid).toBe(true);
+    // running wide on the outside, as fast: a strike (a warning), not a cut
+    ev.length = 0;
+    // drifting out to 8 m beyond the edge and back, at the same speed
+    for (let s2 = a1 * r + 61; s2 <= a1 * r + 200; s2 += 40 * 0.05) {
+      const k = (s2 - a1 * r - 61) / 139;
+      const lat = -8 * Math.sin(Math.PI * k);
+      const [x, y, z] = ovalPos(r, s2, lat);
+      tr.ingest('c', t, x, y, z, false, ev, lat < -3);
+      t += 50;
+    }
+    go(a1 * r + 201, a1 * r + 240, 40);
+    pens = ev.filter((e) => e.type === 'penalty') as Extract<RaceEvent, { type: 'penalty' }>[];
+    expect(pens.map((e) => [e.warning, e.ms, e.gainMs])).toEqual([[1, 0, undefined]]);
+    void L2;
   });
 
   it("race: standing start, laps from the green light, everyone finishes on the leader's lap, penalties count", () => {
@@ -480,7 +532,7 @@ describe('race logic (server-authoritative laps)', () => {
 
   it('waives track limits, resets and rejoins that follow a hit by another car', () => {
     const track = ovalTrack(R, 12);
-    const tr = new RaceTracker(track, 0, 4);
+    const tr = new RaceTracker(track, 0, { raceLaps: 6 });
     tr.addPlayer('v');
     const ev: RaceEvent[] = [];
     let t = drive(tr, 'v', 0, -10, L + 1, 50, 0, 50, ev);

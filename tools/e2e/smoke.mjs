@@ -95,7 +95,9 @@ if (WEATHER) {
   await page.waitForTimeout(600);
 }
 if (TRACK || WEATHER) {
-  const f = await page.textContent('.forecast b');
+  // the forecast is on the lobby's conditions step
+  await page.click('.lb-step >> nth=1');
+  const f = await page.textContent('.lb-forecast b, .forecast b', { timeout: 5000 }).catch(() => '(not shown)');
   console.log(`  forecast: ${f}`);
 }
 await page.click('.lb-step >> nth=4');
@@ -238,6 +240,8 @@ if (args.includes('--pit')) {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(1500);
     await shot('07b-pit-service');
+    await page.waitForTimeout(4500);
+    await shot('07c-pit-service-crew');
     await page.waitForSelector('.pit-menu', { state: 'detached', timeout: 60_000 });
     const after = await page.evaluate(() => ({ compound: window.__apex.session.vehicle.compound.id, frozen: window.__apex.session.vehicle.frozen }));
     console.log('  after service', JSON.stringify(after));

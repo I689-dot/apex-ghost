@@ -212,7 +212,7 @@ export function formatHour(hour: number): string {
 
 /**
  * Climate of each circuit: altitude, and the monthly average daily high / low (°C) from May to September
- * (climate normals as published for Nürburg and Zandvoort; approximate, see DECISIONS.md "Temperature").
+ * (climate normals as published for Nürburg, Zandvoort and Spa; approximate, see DECISIONS.md "Temperature").
  */
 export const CLIMATE: Record<string, { altitudeM: number; highLow: [number, number][] }> = {
   // the GP circuit lies at ~620 m in the Eifel
@@ -235,6 +235,17 @@ export const CLIMATE: Record<string, { altitudeM: number; highLow: [number, numb
       [20, 16],
       [20, 16],
       [18, 14],
+    ],
+  },
+  // the Ardennes, ~430 m up around Francorchamps: like the Eifel, a touch cooler at night
+  spa: {
+    altitudeM: 430,
+    highLow: [
+      [17, 7],
+      [20, 10],
+      [22, 12],
+      [21, 12],
+      [18, 9],
     ],
   },
 };

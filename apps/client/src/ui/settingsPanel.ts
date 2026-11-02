@@ -107,6 +107,47 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       }),
       t('Frame time, network and draw calls in a corner'),
     ),
+    h('h3', { text: t('Race overlays') }),
+    row(
+      t('Relative'),
+      toggle(settings.overlays.relative, (v) => {
+        settings.overlays.relative = v;
+        changed();
+      }),
+      t('The cars just ahead and behind on the road, with the time to each'),
+    ),
+    row(
+      t('Delta bar'),
+      toggle(settings.overlays.deltaBar, (v) => {
+        settings.overlays.deltaBar = v;
+        changed();
+      }),
+      t('Gaining or losing against your best lap, as a bar'),
+    ),
+    row(
+      t('Inputs'),
+      toggle(settings.overlays.inputs, (v) => {
+        settings.overlays.inputs = v;
+        changed();
+      }),
+      t('Throttle, brake and steering'),
+    ),
+    row(
+      t('Circuit map'),
+      toggle(settings.overlays.trackMap, (v) => {
+        settings.overlays.trackMap = v;
+        changed();
+      }),
+      t('The whole circuit with numbered corners and cars (off: the map turning with you)'),
+    ),
+    row(
+      t('Spotter'),
+      toggle(settings.overlays.spotter, (v) => {
+        settings.overlays.spotter = v;
+        changed();
+      }),
+      t('Marks the side of the screen when a car is alongside'),
+    ),
   );
 
   const presetNote = h('p.muted.preset-note', { text: t(PRESET_NOTE[settings.quality]) });
@@ -164,6 +205,54 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     ...graphicsDetailRows(row, detailSelects, changed),
   );
 
+  const fovRange = range(
+    settings.fov,
+    25,
+    95,
+    1,
+    (v) => `${v}°`,
+    (v) => {
+      settings.fov = v;
+      changed();
+    },
+  );
+  /**
+   * The real field of view (iRacing's and ACC's FOV calculators): the screen's height and the eye's distance from it
+   * give the angle the screen really covers, vertical FOV = 2·atan(height / 2·distance).
+   */
+  const fovCalc = () => {
+    const size = h('input.auth-input', { type: 'number', min: 10, max: 120, step: 0.5, value: 27 });
+    const dist = h('input.auth-input', { type: 'number', min: 20, max: 300, value: 65 });
+    const ratio = h('select.auth-input', {}, ...['16:9', '16:10', '21:9', '32:9', '4:3'].map((r) => h('option', { value: r, text: r })));
+    const out = h('b.fov-out');
+    const use = h('button.ghost', { type: 'button' });
+    const calc = () => {
+      const [w, hh] = ratio.value.split(':').map(Number);
+      const heightCm = (Number(size.value) * 2.54 * hh) / Math.hypot(w, hh);
+      const v = Math.round((2 * Math.atan(heightCm / 2 / Math.max(1, Number(dist.value))) * 180) / Math.PI);
+      out.textContent = `${v}°`;
+      use.textContent = t('Use {n}°', { n: Math.max(25, v) });
+      use.onclick = () => {
+        settings.fov = Math.max(25, v);
+        const input = fovRange.querySelector('input') as HTMLInputElement | null;
+        if (input) {
+          input.value = String(settings.fov);
+          input.dispatchEvent(new Event('input'));
+        }
+        changed();
+      };
+    };
+    for (const e of [size, dist, ratio]) e.addEventListener('input', calc);
+    calc();
+    return h(
+      'div.fov-calc',
+      {},
+      h('label', {}, h('span', { text: t('Screen (inches)') }), size),
+      h('label', {}, h('span', { text: t('Aspect') }), ratio),
+      h('label', {}, h('span', { text: t('Eyes to screen (cm)') }), dist),
+      h('div.fov-res', {}, h('span', { text: t('Real FOV') }), out, use),
+    );
+  };
   const camera = h(
     'section',
     {},
@@ -177,18 +266,50 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       t('What is behind you, at the top of the screen'),
     ),
     row(
-      t('Field of view'),
-      range(
-        settings.fov,
-        55,
-        95,
-        1,
-        (v) => `${v}°`,
+      t('Pit stop camera'),
+      select(
+        settings.pitCamera,
+        [
+          ['tv', t('TV camera on the crew')],
+          ['car', t('Stay in the car')],
+        ],
         (v) => {
-          settings.fov = v;
+          settings.pitCamera = v;
           changed();
         },
       ),
+    ),
+    row(t('Field of view'), fovRange, t('Vertical, as iRacing and ACC count it: lower is more realistic on a desk monitor')),
+    fovCalc(),
+    row(
+      t('Head movement'),
+      range(
+        settings.headMovement,
+        0,
+        1,
+        0.05,
+        (v) => `${Math.round(v * 100)} %`,
+        (v) => {
+          settings.headMovement = v;
+          changed();
+        },
+      ),
+      t('The head thrown by braking, acceleration and corners'),
+    ),
+    row(
+      t('Camera shake'),
+      range(
+        settings.cameraShake,
+        0,
+        1,
+        0.05,
+        (v) => `${Math.round(v * 100)} %`,
+        (v) => {
+          settings.cameraShake = v;
+          changed();
+        },
+      ),
+      t('Kerbs, bumps and a flat-spotted tyre'),
     ),
     row(
       t('Seat height'),
@@ -332,6 +453,15 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       }),
       t('Crowd, birds, wind in the trees, thunder'),
     ),
+    // team radio off for now:
+    // row(
+    //   t('Team radio'),
+    //   range(settings.audio.radio, 0, 1, 0.05, pct, (v) => {
+    //     settings.audio.radio = v;
+    //     changed();
+    //   }),
+    //   t('Your race engineer and spotter: gaps, flags, pit calls, cars alongside'),
+    // ),
   );
 
   const controls = h(
@@ -394,6 +524,58 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       text: t('Plug in or connect a gamepad (Xbox, PlayStation…) and press any button. Menus: D-pad or stick to move, A to select, B to go back.'),
     }),
     padSetupBox(),
+    h('h3', { text: t('Steering wheel') }),
+    h('p.muted', {
+      text: t(
+        'Logitech, Thrustmaster, Fanatec, Moza, Simucube and Simagic wheels are recognised. Set the wheel to 900° in its own software and the same here: each car then turns as far as the real one (BMW M4 516°, McLaren 480°, Porsche 800°). Map the pedals with the setup above.',
+      ),
+    }),
+    row(
+      t('Device'),
+      select(
+        settings.wheel.mode,
+        [
+          ['auto', t('Recognise wheels automatically')],
+          ['wheel', t('Always a steering wheel')],
+          ['pad', t('Always a gamepad')],
+        ],
+        (v) => {
+          settings.wheel.mode = v;
+          changed();
+        },
+      ),
+    ),
+    row(
+      t('Wheel rotation'),
+      range(
+        settings.wheel.rotationDeg,
+        180,
+        1080,
+        10,
+        (v) => `${Math.round(v)}°`,
+        (v) => {
+          settings.wheel.rotationDeg = v;
+          changed();
+        },
+      ),
+      t("Lock to lock, as set on the wheel base: the car's own lock is used within it"),
+    ),
+    row(
+      t('Brake pedal curve'),
+      range(
+        settings.wheel.brakeCurve,
+        0.6,
+        2.4,
+        0.1,
+        (v) => v.toFixed(1),
+        (v) => {
+          settings.wheel.brakeCurve = v;
+          changed();
+        },
+      ),
+      t('1 = linear; higher = more travel near the locking point (load-cell pedals: about 1)'),
+    ),
+    h('h3', { text: t('Gamepad') }),
     row(
       t('Steering curve'),
       range(
@@ -496,12 +678,342 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       onclick: () => {
         settings.pad = { ...structuredClone(DEFAULT_SETTINGS.pad), layouts: settings.pad.layouts };
         changed();
-        pad.querySelectorAll<HTMLInputElement>('input[type=range]').forEach((r, i) => {
-          r.value = String([settings.pad.steerCurve, settings.pad.steerSpeed, settings.pad.speedSens, settings.pad.deadzone, settings.pad.brakeCurve][i]);
-          r.dispatchEvent(new Event('input'));
-        });
+        // redrawn with the defaults
+        panel.replaceWith(settingsPanel(onClose, onChange));
       },
     }),
+  );
+
+  // more options, after F1's, ACC's and iRacing's menus
+
+  const num = (get: () => number, set: (v: number) => void, min: number, max: number, step: number, fmt: (v: number) => string) =>
+    range(get(), min, max, step, fmt, (v) => {
+      set(v);
+      changed();
+    });
+  const flag = (get: () => boolean, set: (v: boolean) => void) =>
+    toggle(get(), (v) => {
+      set(v);
+      changed();
+    });
+  const hud = settings.hud;
+  general.append(
+    h('h3', { text: t('HUD') }),
+    row(
+      t('HUD size'),
+      num(
+        () => hud.scale,
+        (v) => (hud.scale = v),
+        0.7,
+        1.4,
+        0.05,
+        pct,
+      ),
+    ),
+    row(
+      t('HUD opacity'),
+      num(
+        () => hud.opacity,
+        (v) => (hud.opacity = v),
+        0.3,
+        1,
+        0.05,
+        pct,
+      ),
+    ),
+    row(
+      t('Timing tower'),
+      flag(
+        () => hud.timing,
+        (v) => (hud.timing = v),
+      ),
+    ),
+    row(
+      t('Lap and position'),
+      flag(
+        () => hud.lapInfo,
+        (v) => (hud.lapInfo = v),
+      ),
+      t('Lap, position and the lap times'),
+    ),
+    row(
+      t('Tyres and damage'),
+      flag(
+        () => hud.tyres,
+        (v) => (hud.tyres = v),
+      ),
+    ),
+    row(
+      t('Shift lights'),
+      flag(
+        () => hud.revLights,
+        (v) => (hud.revLights = v),
+      ),
+    ),
+    row(
+      t('On-screen messages'),
+      flag(
+        () => hud.messages,
+        (v) => (hud.messages = v),
+      ),
+      t('Flags, penalties and lap messages'),
+    ),
+    row(
+      t('Track map'),
+      flag(
+        () => hud.map,
+        (v) => (hud.map = v),
+      ),
+    ),
+    h('h3', { text: t('Picture') }),
+    row(
+      t('Brightness'),
+      num(
+        () => settings.brightness,
+        (v) => (settings.brightness = v),
+        0.6,
+        1.5,
+        0.05,
+        pct,
+      ),
+    ),
+  );
+  camera.append(
+    h('h3', { text: t('Chase camera') }),
+    row(
+      t('Distance'),
+      num(
+        () => settings.chase.distance,
+        (v) => (settings.chase.distance = v),
+        0.7,
+        1.6,
+        0.05,
+        pct,
+      ),
+    ),
+    row(
+      t('Height'),
+      num(
+        () => settings.chase.height,
+        (v) => (settings.chase.height = v),
+        0.5,
+        2,
+        0.05,
+        pct,
+      ),
+    ),
+    row(
+      t('Camera lag'),
+      num(
+        () => settings.chase.lag,
+        (v) => (settings.chase.lag = v),
+        0.3,
+        2.5,
+        0.05,
+        pct,
+      ),
+      t('More: the car turns more in the frame before the camera follows'),
+    ),
+    row(
+      t('Look to apex'),
+      num(
+        () => settings.lookToApex,
+        (v) => (settings.lookToApex = v),
+        0,
+        2,
+        0.1,
+        pct,
+      ),
+      t('The cockpit view turns into corners with the steering'),
+    ),
+  );
+  assists.append(
+    h('h3', { text: t('AI drivers') }),
+    row(
+      t('AI difficulty'),
+      num(
+        () => settings.ai.difficulty,
+        (v) => (settings.ai.difficulty = v),
+        0.8,
+        1.06,
+        0.01,
+        pct,
+      ),
+      t('Their pace in the races you play solo or host (from the next session)'),
+    ),
+  );
+  sound.append(
+    h('h3', { text: t('Mix') }),
+    row(
+      t('Opponents'),
+      num(
+        () => settings.audio.opponents,
+        (v) => (settings.audio.opponents = v),
+        0,
+        1,
+        0.05,
+        pct,
+      ),
+      t("The other cars' engines"),
+    ),
+    row(
+      t('Tyres and surfaces'),
+      num(
+        () => settings.audio.tyres,
+        (v) => (settings.audio.tyres = v),
+        0,
+        1,
+        0.05,
+        pct,
+      ),
+      t('Squeal, kerbs, gravel, grass, scrapes'),
+    ),
+    row(
+      t('Chimes and beeps'),
+      flag(
+        () => settings.audio.chimes,
+        (v) => (settings.audio.chimes = v),
+      ),
+      t('Lap chimes and the start beeps'),
+    ),
+  );
+  if (!IS_APP)
+    controls.append(
+      h('h3', { text: t('Keyboard') }),
+      row(
+        t('Throttle ramp'),
+        num(
+          () => settings.keyboard.throttleRamp,
+          (v) => (settings.keyboard.throttleRamp = v),
+          0.05,
+          1.5,
+          0.05,
+          (v) => `${v.toFixed(2)} s`,
+        ),
+        t('Time from nothing to full throttle: longer, a tap gives part throttle'),
+      ),
+      row(
+        t('Brake ramp'),
+        num(
+          () => settings.keyboard.brakeRamp,
+          (v) => (settings.keyboard.brakeRamp = v),
+          0.05,
+          1.5,
+          0.05,
+          (v) => `${v.toFixed(2)} s`,
+        ),
+        t('Time from nothing to full brake'),
+      ),
+      row(
+        t('Steering speed'),
+        num(
+          () => settings.keyboard.steerSpeed,
+          (v) => (settings.keyboard.steerSpeed = v),
+          0.5,
+          1.6,
+          0.05,
+          pct,
+        ),
+      ),
+    );
+  const p = settings.pad;
+  pad.append(
+    h('h3', { text: t('Pedals') }),
+    row(
+      t('Pedals on'),
+      select(
+        p.pedals,
+        [
+          ['triggers', t('Triggers')],
+          ['rightStick', t('Right stick (up / down)')],
+        ],
+        (v) => {
+          p.pedals = v;
+          changed();
+        },
+      ),
+    ),
+    row(
+      t('Throttle dead zone'),
+      num(
+        () => p.throttleDeadzone,
+        (v) => (p.throttleDeadzone = v),
+        0,
+        0.3,
+        0.01,
+        pct,
+      ),
+    ),
+    row(
+      t('Throttle saturation'),
+      num(
+        () => p.throttleSaturation,
+        (v) => (p.throttleSaturation = v),
+        0.5,
+        1,
+        0.01,
+        pct,
+      ),
+      t('Where the trigger reaches 100 %'),
+    ),
+    row(
+      t('Throttle curve'),
+      num(
+        () => p.throttleCurve,
+        (v) => (p.throttleCurve = v),
+        0.6,
+        2.5,
+        0.1,
+        (v) => v.toFixed(1),
+      ),
+      t('1 = linear; higher = finer at the start'),
+    ),
+    row(
+      t('Brake dead zone'),
+      num(
+        () => p.brakeDeadzone,
+        (v) => (p.brakeDeadzone = v),
+        0,
+        0.3,
+        0.01,
+        pct,
+      ),
+    ),
+    row(
+      t('Brake saturation'),
+      num(
+        () => p.brakeSaturation,
+        (v) => (p.brakeSaturation = v),
+        0.5,
+        1,
+        0.01,
+        pct,
+      ),
+    ),
+    row(
+      t('Steering saturation'),
+      num(
+        () => p.steerSaturation,
+        (v) => (p.steerSaturation = v),
+        0.6,
+        1,
+        0.01,
+        pct,
+      ),
+      t('Stick travel for full lock'),
+    ),
+    row(
+      t('On / off triggers ramp'),
+      num(
+        () => p.digitalRamp,
+        (v) => (p.digitalRamp = v),
+        0.1,
+        2,
+        0.05,
+        (v) => `${v.toFixed(2)} s`,
+      ),
+      t('Triggers with no travel (Switch Pro): held, they reach full over this time'),
+    ),
   );
 
   // tabs: one section at a time (the five side by side were a wall of rows, cut off on smaller screens)

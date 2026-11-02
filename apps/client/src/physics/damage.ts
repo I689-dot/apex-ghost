@@ -18,15 +18,28 @@ export interface ImpactResult {
   amount: number;
 }
 
+const CORNERS: WheelKey[] = ['FL', 'FR', 'RL', 'RR'];
+
+/**
+ * A car's damage, after the sims' models (iRacing's GT3 damage, ACC, F1): bodywork and aero front and rear (a broken
+ * splitter costs front downforce: understeer at speed; a broken wing or diffuser the rear's: oversteer), each corner's
+ * suspension on its own (a bent arm or rim: that wheel's toe and camber off, grip, a sagging corner, a tired damper,
+ * the tyre scrubbing away; the fronts pull the steering), the engine (power), and punctures from hard corner hits
+ * (race control's black flag with the orange disc until the tyre is changed). The six zones are what other players
+ * receive; the corners and punctures are this car's own.
+ */
 export class DamageState {
   readonly zones = new Float32Array(6);
-  /** Direction of the steering pull; 0 until a heavy hit decides it (no damage, no pull). */
-  private pullSign = 0;
+  /** Suspension per corner (FL, FR, RL, RR), 0 … 1; zones[5] is the worst of them. */
+  readonly corners = new Float32Array(4);
+  /** Punctured tyres (FL, FR, RL, RR). */
+  readonly punctured = [false, false, false, false];
   version = 0;
 
   reset(): void {
     this.zones.fill(0);
-    this.pullSign = 0;
+    this.corners.fill(0);
+    this.punctured.fill(false);
     this.version++;
   }
 
@@ -45,17 +58,23 @@ export class DamageState {
     if (az >= ax) zone = lz > 0 ? 0 : 1;
     else zone = lx > 0 ? 2 : 3;
     this.add(zone, amount);
+    // the corner nearest the hit takes the suspension damage (+X is left, +Z forward)
+    const corner = (lz >= 0 ? 0 : 2) + (lx >= 0 ? 0 : 1);
+    let susp: number;
     if (zone === 0) {
       this.add(4, amount * 0.6); // radiator / engine bay
-      this.add(5, amount * 0.35);
-      if (this.zones[0] > 0.2) this.pullSign = lx >= 0 ? 1 : -1;
+      susp = amount * 0.35;
     } else if (zone === 1) {
       this.add(4, amount * 0.25); // mid/rear engines
-      this.add(5, amount * 0.3);
-    } else {
-      this.add(5, amount * 0.6); // wheels hit first on side impacts
-      this.pullSign = zone === 2 ? 1 : -1;
-    }
+      susp = amount * 0.3;
+    } else susp = amount * 0.6; // wheels hit first on side impacts
+    // a glancing hit spreads to the neighbouring corner on its side or axle
+    this.corners[corner] = Math.min(1, this.corners[corner] + susp);
+    const near = az >= ax ? corner ^ 1 : corner ^ 2;
+    this.corners[near] = Math.min(1, this.corners[near] + (susp * 0.25 * Math.min(ax, az)) / Math.max(ax, az, 1e-6));
+    this.zones[5] = Math.max(...this.corners);
+    // a hard hit on a wheel bursts its tyre
+    if (susp > 0.18 || this.corners[corner] > 0.45) this.punctured[corner] = true;
     this.version++;
     return { zone, amount };
   }
@@ -75,9 +94,11 @@ export class DamageState {
       this.zones[i] = 0;
     };
     if (parts.body) for (const i of [0, 1, 2, 3]) clear(i);
-    if (parts.suspension) clear(5);
+    if (parts.suspension) {
+      clear(5);
+      this.corners.fill(0);
+    }
     if (parts.engine) clear(4);
-    if (parts.body && parts.suspension) this.pullSign = 0;
     if (changed) this.version++;
     return changed;
   }
@@ -85,15 +106,38 @@ export class DamageState {
   /** Sets zones from a remote snapshot. */
   setAll(z: readonly number[]): void {
     for (let i = 0; i < 6; i++) this.zones[i] = z[i] ?? 0;
+    // another car's corners are not sent: its suspension damage spread over the side that was hit
+    const l = this.zones[2] >= this.zones[3];
+    this.corners.set(
+      l
+        ? [this.zones[5], this.zones[5] * 0.4, this.zones[5] * 0.6, this.zones[5] * 0.3]
+        : [this.zones[5] * 0.4, this.zones[5], this.zones[5] * 0.3, this.zones[5] * 0.6],
+    );
     this.version++;
+  }
+
+  /** New tyres: the punctures are gone. */
+  tyresChanged(): void {
+    if (this.punctured.some(Boolean)) this.version++;
+    this.punctured.fill(false);
+  }
+
+  private cornerOf(key: WheelKey): number {
+    return this.corners[CORNERS.indexOf(key)];
+  }
+
+  private flat(key: WheelKey): boolean {
+    return this.punctured[CORNERS.indexOf(key)];
   }
 
   get powerScale(): number {
     return 1 - CAP.power * this.zones[4];
   }
 
+  /** Steering pull (rad, + left): towards the front corner bent worse, or the flat front tyre. */
   get alignment(): number {
-    return this.pullSign * CAP.alignmentRad * Math.min(1, this.zones[5] * 0.7 + this.zones[0] * 0.3);
+    const d = this.corners[0] - this.corners[1] + (this.punctured[0] ? 0.5 : 0) - (this.punctured[1] ? 0.5 : 0);
+    return CAP.alignmentRad * Math.max(-1, Math.min(1, d * 1.4 + Math.sign(d) * this.zones[0] * 0.3));
   }
 
   private sideOf(key: WheelKey): number {
@@ -101,23 +145,35 @@ export class DamageState {
   }
 
   gripScale(key: WheelKey): number {
-    return 1 - CAP.grip * Math.min(1, this.zones[5] * 0.6 + this.sideOf(key) * 0.5);
+    const g = 1 - CAP.grip * Math.min(1, this.cornerOf(key) * 0.8 + this.sideOf(key) * 0.4);
+    // a flat tyre on its rim: a third of the grip
+    return this.flat(key) ? g * 0.35 : g;
   }
 
   damperScale(key: WheelKey): number {
-    return 1 - 0.35 * Math.min(1, this.zones[5] * 0.5 + this.sideOf(key) * 0.5);
+    return 1 - 0.35 * Math.min(1, this.cornerOf(key) * 0.7 + this.sideOf(key) * 0.4);
   }
 
   rideDrop(key: WheelKey): number {
-    return CAP.ride * Math.min(1, this.sideOf(key) * 0.6 + this.zones[5] * 0.4);
+    return CAP.ride * Math.min(1, this.sideOf(key) * 0.5 + this.cornerOf(key) * 0.6) + (this.flat(key) ? 0.06 : 0);
+  }
+
+  /** Tyre wear factor: a bent corner's toe scrubs its tyre, a flat one is shredded. */
+  wearScale(key: WheelKey): number {
+    return (1 + 2.5 * this.cornerOf(key)) * (this.flat(key) ? 6 : 1);
   }
 
   dragScale(): number {
     return 1 + CAP.drag * Math.min(1, (this.zones[0] + this.zones[1] + this.zones[2] + this.zones[3]) / 2.2);
   }
 
-  downforceScale(): number {
-    return 1 - CAP.downforce * Math.min(1, this.zones[0] * 0.5 + this.zones[1] * 0.6);
+  /** Downforce left at the front (the splitter, the nose) and the rear (the wing, the diffuser). */
+  downforceFront(): number {
+    return 1 - CAP.downforce * Math.min(1, this.zones[0] * 1.1 + (this.zones[2] + this.zones[3]) * 0.15);
+  }
+
+  downforceRear(): number {
+    return 1 - CAP.downforce * Math.min(1, this.zones[1] * 1.2 + (this.zones[2] + this.zones[3]) * 0.15);
   }
 
   /** 0..1 overall for the HUD. */

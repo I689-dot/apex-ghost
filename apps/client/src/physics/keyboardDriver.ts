@@ -45,6 +45,8 @@ export const KB = {
   hbFadeV0: 10,
   hbFadeV1: 28,
   hbFadeMin: 0.25,
+  /** The player's keyboard steering speed (× the rates above). */
+  rateScale: 1,
 };
 
 /**
@@ -144,6 +146,7 @@ export class KeyboardDriver {
     } else if (target === 0) rate = lerp(KB.steerReturnRate, KB.hsReturnRate, hs);
     else if (reversing) rate = lerp(KB.steerReverseRate, KB.hsReverseRate, hs);
     else rate = lerp(KB.steerOutRate, KB.hsOutRate, hs);
+    if (!pad) rate *= KB.rateScale;
     const before = this.uRamp;
     this.uRamp = moveTowards(this.uRamp, target, rate * dt);
     // the fast reverse rate only applies until the wheel is back at centre

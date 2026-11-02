@@ -41,6 +41,7 @@ await page.addInitScript(() => {
       dynamicResolution: false,
       racingLine: 'off',
       resolutionScale: 1,
+      mirror: false,
     }),
   );
   localStorage.removeItem('apexghost.devWeatherSeed');
@@ -55,12 +56,15 @@ await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions',
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', TIME]);
 await page.waitForTimeout(400);
 {
+  // the car cards exist once the car step is open
+  await page.click('.lb-step >> nth=4');
+  await page.waitForSelector('.car-card');
   const names = await page.evaluate(() => [...document.querySelectorAll('.car-card')].map((c) => c.textContent ?? ''));
   const i = Math.max(
     0,
     names.findIndex((n) => n.toLowerCase().includes(CAR.toLowerCase())),
   );
-  await page.click('.lb-step >> nth=4');
+  console.log(`car: ${names[i]?.trim().slice(0, 40)}`);
   await page.click(`.car-card >> nth=${i}`);
 }
 await page.waitForTimeout(600);
@@ -74,7 +78,8 @@ await page.click('button:has-text("Start race")');
 // briefing: confirm the car setup
 await page.click('button:has-text("Ready to go")', { timeout: 20_000 }).catch(() => {});
 await page.waitForSelector('.race-ui', { timeout: 240_000 });
-await page.addStyleTag({ content: '.perf { display: none !important; }' });
+// no UI in the photos: the HUD, the mirror, the session captions
+await page.addStyleTag({ content: '.perf, .race-ui, .hud, .mirror { display: none !important; }' });
 await page.waitForTimeout(1200);
 // aerial shot straight from the cinematic
 await page.evaluate(() => ((document.querySelector('.cinematic') ?? document.body).style.display = 'none'));

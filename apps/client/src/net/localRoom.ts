@@ -12,12 +12,26 @@ export const LOCAL_CODE = 'SOLO1';
  */
 let room: RoomCore | null = null;
 let timer = 0;
+/** The code of the race this device hosts for other players (p2p.ts), or null. */
+let hostedCode: string | null = null;
 
+/** The room runs in this browser: solo, or a race this device hosts. */
 export function isLocalCode(code: string): boolean {
-  return code === LOCAL_CODE;
+  return code === LOCAL_CODE || code === hostedCode;
 }
 
-export async function createLocalRoom(): Promise<string> {
+/** A race this device hosts for players on other devices (not solo). */
+export function isHostedCode(code: string): boolean {
+  return code === hostedCode;
+}
+
+/** The in-browser room (other players' data channels deliver to it: p2p.ts). */
+export function localRoom(): RoomCore | null {
+  return room;
+}
+
+/** `code`: a code to host under (other players join with it); solo without one. */
+export async function createLocalRoom(code: string = LOCAL_CODE): Promise<string> {
   const index = await loadTrackIndex();
   const tracks: Record<string, TrackRaceData> = {};
   for (const e of index) {
@@ -52,9 +66,10 @@ export async function createLocalRoom(): Promise<string> {
     tracks,
     carIds: new Set(cars.cars.filter((c) => c.role !== 'safety').map((c) => c.id)),
   });
-  r.init(LOCAL_CODE);
+  r.init(code);
   room = r;
-  return LOCAL_CODE;
+  hostedCode = code === LOCAL_CODE ? null : code;
+  return code;
 }
 
 let nextId = 0;

@@ -98,6 +98,19 @@ export function activePad(): Gamepad | null {
   return best;
 }
 
+/**
+ * Steering wheels by name or USB vendor (the browser reports them as game controllers): Logitech (G25/G27/G29/G920/
+ * G923, Driving Force), Thrustmaster (T150, T248, T300, TX, TMX, T-GT, T818), Fanatec (CSL, ClubSport, Podium), Moza,
+ * Simucube, Simagic. Settings → Controller can force either way.
+ */
+const WHEEL_RE =
+  /wheel|racing|driving force|\bg2[5-9]\b|\bg9[0-2][0-9]\b|t150|t248|t300|t500|\btx\b|tmx|t-?gt|t818|fanatec|csl|clubsport|podium|moza|simucube|simagic|vendor: 0eb7|vendor: 346e|vendor: 16d0|0eb7-|346e-/i;
+
+export function isWheel(id: string): boolean {
+  const m = settings.wheel.mode;
+  return m === 'wheel' || (m === 'auto' && WHEEL_RE.test(id));
+}
+
 function shortName(id: string): string {
   return (
     id
@@ -140,11 +153,26 @@ function drive(pad: VirtualPad, now: boolean[], pressed: (i: number) => boolean,
   padInput.active = true;
   PAD.rateScale = settings.pad.steerSpeed;
   PAD.speedSens = settings.pad.speedSens;
-  padInput.throttle = shapePedal(val(BTN.RT), 1.1);
-  // a finer brake curve: the short trigger travel is spent mostly around the locking point (ACC "brake gamma")
-  padInput.brake = shapePedal(val(BTN.LT), settings.pad.brakeCurve);
+  padInput.wheel = isWheel(pad.raw.id);
+  if (padInput.wheel) {
+    // a wheel: its angle as it is (the soft lock and no filters, input.ts), linear pedals with the brake's own curve
+    const ax = pad.axes[0] ?? 0;
+    padInput.steer = -(Math.abs(ax) < 0.002 ? 0 : ax);
+    padInput.throttle = Math.min(1, Math.max(0, (val(BTN.RT) - 0.02) / 0.96));
+    padInput.brake = Math.min(1, Math.max(0, (val(BTN.LT) - 0.02) / 0.96)) ** settings.wheel.brakeCurve;
+  } else {
+    const p = settings.pad;
+    const stick = p.pedals === 'rightStick';
+    const ry = pad.axes[3] ?? 0;
+    // on / off triggers (a Switch Pro's ZL and ZR): pressed and held, they rise to full over the player's ramp
+    const rawThr = stick ? Math.max(0, -ry) : digitalRamp(0, val(BTN.RT));
+    const rawBrk = stick ? Math.max(0, ry) : digitalRamp(1, val(BTN.LT));
+    padInput.throttle = shapePedal(rawThr, p.throttleCurve, p.throttleDeadzone, p.throttleSaturation);
+    // a finer brake curve: the short trigger travel is spent mostly around the locking point (ACC "brake gamma")
+    padInput.brake = shapePedal(rawBrk, p.brakeCurve, p.brakeDeadzone, p.brakeSaturation);
+    padInput.steer = -shapeSteer(pad.axes[0] ?? 0); // + = left
+  }
   padInput.handbrake = now[BTN.A] ? 1 : 0;
-  padInput.steer = -shapeSteer(pad.axes[0] ?? 0); // + = left
 
   // A also confirms (skips the intro); the handbrake is harmless then
   if (pressed(BTN.A)) tapKey('Enter', 'Enter');
@@ -159,8 +187,11 @@ function drive(pad: VirtualPad, now: boolean[], pressed: (i: number) => boolean,
   const want = new Set<ControlAction>();
   for (const [b, a] of HOLD) if (now[b]) want.add(a);
   const rx = pad.axes[2] ?? 0;
-  if (rx < -0.6) want.add('lookLeft');
-  if (rx > 0.6) want.add('lookRight');
+  // (the right stick drives the pedals in that mode: no looking with it)
+  if (settings.pad.pedals !== 'rightStick') {
+    if (rx < -0.6) want.add('lookLeft');
+    if (rx > 0.6) want.add('lookRight');
+  }
   for (const a of held) if (!want.has(a)) pressAction(a, false);
   for (const a of want) if (!held.has(a)) pressAction(a, true);
   held = want;
@@ -173,13 +204,37 @@ function drive(pad: VirtualPad, now: boolean[], pressed: (i: number) => boolean,
  */
 function shapeSteer(x: number): number {
   const dz = settings.pad.deadzone;
-  const m = Math.min(1, Math.max(0, (Math.abs(x) - dz) / (0.97 - dz)));
+  const sat = Math.max(dz + 0.05, settings.pad.steerSaturation);
+  const m = Math.min(1, Math.max(0, (Math.abs(x) - dz) / (sat - dz)));
   return Math.sign(x) * m ** settings.pad.steerCurve;
 }
 
 /** Trigger: a small rest dead zone, full value just before the end stop (worn triggers never read 1.0), curve. */
-function shapePedal(v: number, curve: number): number {
-  return v < 0.04 ? 0 : Math.min(1, (v - 0.04) / 0.92) ** curve;
+/** Trigger → pedal: the dead zone and the saturation point (F1's calibration), then the curve. */
+function shapePedal(v: number, curve: number, dz: number, sat: number): number {
+  const top = Math.max(dz + 0.05, sat);
+  return v <= dz ? 0 : Math.min(1, (v - dz) / (top - dz)) ** curve;
+}
+
+/**
+ * Triggers that report only 0 or 1 (no travel in between, e.g. a Switch Pro): held, they rise over the player's
+ * ramp time, released they fall three times as fast, so short presses give part throttle or brake. A trigger seen
+ * anywhere between is analog and passes straight through from then on.
+ */
+const trig = [
+  { analog: false, v: 0, t: 0 },
+  { analog: false, v: 0, t: 0 },
+];
+function digitalRamp(i: number, raw: number): number {
+  const s = trig[i];
+  const now = performance.now();
+  const dt = Math.min(0.1, s.t ? (now - s.t) / 1000 : 0);
+  s.t = now;
+  if (raw > 0.03 && raw < 0.97) s.analog = true;
+  if (s.analog) return (s.v = raw);
+  const rate = 1 / Math.max(0.05, settings.pad.digitalRamp);
+  s.v = raw > 0.5 ? Math.min(1, s.v + rate * dt) : Math.max(0, s.v - rate * 3 * dt);
+  return s.v;
 }
 
 function release(): void {

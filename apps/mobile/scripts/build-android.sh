@@ -32,7 +32,16 @@ npx cap sync android
 
 echo "sdk.dir=$ANDROID_HOME" > "$here/android/local.properties"
 export APEX_VERSION_CODE="${APEX_VERSION_CODE:-$(date -u +%y%m%d%H)}"
-export APEX_VERSION_NAME="${APEX_VERSION_NAME:-1.0.$(date -u +%Y%m%d)}"
+# the version players see: a plain number, one step per build (apps/mobile/version.json keeps the count); the
+# version code stays date-based so Android always accepts the update over an older build
+VERSION_FILE="$(dirname "$0")/../version.json"
+[ -f "$VERSION_FILE" ] || echo '{"major":1,"minor":0}' > "$VERSION_FILE"
+NEXT_MINOR=$(node -e "const v=require(process.argv[1]);process.stdout.write(String(v.minor+1))" "$(realpath "$VERSION_FILE")")
+MAJOR=$(node -e "const v=require(process.argv[1]);process.stdout.write(String(v.major))" "$(realpath "$VERSION_FILE")")
+if [ -z "${APEX_VERSION_NAME:-}" ]; then
+  export APEX_VERSION_NAME="$MAJOR.$NEXT_MINOR"
+  node -e "const fs=require('fs');const f=process.argv[1];const v=JSON.parse(fs.readFileSync(f));v.minor++;fs.writeFileSync(f,JSON.stringify(v,null,2)+'\n')" "$(realpath "$VERSION_FILE")"
+fi
 echo "▶ gradle assembleRelease (version $APEX_VERSION_NAME, code $APEX_VERSION_CODE)"
 cd "$here/android"
 ./gradlew --no-daemon -q assembleRelease

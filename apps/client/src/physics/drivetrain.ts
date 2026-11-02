@@ -104,11 +104,15 @@ export class Drivetrain {
     this.limiterCut = this.rpm >= s.limiterRpm - 30 ? true : this.rpm < s.limiterRpm - 250 ? false : this.limiterCut;
     const thr = this.limiterCut || this.starved ? 0 : throttle;
     const full = this.torqueAt(this.rpm) * this.powerScale * this.airScale;
-    // engine braking grows with rpm when off throttle
-    const drag = (0.06 + 0.12 * (this.rpm / s.redlineRpm)) * full;
+    // engine braking grows with rpm when off throttle; it only resists the wheels turning the engine (forwards in
+    // the gear): it never drives the car (standing still or rolling back, it pushed it backwards on its own)
+    const turning = wheelOmega * ratio > 0;
+    const drag = turning ? (0.06 + 0.12 * (this.rpm / s.redlineRpm)) * full : 0;
     const tq = thr * full - (1 - thr) * drag;
     this.engineTorque = tq;
     if (clutch === 0) return 0;
+    // the launch clutch opens with no throttle while it slips (a GT3's auto clutch / anti-stall): no creep
+    if (!locked && throttle < 0.02) return 0;
     return tq * ratio * clutch * 0.92; // 8 % driveline loss
   }
 

@@ -12,6 +12,7 @@ import {
 import { SERVER_URL } from '../config';
 import { getSession, setSession } from '../settings';
 import { LocalSocket, isLocalCode } from './localRoom';
+import { P2pSocket, isKnownP2p } from './p2p';
 import { account } from './account';
 
 export type ConnState = 'connecting' | 'open' | 'reconnecting' | 'closed';
@@ -124,13 +125,17 @@ export class Connection {
 
   private open(): void {
     // the offline room runs in this page (localRoom.ts): same protocol, no network
-    const ws = isLocalCode(this.code) ? (new LocalSocket() as unknown as WebSocket) : new WebSocket(this.url());
+    const ws = isLocalCode(this.code)
+      ? (new LocalSocket() as unknown as WebSocket)
+      : isKnownP2p(this.code)
+        ? (new P2pSocket(this.code) as unknown as WebSocket)
+        : new WebSocket(this.url());
     ws.binaryType = 'arraybuffer';
     this.ws = ws;
     ws.onopen = () => {
       this.reconnectAttempt = 0;
       // signed in (and online: the offline room keeps no records): the room records my laps and results
-      const token = !this.spectate && !isLocalCode(this.code) ? account()?.token : undefined;
+      const token = !this.spectate && !isLocalCode(this.code) && !isKnownP2p(this.code) ? account()?.token : undefined;
       this.sendJson({
         t: 'hello',
         v: PROTOCOL_VERSION,
@@ -138,6 +143,9 @@ export class Connection {
         session: this.spectate ? null : getSession(this.code),
         spectate: this.spectate,
         ...(token ? { account: token } : {}),
+        // the driver profile for the timing screens (offline too: it is the player's own)
+        ...(account()?.user.country ? { country: account()?.user.country ?? undefined } : {}),
+        ...(account()?.user.num ? { num: account()?.user.num ?? undefined } : {}),
       });
     };
     ws.onmessage = (e) => {

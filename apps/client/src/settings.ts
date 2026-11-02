@@ -18,6 +18,9 @@ export const CONTROL_ACTIONS = [
   'timing',
   'pause',
   'camera',
+  'damage',
+  'tvCamera',
+  // 'hushRadio', (team radio off for now)
 ] as const;
 export type CameraMode = 'cockpit' | 'chase' | 'far';
 export const CAMERA_MODES: CameraMode[] = ['cockpit', 'chase', 'far'];
@@ -41,6 +44,9 @@ export const ACTION_LABEL: Record<ControlAction, string> = {
   timing: 'Timing screen (hold)',
   pause: 'Pause menu',
   camera: 'Change camera',
+  damage: 'Damage report (hold)',
+  tvCamera: 'TV cameras',
+  // hushRadio: 'Silence the radio (30 s)',
 };
 
 export const DEFAULT_BINDINGS: KeyBindings = {
@@ -59,6 +65,9 @@ export const DEFAULT_BINDINGS: KeyBindings = {
   timing: ['Tab'],
   pause: ['Escape'],
   camera: ['KeyV'],
+  damage: ['KeyF'],
+  tvCamera: ['KeyT'],
+  // hushRadio: ['KeyH'],
 };
 
 export interface Assists {
@@ -101,6 +110,9 @@ export interface Settings {
   /** Phone app: display refresh rate asked for (60, or the screen's 90 / 120 / 144 Hz). */
   refreshRate: number;
   fov: number;
+  /** The head thrown by the G-forces (0 off … 1 full) and the camera shaking on kerbs and bumps (ACC's options). */
+  headMovement: number;
+  cameraShake: number;
   /** Cockpit camera adjustment (m): + raises the eye / moves it forward. */
   seatHeight: number;
   seatForward: number;
@@ -108,9 +120,13 @@ export interface Settings {
   manualGearbox: boolean;
   /** Driving view: from the seat, or chase cameras behind the car. */
   camera: CameraMode;
+  /** During a pit stop: a TV camera on the crew (as F1's broadcast stops), or stay in the car (as iRacing). */
+  pitCamera: 'tv' | 'car';
   /** Virtual rear-view mirror at the top of the screen. */
   mirror: boolean;
   units: 'kmh' | 'mph';
+  /** Race overlays (after iRacing / ACC): the relative box, pedal and steering inputs, the side spotter, the delta bar. */
+  overlays: { relative: boolean; inputs: boolean; spotter: boolean; deltaBar: boolean; trackMap: boolean };
   /** Racing-line assist: off, braking zones and corners only, or the whole lap. */
   racingLine: 'off' | 'corners' | 'full';
   showPerf: boolean;
@@ -118,20 +134,50 @@ export interface Settings {
   ghost: boolean;
   /** Car setup chosen in the lobby. */
   carSetup: CarSetup;
-  /** Mixer levels 0..1 */
-  audio: { master: number; engine: number; effects: number; ambience: number };
+  /** Mixer levels 0..1 (opponents: the other cars' engines; tyres: tyres, kerbs, gravel, grass, scrapes); chimes on/off. */
+  audio: { master: number; engine: number; effects: number; ambience: number; radio: number; opponents: number; tyres: number; chimes: boolean };
+  /** Keyboard (AC / ACC keyboard options): seconds from nothing to full throttle and brake (a tap gives part of it), steering speed. */
+  keyboard: { throttleRamp: number; brakeRamp: number; steerSpeed: number };
+  /** The HUD (F1's on-track display options): size, opacity, and which parts show. */
+  hud: { scale: number; opacity: number; timing: boolean; lapInfo: boolean; tyres: boolean; revLights: boolean; messages: boolean; map: boolean };
+  /** Chase cameras: distance and height (× the default), how much they lag the car's turning (× the default). */
+  chase: { distance: number; height: number; lag: number };
+  /** Cockpit view turns into the corners with the steering (0 off, 1 the default, 2 twice as much), as rFactor / ACC "look to apex". */
+  lookToApex: number;
+  /** Picture brightness (× the exposure). */
+  brightness: number;
+  /** The AI drivers' pace (× their skill), on the races you host or play solo. */
+  ai: { difficulty: number };
   bindings: KeyBindings;
   /**
    * Game controller: stick dead zone (0…0.25), steering curve exponent (1 = linear, higher = finer near centre),
    * steering speed (× the rate limit), speed sensitivity (0 = same speed at any speed … 1 = much calmer at speed),
    * brake curve exponent, rumble.
    */
+  /**
+   * Steering wheel (a controller the browser reports as a wheel, or set by hand): its base's rotation lock to lock (the
+   * same as set in the wheel's own software, 900° as the sims recommend); the car's real lock is then used from it
+   * (soft lock), steering is 1:1 with no filters, the pedals linear with the brake's own curve.
+   */
+  wheel: { mode: 'auto' | 'wheel' | 'pad'; rotationDeg: number; brakeCurve: number };
   pad: {
     deadzone: number;
     steerCurve: number;
     steerSpeed: number;
     speedSens: number;
     brakeCurve: number;
+    /** Pedals (F1's controller calibration): dead zone and saturation (the travel where it reaches 100 %) per trigger, throttle curve. */
+    throttleDeadzone: number;
+    throttleSaturation: number;
+    throttleCurve: number;
+    brakeDeadzone: number;
+    brakeSaturation: number;
+    /** Stick travel where full lock is reached. */
+    steerSaturation: number;
+    /** Pedals on the triggers, or on the right stick (up throttle, down brake). */
+    pedals: 'triggers' | 'rightStick';
+    /** Triggers that are only on or off (Switch Pro ZL/ZR): seconds to reach full while held. */
+    digitalRamp: number;
     vibration: boolean;
     /** Button layouts set up by the player, per controller (input/padMap.ts). */
     layouts: Record<string, PadLayout>;
@@ -155,11 +201,21 @@ export const DEFAULT_SETTINGS: Settings = {
   assists: { abs: true, tc: 1, stability: false, steering: false },
   manualGearbox: false,
   camera: 'cockpit',
+  pitCamera: 'tv',
   mirror: true,
   units: 'kmh',
   racingLine: 'corners',
   showPerf: false,
-  audio: { master: 0.8, engine: 0.9, effects: 0.8, ambience: 0.6 },
+  headMovement: 1,
+  cameraShake: 1,
+  overlays: { relative: true, inputs: true, spotter: true, deltaBar: true, trackMap: true },
+  audio: { master: 0.8, engine: 0.9, effects: 0.8, ambience: 0.6, radio: 0.9, opponents: 0.9, tyres: 0.9, chimes: true },
+  keyboard: { throttleRamp: 0.2, brakeRamp: 0.2, steerSpeed: 1 },
+  hud: { scale: 1, opacity: 1, timing: true, lapInfo: true, tyres: true, revLights: true, messages: true, map: true },
+  chase: { distance: 1, height: 1, lag: 1 },
+  lookToApex: 1,
+  brightness: 1,
+  ai: { difficulty: 1 },
   carSetup: {
     tyre: 'medium',
     wing: 'medium',
@@ -173,7 +229,24 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   ghost: true,
   bindings: DEFAULT_BINDINGS,
-  pad: { deadzone: 0.06, steerCurve: 1.7, steerSpeed: 1, speedSens: 0.5, brakeCurve: 1.4, vibration: true, layouts: {} },
+  wheel: { mode: 'auto', rotationDeg: 900, brakeCurve: 1 },
+  pad: {
+    deadzone: 0.06,
+    steerCurve: 1.7,
+    steerSpeed: 1,
+    speedSens: 0.5,
+    brakeCurve: 1.4,
+    throttleDeadzone: 0.04,
+    throttleSaturation: 0.96,
+    throttleCurve: 1.1,
+    brakeDeadzone: 0.04,
+    brakeSaturation: 0.96,
+    steerSaturation: 0.97,
+    pedals: 'triggers',
+    digitalRamp: 0.6,
+    vibration: true,
+    layouts: {},
+  },
 };
 
 function safeGet(key: string): string | null {
@@ -202,8 +275,14 @@ export function loadSettings(): Settings {
     merged.bindings = { ...DEFAULT_BINDINGS, ...(s.bindings ?? {}) };
     merged.audio = { ...DEFAULT_SETTINGS.audio, ...(s.audio ?? {}) };
     merged.pad = { ...DEFAULT_SETTINGS.pad, ...(s.pad ?? {}) };
+    merged.wheel = { ...DEFAULT_SETTINGS.wheel, ...(s.wheel ?? {}) };
     merged.carSetup = { ...DEFAULT_SETTINGS.carSetup, ...(s.carSetup ?? {}) };
     merged.graphics = { ...(s.graphics ?? {}) };
+    merged.overlays = { ...DEFAULT_SETTINGS.overlays, ...(s.overlays ?? {}) };
+    merged.keyboard = { ...DEFAULT_SETTINGS.keyboard, ...(s.keyboard ?? {}) };
+    merged.hud = { ...DEFAULT_SETTINGS.hud, ...(s.hud ?? {}) };
+    merged.chase = { ...DEFAULT_SETTINGS.chase, ...(s.chase ?? {}) };
+    merged.ai = { ...DEFAULT_SETTINGS.ai, ...(s.ai ?? {}) };
     // the old default (72°, a very wide view: the dash filled half the screen) moves to the new one
     if (s.fov === 72) merged.fov = DEFAULT_SETTINGS.fov;
     return merged;

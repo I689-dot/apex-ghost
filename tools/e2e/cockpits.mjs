@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Captures the in-game cockpit view of every car (solo race, forced clear midday weather, real GPU)
+ * Captures the in-game cockpit view of every car (solo race, forced clear midday weather, real GPU; --ids a,b: those only)
  * into tools/e2e/out/cockpits/<index>-<id>.png. Needs `pnpm dev` running.
  *
  *   node tools/e2e/cockpits.mjs [--from 0] [--to 17] [--seed 1]
@@ -16,7 +16,11 @@ mkdirSync(out, { recursive: true });
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
 const URL = opt('url', 'http://127.0.0.1:5173');
-const cars = JSON.parse(readFileSync(path.join(here, '../../apps/client/public/assets/cars.json'), 'utf8')).cars;
+// the lobby lists every car but the safety car (race control's): pick each by its name, not its place in cars.json
+const only = opt('ids', '');
+const cars = JSON.parse(readFileSync(path.join(here, '../../apps/client/public/assets/cars.json'), 'utf8')).cars.filter(
+  (c) => c.role !== 'safety' && (!only || only.split(',').includes(c.id)),
+);
 const from = Number(opt('from', '0'));
 const to = Number(opt('to', String(cars.length - 1)));
 const seed = opt('seed', '1');
@@ -33,7 +37,7 @@ for (let i = from; i <= to; i++) {
     await page.click('button:has-text("Create room")');
     await page.waitForSelector('.lb-steps');
     await page.click('.lb-step >> nth=4');
-    await page.click(`.car-card >> nth=${i}`);
+    await page.click(`.car-card[title="${cars[i].name}"]`);
     await page.waitForTimeout(600);
     await page.click('.lobby-actions button:has-text("Ready")');
     await page.waitForTimeout(400);

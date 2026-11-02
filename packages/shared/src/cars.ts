@@ -92,6 +92,13 @@ export interface CarEntry {
   info?: { engine: string; gearbox: string; team: string } | null;
   /** Wheels that use the generic fallback model. */
   genericWheels: string[];
+  /**
+   * Fixes to the source model's materials, by material name, checked from the driver's seat (cars.config.json →
+   * pipeline.look): `tint` darkens a colour (× factor: a dash alcantara or carbon whose texture is far too light),
+   * `plain` replaces a texture used in the wrong slot by a flat colour, `glass` makes opaque windows glass, `strip`
+   * lets you see through a sun strip that covers too much of the windscreen from the seat (from outside it stays).
+   */
+  look?: { tint?: Record<string, number>; plain?: Record<string, string>; glass?: string[]; strip?: string[] } | null;
   specs: CarSpecs;
 }
 

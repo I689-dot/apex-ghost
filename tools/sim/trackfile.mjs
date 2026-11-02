@@ -37,3 +37,33 @@ export function loadTrack(id) {
   const collision = raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw;
   return { track, collision, file };
 }
+
+/** A collision file's bytes (gzipped or not) from a path. */
+export function readCollisionFile(file) {
+  const raw = readFileSync(file);
+  return raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw;
+}
+
+/**
+ * The parts of a collision file (collision.apxc: a 12-byte header with the part count at byte 8, then per part its
+ * surface index, vertex and index counts, positions as float32 xyz and triangle indices as uint32).
+ * @param {Uint8Array} buf
+ * @returns {{ surface: number, pos: Float32Array, idx: Uint32Array }[]}
+ */
+export function collisionParts(buf) {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const parts = [];
+  let o = 12;
+  for (let i = 0; i < dv.getUint32(8, true); i++) {
+    const surface = dv.getUint32(o, true);
+    const nv = dv.getUint32(o + 4, true);
+    const ni = dv.getUint32(o + 8, true);
+    o += 12;
+    const pos = new Float32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + nv * 12));
+    o += nv * 12;
+    const idx = new Uint32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + ni * 4));
+    o += ni * 4;
+    parts.push({ surface, pos, idx });
+  }
+  return parts;
+}

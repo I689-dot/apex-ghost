@@ -33,13 +33,22 @@ function playIntro(): void {
       intro.remove();
     }, 800);
   };
+  const INTRO_CARS = [
+    'ferrari_296_gt3_verstappen',
+    'corvette_z06_gt3r',
+    'mclaren_720s_gt3_inception_racing',
+    'lamborghini_huracan_gt3_evo2',
+    '2025_bmw_m4_gt3_evo_g82',
+    '2024_porsche_992_gt3_r',
+  ];
   const reel = cinematicReel(
     [
-      { photo: 'photo_aerial.webp', move: 'rise' },
+      // a different circuit and car from the menu's tiles: Spa from the air, a car picked at random each start
+      { photo: 'photo_aerial_spa.webp', move: 'rise' },
       {
-        photo: 'photo_hero.webp',
+        photo: 'photo_hero_zandvoort.webp',
         move: 'car',
-        car: heroUrl({ id: '2024_porsche_992_gt3_r' } as Parameters<typeof heroUrl>[0]),
+        car: heroUrl({ id: INTRO_CARS[Math.floor(Math.random() * INTRO_CARS.length)] } as Parameters<typeof heroUrl>[0]),
         kicker: 'GT3',
         title: 'APEX GHOST',
       },

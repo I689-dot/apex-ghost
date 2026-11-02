@@ -36,9 +36,12 @@ import { promisify } from 'node:util';
 import { fillHoles, fillTerrain, groundPartsFromGlb, writeFillGlb } from './fill_holes.mjs';
 import { applySignage } from './signage.mjs';
 import { snapStackedLayers } from './flatten_layers.mjs';
+import { dropBuriedPaint } from './buried_paint.mjs';
+import { conformKerbs } from './kerb_conform.mjs';
 import { roadPartsFromGlbs, weldPositions } from './road_collision.mjs';
 import { carSpecs } from './car_specs.mjs';
 import { trackLimitsFromLines } from './track_limits.mjs';
+import { fixPitEntry } from './pit_entry.mjs';
 
 const run = promisify(execFile);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -378,6 +381,79 @@ async function finishFloat(doc, file) {
 
 /* --------------------------------------------------------------- cars --- */
 
+/**
+ * The distant car models again, from each car's most detailed published model (cockpit.glb, else lod0.glb), for every
+ * car in cars.json, including those whose source files are not on this machine (`--only relod [--car id]`):
+ *  - LOD1 (other cars from ~30 m): RELOD.lod1Tris triangles at a tight error, the cabin kept in outline (its tiny
+ *    parts dropped: through the glass a car with an empty cabin looked hollow), 512 px colour;
+ *  - LOD2 (beyond ~130 m): RELOD.lod2Tris, no cabin, 256 px.
+ * The old ones (28k / 7k, error up to 4 %) rounded the bodywork off: cars a few lengths ahead looked like toys.
+ * The KTX2 textures are decoded to PNG (ktx extract) and encoded again at the LOD's size.
+ */
+const RELOD = { lod1Tris: 70_000, lod1Error: 0.012, lod2Tris: 18_000, lod2Error: 0.03 };
+const KTX_CLI = path.join(KTX_DIR, 'bin/ktx');
+
+async function decodeKtx2(doc, tag) {
+  const dir = path.join(tmpRoot, `decode-${tag}`);
+  mkdirSync(dir, { recursive: true });
+  let i = 0;
+  for (const tex of doc.getRoot().listTextures()) {
+    if (tex.getMimeType() !== 'image/ktx2') continue;
+    const id = i++;
+    const src = path.join(dir, `${id}.ktx2`);
+    const dst = path.join(dir, `${id}.png`);
+    writeFileSync(src, Buffer.from(tex.getImage()));
+    await run(KTX_CLI, ['extract', '--transcode', 'rgba8', src, dst], { env: ktxEnv });
+    tex.setImage(readFileSync(dst)).setMimeType('image/png');
+    if (tex.getURI()) tex.setURI(tex.getURI().replace(/\.ktx2$/i, '.png'));
+  }
+  for (const ext of doc.getRoot().listExtensionsUsed()) if (ext.extensionName === 'KHR_texture_basisu') ext.dispose();
+}
+
+/** Drop the interior's small parts only (switches, cables, belts): the seats, cage and dash keep the cabin's shape. */
+function dropInteriorDetail(doc, minSize) {
+  for (const mesh of doc.getRoot().listMeshes())
+    for (const prim of mesh.listPrimitives()) {
+      if (!INTERIOR_MAT_RE.test(prim.getMaterial()?.getName() ?? '')) continue;
+      const pos = prim.getAttribute('POSITION');
+      const mn = pos.getMin([]);
+      const mx = pos.getMax([]);
+      if (Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) < minSize) prim.dispose();
+    }
+}
+
+async function relodCars() {
+  const indexFile = path.join(pub, 'cars.json');
+  const index = JSON.parse(readFileSync(indexFile, 'utf8'));
+  for (const c of index.cars) {
+    if (carFilter && carFilter !== c.id) continue;
+    const dir = path.join(pub, 'cars', c.id);
+    const srcName = existsSync(path.join(dir, 'cockpit.glb')) ? 'cockpit.glb' : 'lod0.glb';
+    const base = await io.read(path.join(dir, srcName));
+    await decodeKtx2(base, c.id);
+    const srcTris = triCount(base);
+    // LOD1
+    const lod1 = await io.readBinary(await io.writeBinary(base));
+    dropInteriorDetail(lod1, 0.12);
+    dropTiny(lod1, 0.02);
+    const t1 = await simplifyTo(lod1, RELOD.lod1Tris, { maxError: RELOD.lod1Error, allowWeld: true });
+    await compressTextures(lod1, { maxColor: 512, maxData: 256, tag: `${c.id}-r1` });
+    const s1 = await finish(lod1, path.join(dir, 'lod1.glb'));
+    // LOD2
+    const lod2 = await io.readBinary(await io.writeBinary(base));
+    dropInterior(lod2);
+    dropTiny(lod2, 0.08);
+    const t2 = await simplifyTo(lod2, RELOD.lod2Tris, { maxError: RELOD.lod2Error, allowWeld: true });
+    await compressTextures(lod2, { maxColor: 256, maxData: 128, tag: `${c.id}-r2` });
+    const s2 = await finish(lod2, path.join(dir, 'lod2.glb'));
+    log(`${c.id}: ${srcName} ${srcTris} tris → LOD1 ${t1} (${(s1 / 1e6).toFixed(2)} MB), LOD2 ${t2} (${(s2 / 1e6).toFixed(2)} MB)`);
+    // the new files under a new version (browsers and the app cache them by URL)
+    c.lods = c.lods.map((u) => u.replace(/\?v=.*$/, '') + V);
+    c.bytes = ['lod0.glb', 'lod1.glb', 'lod2.glb'].reduce((b, f) => b + (existsSync(path.join(dir, f)) ? statSync(path.join(dir, f)).size : 0), 0);
+  }
+  writeFileSync(indexFile, JSON.stringify(index, null, 1));
+}
+
 async function cars() {
   const cfg = JSON.parse(readFileSync(path.join(here, 'cars.config.json'), 'utf8'));
   const carDir = path.join(out, 'cars');
@@ -475,6 +551,7 @@ async function cars() {
       // (cockpitEye), a steering wheel for a model without one (steering), an interior the detection missed
       steering: c.pipeline?.steering ?? meta.steering,
       cockpitCamera: c.pipeline?.cockpitEye ? { ...meta.cockpitCamera, position: c.pipeline.cockpitEye, tuned: true } : meta.cockpitCamera,
+      look: c.pipeline?.look ?? null,
       hasInterior: c.pipeline?.hasInterior ?? meta.hasInterior,
       lights: meta.lights,
       genericWheels: meta.genericWheels,
@@ -542,6 +619,18 @@ async function flattenBorderStrips(doc) {
   }
 }
 
+/**
+ * An older layout's paint under the racing surface (buried_paint.mjs): out of the render and the track limits,
+ * as track_analysis.py leaves it out of the track edges. Maps without a racing-surface layer (traceRoad) have none.
+ */
+function dropOldPaint(doc, what) {
+  const a = MAP.analysis;
+  if (!a?.traceRoad?.length) return;
+  const re = new RegExp(`^(${a.traceRoad.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'i');
+  const [d] = dropBuriedPaint(doc, re, { inside: a.buriedPaintInside ?? undefined, wholeLine: !!a.buriedPaintWholeLine });
+  if (d) log(`${what}: ${d} pieces of old paint under the racing surface removed`);
+}
+
 async function map() {
   const mapOut = path.join(out, MAP.out);
   const dstDir = path.join(pub, MAP.assets);
@@ -553,7 +642,10 @@ async function map() {
     if (!existsSync(src)) continue;
     const doc = await io.read(src);
     await inlineTinyTextures(doc);
-    if (kind === 'track') await flattenBorderStrips(doc);
+    if (kind === 'track') {
+      await flattenBorderStrips(doc);
+      dropOldPaint(doc, 'render');
+    }
     await doc.transform(dedup(), weld());
     const before = triCount(doc);
     if (kind === 'track' || kind === 'scenery') {
@@ -791,7 +883,7 @@ async function writeTracks(mapOut, render) {
     .sort())
     bases.push(JSON.parse(readFileSync(path.join(mapOut, f), 'utf8')));
   const surf = roadSurface(mapOut);
-  if (MAP.fixPitEntry) fixPitEntry(bases);
+  if (MAP.fixPitEntry) fixPitEntry(bases, log);
   // on a map built around a base map, lap-line points on the base map's road keep the base map's data
   const baseLayout = MAP.baseMap ? baseLayoutOf(MAP.baseMap) : null;
   const baseIdx = new Map();
@@ -806,6 +898,7 @@ async function writeTracks(mapOut, render) {
   const rawTrack = path.join(mapOut, 'map_track.glb');
   if (existsSync(rawTrack)) {
     const doc = await io.read(rawTrack);
+    dropOldPaint(doc, 'track limits');
     for (const b of bases) {
       const lim = trackLimitsFromLines(doc, b);
       b.limitL = lim.limitL;
@@ -890,107 +983,6 @@ async function writeTracks(mapOut, render) {
   writeFileSync(racesFile, JSON.stringify({ ...keep, ...races }));
   log(`tracks written: ${index.map((t) => `${t.id} (${Math.round(t.length)} m)`).join(', ')}; index: ${all.map((t) => t.id).join(', ')}`);
 }
-
-/**
- * The traced pit entry wandered off into the paddock (up to 89 m from the lane, so the minimap and the pit-lane
- * markings were wrong there). The real lane, measured from the collision surfaces (tools/sim/pitlat.mjs):
- * it leaves the track at ~4975 m of the GP lap, runs 10–16 m left of the centreline behind the pit wall, crosses
- * the apron and reaches the garages ~20 m left by ~5190 m, where the trace was right again. Rebuilt as
- * (lap s, lateral) pairs on the GP centreline; the service box is moved in front of the garages
- * (5190 m … 60 m, across the start line). Other layouts sharing the lane get the same points.
- */
-const PIT_ENTRY = [
-  [4975, -3],
-  [4990, -12],
-  [5000, -13],
-  [5060, -13],
-  [5100, -14],
-  [5150, -16],
-  [5190, -19.5],
-];
-const PIT_BOX = [5, 300]; // the whole garage row (lap m), one box per garage painted by the client
-
-function fixPitEntry(bases) {
-  const gp = bases[0];
-  const pl = gp.pitLane;
-  if (!pl) return;
-  const cl = gp.centerline;
-  const cs = gp.cumS;
-  const n = cl.length / 3;
-  const L = gp.length;
-  const frame = (sLap) => {
-    const sm = ((sLap % L) + L) % L;
-    let i = 0;
-    while (i < n - 1 && cs[i + 1] <= sm) i++;
-    const j = (i + 1) % n;
-    const seg = (j === 0 ? L : cs[j]) - cs[i] || 1;
-    const f = Math.min(1, Math.max(0, (sm - cs[i]) / seg));
-    let tx = cl[j * 3] - cl[i * 3];
-    let tz = cl[j * 3 + 2] - cl[i * 3 + 2];
-    const tl = Math.hypot(tx, tz) || 1;
-    tx /= tl;
-    tz /= tl;
-    return { x: cl[i * 3] + (cl[j * 3] - cl[i * 3]) * f, y: cl[i * 3 + 1], z: cl[i * 3 + 2] + (cl[j * 3 + 2] - cl[i * 3 + 2]) * f, tx, tz };
-  };
-  const project = (p) => {
-    let best = 0;
-    let bd = Infinity;
-    for (let i = 0; i < n; i++) {
-      const d = (cl[i * 3] - p[0]) ** 2 + (cl[i * 3 + 2] - p[2]) ** 2;
-      if (d < bd) {
-        bd = d;
-        best = i;
-      }
-    }
-    const j = (best + 1) % n;
-    let tx = cl[j * 3] - cl[best * 3];
-    let tz = cl[j * 3 + 2] - cl[best * 3 + 2];
-    const tl = Math.hypot(tx, tz) || 1;
-    tx /= tl;
-    tz /= tl;
-    return { s: cs[best], lat: (p[0] - cl[best * 3]) * tz - (p[2] - cl[best * 3 + 2]) * tx };
-  };
-  const old = pl.points;
-  // first old point back on the real lane (in front of the garages)
-  const join = old.findIndex((p) => {
-    const q = project(p);
-    return q.s >= PIT_ENTRY[PIT_ENTRY.length - 1][0] && q.s < L - 2 && q.lat < -17 && q.lat > -25;
-  });
-  if (join < 0) return;
-  const sJoin = project(old[join]).s;
-  const latAt = (sl) => {
-    const P = [...PIT_ENTRY, [sJoin, project(old[join]).lat]];
-    for (let k = 0; k < P.length - 1; k++) if (sl <= P[k + 1][0]) return P[k][1] + ((P[k + 1][1] - P[k][1]) * (sl - P[k][0])) / (P[k + 1][0] - P[k][0] || 1);
-    return P[P.length - 1][1];
-  };
-  const pts = [];
-  for (let sl = PIT_ENTRY[0][0]; sl < sJoin - 1; sl += 2.5) {
-    const f = frame(sl);
-    const lat = latAt(sl);
-    // + lateral = left of travel: left of (tx, tz) is (tz, -tx)
-    pts.push([round3(f.x + f.tz * lat), f.y, round3(f.z - f.tx * lat)]);
-  }
-  const points = [...pts, ...old.slice(join)];
-  let len = 0;
-  for (let k = 1; k < points.length; k++) len += Math.hypot(points[k][0] - points[k - 1][0], points[k][2] - points[k - 1][2]);
-  const lapS = points.map((p) => project(p).s);
-  const inBox = (sl) => (PIT_BOX[0] > PIT_BOX[1] ? sl >= PIT_BOX[0] || sl <= PIT_BOX[1] : sl >= PIT_BOX[0] && sl <= PIT_BOX[1]);
-  const boxFrom = lapS.findIndex((sl, k) => k > pts.length / 2 && inBox(sl));
-  let boxTo = boxFrom;
-  while (boxTo + 1 < points.length && inBox(lapS[boxTo + 1])) boxTo++;
-  const before = old.length;
-  const fixed = { ...pl, points, length: Math.round(len * 10) / 10, entryS: PIT_ENTRY[0][0], boxFrom, boxTo };
-  for (const b of bases) {
-    if (!b.pitLane) continue;
-    const mid = b.pitLane.points[Math.floor(b.pitLane.points.length / 2)];
-    const same = old.some((p) => Math.hypot(p[0] - mid[0], p[2] - mid[2]) < 5);
-    if (!same) continue;
-    b.pitLane = b === gp ? fixed : { ...b.pitLane, points: points.map((p) => p.slice()), length: fixed.length, boxFrom, boxTo };
-  }
-  log(`pit entry rebuilt: ${before} → ${points.length} points, ${Math.round(len)} m, service box ${boxFrom}–${boxTo}`);
-}
-
-const round3 = (v) => Math.round(v * 1000) / 1000;
 
 /**
  * Road surface lookup from the collision meshes (asphalt + kerbs): every height under a point (x, z).
@@ -1333,6 +1325,17 @@ async function collision(mapOut, dstDir) {
     parts.unshift(...road.parts);
     total = parts.reduce((n, p) => n + p.idx.length / 3, 0);
   }
+  // kerbs within a few cm of the road beside them: no ramps, no steps (kerb_conform.mjs)
+  {
+    const k = conformKerbs(
+      parts.filter((p) => SURF[p.si] === 'asphalt'),
+      parts.filter((p) => SURF[p.si] === 'curb'),
+      parts.filter((p) => SURF[p.si] === 'grass' || SURF[p.si] === 'gravel' || SURF[p.si] === 'sand'),
+    );
+    log(
+      `collision curb: ${k.moved} vertices brought within the road's reach (up to ${(k.maxMove * 100).toFixed(1)} cm), ${k.ground} ground vertices behind them followed`,
+    );
+  }
   // ground holes in the source model (sky showing through, cars falling out of the world): fill them with grass
   const base = JSON.parse(readFileSync(path.join(mapOut, 'track_base.json'), 'utf8'));
   const GROUND_VIS_RE = /^(asph|curb|lines|redline|grass|sand|gravel|travert|conc_|pits|astroturf|box_decal|pavement|tiles|grille|top2)/i;
@@ -1419,7 +1422,14 @@ async function collision(mapOut, dstDir) {
     log(`collision: ${kept} sub-meshes of ${MAP.baseMap} merged (its terrain left out)`);
   }
   // maps on top of a base map: the base's ground is in its own collision file, so "holes" here are not holes
-  const fill = MAP.baseMap ? { cells: 0 } : fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : [], visual);
+  // maps whose model has its ground everywhere ("fillHoles": false): the filler's guesses only covered real
+  // surfaces it does not count as ground (Spa: grass blocks on the pit lane and beside the straight)
+  const fill =
+    MAP.baseMap || MAP.fillHoles === false ? { cells: 0 } : fillHoles(parts, SURF, base.centerline, base.pitLane ? base.pitLane.points.flat() : [], visual);
+  if (MAP.fillHoles === false) {
+    // no fill: an earlier build's must not be drawn or collided with
+    for (const f of [path.join(mapOut, 'fill.json'), path.join(dstDir, 'map_fill.glb')]) if (existsSync(f)) rmSync(f);
+  }
   if (fill.cells) {
     const gi = SURF.indexOf('grass');
     parts.push({ si: gi, pos: fill.pos, idx: fill.idx });
@@ -1470,6 +1480,7 @@ try {
   if ((!only && !args.includes('--map')) || only === 'cars') await cars();
   if (!only || only === 'map') await map();
   if (only === 'tracks') await tracksOnly();
+  if (only === 'relod') await relodCars();
   if (only === 'fill') {
     // re-encode an already built map_fill.glb's textures to KTX2 in place (maps built before the fill was compressed)
     const file = path.join(pub, MAP.assets, 'map_fill.glb');

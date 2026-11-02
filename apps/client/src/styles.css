@@ -870,17 +870,34 @@ select:focus {
   display: block;
 }
 .hud-msg {
+  /* a compact banner as iRacing, F1 and ACC show race messages: small text on a dark bar, an accent edge */
   position: absolute;
-  top: 18%;
+  top: 124px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 1.8rem;
-  font-weight: 700;
   width: max-content;
-  max-width: min(46rem, 80vw);
+  max-width: min(30rem, 72vw);
+  padding: 0.32rem 0.85rem;
+  font-family: var(--body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
   text-align: center;
   text-wrap: balance;
-  line-height: 1.25;
+  text-shadow: none;
+  background: rgba(10, 12, 16, 0.78);
+  border-left: 3px solid var(--accent-2);
+  border-radius: 4px;
+  animation: hud-msg-in 0.18s ease-out;
+}
+.hud-msg:empty {
+  display: none;
+}
+@keyframes hud-msg-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
 }
 /* session clock, top centre */
 .hud-finish {
@@ -948,6 +965,12 @@ select:focus {
 }
 .hud-flag.green {
   background: #19c15a;
+}
+.hud-flag.meatball {
+  padding-left: 2.2rem;
+  color: #fff;
+  background: radial-gradient(circle at 1.1rem 50%, #ff7a00 0 0.5rem, #111 0.56rem);
+  border: 2px solid #ff7a00;
 }
 .hud-flag.dt {
   background: #111;
@@ -1564,9 +1587,14 @@ body.reconnecting::after {
 }
 .car-status {
   width: 200px;
-  padding: 6px 4px 2px;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 12px;
+  padding: 6px 4px 3px;
+  background: rgba(6, 9, 8, 0.82);
+  border: 1px solid rgba(48, 209, 88, 0.35);
+  border-radius: 4px;
+}
+/* the car as lines (ui/carLines.ts), with the damage report's glow */
+.cs-lines {
+  filter: drop-shadow(0 0 1.5px rgba(48, 209, 88, 0.6));
 }
 .car-status-svg {
   display: block;
@@ -1593,14 +1621,17 @@ body.reconnecting::after {
   fill: rgba(255, 255, 255, 0.6);
 }
 .cs-tyre {
-  stroke: rgba(0, 0, 0, 0.6);
-  stroke-width: 1;
-  transition: fill 0.4s;
+  fill-opacity: 0.28;
+  stroke-width: 1.3;
+  transition:
+    fill 0.4s,
+    stroke 0.4s;
 }
 .cs-temp {
-  font: 700 9.5px var(--body);
+  font: 800 9.5px var(--display);
   fill: #fff;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 .cs-lamp .cs-lamp-line {
   fill: none;
@@ -1623,9 +1654,10 @@ body.reconnecting::after {
 .cs-caption {
   text-align: center;
   font-family: var(--display);
+  font-weight: 800;
   font-size: 0.68rem;
-  letter-spacing: 0.16em;
-  color: var(--muted);
+  letter-spacing: 0.14em;
+  color: #30d158;
   margin-top: 1px;
 }
 
@@ -1789,18 +1821,90 @@ body.reconnecting::after {
 .pit-actions button {
   flex: 1;
 }
-.pit-progress {
-  height: 10px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.1);
-  overflow: hidden;
-  margin-top: 0.8rem;
+.pit-svc {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.6rem;
 }
-.pit-progress-fill {
-  height: 100%;
+/* the countdown, big and stencilled like a pit board; the lollipop's GO in green */
+.pit-count {
+  min-width: 5.2rem;
+  font-family: var(--display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 3.4rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-2);
+}
+.pit-count.go {
+  color: var(--good);
+}
+.pit-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pit-job {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.22rem 0.5rem;
+  border-radius: 5px;
+  font-size: 0.86rem;
+  background: rgba(255, 255, 255, 0.04);
+  transition:
+    background 0.2s,
+    opacity 0.2s;
+}
+.pit-job i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+}
+.pit-job b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pit-job.wait {
+  opacity: 0.55;
+}
+.pit-job.work {
+  background: rgba(255, 214, 10, 0.14);
+}
+.pit-job.work i {
   background: var(--accent-2);
-  transform-origin: left;
-  transform: scaleX(0);
+  box-shadow: 0 0 8px var(--accent-2);
+  animation: pit-blink 0.6s infinite alternate;
+}
+.pit-job.done i {
+  background: var(--good);
+}
+.pit-job.done b {
+  color: var(--good);
+}
+@keyframes pit-blink {
+  to {
+    opacity: 0.35;
+  }
+}
+/* during the stop the card sits low and to the side: the TV camera shows the crew at work */
+.pit-menu.servicing {
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 0 200px 1.2rem;
+  background: none;
+  pointer-events: none;
+}
+.pit-card.servicing {
+  width: min(420px, 92vw);
+  background: rgba(10, 12, 16, 0.78);
 }
 
 .hud-board .row i.pit {
@@ -3538,7 +3642,7 @@ body.mirror-on .hud-flag {
   }
 }
 body.mirror-on .hud-msg {
-  top: calc(18% + var(--mirror-h) * 0.55 + 28px);
+  top: calc(150px + var(--mirror-h));
 }
 
 /* line icons (ui/icons.ts) */
@@ -4427,4 +4531,723 @@ body.mirror-on .hud-msg {
   .lb-foot button {
     min-width: 120px;
   }
+}
+
+/* ------------------------------------------- race overlays (ui/overlays.ts) */
+.ov-delta {
+  position: relative;
+  width: 220px;
+  height: 8px;
+  margin: 0.35rem 0 0 auto;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ov-delta-mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.ov-delta-fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 50%;
+  transition: transform 0.1s linear;
+}
+/* gaining grows left from the middle, losing grows right */
+.ov-delta-fill.good {
+  right: 50%;
+  background: var(--good);
+  transform-origin: right center;
+}
+.ov-delta-fill.bad {
+  left: 50%;
+  background: var(--bad);
+  transform-origin: left center;
+}
+.ov-rel {
+  margin: 0.5rem 0 0 auto;
+  width: 250px;
+  font-family: var(--body);
+  font-size: 0.82rem;
+  text-align: left;
+  background: rgba(8, 10, 14, 0.62);
+  border-radius: 6px;
+  overflow: hidden;
+  text-shadow: none;
+}
+.ov-rel-head {
+  padding: 0.2rem 0.6rem;
+  font-family: var(--display);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.06);
+}
+.ov-rel-row {
+  display: grid;
+  grid-template-columns: 1.5rem 4px 1fr auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.14rem 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.ov-rel-row b {
+  font-weight: 700;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.75);
+}
+.ov-rel-row .chip {
+  width: 4px;
+  height: 0.95rem;
+  border-radius: 2px;
+}
+.ov-rel-row span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ov-rel-row em {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.85);
+}
+/* iRacing's relative colours: you gold, your lap white, a lap or more ahead red (lapping you), a lap or more
+   behind blue (you are lapping it), in the pit lane grey */
+.ov-rel-row.me {
+  background: rgba(255, 196, 0, 0.16);
+}
+.ov-rel-row.me span,
+.ov-rel-row.me b {
+  color: #ffc400;
+}
+.ov-rel-row.ahead span,
+.ov-rel-row.ahead em {
+  color: #ff6b6b;
+}
+.ov-rel-row.behind span,
+.ov-rel-row.behind em {
+  color: #64b5ff;
+}
+.ov-rel-row.inpit span,
+.ov-rel-row.inpit em {
+  color: rgba(255, 255, 255, 0.4);
+}
+.ov-rel-row i.pit {
+  margin-left: 0.4rem;
+  font-style: normal;
+  font-size: 0.65rem;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  background: rgba(255, 214, 10, 0.85);
+  color: #111;
+}
+.ov-inputs {
+  position: absolute;
+  right: calc(100% + 18px);
+  bottom: 4px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.ov-wheel {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border: 4px solid rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.ov-wheel-mark {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 4px;
+  height: 10px;
+  margin-left: -2px;
+  background: var(--accent-2);
+  border-radius: 2px;
+}
+.ov-bars {
+  display: flex;
+  gap: 4px;
+}
+.ov-bar {
+  position: relative;
+  width: 10px;
+  height: 64px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ov-bar-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom center;
+  transform: scaleY(0);
+}
+.ov-bar-fill.thr {
+  background: var(--good);
+}
+.ov-bar-fill.brk {
+  background: var(--bad);
+}
+/* the spotter: a band on the edge of the screen on the side a car is alongside */
+.ov-spot {
+  position: absolute;
+  top: 30%;
+  bottom: 30%;
+  width: 14px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ov-spot.left {
+  left: 0;
+  background: linear-gradient(90deg, rgba(255, 214, 10, 0.95), rgba(255, 214, 10, 0));
+}
+.ov-spot.right {
+  right: 0;
+  background: linear-gradient(270deg, rgba(255, 214, 10, 0.95), rgba(255, 214, 10, 0));
+}
+.ov-spot.show {
+  opacity: 1;
+}
+/* small screens (the phone app): the HUD's own boxes only */
+@media (max-height: 560px), (max-width: 900px) {
+  .ov-rel,
+  .ov-inputs {
+    display: none !important;
+  }
+}
+.hud-board .row .chip {
+  display: inline-block;
+  width: 3px;
+  height: 0.85rem;
+  margin-right: 0.35rem;
+  vertical-align: -0.1rem;
+  border-radius: 2px;
+}
+.hud-board .gap {
+  height: 1px;
+  margin: 0.15rem 0.6rem;
+  background: rgba(255, 255, 255, 0.18);
+}
+.hud-board .row s {
+  text-decoration: none;
+  font-size: 0.68rem;
+  margin-left: 0.3rem;
+}
+.hud-board .row s.up {
+  color: var(--good);
+}
+.hud-board .row s.down {
+  color: var(--bad);
+}
+
+/* ------------------------------------------------ damage report (ui/damagePanel.ts) */
+.dmg-panel {
+  position: absolute;
+  left: 20px;
+  top: 26%;
+  width: 290px;
+  padding: 0.55rem 0.65rem 0.6rem;
+  font-family: var(--body);
+  text-shadow: none;
+  background: rgba(6, 9, 8, 0.86);
+  border: 1px solid rgba(48, 209, 88, 0.35);
+  border-radius: 4px;
+}
+/* iRacing's black box: a green title over the car's line drawing */
+.dmg-head {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  color: #30d158;
+  margin-bottom: 0.4rem;
+}
+.dmg-body-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.dmg-car {
+  width: 112px;
+  height: auto;
+  flex: none;
+  image-rendering: auto;
+  filter: drop-shadow(0 0 2px rgba(48, 209, 88, 0.55));
+}
+.dmg-tyres {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  width: 112px;
+  margin-top: 0.4rem;
+}
+.dmg-tyre {
+  --sev: #30d158;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--sev);
+  border: 1px solid var(--sev);
+  border-radius: 2px;
+  padding: 2px 0;
+  background: color-mix(in srgb, var(--sev) 12%, transparent);
+}
+.dmg-tyre.flat {
+  color: #fff;
+  background: var(--sev);
+}
+.dmg-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.74rem;
+  min-width: 0;
+}
+.dmg-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding-left: 6px;
+  border-left: 2px solid var(--sev);
+  color: #d8dde3;
+}
+.dmg-row b {
+  color: var(--sev);
+  white-space: nowrap;
+}
+.dmg-repair {
+  margin-top: 0.4rem;
+  font-size: 0.74rem;
+  color: #ffd60a;
+}
+.dmg-repair:empty {
+  display: none;
+}
+
+/* ------------------------------------------------ driver profile (ui/social.ts profileModal) */
+.flag {
+  display: inline-block;
+  vertical-align: -0.12em;
+  margin-right: 0.35rem;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+  object-fit: cover;
+}
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.profile-row select {
+  flex: 1;
+}
+.profile-flag {
+  min-width: 32px;
+}
+.profile-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+}
+.profile-colour {
+  width: 100%;
+  height: 2.4rem;
+  padding: 0.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+}
+button.mm-avatar {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+button.mm-status.linkish {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* car numbers on the tower and the relative box */
+.hud-board .carnum,
+.ov-rel-row .carnum {
+  display: inline-block;
+  min-width: 1.5rem;
+  margin-right: 0.3rem;
+  padding: 0 0.15rem;
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  color: #111;
+  background: #f2f2f2;
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------ championship (championship.ts) */
+@media (min-width: 1101px) {
+  .mm-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 601px) and (max-width: 1100px) {
+  .mm-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.champ-card {
+  width: min(520px, 94vw);
+}
+.champ-label {
+  display: block;
+  margin: 0.9rem 0 0.35rem;
+  font-family: var(--display);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.champ-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.champ-track {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+.champ-track small {
+  color: var(--muted);
+}
+.champ-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.champ-table {
+  margin: 0.6rem 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+.champ-table li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.8rem;
+  align-items: baseline;
+  padding: 0.22rem 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.champ-table li.me {
+  background: rgba(255, 45, 61, 0.16);
+}
+.champ-table li small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.champ-results h3 {
+  margin: 1rem 0 0.2rem;
+}
+.champ-winner {
+  font-family: var(--display);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent-2);
+}
+/* the FOV calculator (settings, camera) */
+.fov-calc {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0.2rem 0 0.8rem;
+  padding: 0.7rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.fov-calc label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.fov-res {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.fov-out {
+  font-family: var(--display);
+  font-size: 1.4rem;
+}
+@media (max-width: 600px) {
+  .fov-calc {
+    grid-template-columns: 1fr;
+  }
+}
+/* iRacing's inputs widget (overlays.ts): drawn on a canvas at twice its size */
+.ov-in-canvas {
+  display: block;
+  width: 270px;
+  height: 56px;
+}
+/* the delta under the rear-view mirror, as iRacing shows it */
+.ov-mdelta {
+  position: absolute;
+  top: calc(var(--mirror-h, 0px) + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.05rem 0.55rem;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  background: rgba(10, 12, 16, 0.78);
+  border-radius: 4px;
+  text-shadow: none;
+}
+.ov-mdelta:empty {
+  display: none;
+}
+.ov-mdelta.good {
+  color: var(--good);
+}
+.ov-mdelta.bad {
+  color: var(--bad);
+}
+body:not(.mirror-on) .ov-mdelta {
+  display: none;
+}
+/* the session clock moves below the mirror's delta */
+body.mirror-on .hud-finish {
+  top: calc(44px + var(--mirror-h));
+}
+body.mirror-on .hud-pit {
+  top: calc(82px + var(--mirror-h));
+}
+body.mirror-on .hud-flag {
+  top: calc(116px + var(--mirror-h));
+}
+/* iRacing's circuit map (ui/circuitMap.ts), drawn at twice its size */
+.circuit-map canvas {
+  display: block;
+  width: 260px;
+  height: 200px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+@media (max-height: 560px), (max-width: 900px) {
+  .circuit-map canvas {
+    width: 180px;
+    height: 138px;
+  }
+}
+/* the solo career on the results screen and the driver chip (career.ts) */
+.career-gain {
+  margin-bottom: 1.2rem;
+}
+.career-gain h3 {
+  margin: 1.1rem 0 0.4rem;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  color: var(--accent-2);
+}
+.career-row {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+}
+.career-xp {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.86rem;
+}
+.career-xp div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.career-xp b {
+  font-variant-numeric: tabular-nums;
+}
+.career-xp .total {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 4px;
+  padding-top: 4px;
+  color: var(--accent-2);
+}
+.career-side {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.career-level {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--display);
+  font-weight: 700;
+}
+.career-level small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.career-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+.career-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.career-lic {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+}
+.lic {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #fff;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.career-up {
+  margin: 0;
+  color: var(--accent-2);
+  font-family: var(--display);
+  font-weight: 700;
+}
+.mm-career {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+}
+.mm-career small {
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+/* Results & Stats (app.ts weekendTable), after iRacing's */
+.weekend-stats h3 {
+  margin: 1.1rem 0 0.4rem;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  color: var(--accent-2);
+}
+.weekend-stats table {
+  width: 100%;
+  font-size: 0.86rem;
+}
+.weekend-stats tr.me td {
+  color: var(--accent-2);
+}
+.weekend-stats td small {
+  color: var(--muted);
+}
+.weekend-stats .cc {
+  font-size: 0.7rem;
+}
+.trk-layouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+/* the inputs widget carries the gear and speed (ui/overlays.ts): the old speedometer only without it */
+.inputs-on:not(.spectating) .hud-speedo,
+.inputs-on:not(.spectating) .hud-rpm {
+  display: none;
+}
+/* the player's HUD settings (ui/hud.ts: Settings → General → HUD) */
+.hud > .hud-tl,
+.hud > .hud-tr,
+.hud > .hud-bc,
+.hud > .hud-br,
+.hud > .hud-bl,
+.hud > .dmg-panel {
+  zoom: var(--hud-scale, 1);
+  opacity: var(--hud-opacity, 1);
+}
+.hud.no-timing .hud-board,
+.hud.no-lapinfo .hud-times,
+.hud.no-lapinfo .hud-tl > .hud-block,
+.hud.no-tyres .hud-bl,
+.hud.no-revlights .hud-leds,
+.hud.no-messages .hud-msg,
+.hud.no-map .hud-br {
+  display: none;
+}
+
+/* coins (career.ts): the menu chip, locked cars with their price, the results */
+.mm-coins {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  color: #ffd60a;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.mm-coins svg,
+.car-card .price svg {
+  width: 14px;
+  height: 14px;
+}
+.car-card.locked img {
+  filter: grayscale(0.85) brightness(0.65);
+}
+.car-card .price {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffd60a;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+.career-xp .coin b {
+  color: #ffd60a;
 }

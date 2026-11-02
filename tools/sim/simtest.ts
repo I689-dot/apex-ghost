@@ -127,6 +127,17 @@ console.log(
   );
 }
 
+// 1b) in first gear, no pedals for 10 s: it must stay put (no creep, no engine braking pushing it back)
+{
+  const s = setup();
+  for (let i = 0; i < 240; i++) step(s, ctl());
+  s.v.drivetrain.setGear(1);
+  const p0 = s.v.body.translation();
+  for (let i = 0; i < 1200; i++) step(s, ctl());
+  const p1 = s.v.body.translation();
+  log('rest in 1st gear (10 s, no pedals)', `${Math.hypot(p1.x - p0.x, p1.z - p0.z).toFixed(3)} m, speed ${s.v.telemetry.speed.toFixed(3)} m/s`);
+}
+
 // 2) launch: 0-100, 0-200, top speed
 {
   const s = setup();

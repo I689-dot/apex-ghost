@@ -106,6 +106,9 @@ export interface PersistedPlayer {
   tyre?: TyreChoice;
   /** Signed in: the account token (records). */
   account?: string;
+  /** Driver profile (cosmetic, as the nickname): country and car number. */
+  country?: string;
+  num?: number;
 }
 
 export interface PersistedRoom {
@@ -137,19 +140,36 @@ interface Player extends PersistedPlayer {
 }
 
 const ID_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';
-const BOT_NAMES = [
-  'AI Nova',
-  'AI Viper',
-  'AI Comet',
-  'AI Falcon',
-  'AI Rook',
-  'AI Blaze',
-  'AI Orion',
-  'AI Pulse',
-  'AI Atlas',
-  'AI Echo',
-  'AI Zephyr',
-  'AI Quasar',
+/**
+ * AI drivers: realistic names from the nationalities of a GT3 grid (GT World Challenge Europe: Germany, Britain,
+ * Belgium, the Netherlands, France, Italy, Spain, Austria, Switzerland, Denmark, Poland, the US, Australia, Brazil,
+ * Japan), invented (no real driver's name), each with the flag of its country.
+ */
+const BOT_DRIVERS: [string, string][] = [
+  ['Lukas Brenner', 'DE'],
+  ['Jonas Hartmann', 'DE'],
+  ['Felix Kramer', 'DE'],
+  ['Oliver Whitmore', 'GB'],
+  ['Callum Fletcher', 'GB'],
+  ['Harry Ashdown', 'GB'],
+  ['Maxime Delvaux', 'BE'],
+  ['Thomas Peeters', 'BE'],
+  ['Sem van Doorn', 'NL'],
+  ['Ruben Visser', 'NL'],
+  ['Hugo Marchand', 'FR'],
+  ['Théo Lefèvre', 'FR'],
+  ['Matteo Ferraresi', 'IT'],
+  ['Luca Bellandi', 'IT'],
+  ['Pablo Echeverría', 'ES'],
+  ['Álvaro Montes', 'ES'],
+  ['Niklas Eder', 'AT'],
+  ['Simon Aebischer', 'CH'],
+  ['Mads Kjeldsen', 'DK'],
+  ['Kacper Wiśniak', 'PL'],
+  ['Tyler Brooks', 'US'],
+  ['Jack Morrison', 'AU'],
+  ['Rafael Moreira', 'BR'],
+  ['Kenta Morishita', 'JP'],
 ];
 
 export class RoomCore {
@@ -288,6 +308,8 @@ export class RoomCore {
         bot: p.bot,
         tyre: p.tyre ?? 'medium',
         briefed: !!p.briefed,
+        country: p.country ?? null,
+        num: p.num ?? null,
       }));
     return {
       code: this.code,
@@ -412,6 +434,8 @@ export class RoomCore {
         existing.conn = conn;
         existing.disconnectedAt = null;
         if (msg.account) existing.account = msg.account;
+        if (msg.country) existing.country = msg.country;
+        if (msg.num) existing.num = msg.num;
         this.connPlayer.set(conn.id, existing.id);
         this.sendWelcome(existing);
         this.broadcastRoom();
@@ -442,6 +466,8 @@ export class RoomCore {
       lastDamageAt: 0,
       lastPacketAt: 0,
       ...(msg.account ? { account: msg.account } : {}),
+      ...(msg.country ? { country: msg.country } : {}),
+      ...(msg.num ? { num: msg.num } : {}),
     };
     this.players.set(p.id, p);
     this.connPlayer.set(conn.id, p.id);
@@ -648,9 +674,14 @@ export class RoomCore {
       this.send(host, { t: 'error', code: 'car_taken', message: 'No free car left for a bot.', fatal: false });
       return;
     }
-    const used = new Set([...this.players.values()].map((x) => x.nick));
-    const nick = BOT_NAMES.find((n) => !used.has(n)) ?? `AI ${this.rid(3).toUpperCase()}`;
+    // the car first (as it always was drawn), then the name and number
     const carId = free[Math.floor(this.env.random() * free.length)];
+    const used = new Set([...this.players.values()].map((x) => x.nick));
+    const free_ = BOT_DRIVERS.filter(([n]) => !used.has(n));
+    const [nick, country] = free_.length ? free_[Math.floor(this.env.random() * free_.length)] : [`AI ${this.rid(3).toUpperCase()}`, undefined];
+    const usedNums = new Set([...this.players.values()].map((x) => x.num));
+    let num = 2 + Math.floor(this.env.random() * 97);
+    while (usedNums.has(num)) num = (num % 98) + 2;
     const bot: Player = {
       id: `bot${this.rid(7)}`,
       nick,
@@ -660,6 +691,8 @@ export class RoomCore {
       joinedAt: this.env.now(),
       waiting: false,
       bot: true,
+      country,
+      num,
       tyre: planWeather(this.conditions.seed, this.conditions).initialWetness > 0.35 ? 'wet' : 'medium',
       conn: null,
       disconnectedAt: null,

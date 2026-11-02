@@ -12,11 +12,23 @@
  * The Worker calls `api()` over Durable Object RPC; it answers an HTTP status and a JSON body.
  */
 import { DurableObject } from 'cloudflare:workers';
-import { NICK_MAX, NICK_MIN, type AccountUser, type FriendEntry, type RecordRow, type UserStats } from '@apex/shared';
+import { NICK_MAX, NICK_MIN, PROFILE_RE, type AccountUser, type FriendEntry, type RecordRow, type UserStats } from '@apex/shared';
 import type { RecordEvent } from './room';
 
 export type AccountOp =
-  'register' | 'login' | 'logout' | 'delete' | 'me' | 'friends' | 'friends/add' | 'friends/accept' | 'friends/remove' | 'presence' | 'records' | 'stats';
+  | 'register'
+  | 'login'
+  | 'logout'
+  | 'delete'
+  | 'me'
+  | 'profile'
+  | 'friends'
+  | 'friends/add'
+  | 'friends/accept'
+  | 'friends/remove'
+  | 'presence'
+  | 'records'
+  | 'stats';
 
 /** An HTTP status and the JSON body (as text: RPC carries it unchanged). */
 export interface AccountReply {
@@ -133,6 +145,15 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.sql.exec(SCHEMA);
+    // the driver profile's columns (added after the first accounts)
+    const cols = new Set(this.rows<{ name: string }>('pragma table_info(users)').map((c) => c.name));
+    for (const [c, type] of [
+      ['country', 'text'],
+      ['num', 'integer'],
+      ['abbr', 'text'],
+      ['colour', 'text'],
+    ])
+      if (!cols.has(c)) this.sql.exec(`alter table users add column ${c} ${type}`);
   }
 
   private rows<T = Row>(query: string, ...args: SqlStorageValue[]): T[] {
@@ -167,6 +188,8 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
           const u = this.userOf(token);
           return u ? { status: 200, body: { user: u } } : { status: 401, body: { error: 'Sign in first.' } };
         }
+        case 'profile':
+          return { status: 200, body: { user: this.setProfile(token, body) } };
         case 'presence': {
           const u = this.requireUser(token);
           this.sql.exec('update users set last_seen = ? where id = ?', Date.now(), u.id);
@@ -197,10 +220,35 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     }
   }
 
+  /** Saves the driver profile (each field checked; null clears it). */
+  private setProfile(token: string | null, body: Record<string, unknown>): AccountUser {
+    const u = this.requireUser(token);
+    const pick = (v: unknown, ok: (x: unknown) => boolean) => (v === null || v === undefined || v === '' ? null : ok(v) ? v : undefined);
+    const country = pick(body.country, (x) => typeof x === 'string' && PROFILE_RE.country.test(x));
+    const num = pick(body.num, (x) => typeof x === 'number' && Number.isInteger(x) && x >= 1 && x <= 999);
+    const abbr = pick(body.abbr, (x) => typeof x === 'string' && PROFILE_RE.abbr.test(x));
+    const colour = pick(body.colour, (x) => typeof x === 'string' && PROFILE_RE.colour.test(x));
+    if ([country, num, abbr, colour].some((v) => v === undefined)) throw new HttpError(400, 'Check the profile fields.');
+    this.sql.exec(
+      'update users set country = ?, num = ?, abbr = ?, colour = ? where id = ?',
+      country as SqlStorageValue,
+      num as SqlStorageValue,
+      abbr as SqlStorageValue,
+      colour as SqlStorageValue,
+      u.id,
+    );
+    return this.userOf(token) as AccountUser;
+  }
+
   /** The signed-in user of a token (null: not signed in or unknown). */
   userOf(token: string | null): AccountUser | null {
     if (!token || !/^[0-9a-f]{48}$/.test(token)) return null;
-    return this.rows<AccountUser>('select u.id as id, u.nick as nick from tokens t join users u on u.id = t.user_id where t.token = ?', token)[0] ?? null;
+    return (
+      this.rows<AccountUser>(
+        'select u.id as id, u.nick as nick, u.country as country, u.num as num, u.abbr as abbr, u.colour as colour from tokens t join users u on u.id = t.user_id where t.token = ?',
+        token,
+      )[0] ?? null
+    );
   }
 
   /** Accepted friends' ids of the token's user (whom their presence is shown to); [] when unknown. */

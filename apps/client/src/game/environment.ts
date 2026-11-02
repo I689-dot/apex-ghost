@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { sunPosition, type WeatherPlan, type WeatherState } from '@apex/shared';
-import type { QualityConfig } from '../settings';
+import { settings, type QualityConfig } from '../settings';
 import { FOG_SHARED, installAtmosphereChunks, skyRadiance, sunTransmittance } from './atmosphere';
 import { SkyDome } from './sky';
 import { SHADOW_LAYER } from './carVisual';
@@ -303,7 +303,7 @@ export class Environment {
     this.rainMat.uniforms.uIntensity.value = w.rain;
     (this.rainMat.uniforms.uColor.value as THREE.Color).setRGB(0.7, 0.74, 0.8).multiplyScalar(0.15 + 0.85 * day);
 
-    renderer.toneMappingExposure = 1.0 + this.night * 1.1 + overcast * 0.12;
+    renderer.toneMappingExposure = (1.0 + this.night * 1.1 + overcast * 0.12) * settings.brightness;
   }
 
   /** Regenerates the reflection environment from the sky (call at load, then rarely). */
@@ -352,6 +352,12 @@ export class Environment {
  * Screen-space rain droplets on the windshield (cockpit view only).
  * A full-screen quad drawn last with a cheap procedural shader.
  */
+/**
+ * The wiper's geometry on screen (fractions of the view height, from the bottom) and speeds (a whole turn, there and
+ * back, in rad/s): ~1.3 s a cycle normally, ~0.85 s fast, as on a road car's two speeds.
+ */
+const WIPER = { sweep: 1.45, length: 0.78, pivotY: 0.36, normal: (Math.PI * 2) / 1.3, fast: (Math.PI * 2) / 0.85, intervalS: 3 };
+
 export class WindshieldFx {
   readonly mesh: THREE.Mesh;
   private mat: THREE.ShaderMaterial;
@@ -363,14 +369,39 @@ export class WindshieldFx {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      uniforms: { uTime: { value: 0 }, uRain: { value: 0 }, uSpeed: { value: 0 }, uAspect: { value: 1 }, uLight: { value: 1 } },
+      uniforms: {
+        uTime: { value: 0 },
+        uRain: { value: 0 },
+        uSpeed: { value: 0 },
+        uAspect: { value: 1 },
+        uLight: { value: 1 },
+        uPhase: { value: 0 },
+        uIdle: { value: 99 },
+        uOmega: { value: WIPER.normal },
+      },
       vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
       // Drops are tiny lenses: mostly clear, a bright lower crescent (they refract the sky upside down), a darker
       // rim and a pin-point highlight. They stay on the windscreen (upper part of the view), are pushed up and
-      // stretched by the airflow at speed and leave faint streaks.
+      // stretched by the airflow at speed and leave faint streaks. The wiper (one blade pivoting at the bottom
+      // middle, as on most GT3 cars) clears what it sweeps; the rain fills it in again, and a film of water trails
+      // the blade.
       fragmentShader: /* glsl */ `
         uniform float uTime; uniform float uRain; uniform float uSpeed; uniform float uAspect; uniform float uLight;
+        uniform float uPhase; uniform float uIdle; uniform float uOmega;
         varying vec2 vUv;
+        const float PI = 3.14159265;
+        const float SWEEP = ${WIPER.sweep.toFixed(3)};
+        const float BLADE = ${WIPER.length.toFixed(3)};
+        const vec2 PIVOT_V = vec2(0.5, ${WIPER.pivotY.toFixed(3)});
+        // seconds since the blade last passed angle phi (from straight up, + to the right); the blade's angle is
+        // -SWEEP * cos(phase): parked on the left at a whole turn, on the right at half a turn
+        float sinceWiped(float phi) {
+          if (abs(phi) > SWEEP) return 1e3;
+          float a1 = acos(clamp(-phi / SWEEP, -1.0, 1.0));
+          float a2 = 2.0 * PI - a1;
+          float gap = min(mod(uPhase - a1, 2.0 * PI), mod(uPhase - a2, 2.0 * PI));
+          return gap / uOmega + uIdle;
+        }
         float h(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
         // xyz: lens normal (x, y) and coverage; w: streak
         vec4 drops(vec2 uv, float scale, float t, float seed) {
@@ -391,6 +422,12 @@ export class WindshieldFx {
         }
         void main() {
           vec2 uv = vec2(vUv.x * uAspect, vUv.y);
+          vec2 pivot = vec2(PIVOT_V.x * uAspect, PIVOT_V.y);
+          vec2 rel = uv - pivot;
+          float r = length(rel);
+          float since = r < BLADE ? sinceWiped(atan(rel.x, rel.y)) : 1e3;
+          // the rain refills the swept glass: about a second in a downpour, several in a drizzle
+          float refill = clamp(since * (0.25 + uRain * 1.6), 0.0, 1.0);
           vec4 a = drops(uv, 11.0, uTime, 0.0);
           vec4 b = drops(uv + 0.37, 19.0, uTime * 1.3, 5.0);
           vec4 c = drops(uv + 0.71, 31.0, uTime * 1.7, 9.0);
@@ -402,10 +439,15 @@ export class WindshieldFx {
           float lum = clamp(0.55 - 0.45 * n.y, 0.0, 1.0) * uLight;
           float spec = pow(max(0.0, 1.0 - length(n - vec2(-0.35, 0.45)) * 2.2), 6.0) * uLight;
           vec3 col = vec3(0.82, 0.88, 0.95) * lum + spec;
-          float alpha = cov * (0.06 + 0.32 * rim) + spec * cov * 0.8 + (a.w + b.w + c.w) * 0.06;
+          float alpha = (cov * (0.06 + 0.32 * rim) + spec * cov * 0.8 + (a.w + b.w + c.w) * 0.06) * refill;
+          // the film of water the blade leaves: a bright smear for a moment, thinning out
+          float film = since < 0.35 ? (1.0 - since / 0.35) * 0.10 * uRain : 0.0;
+          col = mix(col, vec3(0.86, 0.9, 0.96) * uLight, film > 0.0 ? 0.5 : 0.0);
+          alpha += film;
           // only on the windscreen: fade out towards the dashboard (lower part of the view)
-          alpha *= smoothstep(0.36, 0.52, vUv.y);
-          gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.6));
+          float screen = smoothstep(0.36, 0.52, vUv.y);
+          alpha *= screen;
+          gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.95));
         }`,
     });
     this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.mat);
@@ -427,6 +469,9 @@ export class WindshieldFx {
     };
   }
 
+  /** The wiper: where it is in its turn (0 … 2π: there and back), how fast it runs, the pause in a drizzle. */
+  private wipe = { frac: 0, omega: WIPER.normal, wait: 0, idle: 99 };
+
   update(dt: number, rain: number, speed: number, aspect: number, light: number, lookingForward: boolean): void {
     const u = this.mat.uniforms;
     u.uTime.value += dt;
@@ -434,7 +479,32 @@ export class WindshieldFx {
     u.uSpeed.value = Math.min(1, speed / 45);
     u.uAspect.value = aspect;
     u.uLight.value = light;
+    // no wipers (they looked wrong drawn over the view): the drops stay, the airflow moves them
+    // this.updateWiper(dt, rain);
+    u.uPhase.value = this.wipe.frac;
+    u.uOmega.value = this.wipe.omega;
+    u.uIdle.value = this.wipe.idle;
     this.mesh.visible = rain > 0.02 && lookingForward;
+  }
+
+  /**
+   * Automatic wipers, as a driver would set them: off in the dry, one sweep every few seconds in a drizzle,
+   * continuous in steady rain, fast in a downpour. A sweep in progress always finishes back at the park position.
+   */
+  private updateWiper(dt: number, rain: number): void {
+    const w = this.wipe;
+    const mode = rain < 0.04 ? 'off' : rain < 0.25 ? 'interval' : rain < 0.6 ? 'normal' : 'fast';
+    if (w.frac === 0) {
+      w.idle += dt;
+      w.wait -= dt;
+      if (mode === 'off' || (mode === 'interval' && w.wait > 0)) return;
+      w.omega = mode === 'fast' ? WIPER.fast : WIPER.normal;
+      w.wait = WIPER.intervalS;
+    }
+    w.idle = 0;
+    w.frac += w.omega * dt;
+    // back at the park position
+    if (w.frac >= Math.PI * 2) w.frac = 0;
   }
 
   setCrack(frontDamage: number, lookingForward: boolean): void {

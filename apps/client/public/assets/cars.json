@@ -13,11 +13,11 @@
    "color": "#1d2f55",
    "thumbnail": "assets/cars/vantage_gt3_evo_heart_of_racing/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/vantage_gt3_evo_heart_of_racing/lod0.glb?v=mvck5wjy",
-    "assets/cars/vantage_gt3_evo_heart_of_racing/lod1.glb?v=mvck5wjy",
-    "assets/cars/vantage_gt3_evo_heart_of_racing/lod2.glb?v=mvck5wjy"
+    "assets/cars/vantage_gt3_evo_heart_of_racing/lod0.glb?v=mvwdtpvl",
+    "assets/cars/vantage_gt3_evo_heart_of_racing/lod1.glb?v=mvwdtpvl",
+    "assets/cars/vantage_gt3_evo_heart_of_racing/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 5049140,
+   "bytes": 5384600,
    "cockpit": "assets/cars/vantage_gt3_evo_heart_of_racing/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 8299868,
    "dims": {
@@ -181,11 +181,11 @@
    "color": "#0b5d3b",
    "thumbnail": "assets/cars/aston_martin_vantage_safety_car/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/aston_martin_vantage_safety_car/lod0.glb?v=mvtz9wm0",
-    "assets/cars/aston_martin_vantage_safety_car/lod1.glb?v=mvtz9wm0",
-    "assets/cars/aston_martin_vantage_safety_car/lod2.glb?v=mvtz9wm0"
+    "assets/cars/aston_martin_vantage_safety_car/lod0.glb?v=mvwdtpvl",
+    "assets/cars/aston_martin_vantage_safety_car/lod1.glb?v=mvwdtpvl",
+    "assets/cars/aston_martin_vantage_safety_car/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3355916,
+   "bytes": 3571516,
    "cockpit": "assets/cars/aston_martin_vantage_safety_car/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 2923412,
    "dims": {
@@ -333,11 +333,11 @@
    "color": "#c8332b",
    "thumbnail": "assets/cars/2020_audi_r8_lms_evo/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2020_audi_r8_lms_evo/lod0.glb?v=mvck5wjy",
-    "assets/cars/2020_audi_r8_lms_evo/lod1.glb?v=mvck5wjy",
-    "assets/cars/2020_audi_r8_lms_evo/lod2.glb?v=mvck5wjy"
+    "assets/cars/2020_audi_r8_lms_evo/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2020_audi_r8_lms_evo/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2020_audi_r8_lms_evo/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3943296,
+   "bytes": 4539404,
    "cockpit": "assets/cars/2020_audi_r8_lms_evo/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 2959044,
    "dims": {
@@ -497,11 +497,11 @@
    "color": "#d23a2a",
    "thumbnail": "assets/cars/bmw_m4_touring_nh_24h/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/bmw_m4_touring_nh_24h/lod0.glb?v=mvck5wjy",
-    "assets/cars/bmw_m4_touring_nh_24h/lod1.glb?v=mvck5wjy",
-    "assets/cars/bmw_m4_touring_nh_24h/lod2.glb?v=mvck5wjy"
+    "assets/cars/bmw_m4_touring_nh_24h/lod0.glb?v=mvwdtpvl",
+    "assets/cars/bmw_m4_touring_nh_24h/lod1.glb?v=mvwdtpvl",
+    "assets/cars/bmw_m4_touring_nh_24h/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3099880,
+   "bytes": 3301564,
    "cockpit": "assets/cars/bmw_m4_touring_nh_24h/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 4065392,
    "dims": {
@@ -668,11 +668,11 @@
    "color": "#0a0a0a",
    "thumbnail": "assets/cars/bmw_m4_gt3_vecarz/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/bmw_m4_gt3_vecarz/lod0.glb?v=mvtz9wm0",
-    "assets/cars/bmw_m4_gt3_vecarz/lod1.glb?v=mvtz9wm0",
-    "assets/cars/bmw_m4_gt3_vecarz/lod2.glb?v=mvtz9wm0"
+    "assets/cars/bmw_m4_gt3_vecarz/lod0.glb?v=mvwdtpvl",
+    "assets/cars/bmw_m4_gt3_vecarz/lod1.glb?v=mvwdtpvl",
+    "assets/cars/bmw_m4_gt3_vecarz/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4634896,
+   "bytes": 4920860,
    "cockpit": "assets/cars/bmw_m4_gt3_vecarz/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 7359016,
    "dims": {
@@ -853,11 +853,11 @@
    "color": "#141414",
    "thumbnail": "assets/cars/2025_bmw_m4_gt3_evo_g82/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod0.glb?v=mvck5wjy",
-    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod1.glb?v=mvck5wjy",
-    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod2.glb?v=mvck5wjy"
+    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2025_bmw_m4_gt3_evo_g82/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3179940,
+   "bytes": 3714072,
    "cockpit": "assets/cars/2025_bmw_m4_gt3_evo_g82/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 1892888,
    "dims": {
@@ -1025,11 +1025,11 @@
    "color": "#1e5bd6",
    "thumbnail": "assets/cars/bmw_m4_gt3_evo_2026/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/bmw_m4_gt3_evo_2026/lod0.glb?v=mvtz9wm0",
-    "assets/cars/bmw_m4_gt3_evo_2026/lod1.glb?v=mvtz9wm0",
-    "assets/cars/bmw_m4_gt3_evo_2026/lod2.glb?v=mvtz9wm0"
+    "assets/cars/bmw_m4_gt3_evo_2026/lod0.glb?v=mvwdtpvl",
+    "assets/cars/bmw_m4_gt3_evo_2026/lod1.glb?v=mvwdtpvl",
+    "assets/cars/bmw_m4_gt3_evo_2026/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 6551308,
+   "bytes": 7460968,
    "cockpit": "assets/cars/bmw_m4_gt3_evo_2026/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 8781564,
    "dims": {
@@ -1203,11 +1203,11 @@
    "color": "#f5a800",
    "thumbnail": "assets/cars/corvette_z06_gt3r/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/corvette_z06_gt3r/lod0.glb?v=mvtz9wm0",
-    "assets/cars/corvette_z06_gt3r/lod1.glb?v=mvtz9wm0",
-    "assets/cars/corvette_z06_gt3r/lod2.glb?v=mvtz9wm0"
+    "assets/cars/corvette_z06_gt3r/lod0.glb?v=mvwdtpvl",
+    "assets/cars/corvette_z06_gt3r/lod1.glb?v=mvwdtpvl",
+    "assets/cars/corvette_z06_gt3r/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3333572,
+   "bytes": 3956940,
    "cockpit": "assets/cars/corvette_z06_gt3r/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 3018572,
    "dims": {
@@ -1379,11 +1379,11 @@
    "color": "#c8102e",
    "thumbnail": "assets/cars/ferrari_296_challenge_2024/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/ferrari_296_challenge_2024/lod0.glb?v=mvck5wjy",
-    "assets/cars/ferrari_296_challenge_2024/lod1.glb?v=mvck5wjy",
-    "assets/cars/ferrari_296_challenge_2024/lod2.glb?v=mvck5wjy"
+    "assets/cars/ferrari_296_challenge_2024/lod0.glb?v=mvwdtpvl",
+    "assets/cars/ferrari_296_challenge_2024/lod1.glb?v=mvwdtpvl",
+    "assets/cars/ferrari_296_challenge_2024/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4593124,
+   "bytes": 5463688,
    "cockpit": "assets/cars/ferrari_296_challenge_2024/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 5815544,
    "dims": {
@@ -1556,11 +1556,11 @@
    "color": "#1c2f6b",
    "thumbnail": "assets/cars/ferrari_296_gt3_verstappen/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/ferrari_296_gt3_verstappen/lod0.glb?v=mvtz9wm0",
-    "assets/cars/ferrari_296_gt3_verstappen/lod1.glb?v=mvtz9wm0",
-    "assets/cars/ferrari_296_gt3_verstappen/lod2.glb?v=mvtz9wm0"
+    "assets/cars/ferrari_296_gt3_verstappen/lod0.glb?v=mvwdtpvl",
+    "assets/cars/ferrari_296_gt3_verstappen/lod1.glb?v=mvwdtpvl",
+    "assets/cars/ferrari_296_gt3_verstappen/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 7245884,
+   "bytes": 8538576,
    "cockpit": "assets/cars/ferrari_296_gt3_verstappen/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 11115068,
    "dims": {
@@ -1733,11 +1733,11 @@
    "color": "#2b5fb3",
    "thumbnail": "assets/cars/ford_mustang_gt3/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/ford_mustang_gt3/lod0.glb?v=mvtz9wm0",
-    "assets/cars/ford_mustang_gt3/lod1.glb?v=mvtz9wm0",
-    "assets/cars/ford_mustang_gt3/lod2.glb?v=mvtz9wm0"
+    "assets/cars/ford_mustang_gt3/lod0.glb?v=mvwdtpvl",
+    "assets/cars/ford_mustang_gt3/lod1.glb?v=mvwdtpvl",
+    "assets/cars/ford_mustang_gt3/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 7653724,
+   "bytes": 8779236,
    "cockpit": "assets/cars/ford_mustang_gt3/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 11608820,
    "dims": {
@@ -1910,11 +1910,11 @@
    "color": "#f0f0f0",
    "thumbnail": "assets/cars/lamborghini_huracan_gt3_evo/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/lamborghini_huracan_gt3_evo/lod0.glb?v=mvck5wjy",
-    "assets/cars/lamborghini_huracan_gt3_evo/lod1.glb?v=mvck5wjy",
-    "assets/cars/lamborghini_huracan_gt3_evo/lod2.glb?v=mvck5wjy"
+    "assets/cars/lamborghini_huracan_gt3_evo/lod0.glb?v=mvwdtpvl",
+    "assets/cars/lamborghini_huracan_gt3_evo/lod1.glb?v=mvwdtpvl",
+    "assets/cars/lamborghini_huracan_gt3_evo/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 1153528,
+   "bytes": 1542848,
    "cockpit": "assets/cars/lamborghini_huracan_gt3_evo/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 2167396,
    "dims": {
@@ -2069,11 +2069,11 @@
    "color": "#1b1b1b",
    "thumbnail": "assets/cars/2023_lamborghini_huracan_gt3_evo2/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod0.glb?v=mvck5wjy",
-    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod1.glb?v=mvck5wjy",
-    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod2.glb?v=mvck5wjy"
+    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2023_lamborghini_huracan_gt3_evo2/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3792824,
+   "bytes": 4632636,
    "cockpit": "assets/cars/2023_lamborghini_huracan_gt3_evo2/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 3973136,
    "dims": {
@@ -2229,7 +2229,12 @@
     "gearbox": "6-speed Xtrac sequential",
     "team": "Lamborghini Squadra Corse customer racing"
    },
-   "role": null
+   "role": null,
+   "look": {
+    "tint": {
+     "DASH_PANEL_ALCANTRA_005": 0.22
+    }
+   }
   },
   {
    "id": "lamborghini_huracan_gt3_evo2",
@@ -2240,11 +2245,11 @@
    "color": "#c7c22c",
    "thumbnail": "assets/cars/lamborghini_huracan_gt3_evo2/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/lamborghini_huracan_gt3_evo2/lod0.glb?v=mvck5wjy",
-    "assets/cars/lamborghini_huracan_gt3_evo2/lod1.glb?v=mvck5wjy",
-    "assets/cars/lamborghini_huracan_gt3_evo2/lod2.glb?v=mvck5wjy"
+    "assets/cars/lamborghini_huracan_gt3_evo2/lod0.glb?v=mvwdtpvl",
+    "assets/cars/lamborghini_huracan_gt3_evo2/lod1.glb?v=mvwdtpvl",
+    "assets/cars/lamborghini_huracan_gt3_evo2/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 6601124,
+   "bytes": 7107104,
    "cockpit": "assets/cars/lamborghini_huracan_gt3_evo2/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 7188980,
    "dims": {
@@ -2384,7 +2389,15 @@
     "gearbox": "6-speed Xtrac sequential",
     "team": "Iron Lynx"
    },
-   "role": null
+   "role": null,
+   "look": {
+    "tint": {
+     "mat_227": 0.3
+    },
+    "strip": [
+     "mat_14"
+    ]
+   }
   },
   {
    "id": "lamborghini_temerario_gt3",
@@ -2395,11 +2408,11 @@
    "color": "#8fd14f",
    "thumbnail": "assets/cars/lamborghini_temerario_gt3/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/lamborghini_temerario_gt3/lod0.glb?v=mvtz9wm0",
-    "assets/cars/lamborghini_temerario_gt3/lod1.glb?v=mvtz9wm0",
-    "assets/cars/lamborghini_temerario_gt3/lod2.glb?v=mvtz9wm0"
+    "assets/cars/lamborghini_temerario_gt3/lod0.glb?v=mvwdtpvl",
+    "assets/cars/lamborghini_temerario_gt3/lod1.glb?v=mvwdtpvl",
+    "assets/cars/lamborghini_temerario_gt3/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4923068,
+   "bytes": 5593624,
    "cockpit": "assets/cars/lamborghini_temerario_gt3/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 6973932,
    "dims": {
@@ -2552,7 +2565,17 @@
     "gearbox": "6-speed sequential",
     "team": "Lamborghini Squadra Corse (2026 debut with Pfaff Motorsports)"
    },
-   "role": null
+   "role": null,
+   "look": {
+    "glass": [
+     "Vetri_LPT",
+     "INT_Vetro"
+    ],
+    "strip": [
+     "Material.009",
+     "Banner_LPT"
+    ]
+   }
   },
   {
    "id": "lexus_rc_f_gt3",
@@ -2563,11 +2586,11 @@
    "color": "#e6e6e6",
    "thumbnail": "assets/cars/lexus_rc_f_gt3/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/lexus_rc_f_gt3/lod0.glb?v=mvtz9wm0",
-    "assets/cars/lexus_rc_f_gt3/lod1.glb?v=mvtz9wm0",
-    "assets/cars/lexus_rc_f_gt3/lod2.glb?v=mvtz9wm0"
+    "assets/cars/lexus_rc_f_gt3/lod0.glb?v=mvwdtpvl",
+    "assets/cars/lexus_rc_f_gt3/lod1.glb?v=mvwdtpvl",
+    "assets/cars/lexus_rc_f_gt3/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 5859428,
+   "bytes": 7105480,
    "cockpit": "assets/cars/lexus_rc_f_gt3/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 6029296,
    "dims": {
@@ -2723,7 +2746,13 @@
     "gearbox": "6-speed sequential",
     "team": "Lexus customer racing (IMSA GTD, WEC LMGT3)"
    },
-   "role": null
+   "role": null,
+   "look": {
+    "tint": {
+     "int_carbon": 0.22,
+     "cockpit_lr": 0.3
+    }
+   }
   },
   {
    "id": "2015_mclaren_650s_gt3",
@@ -2734,11 +2763,11 @@
    "color": "#1d1f24",
    "thumbnail": "assets/cars/2015_mclaren_650s_gt3/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2015_mclaren_650s_gt3/lod0.glb?v=mvck5wjy",
-    "assets/cars/2015_mclaren_650s_gt3/lod1.glb?v=mvck5wjy",
-    "assets/cars/2015_mclaren_650s_gt3/lod2.glb?v=mvck5wjy"
+    "assets/cars/2015_mclaren_650s_gt3/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2015_mclaren_650s_gt3/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2015_mclaren_650s_gt3/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3777672,
+   "bytes": 4929684,
    "cockpit": "assets/cars/2015_mclaren_650s_gt3/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 4110200,
    "dims": {
@@ -2895,11 +2924,11 @@
    "color": "#2a6cc4",
    "thumbnail": "assets/cars/2020_mclaren_720s_gt3/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2020_mclaren_720s_gt3/lod0.glb?v=mvck5wjy",
-    "assets/cars/2020_mclaren_720s_gt3/lod1.glb?v=mvck5wjy",
-    "assets/cars/2020_mclaren_720s_gt3/lod2.glb?v=mvck5wjy"
+    "assets/cars/2020_mclaren_720s_gt3/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2020_mclaren_720s_gt3/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2020_mclaren_720s_gt3/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4646464,
+   "bytes": 5444876,
    "cockpit": "assets/cars/2020_mclaren_720s_gt3/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 5044948,
    "dims": {
@@ -3078,11 +3107,11 @@
    "color": "#c8321e",
    "thumbnail": "assets/cars/mclaren_720s_gt3_inception_racing/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/mclaren_720s_gt3_inception_racing/lod0.glb?v=mvck5wjy",
-    "assets/cars/mclaren_720s_gt3_inception_racing/lod1.glb?v=mvck5wjy",
-    "assets/cars/mclaren_720s_gt3_inception_racing/lod2.glb?v=mvck5wjy"
+    "assets/cars/mclaren_720s_gt3_inception_racing/lod0.glb?v=mvwdtpvl",
+    "assets/cars/mclaren_720s_gt3_inception_racing/lod1.glb?v=mvwdtpvl",
+    "assets/cars/mclaren_720s_gt3_inception_racing/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 3322080,
+   "bytes": 3781332,
    "cockpit": "assets/cars/mclaren_720s_gt3_inception_racing/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 5302584,
    "dims": {
@@ -3246,11 +3275,11 @@
    "color": "#d98a2b",
    "thumbnail": "assets/cars/mclaren_720s_lmgt3_evo/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/mclaren_720s_lmgt3_evo/lod0.glb?v=mvck5wjy",
-    "assets/cars/mclaren_720s_lmgt3_evo/lod1.glb?v=mvck5wjy",
-    "assets/cars/mclaren_720s_lmgt3_evo/lod2.glb?v=mvck5wjy"
+    "assets/cars/mclaren_720s_lmgt3_evo/lod0.glb?v=mvwdtpvl",
+    "assets/cars/mclaren_720s_lmgt3_evo/lod1.glb?v=mvwdtpvl",
+    "assets/cars/mclaren_720s_lmgt3_evo/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 5306468,
+   "bytes": 5800464,
    "cockpit": "assets/cars/mclaren_720s_lmgt3_evo/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 7228128,
    "dims": {
@@ -3404,11 +3433,11 @@
    "color": "#f2a7c7",
    "thumbnail": "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod0.glb?v=mvck5wjy",
-    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod1.glb?v=mvck5wjy",
-    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod2.glb?v=mvck5wjy"
+    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4124528,
+   "bytes": 5050980,
    "cockpit": "assets/cars/2015_mercedes_amg_gt3_marin_kitagawa/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 4108532,
    "dims": {
@@ -3576,11 +3605,11 @@
    "color": "#1f3b6b",
    "thumbnail": "assets/cars/mercedes_amg_gt3_evo/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/mercedes_amg_gt3_evo/lod0.glb?v=mvck5wjy",
-    "assets/cars/mercedes_amg_gt3_evo/lod1.glb?v=mvck5wjy",
-    "assets/cars/mercedes_amg_gt3_evo/lod2.glb?v=mvck5wjy"
+    "assets/cars/mercedes_amg_gt3_evo/lod0.glb?v=mvwdtpvl",
+    "assets/cars/mercedes_amg_gt3_evo/lod1.glb?v=mvwdtpvl",
+    "assets/cars/mercedes_amg_gt3_evo/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 2512376,
+   "bytes": 3173432,
    "cockpit": "assets/cars/mercedes_amg_gt3_evo/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 2824608,
    "dims": {
@@ -3740,11 +3769,11 @@
    "color": "#1c2b4f",
    "thumbnail": "assets/cars/mercedes_amg_gt3_red_bull_racing/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod0.glb?v=mvck5wjy",
-    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod1.glb?v=mvck5wjy",
-    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod2.glb?v=mvck5wjy"
+    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod0.glb?v=mvwdtpvl",
+    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod1.glb?v=mvwdtpvl",
+    "assets/cars/mercedes_amg_gt3_red_bull_racing/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 6970704,
+   "bytes": 8016316,
    "cockpit": "assets/cars/mercedes_amg_gt3_red_bull_racing/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 7073404,
    "dims": {
@@ -3910,11 +3939,11 @@
    "color": "#2b2d30",
    "thumbnail": "assets/cars/2022_mercedes_amg_project_one/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2022_mercedes_amg_project_one/lod0.glb?v=mvck5wjy",
-    "assets/cars/2022_mercedes_amg_project_one/lod1.glb?v=mvck5wjy",
-    "assets/cars/2022_mercedes_amg_project_one/lod2.glb?v=mvck5wjy"
+    "assets/cars/2022_mercedes_amg_project_one/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2022_mercedes_amg_project_one/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2022_mercedes_amg_project_one/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4305816,
+   "bytes": 4866032,
    "cockpit": "assets/cars/2022_mercedes_amg_project_one/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 4519704,
    "dims": {
@@ -4087,11 +4116,11 @@
    "color": "#c9962b",
    "thumbnail": "assets/cars/2024_porsche_992_gt3_r/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/2024_porsche_992_gt3_r/lod0.glb?v=mvck5wjy",
-    "assets/cars/2024_porsche_992_gt3_r/lod1.glb?v=mvck5wjy",
-    "assets/cars/2024_porsche_992_gt3_r/lod2.glb?v=mvck5wjy"
+    "assets/cars/2024_porsche_992_gt3_r/lod0.glb?v=mvwdtpvl",
+    "assets/cars/2024_porsche_992_gt3_r/lod1.glb?v=mvwdtpvl",
+    "assets/cars/2024_porsche_992_gt3_r/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 4013096,
+   "bytes": 4738336,
    "cockpit": "assets/cars/2024_porsche_992_gt3_r/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 4888308,
    "dims": {
@@ -4261,11 +4290,11 @@
    "color": "#d0d0d0",
    "thumbnail": "assets/cars/porsche_992_gt3_r/thumb.webp?v=mvck5wjy",
    "lods": [
-    "assets/cars/porsche_992_gt3_r/lod0.glb?v=mvck5wjy",
-    "assets/cars/porsche_992_gt3_r/lod1.glb?v=mvck5wjy",
-    "assets/cars/porsche_992_gt3_r/lod2.glb?v=mvck5wjy"
+    "assets/cars/porsche_992_gt3_r/lod0.glb?v=mvwdtpvl",
+    "assets/cars/porsche_992_gt3_r/lod1.glb?v=mvwdtpvl",
+    "assets/cars/porsche_992_gt3_r/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 5031548,
+   "bytes": 5819588,
    "cockpit": "assets/cars/porsche_992_gt3_r/cockpit.glb?v=mvck5wjy",
    "cockpitBytes": 6021780,
    "dims": {
@@ -4435,11 +4464,11 @@
    "color": "#86b5df",
    "thumbnail": "assets/cars/porsche_911_gt3_r_rennsport/thumb.webp?v=mvtz9wm0",
    "lods": [
-    "assets/cars/porsche_911_gt3_r_rennsport/lod0.glb?v=mvtz9wm0",
-    "assets/cars/porsche_911_gt3_r_rennsport/lod1.glb?v=mvtz9wm0",
-    "assets/cars/porsche_911_gt3_r_rennsport/lod2.glb?v=mvtz9wm0"
+    "assets/cars/porsche_911_gt3_r_rennsport/lod0.glb?v=mvwdtpvl",
+    "assets/cars/porsche_911_gt3_r_rennsport/lod1.glb?v=mvwdtpvl",
+    "assets/cars/porsche_911_gt3_r_rennsport/lod2.glb?v=mvwdtpvl"
    ],
-   "bytes": 6709880,
+   "bytes": 7645424,
    "cockpit": "assets/cars/porsche_911_gt3_r_rennsport/cockpit.glb?v=mvtz9wm0",
    "cockpitBytes": 6677128,
    "dims": {
@@ -4594,7 +4623,12 @@
     "gearbox": "6-speed sequential",
     "team": "Porsche Motorsport (limited edition, track only)"
    },
-   "role": null
+   "role": null,
+   "look": {
+    "plain": {
+     "MI_Suede_Tile_Tow_Normalmaps": "#1d1e21"
+    }
+   }
   }
  ]
 }

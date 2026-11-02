@@ -16,6 +16,10 @@ class_name = "DirectoryDO"
 name = "ACCOUNTS"
 class_name = "AccountsDO"
 
+[[durable_objects.bindings]]
+name = "SIGNAL"
+class_name = "SignalDO"
+
 # Free plan: Durable Objects must be SQLite-backed.
 [[migrations]]
 tag = "v1"
@@ -30,6 +34,11 @@ new_sqlite_classes = ["DirectoryDO"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["AccountsDO"]
+
+# WebRTC signalling for races hosted on a device (signal.ts; keeps nothing in storage)
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["SignalDO"]
 
 [observability]
 enabled = false

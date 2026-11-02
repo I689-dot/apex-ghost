@@ -310,6 +310,12 @@ export class Wheel {
   nz = 0;
   omega = 0;
   angle = 0;
+  /**
+   * A flat spot from a lock-up (0 … 1): the tread scrubbed in one place while the wheel slid. It thumps once a
+   * revolution (more with speed), costs a little grip and wears that tyre faster; only new tyres take it away (ACC
+   * models them; F1: "most bad flat spots are terminal for the tyre").
+   */
+  flatSpot = 0;
   steer = 0;
   fz = 0;
   slipRatio = 0;
@@ -546,6 +552,7 @@ export class Vehicle {
     this.compound = compound;
     for (const w of this.wheels) {
       w.wear = 0;
+      w.flatSpot = 0;
       w.temp = tempC;
       w.setC = tempC;
       const set = this.setup.pressure;
@@ -903,7 +910,10 @@ export class Vehicle {
       }
     }
     tel.airborne = contacts === 0 ? tel.airborne + dt : 0;
-    tel.surfaceRumble = rumble;
+    // a flat-spotted tyre shakes the car (the cockpit's vibration, the pad's rumble) at speed
+    let flat = 0;
+    for (const w of this.wheels) flat = Math.max(flat, w.flatSpot);
+    tel.surfaceRumble = Math.max(rumble, flat * 0.6 * Math.min(1, speed / 30));
 
     // spring + damper + anti-roll
     const arbF = s.antiRollFront;
@@ -925,6 +935,8 @@ export class Vehicle {
       const arb = w.front ? arbF : arbR;
       f += arb * (w.compression - other.compression);
       if (w.compression > w.travel) f += 350000 * (w.compression - w.travel); // bump stop
+      // a flat spot: a short push each revolution, where the flat part meets the road
+      if (w.flatSpot > 0.01) f += w.flatSpot * 2600 * Math.min(1, speed / 25) * Math.max(0, Math.cos(w.angle)) ** 16;
       w.fz = Math.max(0, f);
     }
 
@@ -1045,7 +1057,14 @@ export class Vehicle {
       const off = lean - CHASSIS.camberRoll * CHASSIS.camberRollRef;
       const camberGrip = 1 - Math.min(0.08, CHASSIS.camberGrip * off * off);
       const mu =
-        muBase * surf.grip * dmg.gripScale(w.key) * tyreTempGrip(w.temp, this.compound.optimumC) * wearGrip(w.wear) * pressureGrip(w.pressure) * camberGrip;
+        muBase *
+        surf.grip *
+        dmg.gripScale(w.key) *
+        tyreTempGrip(w.temp, this.compound.optimumC) *
+        wearGrip(w.wear) *
+        pressureGrip(w.pressure) *
+        camberGrip *
+        (1 - 0.06 * w.flatSpot);
       const fz = w.fz;
       const R = w.radius;
       const den = Math.max(Math.abs(vx), 2.5);
@@ -1104,7 +1123,10 @@ export class Vehicle {
       w.temp += ((heat - cool) / (TYRE_TEMP.heatCapacity * this.compound.heatCap * size)) * dt;
       // tread wear from sliding energy, faster when overheated
       const over = Math.max(0, w.temp - this.compound.optimumC - 15) / 30;
-      w.wear = Math.min(1, w.wear + slipPower * dt * WEAR_PER_J * wearRate(this.compound, this.wetness) * (1 + over));
+      w.wear = Math.min(1, w.wear + slipPower * dt * WEAR_PER_J * wearRate(this.compound, this.wetness) * (1 + over) * dmg.wearScale(w.key) * (1 + w.flatSpot));
+      // locked under braking at speed: the tread scrubs flat where it touches (a second at 150 km/h: a clear thump)
+      if (w.contact && brakeIn > 0.25 && Math.abs(vF) > 12 && w.slipRatio < -0.75)
+        w.flatSpot = Math.min(1, w.flatSpot + dt * 0.11 * Math.min(2, Math.abs(vF) / 40));
       // force at the contact patch, raised towards a roll centre to tame roll-over
       const fwx = wfx * fxT + wlx * fyT + nx * fz;
       const fwy = wfy * fxT + wly * fyT + ny * fz;
@@ -1125,14 +1147,16 @@ export class Vehicle {
     const heaveMm =
       ((W0[0].compression + W0[1].compression - (2 * W0[0].fz0) / W0[0].k + W0[2].compression + W0[3].compression - (2 * W0[2].fz0) / W0[2].k) / 4) * 1000;
     const heave = Math.max(1 - CHASSIS.heaveMax, Math.min(1 + CHASSIS.heaveMax, 1 + CHASSIS.heavePerMm * heaveMm));
-    const df = 0.5 * this.airDensity * s.downforceArea * dmg.downforceScale() * this.wake.downforce * vF * vF * yawKeep * heave;
+    const df = 0.5 * this.airDensity * s.downforceArea * this.wake.downforce * vF * vF * yawKeep * heave;
     // pitch: the nose down (front springs more compressed than static, the rear less) moves the balance forward
     const W = this.wheels;
     const pitchMm =
       (((W[0].compression + W[1].compression) / 2 - W[0].fz0 / W[0].k - ((W[2].compression + W[3].compression) / 2 - W[2].fz0 / W[2].k)) * 1000) | 0;
     const shift = Math.max(-CHASSIS.balanceMax, Math.min(CHASSIS.balanceMax, pitchMm * CHASSIS.balancePerMm)) + CHASSIS.yawRear * (1 - yawKeep);
-    const dfF = df * Math.max(0.2, Math.min(0.7, s.aeroBalanceFront + shift));
-    const dfR = df - dfF;
+    // damage: the front and the rear lose their own downforce (a broken splitter understeers, a broken wing oversteers)
+    const dfF0 = df * Math.max(0.2, Math.min(0.7, s.aeroBalanceFront + shift));
+    const dfF = dfF0 * dmg.downforceFront();
+    const dfR = (df - dfF0) * dmg.downforceRear();
     const zf = this.car.wheels.FL.position[2];
     const zr = this.car.wheels.RL.position[2];
     body.addForceAtPoint(

@@ -5,7 +5,8 @@ import type { Vehicle } from '../physics/vehicle';
  * Track limits as in the real rules: the painted white line is the edge of the track (per point and side,
  * measured from the map: track.limitL/limitR), and a car is off only when all four wheels are beyond it. Kerbs
  * outside the line can be used: a wheel counts as beyond only past the line + LIMIT_TOLERANCE_M (about half a
- * kerb). A hold time ignores a brief moment out (riding a kerb, a bump).
+ * kerb). A hold time ignores a brief moment out (riding a kerb, a bump). A wheel in the air judges nothing (it
+ * may be over the line; its last contact point is stale): a car riding a kerb on two wheels is not off.
  */
 export const LIMIT_TOLERANCE_M = 0.5;
 const HOLD_S = 0.4;
@@ -26,14 +27,12 @@ export function beyondLimitsNow(v: Vehicle, track: TrackData, index: number, lat
   tz /= tl;
   const left = lateral >= 0;
   const lim = limitAt(track, index, left) + LIMIT_TOLERANCE_M;
-  let touching = 0;
   for (const w of v.wheels) {
-    if (!w.contact) continue;
-    touching++;
+    if (!w.contact) return false;
     const wl = (w.cpx - cl[index * 3]) * tz - (w.cpz - cl[index * 3 + 2]) * tx;
     if ((left ? wl : -wl) <= lim) return false;
   }
-  return touching > 0;
+  return true;
 }
 
 export class TrackLimits {

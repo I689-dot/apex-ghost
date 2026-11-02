@@ -114,7 +114,20 @@ export class Graphics {
   setScene(scene: THREE.Scene, camera: THREE.Camera): void {
     this.scene = scene;
     this.camera = camera;
+    this.canvas.style.visibility = '';
     this.rebuildPipeline();
+  }
+
+  /**
+   * Nothing to draw (the session is over): the canvas is cleared and hidden. Its last frame stayed on screen behind
+   * the menu, the results and the lobby (the menu's hero showed the race you had just left).
+   */
+  idle(): void {
+    this.scene = null;
+    this.camera = null;
+    this.renderer.setRenderTarget(null);
+    this.renderer.clear();
+    this.canvas.style.visibility = 'hidden';
   }
 
   /** Switch the camera without rebuilding the post-processing chain (cinematic ↔ cockpit). */

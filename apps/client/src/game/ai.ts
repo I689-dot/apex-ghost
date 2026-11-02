@@ -121,12 +121,15 @@ export interface CarLimits {
   airDensity: number;
 }
 
+/** Share of the tyres' grip the bots plan with, cornering and braking (tools/sim/ailap.ts tunes it: AI_CORNER, AI_BRAKE). */
+export const AI_GRIP = { corner: 0.92, brake: 0.98 };
+
 export function carLimits(specs: CarSpecs, skill = 1, airDensity = RHO): CarLimits {
   return {
     airDensity,
     massKg: specs.massKg,
-    mu: specs.tyreGrip * 0.8 * skill,
-    muBrake: specs.tyreGrip * 0.86 * skill,
+    mu: specs.tyreGrip * AI_GRIP.corner * skill,
+    muBrake: specs.tyreGrip * AI_GRIP.brake * skill,
     dragArea: specs.dragArea,
     downforceArea: specs.downforceArea,
     powerW: specs.powerKw * 1000 * 0.85,
@@ -235,6 +238,11 @@ export class AiDriver {
   pitBoxShift = 0;
   inPitLane = false;
   private boxDone = false;
+  /** Where along the pit lane the car is (lane point index). */
+  get laneIndex(): number {
+    return this.laneIdx;
+  }
+
   private laneIdx = 0;
   private laneStuck = 0;
 
@@ -278,14 +286,15 @@ export class AiDriver {
     const n = pts.length;
     const limit = lane.speedLimitKmh / 3.6 - 0.8;
     if (!this.inPitLane) {
-      // slow for the entry, aiming for the lane from 150 m. The traced lane is only roughly where the real one is
+      // slow for the entry on the racing line, aiming for the lane from 50 m (from further back the straight line to
+      // the lane's first point cut the chicane before the Nürburgring's entry). The traced lane is only roughly where the real one is
       // (the Nürburgring's jumps 6 m sideways in 2 m where it leaves the track, right at the end of the pit wall),
       // so in the lane the car's body ignores the circuit's walls: following the trace, the bots clipped a wall's
       // end, ran on the wrong side of it and stuck; now they may brush through a corner of one instead.
       const d = wrapDelta(s, lane.entryS, this.track.length);
       if (d < 0 || d > 600) return null;
       const v = Math.sqrt(ENTRY_MS * ENTRY_MS + 2 * 6 * Math.max(0, d - 10));
-      if (d > 150) return { follow: false, x: 0, z: 0, v };
+      if (d > 50) return { follow: false, x: 0, z: 0, v };
       this.inPitLane = true;
       this.laneIdx = 0;
       this.boxDone = false;

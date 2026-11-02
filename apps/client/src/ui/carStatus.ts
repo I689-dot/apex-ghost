@@ -8,7 +8,8 @@
  */
 import type { CarEntry } from '@apex/shared';
 import { COMPOUNDS, type CompoundId } from '../physics/tyres';
-import type { TopView } from '../game/topView';
+import type { TopLines, TopView } from '../game/topView';
+import { CarLineArt, damageColour as lineDamageColour } from './carLines';
 import { t } from '../i18n';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -33,6 +34,8 @@ const TYRE_COLOURS = { cold: '#3a86ff', warm: '#5ec8ff', ok: '#30d158', hot: '#f
 function tyreColour(t: number, optimumC: number): string {
   return t < optimumC - 20 ? TYRE_COLOURS.cold : t < optimumC - 8 ? TYRE_COLOURS.warm : t <= optimumC + 18 ? TYRE_COLOURS.ok : TYRE_COLOURS.hot;
 }
+/** The line drawing's colours: the damage report's scale (ui/carLines.ts). */
+const lineColour = lineDamageColour;
 function damageColour(d: number): string {
   return d < 0.05 ? 'transparent' : d < 0.3 ? '#ffd60a' : d < 0.6 ? '#ff9f0a' : '#ff453a';
 }
@@ -53,6 +56,10 @@ export class CarStatus {
   private drawn: SVGElement[] = [];
   private zg: SVGGElement;
   private labels: SVGTextElement[] = [];
+  /** The car as a line drawing (iRacing's look, as the damage report), over the picture once it is ready. */
+  private art = new CarLineArt();
+  private carImg: SVGImageElement | null = null;
+  private artKey = '';
 
   constructor() {
     // car, front up. viewBox 0..120 × 0..110; body centred at x = 60
@@ -181,6 +188,8 @@ export class CarStatus {
     this.svg.querySelector('defs')?.append(mask, silhouette);
     img.setAttribute('filter', 'url(#cs-silhouette)');
     this.svg.insertBefore(img, this.zg);
+    this.carImg = img;
+    this.showLines();
     this.zg.removeAttribute('clip-path');
     this.zg.setAttribute('mask', 'url(#cs-car-mask)');
     const z0 = sy(view.maxZ);
@@ -235,6 +244,30 @@ export class CarStatus {
 
   private treadH = [16, 16, 16, 16];
 
+  /** The car's line drawing (game/topView.ts renderTopLines): it replaces the picture and the damage blocks. */
+  setLines(entry: CarEntry, lines: TopLines | null): void {
+    this.art.setCar(entry, lines);
+    this.artKey = '';
+    this.showLines();
+  }
+
+  private showLines(zones: number[] = [0, 0, 0, 0, 0]): void {
+    const img = this.carImg;
+    if (!img || !this.art.lines) return;
+    const key = zones.join(',');
+    if (key === this.artKey) return;
+    this.artKey = key;
+    const zc = zones.map(lineColour);
+    // the corners take the colour of their end of the car
+    if (!this.art.draw(zc, [zc[0], zc[0], zc[1], zc[1]])) return;
+    const url = this.art.canvas.toDataURL('image/png');
+    img.setAttribute('href', url);
+    img.removeAttribute('filter');
+    img.setAttribute('class', 'cs-car cs-lines');
+    // the parts' colours are in the lines now: no blocks over them
+    this.zg.style.display = 'none';
+  }
+
   /** temps: FL, FR, RL, RR (°C); zones: front, rear, left, right, engine (0..1). */
   update(temps: number[], zones: ArrayLike<number>, abs: boolean, tc: boolean, compound: CompoundId, wear: number[], brakes: number[] = []): void {
     const t = temps.map((x) => Math.round(x));
@@ -247,6 +280,8 @@ export class CarStatus {
     const opt = COMPOUNDS[compound].optimumC;
     for (let i = 0; i < 4; i++) {
       this.tyres[i].setAttribute('fill', tyreColour(t[i], opt));
+      this.tyres[i].setAttribute('stroke', tyreColour(t[i], opt));
+      this.temps[i].setAttribute('fill', tyreColour(t[i], opt));
       this.temps[i].textContent = `${t[i]}°`;
       this.treads[i].setAttribute('height', String(this.treadH[i] * Math.min(1, wr[i] / 50)));
       this.brakes[i].setAttribute('fill', { c: '#5ec8ff', o: '#30d158', h: '#ff9f0a', f: '#ff453a' }[bk[i] ?? 'c'] ?? '#5ec8ff');
@@ -260,6 +295,7 @@ export class CarStatus {
       this.zones[i].setAttribute('fill', damageColour(d));
       this.zones[i].setAttribute('fill-opacity', String(0.35 + 0.5 * d));
     }
+    this.showLines(z.map((v) => v / 20));
     this.abs.classList.toggle('on', abs);
     this.tc.classList.toggle('on', tc);
   }

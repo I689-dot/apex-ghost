@@ -11,3 +11,8 @@ packages/shared/src/generated
 apps/mobile/android
 apps/mobile/ios
 CARS-MODELS
+tools/e2e/out
+tools/sim/out
+GRAPHICS-IMPROVEMENT
+3DMODELS
+OLD_3DMODELS

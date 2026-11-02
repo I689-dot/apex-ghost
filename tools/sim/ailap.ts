@@ -8,20 +8,19 @@
  */
 import RAPIER from '@dimforge/rapier3d-compat';
 import { readFileSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CarsFile, Surface, TrackData } from '../../packages/shared/src/index.ts';
 import { TYRE_TEMP, Vehicle, type GroundHit, type GroundQuery } from '../../apps/client/src/physics/vehicle.ts';
 import { DamageState } from '../../apps/client/src/physics/damage.ts';
 import type { Controls } from '../../apps/client/src/physics/input.ts';
-import { AiDriver, BOT_ASSISTS, carLimits, profileLapTime, racingLineFor, speedProfile } from '../../apps/client/src/game/ai.ts';
+import { AI_GRIP, AiDriver, BOT_ASSISTS, carLimits, profileLapTime, racingLineFor, speedProfile } from '../../apps/client/src/game/ai.ts';
 import { nearestCenterlineIndex } from '../../packages/shared/src/index.ts';
 import { TrackLimits, beyondLimitsNow } from '../../apps/client/src/game/trackLimits.ts';
 import { cutWallsAcrossLine } from '../../apps/client/src/game/wallCut.ts';
 import { RoadPatches } from '../../apps/client/src/game/roadPatches.ts';
 import { RaceTracker } from '../../packages/shared/src/race.ts';
-import { loadTrack, trackArg } from './trackfile.mjs';
+import { collisionParts, loadTrack, readCollisionFile, trackArg } from './trackfile.mjs';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../../apps/client/src/physics/tyres.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -35,6 +34,8 @@ const optVals = new Set(
   ),
 );
 const carId = args.find((a) => !a.startsWith('--') && !optVals.has(a)) ?? '2024_porsche_992_gt3_r';
+if (process.env.AI_CORNER) AI_GRIP.corner = Number(process.env.AI_CORNER);
+if (process.env.AI_BRAKE) AI_GRIP.brake = Number(process.env.AI_BRAKE);
 const loaded = loadTrack(trackArg(args));
 const collisionArg = opt('collision', '');
 /** Real GT3 pole laps, for comparison. */
@@ -63,22 +64,12 @@ function makeWorld() {
   const surf = new Map<number, Surface>();
   if (useTrack) {
     const track = loaded.track as TrackData;
-    const buf = collisionArg ? gunzipSync(readFileSync(collisionArg)) : loaded.collision;
-    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-    let o = 12;
-    for (let i = 0; i < dv.getUint32(8, true); i++) {
-      const si = dv.getUint32(o, true);
-      const nv = dv.getUint32(o + 4, true);
-      const ni = dv.getUint32(o + 8, true);
-      o += 12;
-      const pos = new Float32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + nv * 12));
-      o += nv * 12;
-      let idx = new Uint32Array(buf.buffer.slice(buf.byteOffset + o, buf.byteOffset + o + ni * 4));
-      o += ni * 4;
+    for (const part of collisionParts(collisionArg ? readCollisionFile(collisionArg) : loaded.collision)) {
+      const surface = track.collision.surfaces[part.surface];
       // as the game does: walls across this layout's lap line are cut (wallCut.ts)
-      if (track.collision.surfaces[si] === 'wall') idx = cutWallsAcrossLine(pos, idx, track);
-      const c = world.createCollider(RAPIER.ColliderDesc.trimesh(pos, idx));
-      surf.set(c.handle, track.collision.surfaces[si]);
+      const idx = surface === 'wall' ? cutWallsAcrossLine(part.pos, part.idx, track) : part.idx;
+      const c = world.createCollider(RAPIER.ColliderDesc.trimesh(part.pos, idx));
+      surf.set(c.handle, surface);
     }
   } else {
     const c = world.createCollider(RAPIER.ColliderDesc.cuboid(20000, 1, 20000).setTranslation(0, -1, 0));
@@ -195,6 +186,8 @@ for (const skill of skills) {
   // HEATLOG=1: where each axle's tyre heat comes from on the flying laps (J): drive/brake slip, cornering slip, rolling
   const heat = { long: [0, 0], lat: [0, 0], roll: [0, 0] };
   const limits = new TrackLimits();
+  /** What the lap logic judged (track limits, cuts), as the server would. */
+  const verdicts: string[] = [];
   // SEGLOG=1: per 20 m of the flying lap, the bot's speed against its own target, braking it did not need (target
   // above its speed) and steering reversals (weaving)
   const seg = new Map<
@@ -337,8 +330,12 @@ for (const skill of skills) {
     }
     if (i % 12 === 0) {
       const p = s.v.body.translation();
-      for (const e of tr.ingest('ai', t * 1000, p.x, p.y, p.z, false))
-        if (e.type === 'lap') {
+      for (const e of tr.ingest('ai', t * 1000, p.x, p.y, p.z, false, [], limits.offTrack))
+        if (e.type === 'penalty') {
+          verdicts.push(
+            `${e.reason}${e.invalidated ? ' lap deleted' : ''}${e.warning ? ` warning ${e.warning}` : ''}${e.noAdvantage ? ' (lost time)' : ''}${e.gainMs !== undefined ? ` cut, gained ${e.gainMs} ms` : ''}${e.ms ? ` +${e.ms} ms` : ''} at ${track.cumS[Math.max(0, hint)].toFixed(0)} m`,
+          );
+        } else if (e.type === 'lap') {
           nextSplit = 500;
           laps.push(e.lapMs);
           const w = s.v.wheels;
@@ -363,6 +360,7 @@ for (const skill of skills) {
     }
     console.log(`    time behind the bot's own target: ${lost.toFixed(1)} s`);
   }
+  if (verdicts.length) console.log(`  verdicts: ${verdicts.join(' · ')}`);
   const pr = tr.players.get('ai');
   if (splits.length) console.log(`  splits (lap m: race s) ${splits.join(' ')}`);
   if (laps.length < LAPS || resets > 2) failed = true;

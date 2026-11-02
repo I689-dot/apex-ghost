@@ -3,6 +3,7 @@ import type { CarEntry, TrackData } from '@apex/shared';
 import type { Vehicle } from '../physics/vehicle';
 import { Ambience, CarSounds, type EngineVoice, type GameAudio } from './audio';
 import { engineProfileFor } from './engineProfiles';
+import { settings } from '../settings';
 
 /** A car other than yours, as the audio sees it. */
 export interface OtherCar {
@@ -118,6 +119,7 @@ export class SessionAudio {
       else if (w.surface === 'gravel' || w.surface === 'sand') gravel += 0.25;
       else if (w.surface === 'grass') grass += 0.25;
     }
+    this.car.level(settings.audio.tyres);
     this.car.update(tel.speed, Math.max(0, slip), kerb, gravel, grass, o.rain, o.inCockpit);
     // ---- other cars: voices for the nearest few
     const near = o.others
@@ -156,7 +158,8 @@ export class SessionAudio {
         load = ov.load;
       }
       ov.prevSpeed = speed;
-      ov.voice.set(rpm, load, ratio, p.gain * 0.9, p.pan, p.doppler);
+      // the other cars at the player's opponents level (Settings → Sound)
+      ov.voice.set(rpm, load, ratio, p.gain * 0.9 * settings.audio.opponents ** 2, p.pan, p.doppler);
     }
     // ---- ambience
     this.crowdT -= dt;
@@ -197,12 +200,17 @@ export class SessionAudio {
     this.a.impact(severity);
   }
 
+  /** Touching a wall (every contact event while rubbing it): the scrape. */
+  scrape(severity: number): void {
+    this.car.scrape(severity);
+  }
+
   beep(go: boolean): void {
-    this.a.countdownBeep(go);
+    if (settings.audio.chimes) this.a.countdownBeep(go);
   }
 
   chime(kind: 'lap' | 'best' | 'session-best' | 'invalid'): void {
-    this.a.chime(kind);
+    if (settings.audio.chimes) this.a.chime(kind);
   }
 
   dispose(): void {

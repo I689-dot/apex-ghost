@@ -9,6 +9,9 @@ export default tseslint.config(
       '**/.wrangler/**',
       'apps/client/public/**',
       'tools/asset-pipeline/out/**',
+      // scratch output of the test tools (screenshots, one-off probes): not part of the project
+      'tools/e2e/out/**',
+      'tools/sim/out/**',
       '3D MODELS/**',
       '.claude/**',
       'apps/mobile/android/**',

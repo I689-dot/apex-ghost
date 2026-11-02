@@ -17,13 +17,17 @@ import { isPresence, type AccountUser, type FriendEntry, type Presence } from '@
 import { RoomCore, type Conn, type PersistedRoom, type RecordEvent } from './room';
 import { AccountsDO, type AccountOp } from './accounts';
 
+import { SignalDO } from './signal';
 export { AccountsDO };
+export { SignalDO };
 
 export interface Env {
   ROOMS: DurableObjectNamespace<RoomDO>;
   DIRECTORY: DurableObjectNamespace<DirectoryDO>;
   /** Accounts, friends and records (accounts.ts). */
   ACCOUNTS: DurableObjectNamespace<AccountsDO>;
+  /** Signalling for races hosted on a device (signal.ts). */
+  SIGNAL: DurableObjectNamespace<SignalDO>;
   /** "1": online play without an account (the local dev server's .dev.vars). */
   OPEN_ONLINE?: string;
 }
@@ -99,7 +103,17 @@ export default {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (url.pathname === '/health') return json({ ok: true });
-    const am = url.pathname.match(/^\/api\/(?:account\/)?(register|login|logout|delete|me|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/);
+    // races hosted on a device: the WebRTC offer / answer relay (signal.ts), one instance per room code
+    const pm = url.pathname.match(/^\/api\/p2p\/([A-Z0-9]{5})(\/.*)?$/);
+    if (pm) {
+      const res = await env.SIGNAL.get(env.SIGNAL.idFromName(pm[1])).fetch(new Request(`https://signal${pm[2] ?? '/'}`, req));
+      const out = new Response(res.body, res);
+      for (const [k, v] of Object.entries(CORS)) out.headers.set(k, v);
+      return out;
+    }
+    const am = url.pathname.match(
+      /^\/api\/(?:account\/)?(register|login|logout|delete|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/,
+    );
     if (am) return accountApi(req, env, am[1]);
 
     if (url.pathname === '/api/rooms' && req.method === 'GET') {

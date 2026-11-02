@@ -60,7 +60,7 @@ const N = cl.length / 3;
 const pit = t.pitLane.points;
 const pos = process.argv.slice(2).filter((a, i, all) => a !== '--track' && all[i - 1] !== '--track');
 const [from, to] = [Number(pos[0] ?? 4950), Number(pos[1] ?? 5200)];
-for (let s = from; s <= to; s += 10) {
+for (let s = from; s <= to; s += Number(process.env.STEP ?? 10)) {
   const sm = s % t.length;
   let i = 0;
   while (i < N - 1 && cs[i] < sm) i++;

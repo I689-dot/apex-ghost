@@ -25,6 +25,9 @@ export interface PlayerInfo {
   tyre: TyreChoice;
   /** Done with the briefing (car set up). */
   briefed: boolean;
+  /** Driver profile shown on the timing screens: country (ISO alpha-2) and car number. */
+  country?: string | null;
+  num?: number | null;
 }
 
 export type TyreChoice = 'soft' | 'medium' | 'hard' | 'wet';
@@ -155,7 +158,7 @@ export type ErrorCode =
 
 export type ClientMsg =
   /** `account`: the signed-in player's token (accounts.ts): their laps and results go to their records. */
-  | { t: 'hello'; v: number; nick: string; session: string | null; spectate?: boolean; account?: string }
+  | { t: 'hello'; v: number; nick: string; session: string | null; spectate?: boolean; account?: string; country?: string; num?: number }
   | { t: 'selectCar'; carId: string | null }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
@@ -263,6 +266,8 @@ export function parseClientMsg(raw: string): ClientMsg | null {
             session: v.session,
             spectate: v.spectate === true,
             ...(typeof v.account === 'string' && /^[0-9a-f]{48}$/.test(v.account) ? { account: v.account } : {}),
+            ...(typeof v.country === 'string' && /^[A-Z]{2}$/.test(v.country) ? { country: v.country } : {}),
+            ...(typeof v.num === 'number' && Number.isInteger(v.num) && v.num >= 1 && v.num <= 999 ? { num: v.num } : {}),
           }
         : null;
     case 'selectCar':

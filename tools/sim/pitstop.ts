@@ -14,6 +14,7 @@ import { TRACK_GROUPS, Vehicle, WALL_GROUPS, type GroundHit, type GroundQuery } 
 import { DamageState } from '../../apps/client/src/physics/damage.ts';
 import { AiDriver, BOT_ASSISTS } from '../../apps/client/src/game/ai.ts';
 import { PitLaneMonitor } from '../../apps/client/src/game/pitLane.ts';
+import { RoadPatches } from '../../apps/client/src/game/roadPatches.ts';
 import { COMPOUNDS } from '../../apps/client/src/physics/tyres.ts';
 import { loadTrack, trackArg } from './trackfile.mjs';
 
@@ -57,6 +58,16 @@ const surf = new Map<number, Surface>();
 world.updateSceneQueries();
 const ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
 const excl: { body?: RAPIER.RigidBody } = {};
+// the game's smoothed pit lane surface (track.ts buildSmoothSurfaces); RAW=1 drives the bare collision
+const patches = process.env.RAW
+  ? null
+  : RoadPatches.build(track, (x, yTop, z, maxD) => {
+      ray.origin = { x, y: yTop, z };
+      ray.dir = { x: 0, y: -1, z: 0 };
+      const h = world.castRay(ray, maxD, true, undefined, (0xffff << 16) | 5);
+      if (!h || surf.get(h.collider.handle) === 'wall') return null;
+      return yTop - h.timeOfImpact;
+    });
 const ground: GroundQuery = {
   cast(ox, oy, oz, dx, dy, dz, maxDist, out: GroundHit) {
     ray.origin = { x: ox, y: oy, z: oz };
@@ -73,6 +84,7 @@ const ground: GroundQuery = {
     out.ny = y;
     out.nz = z;
     out.surface = surf.get(hit.collider.handle) ?? 'asphalt';
+    if (out.surface !== 'wall') patches?.apply(ox, oy, oz, dx, dy, dz, maxDist, out);
     return out;
   },
 };
@@ -107,6 +119,14 @@ let exitAt = -1;
 let serviceUntil = -1;
 let lastLog = -1;
 let ok = false;
+// the ride in the lane: vertical acceleration of the body and wheels leaving the ground
+let vyPrev = 0;
+let heaveMax = 0;
+let heaveAt = '';
+let heaveSq = 0;
+let heaveN = 0;
+let lifts = 0;
+let contactPrev = 4;
 for (let i = 0; i < 120 * 400; i++) {
   const p = v.body.translation();
   // the session's pit lane monitor: how far off the circuit the car is (edge from the centreline)
@@ -145,6 +165,26 @@ for (let i = 0; i < 120 * 400; i++) {
   v.step(DT, ai.update(DT, true, v.weatherGrip * v.tyreGripAvg));
   world.step(ev);
   t += DT;
+  const vy = v.body.linvel().y;
+  if (pit.inLane && !v.frozen) {
+    const ay = Math.abs(vy - vyPrev) / DT;
+    heaveSq += ay * ay;
+    heaveN++;
+    if (ay > heaveMax) {
+      heaveMax = ay;
+      heaveAt = `${t.toFixed(1)} s, lane point ${pit.index}, ${(v.telemetry.speed * 3.6).toFixed(0)} km/h`;
+    }
+    if (process.env.RIDE && ay > 15) {
+      const q = v.body.translation();
+      console.log(
+        `  jolt ${ay.toFixed(0)} m/s² at lane point ${pit.index} (${q.x.toFixed(1)}, ${q.y.toFixed(2)}, ${q.z.toFixed(1)}), ${(v.telemetry.speed * 3.6).toFixed(0)} km/h, wheels ${v.wheels.map((w) => (w.contact ? 1 : 0)).join('')}`,
+      );
+    }
+    const contact = v.wheels.filter((w) => w.contact).length;
+    if (contact < 4 && contactPrev === 4) lifts++;
+    contactPrev = contact;
+  }
+  vyPrev = vy;
   if ((ai.inPitLane || pit.inLane) && Math.floor(t * 4) !== lastLog) {
     lastLog = Math.floor(t * 4);
     console.log(
@@ -157,6 +197,9 @@ console.log(
   ok
     ? `  in the lane at ${enteredAt.toFixed(1)} s, at the box ${boxAt >= 0 ? `${boxAt.toFixed(1)} s` : 'never'}, out at ${exitAt.toFixed(1)} s (lane ${(exitAt - enteredAt).toFixed(1)} s)`
     : `  FAILED: entered ${enteredAt >= 0 ? `${enteredAt.toFixed(1)} s` : 'never'}, box ${boxAt >= 0 ? `${boxAt.toFixed(1)} s` : 'never'}, still in the lane: ${ai.inPitLane}`,
+);
+console.log(
+  `  ride in the lane: heave max ${heaveMax.toFixed(1)} m/s² (${heaveAt}), rms ${Math.sqrt(heaveSq / Math.max(1, heaveN)).toFixed(2)} m/s², ${lifts} wheel lift-offs`,
 );
 process.exit(ok ? 0 : 1);
 

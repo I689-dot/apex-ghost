@@ -104,6 +104,24 @@ export async function register(nick: string, password: string): Promise<void> {
 
 export async function login(nick: string, password: string): Promise<void> {
   save(await api<Account>('account/login', { nick, password }));
+  await refreshProfile();
+}
+
+/** The signed-in user with the driver profile, from the server (after signing in, and at start). */
+export async function refreshProfile(): Promise<void> {
+  if (!current) return;
+  try {
+    const { user } = await api<{ user: AccountUser }>('account/me');
+    if (current) save({ ...current, user });
+  } catch {
+    /* offline: the stored one stays */
+  }
+}
+
+/** Saves the driver profile (country, number, three-letter code, helmet colour; null clears a field). */
+export async function saveProfile(p: Pick<AccountUser, 'country' | 'num' | 'abbr' | 'colour'>): Promise<void> {
+  const { user } = await api<{ user: AccountUser }>('account/profile', p);
+  if (current) save({ ...current, user });
 }
 
 export async function logout(): Promise<void> {

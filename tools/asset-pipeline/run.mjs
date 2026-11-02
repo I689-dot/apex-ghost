@@ -22,7 +22,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
-const srcDir = process.env.MODELS_DIR ?? path.join(root, '3D MODELS'); // MODELS_DIR: sources elsewhere (e.g. from a git worktree)
+// MODELS_DIR: sources elsewhere (e.g. from a git worktree); the original downloads now live in OLD_3DMODELS/
+const srcDir =
+  process.env.MODELS_DIR ?? [path.join(root, '3D MODELS'), path.join(root, 'OLD_3DMODELS')].find((d) => existsSync(d)) ?? path.join(root, '3D MODELS');
 const outDir = path.join(here, 'out');
 // car downloads (Sketchfab GLB / OBJ zips), extracted one folder per car: CAR_MODELS_DIR to use another place
 const newCarsDir = process.env.CAR_MODELS_DIR ?? path.join(root, 'CARS-MODELS', 'extracted');
@@ -170,12 +172,23 @@ async function map() {
       await run(BLENDER, ['-b', '--factory-startup', '-P', 'tools/asset-pipeline/blender/build_nordschleife.py', '--', root, path.basename(m.config)], 'map');
       continue;
     }
-    const usd = path.join(srcDir, m.source);
+    const usd = m.usdz ? await unpackUsdz(path.join(root, m.usdz)) : path.join(srcDir, m.source);
     // the Nürburgring analysis has no config section (its defaults are built in)
     const cfg = m.analysis ? [m.config] : [];
     await run(USD_PYTHON, ['tools/asset-pipeline/track_analysis.py', usd, mapOut, ...cfg], 'track');
     await run(BLENDER, ['-b', '--factory-startup', '-P', 'tools/asset-pipeline/blender/convert_map.py', '--', usd, mapOut, ...cfg], 'map');
   }
+}
+
+/** A .usdz (a zip of the USD scene and its textures) unpacked once into out/src/<name>/: its scene.usdc. */
+async function unpackUsdz(file) {
+  const dir = path.join(outDir, 'src', path.basename(file, '.usdz'));
+  const usd = path.join(dir, 'scene.usdc');
+  if (!existsSync(usd) || statSync(usd).mtimeMs < statSync(file).mtimeMs) {
+    mkdirSync(dir, { recursive: true });
+    await run('unzip', ['-oq', file, '-d', dir], 'unzip');
+  }
+  return usd;
 }
 
 async function optimize() {

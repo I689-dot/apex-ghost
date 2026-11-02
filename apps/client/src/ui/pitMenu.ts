@@ -1,4 +1,5 @@
-import { serviceTime, type ServicePlan, type Zones } from '../game/pitService';
+import { SERVICE, serviceTime, type ServicePlan, type Zones } from '../game/pitService';
+import { stopTimeline } from '../game/pitCrew';
 import { COMPOUNDS, type CompoundId } from '../physics/tyres';
 import { h } from './dom';
 import { uiAsset } from './images';
@@ -34,7 +35,9 @@ export class PitMenu {
   private tyreBtns = new Map<CompoundId | 'keep', HTMLButtonElement>();
   private repairBoxes: HTMLInputElement[] = [];
   private clockEl: HTMLElement;
-  private progress: HTMLElement | null = null;
+  /** The jobs of the stop in progress: each from start to end (s after the service began), its row. */
+  private jobs: { from: number; to: number; row: HTMLElement }[] = [];
+  private countEl: HTMLElement | null = null;
   private servicing = false;
 
   constructor(
@@ -254,21 +257,66 @@ export class PitMenu {
       return;
     }
     this.servicing = true;
-    this.progress = h('div.pit-progress-fill');
+    // the jobs as the crew does them (pitCrew.stopTimeline), each ticking from waiting to working to done, as
+    // iRacing's pit service list and a TV pit graphic show them: no progress bar
+    const ev = stopTimeline(this.plan, this.info.zones);
+    const at = (kind: string, wheel = -1) => ev.find((e) => e.kind === kind && (wheel < 0 || e.wheel === wheel))?.at;
+    const fuel = this.plan.fuelL > 0 ? this.plan.fuelL / SERVICE.refuelLps : 0;
+    const driver = this.plan.driverChange ? SERVICE.driverChange : 0;
+    const jackUp = at('jackUp');
+    const jackDown = at('jackDown');
+    const z = this.info.zones;
+    const repairS: { label: string; seconds: number }[] = [];
+    if (this.plan.body) repairS.push({ label: t('Bodywork & aero'), seconds: SERVICE.body(z) });
+    if (this.plan.suspension) repairS.push({ label: t('Suspension'), seconds: SERVICE.suspension(z) });
+    if (this.plan.engine) repairS.push({ label: t('Engine'), seconds: SERVICE.engine(z) });
+    const jobs: { label: string; from: number; to: number }[] = [];
+    if (driver > 0) jobs.push({ label: t('Driver change'), from: 0, to: driver });
+    if (fuel > 0) jobs.push({ label: t('Refuelling {l} l', { l: Math.round(this.plan.fuelL) }), from: 0, to: fuel });
+    if (jackUp !== undefined) jobs.push({ label: t('Car up'), from: jackUp, to: jackUp + 0.35 });
+    const wheels = [t('Front left'), t('Front right'), t('Rear left'), t('Rear right')];
+    wheels.forEach((name, w) => {
+      const a = at('gunOff', w);
+      const b = at('gunOn', w);
+      if (a !== undefined && b !== undefined) jobs.push({ label: `${name} · ${t(COMPOUNDS[this.plan.tyres ?? 'medium'].name)}`, from: a, to: b + 0.7 });
+    });
+    if (jackUp !== undefined) {
+      let t0 = jackUp + SERVICE.jacks / 2;
+      for (const p of repairS) {
+        jobs.push({ label: p.label, from: t0, to: t0 + p.seconds });
+        t0 += p.seconds;
+      }
+    }
+    if (jackDown !== undefined) jobs.push({ label: t('Car down'), from: jackDown, to: st.total });
+    jobs.sort((a, b) => a.from - b.from);
+    this.jobs = jobs.map((j) => ({
+      from: j.from,
+      to: j.to,
+      row: h('div.pit-job.wait', {}, h('i'), h('span', { text: j.label }), h('b', { text: `${(j.to - j.from).toFixed(1)} s` })),
+    }));
+    this.countEl = h('div.pit-count', { text: st.total.toFixed(1) });
     const card = this.el.querySelector('.pit-card') as HTMLElement;
+    card.classList.add('servicing');
+    this.el.classList.add('servicing');
     card.replaceChildren(
-      h('div.pit-head', {}, h('h2', { text: t('SERVICE') }), this.clockEl),
-      h('div.pit-breakdown', {}, ...st.parts.map((p) => h('div', {}, h('span', { text: p.label }), h('b', { text: `${p.seconds.toFixed(1)} s` })))),
-      h('div.pit-progress', {}, this.progress),
+      h('div.pit-head', {}, h('h2', { text: t('PIT STOP') }), this.clockEl),
+      h('div.pit-svc', {}, this.countEl, h('div.pit-jobs', {}, ...this.jobs.map((j) => j.row))),
       this.totalEl,
     );
+    this.totalEl.textContent = t('Hold the brake: the lollipop goes up when the car is down');
     this.onStart(this.plan, st.total);
   }
 
-  /** Service progress 0..1 and seconds left. */
-  setProgress(u: number, left: number): void {
-    if (this.progress) this.progress.style.transform = `scaleX(${Math.min(1, u)})`;
-    this.totalEl.textContent = left > 0 ? `${left.toFixed(1)} s` : t('GO GO GO!');
+  /** Service time elapsed and seconds left: the jobs' states and the countdown. */
+  setProgress(_u: number, left: number, elapsed = 0): void {
+    for (const j of this.jobs) {
+      const state = elapsed >= j.to ? 'done' : elapsed >= j.from ? 'work' : 'wait';
+      if (!j.row.classList.contains(state)) j.row.className = `pit-job ${state}`;
+    }
+    if (this.countEl) {
+      this.countEl.textContent = left > 0 ? left.toFixed(1) : t('GO');
+      this.countEl.classList.toggle('go', left <= 0);
+    }
   }
 
   private leave(): void {

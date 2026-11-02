@@ -1,0 +1,56 @@
+{
+ "gravel": {
+  "freesound": 577504,
+  "author": "TRP",
+  "loop": true,
+  "seconds": 4.0
+ },
+ "kerb": {
+  "freesound": 62652,
+  "author": "bsumusictech",
+  "loop": true,
+  "seconds": 7.0
+ },
+ "grass": {
+  "freesound": 665627,
+  "author": "felix.blume",
+  "loop": true,
+  "seconds": 6.0
+ },
+ "squeal": {
+  "freesound": 614627,
+  "author": "johnnydekk",
+  "loop": true,
+  "seconds": 4.0
+ },
+ "scrape": {
+  "freesound": 385939,
+  "author": "Pól",
+  "loop": true,
+  "seconds": 3.6
+ },
+ "crash_light": {
+  "freesound": 641048,
+  "author": "magnuswaker",
+  "loop": false,
+  "seconds": 1.6
+ },
+ "crash_medium": {
+  "freesound": 807437,
+  "author": "Logicogonist",
+  "loop": false,
+  "seconds": 0.96
+ },
+ "crash_heavy": {
+  "freesound": 592388,
+  "author": "magnuswaker",
+  "loop": false,
+  "seconds": 2.5
+ },
+ "crash_debris": {
+  "freesound": 237375,
+  "author": "squareal",
+  "loop": false,
+  "seconds": 4.0
+ }
+}

@@ -1,6 +1,6 @@
-import type { CarEntry, FriendEntry, Presence, RecordRow, UserStats } from '@apex/shared';
+import { PROFILE_RE, type CarEntry, type FriendEntry, type Presence, type RecordRow, type UserStats } from '@apex/shared';
 import { h } from './dom';
-import { t } from '../i18n';
+import { getLang, t } from '../i18n';
 import * as acc from '../net/account';
 import { ICONS } from './icons';
 
@@ -365,5 +365,101 @@ export function recordsModal(tracks: TrackChoice[], cars: CarEntry[], startTrack
   const modal: HTMLElement = h('div.modal', { onclick: (e: Event) => e.target === modal && close() }, card);
   void load();
   void loadCareer();
+  return modal;
+}
+
+/** Countries for the driver profile (ISO 3166 alpha-2): the motorsport nations first, then the rest A-Z by code. */
+const COUNTRIES = (
+  'GB DE FR IT ES NL BE AT CH PT DK SE NO FI PL CZ HU MC US CA MX BR AR CL CO JP CN KR AU NZ ZA AE SA QA BH IN TH MY SG ID ' +
+  'IE IS LU LT LV EE SK SI HR RS RO BG GR TR UA RU UY PE VE EC PY BO CR PA GT CU DO PR MA DZ TN EG NG KE IL PH VN TW HK'
+).split(' ');
+
+/** A country's flag (an image, no emoji), 2:1.5 px. */
+export function flagImg(cc: string | null | undefined, w = 20): HTMLElement | null {
+  if (!cc || !PROFILE_RE.country.test(cc)) return null;
+  return h('img.flag', { src: `https://flagcdn.com/w40/${cc.toLowerCase()}.png`, alt: cc, width: w, height: Math.round(w * 0.75), loading: 'lazy' });
+}
+
+/**
+ * The driver profile, as iRacing's member profile and F1's driver card keep it: country, car number, the three-letter
+ * code of the timing screens, helmet colour. Shown on the timing tower and the relative box in races.
+ */
+export function profileModal(onDone: () => void): HTMLElement {
+  const me = acc.account()?.user;
+  let names: Intl.DisplayNames | null = null;
+  try {
+    names = new Intl.DisplayNames([getLang()], { type: 'region' });
+  } catch {
+    names = null;
+  }
+  const country = h(
+    'select.auth-input',
+    {},
+    h('option', { value: '', text: t('Not set') }),
+    ...COUNTRIES.map((c) => h('option', { value: c, text: `${names?.of(c) ?? c} (${c})`, selected: me?.country === c })),
+  );
+  const flag = h('span.profile-flag');
+  const showFlag = () => flag.replaceChildren(flagImg(country.value, 32) ?? '');
+  country.addEventListener('change', showFlag);
+  showFlag();
+  const num = h('input.auth-input', { type: 'number', min: 1, max: 999, placeholder: '1 - 999', value: me?.num ?? '' });
+  const abbr = h('input.auth-input', {
+    type: 'text',
+    maxlength: 3,
+    placeholder: (me?.nick ?? '')
+      .replace(/[^a-z]/gi, '')
+      .slice(0, 3)
+      .toUpperCase(),
+    value: me?.abbr ?? '',
+    spellcheck: 'false',
+  });
+  abbr.addEventListener('input', () => (abbr.value = abbr.value.replace(/[^a-z]/gi, '').toUpperCase()));
+  const colour = h('input.profile-colour', { type: 'color', value: me?.colour ?? '#ff2d3d' });
+  const err = h('div.form-error.auth-error');
+  const close = () => {
+    modal.remove();
+    onDone();
+  };
+  const submit = h('button.primary.auth-submit', { type: 'submit', text: t('Save') });
+  const card = h(
+    'form.auth-card.profile-card',
+    {
+      onsubmit: async (e: Event) => {
+        e.preventDefault();
+        err.textContent = '';
+        const n = num.value ? Number(num.value) : null;
+        const a = abbr.value || null;
+        if (n !== null && !(Number.isInteger(n) && n >= 1 && n <= 999)) return void (err.textContent = t('The number goes from 1 to 999.'));
+        if (a !== null && !PROFILE_RE.abbr.test(a)) return void (err.textContent = t('The code is three letters.'));
+        submit.setAttribute('disabled', '');
+        try {
+          await acc.saveProfile({ country: country.value || null, num: n, abbr: a, colour: colour.value });
+          close();
+        } catch (x) {
+          err.textContent = x instanceof Error ? x.message : String(x);
+        } finally {
+          submit.removeAttribute('disabled');
+        }
+      },
+    },
+    h(
+      'header.auth-head',
+      {},
+      h('div', {}, h('span.auth-kicker', { text: me?.nick ?? '' }), h('h2', { text: t('Driver profile') })),
+      h('button.auth-close', { type: 'button', html: ICONS.close, title: t('Close'), 'aria-label': t('Close'), onclick: close }),
+    ),
+    h('p.auth-lead', { text: t('How you appear on the timing screens: your flag, your number and your three-letter code.') }),
+    h('label.auth-field', {}, h('span', { text: t('Country') }), h('div.profile-row', {}, flag, country)),
+    h(
+      'div.profile-pair',
+      {},
+      h('label.auth-field', {}, h('span', { text: t('Car number') }), num),
+      h('label.auth-field', {}, h('span', { text: t('Code') }), abbr),
+    ),
+    h('label.auth-field', {}, h('span', { text: t('Helmet colour') }), colour),
+    err,
+    submit,
+  );
+  const modal: HTMLElement = h('div.modal.auth-modal', { onclick: (e: Event) => e.target === modal && close() }, card);
   return modal;
 }

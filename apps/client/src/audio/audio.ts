@@ -2,6 +2,11 @@ import type { EngineProfile } from './engineProfiles';
 import { EngineDSP, SampleEngine, mixEngine } from './engine-worklet.js';
 import { loadBank } from './engineBank';
 import { ASSET_BASE } from '../config';
+import { assetFetch } from '../mobile/assetCache';
+
+/** Recorded surface and contact sounds (tools/asset-pipeline/surface_sounds.py; sources in audio/CREDITS.md). */
+const SAMPLES = ['gravel', 'kerb', 'grass', 'squeal', 'scrape', 'crash_light', 'crash_medium', 'crash_heavy', 'crash_debris'] as const;
+export type SampleName = (typeof SAMPLES)[number];
 
 /** Mixer levels (0..1), saved with the settings. */
 export interface AudioLevels {
@@ -9,15 +14,17 @@ export interface AudioLevels {
   engine: number;
   effects: number;
   ambience: number;
+  /** The team radio (race engineer and spotter). */
+  radio: number;
 }
 
 const WORKLET_URL = new URL('./engine-worklet.js', import.meta.url).href;
 
 /**
  * Game audio. Engines: real onboard recordings (constant-rpm loop banks, granular playback) over a procedural
- * layer built from each layout's firing pattern (engine-worklet.js); everything else is procedural:
- * tyres, kerbs, gravel, wind, gearbox whine, turbos, impacts, rain, crowd and birds from shaped noise and
- * oscillators. One AudioContext for the whole app, created on the first user gesture (browser rule).
+ * layer built from each layout's firing pattern (engine-worklet.js); tyres on gravel, kerbs, grass, tyre squeal,
+ * wall scrapes and crashes are real recordings too (over the procedural layer, which is all there is until they
+ * load); wind, gearbox whine, turbos, rain, crowd and birds are shaped noise and oscillators. One AudioContext for the whole app, created on the first user gesture (browser rule).
  */
 export class GameAudio {
   readonly ctx: AudioContext;
@@ -25,6 +32,7 @@ export class GameAudio {
   readonly engineBus: GainNode;
   readonly sfxBus: GainNode;
   readonly ambBus: GainNode;
+  readonly radioBus: GainNode;
   readonly noise: AudioBuffer;
   readonly brown: AudioBuffer;
   private ready: Promise<boolean>;
@@ -33,6 +41,8 @@ export class GameAudio {
   settled = false;
   private meter: AnalyserNode;
   private meterBuf = new Float32Array(2048);
+  /** The recordings, as they load. */
+  readonly samples = new Map<SampleName, AudioBuffer>();
 
   constructor(levels: AudioLevels) {
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
@@ -51,6 +61,7 @@ export class GameAudio {
     this.engineBus = this.gain(1, this.master);
     this.sfxBus = this.gain(1, this.master);
     this.ambBus = this.gain(1, this.master);
+    this.radioBus = this.gain(1, this.master);
     this.setLevels(levels);
     // 3 s of white noise and of "brown" (integrated) noise, looped by every noise source
     const n = this.ctx.sampleRate * 3;
@@ -76,6 +87,12 @@ export class GameAudio {
       .finally(() => {
         this.settled = true;
       });
+    for (const name of SAMPLES)
+      void assetFetch(`${ASSET_BASE}assets/audio/surface/${name}.wav`)
+        .then((r) => r.arrayBuffer())
+        .then((b) => this.ctx.decodeAudioData(b))
+        .then((buf) => this.samples.set(name, buf))
+        .catch(() => console.warn(`[audio] ${name} not loaded: the procedural sound stays`));
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void this.ctx.suspend();
       else void this.ctx.resume();
@@ -104,6 +121,7 @@ export class GameAudio {
     this.engineBus.gain.setTargetAtTime(l.engine * l.engine, t, 0.05);
     this.sfxBus.gain.setTargetAtTime(l.effects * l.effects, t, 0.05);
     this.ambBus.gain.setTargetAtTime(l.ambience * l.ambience * 0.8, t, 0.05);
+    this.radioBus.gain.setTargetAtTime((l.radio ?? 0.9) * (l.radio ?? 0.9) * 1.4, t, 0.05);
   }
 
   gain(v: number, to?: AudioNode): GainNode {
@@ -166,10 +184,38 @@ export class GameAudio {
     s.stop(t + dur * 2 + 0.1);
   }
 
-  /** Body impact: a low thump plus crunch, scaled by severity (0..1). */
+  /** A recording once (a crash), at a gain and a playback rate, panned. */
+  playSample(name: SampleName, vol: number, rate = 1, pan = 0, when = 0): boolean {
+    const buf = this.samples.get(name);
+    if (!buf) return false;
+    const t = this.ctx.currentTime + when;
+    const p = this.ctx.createStereoPanner();
+    p.pan.value = pan;
+    p.connect(this.sfxBus);
+    const g = this.gain(vol, p);
+    const s = this.ctx.createBufferSource();
+    s.buffer = buf;
+    s.playbackRate.value = rate;
+    s.connect(g);
+    s.start(t);
+    return true;
+  }
+
+  /**
+   * Body impact, scaled by severity (0..1): a low thump for the weight, and a recorded crash: a knock of metal for a
+   * brush, a crunch for a hit, a crash with the debris falling after it for a big one (a synthesized crunch until
+   * the recordings load). Each a little higher or lower, so two hits never sound the same.
+   */
   impact(severity: number, pan = 0): void {
     const v = Math.min(1, severity);
     const t = this.ctx.currentTime;
+    const rate = 0.9 + Math.random() * 0.2;
+    const recorded =
+      v < 0.3
+        ? this.playSample('crash_light', 0.5 + 1.5 * v, rate, pan)
+        : v < 0.65
+          ? this.playSample('crash_medium', 0.7 + 0.6 * v, rate, pan) && this.playSample('crash_light', 0.4, rate * 0.9, pan)
+          : this.playSample('crash_heavy', 1.1, rate, pan) && this.playSample('crash_debris', 0.6, 1, pan, 0.15);
     const o = this.ctx.createOscillator();
     o.frequency.setValueAtTime(90, t);
     o.frequency.exponentialRampToValueAtTime(38, t + 0.25);
@@ -179,6 +225,7 @@ export class GameAudio {
     o.connect(g);
     o.start(t);
     o.stop(t + 0.6);
+    if (recorded) return;
     this.burst('lowpass', 1800, 0.7, 0.18 + 0.2 * v, 0.7 * v, this.sfxBus, pan);
     if (v > 0.35) this.burst('bandpass', 3800, 1.5, 0.35, 0.25 * v, this.sfxBus, pan);
   }
@@ -389,8 +436,18 @@ export class EngineVoice {
   }
 }
 
-/** Your car's chassis noises: tyres, road, kerbs, gravel/grass, wind, rain on the car. */
+type Layer = 'gravel' | 'kerb' | 'grass' | 'squeal' | 'scrape';
+
+/**
+ * Your car's chassis noises: tyres, road, kerbs, gravel/grass, a wall scrape, wind, rain on the car. The surfaces
+ * are recorded loops played faster with speed (the stones, the kerb's stripes and the grass come quicker), over the
+ * procedural layer kept quieter underneath.
+ */
 export class CarSounds {
+  private loops = new Map<Layer, { src: AudioBufferSourceNode; g: GainNode }>();
+  /** Rubbing a wall: kept up by the contact events, fading in a few tenths when they stop. */
+  private scrapeLevel = 0;
+  private lastT = 0;
   private squeal: GainNode;
   private squealFilter: BiquadFilterNode;
   private road: GainNode;
@@ -405,8 +462,11 @@ export class CarSounds {
   private rain: GainNode;
   private srcs: AudioScheduledSourceNode[] = [];
 
+  /** Everything here goes through this (the player's tyres and surfaces level). */
+  private out: GainNode;
+
   constructor(private readonly a: GameAudio) {
-    const bus = a.sfxBus;
+    const bus = (this.out = a.gain(1, a.sfxBus));
     this.squeal = a.gain(0, bus);
     this.squealFilter = a.filter('bandpass', 900, 6, this.squeal);
     this.srcs.push(a.noiseSource(this.squealFilter));
@@ -438,19 +498,64 @@ export class CarSounds {
    * @param slip 0..1 how far past the grip peak the tyres are (asphalt); @param kerb 0..1;
    * @param gravel / grass fraction of wheels on them; @param rain 0..1
    */
+  /** The tyres-and-surfaces level (0..1, Settings → Sound). */
+  level(v: number): void {
+    this.out.gain.setTargetAtTime(v * v, this.a.ctx.currentTime, 0.1);
+  }
+
+  /** A contact with a wall this moment (0..1 of a hard hit): keeps the scrape going. */
+  scrape(v: number): void {
+    this.scrapeLevel = Math.max(this.scrapeLevel, Math.min(1, 0.35 + v * 4));
+  }
+
+  /** A recorded layer's loop, started on first use (once its recording has loaded), at a random point. */
+  private layer(name: Layer, vol: number, rate: number, t: number): boolean {
+    let l = this.loops.get(name);
+    if (!l) {
+      const buf = this.a.samples.get(name);
+      if (!buf) return false;
+      if (vol < 0.001) return true;
+      const g = this.a.gain(0, this.out);
+      const src = this.a.ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.connect(g);
+      src.start(0, Math.random() * buf.duration);
+      this.srcs.push(src);
+      l = { src, g };
+      this.loops.set(name, l);
+    }
+    l.g.gain.setTargetAtTime(vol, t, name === 'kerb' || name === 'scrape' ? 0.02 : 0.05);
+    l.src.playbackRate.setTargetAtTime(rate, t, 0.05);
+    return true;
+  }
+
   update(speed: number, slip: number, kerb: number, gravel: number, grass: number, rain: number, inCockpit: boolean): void {
     const t = this.a.ctx.currentTime;
+    const dt = Math.min(0.2, Math.max(0, t - this.lastT));
+    this.lastT = t;
     const sp = Math.min(1, speed / 75);
     const near = inCockpit ? 1 : 0.25;
-    this.squeal.gain.setTargetAtTime(Math.min(0.32, slip * 0.4) * Math.min(1, speed / 6) * near, t, 0.04);
+    const moving = Math.min(1, speed / 8);
+    // the recordings, and the procedural layer at a third under one that plays
+    const sq = Math.min(1, slip * 1.25) * Math.min(1, speed / 6) * near;
+    const under = (rec: boolean) => (rec ? 0.35 : 1);
+    const sqRec = this.layer('squeal', 0.45 * sq, 0.95 + 0.15 * Math.min(1, slip), t);
+    this.squeal.gain.setTargetAtTime(Math.min(0.32, slip * 0.4) * Math.min(1, speed / 6) * near * under(sqRec), t, 0.04);
     this.squealFilter.frequency.setTargetAtTime(750 + 500 * Math.min(1, slip), t, 0.05);
     this.road.gain.setTargetAtTime(0.32 * sp * near, t, 0.1);
-    const kl = 0.25 * kerb * Math.min(1, speed / 10) * near;
+    // a kerb's stripes come at the speed the car crosses them: the recording (a rumble strip at ~100 km/h) faster or slower
+    const kRec = this.layer('kerb', 1.0 * kerb * Math.min(1, speed / 10) * near, Math.min(1.7, Math.max(0.5, speed / 28)), t);
+    const kl = 0.25 * kerb * Math.min(1, speed / 10) * near * under(kRec);
     this.kerbAm.gain.setTargetAtTime(kl, t, 0.02);
     this.kerbDepth.gain.setTargetAtTime(kl, t, 0.02);
     this.kerbLfo.frequency.setTargetAtTime(Math.max(4, speed / 1.0), t, 0.05);
-    this.gravel.gain.setTargetAtTime(0.35 * gravel * Math.min(1, speed / 8) * near, t, 0.05);
-    this.grass.gain.setTargetAtTime(0.3 * grass * Math.min(1, speed / 8) * near, t, 0.05);
+    const gRec = this.layer('gravel', 1.1 * gravel * moving * near, 0.75 + 0.5 * Math.min(1, speed / 40), t);
+    this.gravel.gain.setTargetAtTime(0.35 * gravel * moving * near * under(gRec), t, 0.05);
+    const grRec = this.layer('grass', 0.9 * grass * moving * near, 0.8 + 0.4 * Math.min(1, speed / 30), t);
+    this.grass.gain.setTargetAtTime(0.3 * grass * moving * near * (grRec ? 0.6 : 1), t, 0.05);
+    this.scrapeLevel *= Math.exp(-dt * 5);
+    this.layer('scrape', 0.8 * this.scrapeLevel * Math.min(1, speed / 4) * (inCockpit ? 1 : 0.5), 0.8 + 0.4 * Math.min(1, speed / 40), t);
     this.wind.gain.setTargetAtTime(0.22 * sp * sp * (inCockpit ? 0.7 : 0.15), t, 0.1);
     this.windFilter.frequency.setTargetAtTime(350 + speed * 9, t, 0.1);
     this.rain.gain.setTargetAtTime(0.14 * rain * (inCockpit ? 1 : 0.6), t, 0.3);
@@ -465,6 +570,7 @@ export class CarSounds {
       }
     }
     for (const g of [this.squeal, this.road, this.kerbAm, this.gravel, this.grass, this.wind, this.rain]) g.disconnect();
+    for (const l of this.loops.values()) l.g.disconnect();
   }
 }
 

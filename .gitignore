@@ -21,3 +21,9 @@ CARS-MODELS/
 
 # the user's source models (third-party licences): converted into apps/client/public/assets by the pipeline
 MODELS/
+3DMODELS/
+OLD_3DMODELS/
+
+# the user's own reference material: not part of the game
+GRAPHICS-IMPROVEMENT/
+Grass.usdz

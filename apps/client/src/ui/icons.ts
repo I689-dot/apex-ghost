@@ -6,6 +6,7 @@ const svg = (body: string) =>
   `<svg class="svg-icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
 export const ICONS = {
+  coin: svg('<circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.2a3 3 0 1 0 0 5.6"/>'),
   lock: svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
   download: svg('<path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/>'),
   left: svg('<path d="M15 5 8 12l7 7" stroke-width="2.6"/>'),

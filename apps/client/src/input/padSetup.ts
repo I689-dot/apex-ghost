@@ -12,9 +12,9 @@ import { layoutFor, padKey, readPad, STD_BUTTONS, type PadLayout, type PadSource
 
 type Step = { label: string; button?: number; axis?: number };
 const STEPS = (): Step[] => [
-  { label: t('Press THROTTLE'), button: 7 },
-  { label: t('Press BRAKE'), button: 6 },
-  { label: t('Push the steering stick to the RIGHT'), axis: 0 },
+  { label: t('Press THROTTLE (trigger or pedal)'), button: 7 },
+  { label: t('Press BRAKE (trigger or pedal)'), button: 6 },
+  { label: t('Turn the wheel or push the steering stick to the RIGHT'), axis: 0 },
   { label: t('Press HANDBRAKE (also "select" in menus)'), button: 0 },
   { label: t('Press BACK in menus (also shift up)'), button: 1 },
   { label: t('Press SHIFT UP'), button: 5 },

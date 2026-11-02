@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { nearestCenterlineIndex, progressAt, type Surface, type TrackData } from '@apex/shared';
+import { nearestCenterlineIndex, pointAtDistance, progressAt, type Surface, type TrackData } from '@apex/shared';
 import { fetchWithProgress, loadCollision, parseGltf, type CollisionMesh } from './assets';
 import { RAY_GROUPS, TRACK_GROUPS, WALL_GROUPS, type GroundHit, type GroundQuery } from '../physics/vehicle';
 import type { QualityConfig } from '../settings';
@@ -180,6 +180,40 @@ function photoDetail(name: string): { value: THREE.Texture } {
     slot.value = tex;
   });
   return u;
+}
+
+let spaLawn: THREE.Texture | null = null;
+/** Spa-Francorchamps' lawn texture (its model's grass-ext-shad), loaded once for every map. */
+function spaLawnTexture(): THREE.Texture {
+  if (spaLawn) return spaLawn;
+  const tex = new THREE.TextureLoader().load(`${TEX_BASE}lawn_spa.jpg`);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 16;
+  spaLawn = tex;
+  return tex;
+}
+
+/** Metres a repeat of Spa's lawn texture covers (measured on its model's main grass). */
+const SPA_LAWN_TILE_M = 5.5;
+
+/** A grass material drawn with Spa's lawn, sampled in world space (its own UVs differ map to map). */
+function useSpaLawn(m: THREE.MeshStandardMaterial): void {
+  m.map = spaLawnTexture();
+  m.color.setRGB(1, 1, 1);
+  m.needsUpdate = true;
+  const base = m.onBeforeCompile;
+  const baseKey = m.customProgramCacheKey.bind(m);
+  m.onBeforeCompile = (sh, r) => {
+    base.call(m, sh, r);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vSpaLawnUv;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\nvSpaLawnUv = (modelMatrix * vec4(transformed, 1.0)).xz / ${SPA_LAWN_TILE_M.toFixed(2)};`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vSpaLawnUv;')
+      .replace('#include <map_fragment>', THREE.ShaderChunk.map_fragment.replace('vMapUv', 'vSpaLawnUv'));
+  };
+  m.customProgramCacheKey = () => `${baseKey()}-spalawn`;
 }
 
 /** Walls, stands, buildings: concrete grain (full) and metal (half), triplanar in world space. */
@@ -369,6 +403,129 @@ const DECAL_LAYERS: [RegExp, { lift: number; offset: number }][] = [
   [/^(top2|terrain_fill|grass_fill)/i, { lift: 0, offset: 2 }],
 ];
 
+/**
+ * The two paints of a kerb texture (linear RGB, 0..1), or null when it is not a two-colour stripe. Grouped by hue
+ * (chromaticity: the dirt and wear only darken a paint), from its two most different pixels; null when the pixels lie
+ * off the line between the two hues (a third colour) or the two are too alike.
+ */
+function twoPaints(px: Uint8Array): { a: THREE.Color; b: THREE.Color } | null {
+  const n = px.length / 4;
+  const rgb = (i: number) => [px[i * 4] / 255, px[i * 4 + 1] / 255, px[i * 4 + 2] / 255];
+  const hue = (v: number[]) => {
+    const s = v[0] + v[1] + v[2] + 1e-3;
+    return [v[0] / s, v[1] / s, v[2] / s];
+  };
+  const d2 = (p: number[], q: number[]) => (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
+  const hues = Array.from({ length: n }, (_, i) => hue(rgb(i)));
+  const far = (from: number[]) => hues.reduce((best, h) => (d2(h, from) > d2(best, from) ? h : best), from);
+  let hb = far(hues[0]);
+  let ha = far(hb);
+  const ca = [0, 0, 0];
+  const cb = [0, 0, 0];
+  for (let it = 0; it < 8; it++) {
+    const sa = [0, 0, 0, 0];
+    const sb = [0, 0, 0, 0];
+    ca.fill(0);
+    cb.fill(0);
+    for (let i = 0; i < n; i++) {
+      const toA = d2(hues[i], ha) < d2(hues[i], hb);
+      const s = toA ? sa : sb;
+      const c = toA ? ca : cb;
+      const v = rgb(i);
+      for (let k = 0; k < 3; k++) {
+        s[k] += hues[i][k];
+        c[k] += v[k];
+      }
+      s[3]++;
+    }
+    if (!sa[3] || !sb[3]) return null;
+    ha = [sa[0] / sa[3], sa[1] / sa[3], sa[2] / sa[3]];
+    hb = [sb[0] / sb[3], sb[1] / sb[3], sb[2] / sb[3]];
+    for (let k = 0; k < 3; k++) {
+      ca[k] /= sa[3];
+      cb[k] /= sb[3];
+    }
+  }
+  const d = [hb[0] - ha[0], hb[1] - ha[1], hb[2] - ha[2]];
+  const dd = d[0] ** 2 + d[1] ** 2 + d[2] ** 2;
+  if (dd < 0.15 ** 2) return null;
+  let off = 0;
+  for (const h of hues) {
+    const u = Math.min(1, Math.max(0, ((h[0] - ha[0]) * d[0] + (h[1] - ha[1]) * d[1] + (h[2] - ha[2]) * d[2]) / dd));
+    off += Math.sqrt((h[0] - ha[0] - u * d[0]) ** 2 + (h[1] - ha[1] - u * d[1]) ** 2 + (h[2] - ha[2] - u * d[2]) ** 2);
+  }
+  if (off / n > 0.045) return null;
+  return { a: new THREE.Color(ca[0], ca[1], ca[2]), b: new THREE.Color(cb[0], cb[1], cb[2]) };
+}
+
+/** The kerb shader (Track.crispKerbs): crisp paint boundary, dirt kept as brightness, grain in shade and lighting. */
+function addKerbDetail(sm: THREE.MeshStandardMaterial, paints: { a: THREE.Color; b: THREE.Color } | null): void {
+  const base = sm.onBeforeCompile;
+  const baseKey = sm.customProgramCacheKey.bind(sm);
+  sm.onBeforeCompile = (sh, r) => {
+    base.call(sm, sh, r);
+    sh.uniforms.kerbA = { value: paints?.a ?? new THREE.Color() };
+    sh.uniforms.kerbB = { value: paints?.b ?? new THREE.Color(1, 1, 1) };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vKerbW;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKerbW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vKerbW;
+uniform vec3 kerbA;
+uniform vec3 kerbB;
+float kerbHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float kerbNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(kerbHash(i), kerbHash(i + vec2(1.0, 0.0)), f.x), mix(kerbHash(i + vec2(0.0, 1.0)), kerbHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+${
+  paints
+    ? `{
+  // where between the two paints this texel is, cut at the middle: a sharp edge, as wide as a pixel on screen
+  // (by hue: the dirt only darkens a paint)
+  vec3 kt = texture2D(map, vMapUv).rgb;
+  vec3 ha = kerbA / (kerbA.r + kerbA.g + kerbA.b + 1e-3);
+  vec3 hb = kerbB / (kerbB.r + kerbB.g + kerbB.b + 1e-3);
+  vec3 kd = hb - ha;
+  float ku = clamp(dot(kt / (kt.r + kt.g + kt.b + 1e-3) - ha, kd) / dot(kd, kd), 0.0, 1.0);
+  float kw = clamp(fwidth(ku) * 0.75, 0.002, 0.5);
+  vec3 crisp = mix(kerbA, kerbB, smoothstep(0.5 - kw, 0.5 + kw, ku));
+  // the texture's dirt and wear, as how much darker it is than its clean paint there
+  float kl = dot(mix(kerbA, kerbB, ku), vec3(0.2126, 0.7152, 0.0722));
+  float dirt = clamp(dot(kt, vec3(0.2126, 0.7152, 0.0722)) / max(kl, 0.01), 0.25, 1.2);
+  diffuseColor.rgb = diffuse * crisp * mix(1.0, dirt, 0.8);
+}`
+    : ''
+}
+float kerbG = kerbNoise(vKerbW.xz * 38.0) - 0.5;
+float kerbG2 = kerbNoise(vKerbW.xz * 6.5 + 17.0) - 0.5;
+diffuseColor.rgb *= 1.0 + 0.07 * kerbG + 0.05 * kerbG2;`,
+      )
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>
+roughnessFactor = clamp(roughnessFactor + 0.12 * kerbG2 + 0.08 * kerbG, 0.3, 1.0);`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+// the concrete's grain under the paint, in the lighting (screen-space slope of the grain)
+normal = normalize(normal - 0.35 * vec3(dFdx(kerbG), dFdy(kerbG), 0.0) * 6.0);`,
+      );
+  };
+  sm.customProgramCacheKey = () => `${baseKey()}-kerb${paints ? '2' : '1'}`;
+  sm.needsUpdate = true;
+}
+
 function applyDecalLayer(sm: THREE.MeshStandardMaterial): void {
   const layer = DECAL_LAYERS.find(([re]) => re.test(sm.name))?.[1];
   if (!layer) return;
@@ -430,6 +587,8 @@ export class Track {
   excludeBody: RAPIER.RigidBody | undefined;
   /** The mown grass of the verges and infields (grassShells.ts grows blades on it). */
   readonly lawnMaterials = new Set<THREE.MeshStandardMaterial>();
+  /** The kerbs' painted surfaces (crispKerbs). */
+  private kerbMaterials: THREE.MeshStandardMaterial[] = [];
   /** Every ground surface (grass, gravel, terrain, paving): not structures (grassMask.ts). */
   readonly groundMaterials = new Set<THREE.Material>();
   /** Procedural forest around the circuit (null when the map has none or it failed to load). */
@@ -484,6 +643,32 @@ export class Track {
             b[4] = Math.max(b[4], v.y);
             b[5] = Math.max(b[5], v.z);
           }
+        }
+        // pieces far wider than a card or a row of them (Spa's trees are welded into strips a hundred metres long):
+        // one tree per cluster of their vertices, where the foliage really is, instead of a row along the diagonal
+        const big = new Set<number>();
+        for (const [r, b] of box) if (Math.hypot(b[3] - b[0], b[5] - b[2]) > 40) big.add(r);
+        if (big.size) {
+          const cells = new Map<string, number[]>();
+          for (let i = 0; i < n; i++) {
+            if (!big.has(find(i))) continue;
+            v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+            const key = `${Math.floor(v.x / 5)},${Math.floor(v.z / 5)}`;
+            const c = cells.get(key);
+            if (!c) cells.set(key, [v.x, v.y, v.z, v.y, 1]);
+            else {
+              c[0] += v.x;
+              c[2] += v.z;
+              c[1] = Math.min(c[1], v.y);
+              c[3] = Math.max(c[3], v.y);
+              c[4]++;
+            }
+          }
+          for (const c of cells.values()) {
+            const h = c[3] - c[1];
+            if (h >= 1.5 && c[4] >= 3) out.push({ x: c[0] / c[4], y: c[1], z: c[2] / c[4], h, spruce: pine });
+          }
+          for (const r of big) box.delete(r);
         }
         for (const b of box.values()) {
           const h = b[4] - b[1];
@@ -559,17 +744,28 @@ export class Track {
         // every straight towards the sun on a dry track. Dry asphalt and grass are rough dielectrics.
         if (GROUND_MAT_RE.test(sm.name)) sm.metalness = 0;
         if (/^asph/i.test(sm.name)) sm.roughness = Math.max(sm.roughness, 0.9);
+        // kerbs are painted concrete: a satin sheen, not the asphalt's matte (set before the wet track keeps its dry value)
+        if (/^curb/i.test(sm.name) && sm.map) {
+          sm.roughness = 0.6;
+          t.kerbMaterials.push(sm);
+        }
         if (ROAD_MAT_RE.test(sm.name)) t.roadMaterials.push({ mat: sm, color: sm.color.clone(), roughness: sm.roughness });
         if (LIGHT_MAT_RE.test(sm.name)) t.lightMaterials.push(sm);
         if (/^red_lights/i.test(sm.name)) t.startLights.red.push(sm);
         if (/^green_lights/i.test(sm.name)) t.startLights.green.push(sm);
-        sm.side = sm.alphaTest > 0 || sm.transparent ? THREE.DoubleSide : THREE.FrontSide;
+        // walls too: the source maps flip some of their triangles (Zandvoort's concrete at Tarzan was missing every
+        // other one, culled as a back face)
+        sm.side = sm.alphaTest > 0 || sm.transparent || /^wall/i.test(sm.name) ? THREE.DoubleSide : THREE.FrontSide;
         if (GROUND_MAT_RE.test(sm.name) || sm.name === 'grass_fill') {
           const isGrass = /grass|fill|turf/i.test(sm.name);
           const isGravel = /^(gravel|sand)/i.test(sm.name);
           // the satellite terrain (top2) is only seen from afar: no close-up detail there; stones need contrast
           const det = /^top2/i.test(sm.name) ? 0 : isGrass ? 0.28 : isGravel ? 0.42 : 0.16;
           addMacroVariation(sm, 0.22, isGrass || /top2/i.test(sm.name), det, isGrass ? 'grass' : isGravel ? 'gravel' : 'paved');
+          // every map's lawn wears Spa's: a sharp photo of real circuit grass, tiled every 5.5 m as Spa's model does
+          // (the Nürburgring's 256 px texture was stretched over 40 m); Spa's own grass keeps its UVs
+          // (Spa's own side and extension grass too: their dried-out textures read as bare patches on the banks)
+          if (isGrass && det > 0 && !/^grass_spa$/i.test(sm.name)) useSpaLawn(sm);
           if (isGrass && det > 0) t.lawnMaterials.add(sm);
           t.groundMaterials.add(sm);
         } else if (PAVED_MAT_RE.test(sm.name)) {
@@ -592,6 +788,44 @@ export class Track {
       }
     });
     return { track: t, collision };
+  }
+
+  /**
+   * Kerbs as sharp as ACC's or F1's: the maps' kerb textures are tiny (32×128 to 256 px stretched over metres), so
+   * the stripes' edges smear. Each kerb texture's two paints are read back from the GPU once (the shipped textures
+   * are GPU-compressed), and the shader redraws the boundary between them crisp at any distance (anti-aliased by
+   * its screen-space width), keeping the texture's dirt as a brightness ratio; fine grain in the paint, in its
+   * shade and its lighting, for the concrete under it. Kerbs of more than two colours keep their texture and get
+   * the grain.
+   */
+  crispKerbs(renderer: THREE.WebGLRenderer): void {
+    if (!this.kerbMaterials.length) return;
+    const N = 32;
+    const rt = new THREE.WebGLRenderTarget(N, N, { type: THREE.UnsignedByteType });
+    const quadMat = new THREE.MeshBasicMaterial({ toneMapped: false });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), quadMat);
+    const scene = new THREE.Scene();
+    scene.add(quad);
+    const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const px = new Uint8Array(N * N * 4);
+    const prevTarget = renderer.getRenderTarget();
+    const palettes = new Map<THREE.Texture, { a: THREE.Color; b: THREE.Color } | null>();
+    for (const sm of this.kerbMaterials) {
+      const tex = sm.map as THREE.Texture;
+      if (!palettes.has(tex)) {
+        quadMat.map = tex;
+        quadMat.needsUpdate = true;
+        renderer.setRenderTarget(rt);
+        renderer.render(scene, cam);
+        renderer.readRenderTargetPixels(rt, 0, 0, N, N, px);
+        palettes.set(tex, twoPaints(px));
+      }
+      addKerbDetail(sm, palettes.get(tex) ?? null);
+    }
+    renderer.setRenderTarget(prevTarget);
+    rt.dispose();
+    quad.geometry.dispose();
+    quadMat.dispose();
   }
 
   /** Build Rapier trimesh colliders; one per surface sub-mesh. */
@@ -812,25 +1046,6 @@ export class Track {
 
   /** Position and heading on the centreline at distance s. */
   pointAt(s: number, out: { x: number; y: number; z: number; yaw: number }): void {
-    const d = this.data;
-    const L = d.length;
-    s = ((s % L) + L) % L;
-    let lo = 0;
-    let hi = d.cumS.length - 1;
-    while (lo < hi) {
-      const m = (lo + hi + 1) >> 1;
-      if (d.cumS[m] <= s) lo = m;
-      else hi = m - 1;
-    }
-    const n = d.cumS.length;
-    const i = lo;
-    const j = (i + 1) % n;
-    const segLen = (j === 0 ? L : d.cumS[j]) - d.cumS[i];
-    const u = segLen > 0 ? (s - d.cumS[i]) / segLen : 0;
-    const cl = d.centerline;
-    out.x = cl[i * 3] + (cl[j * 3] - cl[i * 3]) * u;
-    out.y = cl[i * 3 + 1] + (cl[j * 3 + 1] - cl[i * 3 + 1]) * u;
-    out.z = cl[i * 3 + 2] + (cl[j * 3 + 2] - cl[i * 3 + 2]) * u;
-    out.yaw = Math.atan2(cl[j * 3] - cl[i * 3], cl[j * 3 + 2] - cl[i * 3 + 2]);
+    pointAtDistance(this.data, s, out);
   }
 }

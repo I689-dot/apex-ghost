@@ -10,6 +10,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
     "assets": "node tools/asset-pipeline/run.mjs",
     "loadtest": "tsx tools/loadtest/loadtest.ts",
     "deploy:server": "pnpm --filter @apex/server run deploy",

@@ -3,7 +3,16 @@
 export interface AccountUser {
   id: string;
   nick: string;
+  /** Driver profile (as iRacing's member profile and F1's driver card): country (ISO 3166 alpha-2), car number 1-999,
+   * three-letter code for timing screens, helmet colour. */
+  country?: string | null;
+  num?: number | null;
+  abbr?: string | null;
+  colour?: string | null;
 }
+
+/** A profile field check shared by the server and the profile form. */
+export const PROFILE_RE = { country: /^[A-Z]{2}$/, abbr: /^[A-Z]{3}$/, colour: /^#[0-9a-fA-F]{6}$/ };
 
 /** Where a signed-in player is right now (heartbeats, ~45 s; gone after 90 s without one). */
 export interface Presence {

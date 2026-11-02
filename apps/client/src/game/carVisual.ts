@@ -1,9 +1,15 @@
 import * as THREE from 'three';
+import { steeringLockDeg } from '../physics/steeringLock';
 import type { CarEntry } from '@apex/shared';
 import type { CarModel } from './assets';
 
 const WHEELS = ['FL', 'FR', 'RL', 'RR'] as const;
-const LOD_DIST = [0, 18, 80];
+/**
+ * Where other cars switch to lighter models (× CAR_LOD.scale): full detail up close, LOD1 (~70k triangles, the cabin
+ * in outline) from 30 m, LOD2 (~18k) beyond 130 m. With the old 28k / 7k models the switch had to come late and still
+ * showed: the cars a few lengths ahead looked like rounded-off toys.
+ */
+const LOD_DIST = [0, 30, 130];
 /** The quality preset's car detail distance (QualityConfig.carLodScale): set before the cars are built. */
 export const CAR_LOD = { scale: 1 };
 /** Objects only shadow cameras render (environment.ts enables it on the sun). */
@@ -80,7 +86,8 @@ export class CarVisual {
   private originalPositions = new Map<THREE.BufferGeometry, Float32Array>();
   private originalNormals = new Map<THREE.BufferGeometry, Float32Array>();
   private steerAxis = new THREE.Vector3(0, 0, 1);
-  private steerRatio = 11; // steering-wheel angle : road-wheel angle
+  /** Steering-wheel angle : road-wheel angle, from the real car's lock (steeringLock.ts). */
+  private steerRatio: number;
   private headlightPool: THREE.Mesh | null = null;
   headlights: THREE.SpotLight[] = [];
   private smoke: THREE.Sprite[] = [];
@@ -102,6 +109,7 @@ export class CarVisual {
     readonly local: boolean,
     outside?: THREE.Group,
   ) {
+    this.steerRatio = steeringLockDeg(entry.id) / 2 / Math.max(10, entry.specs.maxSteerDeg);
     this.object.name = `car_${entry.id}`;
     if (entry.steering) this.steerAxis.set(...entry.steering.axis).normalize();
     const levels = local ? model.lods.slice(0, 1) : model.lods;
@@ -173,6 +181,44 @@ export class CarVisual {
     return true;
   }
 
+  /** The car's material fixes (CarEntry.look), checked from the driver's seat: every model of the car, any driver's. */
+  private applyLook(sm: THREE.MeshStandardMaterial): void {
+    const look = this.entry.look;
+    if (!look) return;
+    const f = look.tint?.[sm.name];
+    if (f !== undefined) sm.color.multiplyScalar(f);
+    const flat = look.plain?.[sm.name];
+    if (flat) {
+      sm.map = null;
+      sm.color.set(flat);
+      sm.roughness = Math.max(sm.roughness, 0.8);
+      sm.needsUpdate = true;
+    }
+    if (look.glass?.includes(sm.name)) {
+      sm.map = null;
+      sm.color.setHex(0x9aa3ad);
+      sm.transparent = true;
+      sm.opacity = 0.22;
+      sm.depthWrite = false;
+      sm.roughness = 0.05;
+      sm.metalness = 0;
+      sm.needsUpdate = true;
+    }
+    // your own sun strip, from the seat only: a tinted band you can see through (from outside it stays a sticker)
+    if (this.local && look.strip?.includes(sm.name)) {
+      sm.transparent = true;
+      sm.depthWrite = false;
+      sm.onBeforeCompile = (sh) => {
+        sh.uniforms.cockpitGlass = cockpitGlass;
+        sh.fragmentShader = sh.fragmentShader
+          .replace('void main() {', 'uniform float cockpitGlass;\nvoid main() {')
+          .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.a *= mix(1.0, 0.28, cockpitGlass);');
+      };
+      sm.customProgramCacheKey = () => 'apx-sunstrip';
+      sm.needsUpdate = true;
+    }
+  }
+
   private prepareMaterials(root: THREE.Object3D, cache: Map<THREE.Material, THREE.Material>): void {
     root.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -198,6 +244,7 @@ export class CarVisual {
             sm.roughness = 0.85;
             sm.metalness = 0;
           }
+          if (sm.isMeshStandardMaterial) this.applyLook(sm);
           if (this.local && sm.isMeshStandardMaterial && sm.transparent && GLASS_RE.test(sm.name)) darkenFromCockpit(sm);
           if (!this.local) {
             // stochastic transparency: fades without sorting and without recompiling later

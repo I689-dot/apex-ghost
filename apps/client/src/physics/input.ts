@@ -1,4 +1,5 @@
-import type { ControlAction, KeyBindings } from '../settings';
+import { settings, type ControlAction, type KeyBindings } from '../settings';
+import { KB } from './keyboardDriver';
 
 /** Raw digital key state, updated by DOM events. */
 export class Keyboard {
@@ -78,7 +79,9 @@ export interface Controls {
 export const touchInput = { active: false, throttle: 0, brake: 0, steer: 0, handbrake: 0 };
 
 /** Game controller (src/input/gamepad.ts): analog triggers and stick, same meaning and filters as touchInput. */
-export const padInput = { active: false, throttle: 0, brake: 0, steer: 0, handbrake: 0 };
+export const padInput = { active: false, throttle: 0, brake: 0, steer: 0, handbrake: 0, wheel: false };
+/** The car being driven's steering lock (degrees lock to lock), for a wheel's soft lock (steeringLock.ts). */
+export const WHEEL = { carLockDeg: 600 };
 
 /**
  * Reads the keys into digital targets. All smoothing happens inside the physics step
@@ -88,6 +91,10 @@ export class InputSmoother {
   readonly out: Controls = { throttle: 0, brake: 0, steer: 0, handbrake: 0, digital: true };
 
   update(_dt: number, kb: Keyboard, _speedMs: number, reverse: boolean): Controls {
+    // the player's keyboard ramps (Settings → Controls): a short tap is part throttle or brake
+    KB.thrUp = 1 / Math.max(0.05, settings.keyboard.throttleRamp);
+    KB.brkUp = 1 / Math.max(0.05, settings.keyboard.brakeRamp);
+    KB.rateScale = settings.keyboard.steerSpeed;
     const up = kb.held('throttle');
     const down = kb.held('brake');
     // when reversing, the keys swap meaning (S drives backwards, W brakes)
@@ -105,8 +112,12 @@ export class InputSmoother {
       this.out.throttle = Math.max(this.out.throttle, reverse ? brk : thr);
       this.out.brake = Math.max(this.out.brake, reverse ? thr : brk);
       this.out.handbrake = Math.max(this.out.handbrake, clamp01(src.handbrake));
-      if (this.out.steer === 0) this.out.steer = Math.min(1, Math.max(-1, src.steer));
+      // a wheel: its angle (a fraction of half its rotation) scaled to the car's lock (soft lock), 1:1
+      const st = src === padInput && padInput.wheel ? (src.steer * settings.wheel.rotationDeg) / WHEEL.carLockDeg : src.steer;
+      if (this.out.steer === 0) this.out.steer = Math.min(1, Math.max(-1, st));
     }
+    // a wheel drives the steering directly, as a real one: no keyboard or pad filters
+    this.out.digital = !(padInput.active && padInput.wheel && !left && !right);
     // a key held for steering wins; otherwise a connected controller makes the filters proportional
     this.out.analog = padInput.active && !left && !right && !(touchInput.active && touchInput.steer !== 0);
     return this.out;
