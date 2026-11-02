@@ -27,6 +27,7 @@ func _run() -> void:
 	conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "ready", "ready": true})
 	await get_tree().create_timer(0.3).timeout
+	conn.send_json({"t": "setConditions", "weather": "clear", "time": "midday", "changes": "off"})
 	conn.send_json({"t": "start"})
 	await get_tree().create_timer(0.3).timeout
 	conn.send_json({"t": "briefed"})
@@ -51,6 +52,9 @@ func _run() -> void:
 	await session.load_session(func(l, t, lbl): print("load ", lbl))
 	print("loaded in ", (Time.get_ticks_msec() - t0) / 1000.0, " s")
 	session.start()
+	if OS.get_environment("TELEPORT") != "":
+		var pt := TrackMath.point_at_distance(session.track_data, float(OS.get_environment("TELEPORT")))
+		session.vehicle.place(pt.x, pt.y + 0.5, pt.z, pt.yaw)
 	var shot_dir := OS.get_environment("SHOT_DIR")
 	var elapsed := 0.0
 	var next_shot := 0.0

@@ -294,7 +294,7 @@ func load_session(progress: Callable) -> void:
 	track = TrackScene.new(track_data).load_scene()
 	add_child(track)
 	await step.call(I18n.t("Planting the forest"))
-	_load_forest(q)
+	await _load_forest(q)
 	await step.call(I18n.t("Building the circuit physics"))
 	track.build_ground_query(get_viewport().world_3d)
 	_attach_world_extras(q)
@@ -551,14 +551,10 @@ func request_reset() -> void:
 # ----------------------------------------------------- optional modules ---
 # Each hook does its work when the module exists (the later ports fill them in), and nothing otherwise.
 
-func _load_forest(_q: Dictionary) -> void:
-	if ClassDB.class_exists("Forest") or ResourceLoader.exists("res://scripts/game/forest.gd"):
-		var f = load("res://scripts/game/forest.gd")
-		if f != null and f.has_method("load_forest"):
-			forest = await f.load_forest(track, track_data, _q)
-			if forest != null:
-				track.forest = forest
-				add_child(forest)
+func _load_forest(q: Dictionary) -> void:
+	forest = await Forest.load_forest(self, track, track_data, q)
+	if forest != null:
+		track.forest = forest
 
 func _attach_world_extras(q: Dictionary) -> void:
 	var crowd := Crowd.build(track, track_data, float(q.crowd))

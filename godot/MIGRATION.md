@@ -24,7 +24,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/crowd.ts
 - [x] apps/client/src/game/dashDisplay.ts
 - [~] apps/client/src/game/environment.ts (sky, sun, fog, rain done; windshield rain/crack, stars, moon pending)
-- [ ] apps/client/src/game/forest.ts
+- [x] apps/client/src/game/forest.ts (packed cells, near models, impostors)
 - [x] apps/client/src/game/ghost.ts
 - [~] apps/client/src/game/graphics.ts (AA, scale, dynamic res, bloom, grade; no AO on the Mobile renderer)
 - [ ] apps/client/src/game/grassBlades.ts
