@@ -51,6 +51,7 @@ static func ensure_globals() -> void:
 		_globals = true
 		RenderingServer.global_shader_parameter_add("wind_time", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 		RenderingServer.global_shader_parameter_add("wind_strength", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)
+		RenderingServer.global_shader_parameter_add("shell_ground", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 
 ## Wind strength (0 calm … ~2 storm), from the weather.
 static func set_wind_strength(v: float) -> void:

@@ -54,7 +54,8 @@ func _run() -> void:
 	session.start()
 	if OS.get_environment("TELEPORT") != "":
 		var pt := TrackMath.point_at_distance(session.track_data, float(OS.get_environment("TELEPORT")))
-		session.vehicle.place(pt.x, pt.y + 0.5, pt.z, pt.yaw)
+		var lat := float(OS.get_environment("LATERAL")) if OS.get_environment("LATERAL") != "" else 0.0
+		session.vehicle.place(pt.x + cos(pt.yaw) * lat, pt.y + 0.5, pt.z - sin(pt.yaw) * lat, pt.yaw)
 	var shot_dir := OS.get_environment("SHOT_DIR")
 	var elapsed := 0.0
 	var next_shot := 0.0
@@ -73,6 +74,10 @@ func _run() -> void:
 				var m = n.mesh.surface_get_material(i)
 				if m != null and ("isp" in m.resource_name or "creen" in m.resource_name):
 					print("mat: ", m.resource_name, " on ", n.name, " visible=", n.is_visible_in_tree())
+	print("shells: ", session.shells.cells.size() if session.shells != null else -1, " visible: ", session.shells.cells.filter(func(c): return c.node.visible).size() if session.shells != null else 0, " crowd/forest: ", session.forest != null)
+	if session.shells != null:
+		var c0 = session.shells.cells[0]
+		print("visible cells: ", session.shells.cells.filter(func(c): return c.node.visible).size(), " cell0 ", c0.x, " ", c0.z, " cam ", session.get_viewport().get_camera_3d().global_position, " car ", session.vehicle.global_position, " vis ", session.shells.visible, " n ", session.shells._last_n)
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
 	session.dispose()
 	get_tree().quit()

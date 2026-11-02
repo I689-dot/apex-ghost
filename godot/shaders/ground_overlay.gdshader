@@ -5,6 +5,8 @@ render_mode unshaded, blend_mul, depth_draw_never, fog_disabled;
 // dry / lush hue drift on grass, the mown lawn's photo detail with mowing stripes, the asphalt's aggregate, pebbles on
 // gravel. kind: 0 grass, 1 gravel, 2 paved, 3 asphalt.
 
+global uniform float shell_ground;
+
 uniform int kind = 2;
 uniform float strength = 0.22;
 uniform bool hue = false;
@@ -50,6 +52,8 @@ void fragment() {
 		f *= 1.0 + lay * (0.06 + 0.13 * along * (1.0 - abs(v.y) * 0.6));
 		// a lusher, deeper green
 		f *= vec3(0.93, 1.03, 0.86);
+		// under the 3D blades near the camera (grass shells): soil and shade between them
+		if (shell_ground > 0.0) f *= 1.0 - 0.12 * (1.0 - smoothstep(shell_ground * 0.5, shell_ground, distance(v_w, CAMERA_POSITION_WORLD)));
 	} else if (kind == 3 && detail > 0.0) {
 		// photo asphalt: the aggregate at two scales
 		vec3 a1 = texture(detail_tex, wp / 3.8).rgb;

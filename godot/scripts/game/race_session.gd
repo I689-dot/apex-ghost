@@ -560,6 +560,10 @@ func _attach_world_extras(q: Dictionary) -> void:
 	var crowd := Crowd.build(track, track_data, float(q.crowd))
 	if crowd != null:
 		add_child(crowd)
+	Forest.ensure_globals()
+	shells = GrassShells.build(track, track.lawn_materials, track_data)
+	if shells != null:
+		add_child(shells)
 
 func _attach_my_car_extras(entry: Dictionary) -> void:
 	if not spectator:

@@ -19,6 +19,7 @@ static func _tex(path: String) -> Texture2D:
 
 ## kind: "grass", "gravel", "paved" or "asphalt"; strength and detail as the web game's (0.22 / 0.28 on grass).
 static func overlay(kind: String, strength: float, hue: bool, detail: float) -> ShaderMaterial:
+	Forest.ensure_globals()
 	if _shader == null:
 		_shader = load("res://shaders/ground_overlay.gdshader")
 	var m := ShaderMaterial.new()
