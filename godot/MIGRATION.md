@@ -36,7 +36,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/pitCrew.ts
 - [x] apps/client/src/game/pitLane.ts
 - [x] apps/client/src/game/pitService.ts
-- [ ] apps/client/src/game/preview.ts
+- [x] apps/client/src/game/preview.ts (n/a: the showroom is not shown by the UI)
 - [x] apps/client/src/game/racingLineFx.ts
 - [x] apps/client/src/game/racingLinePrep.ts
 - [x] apps/client/src/game/racingLineWorker.ts (thread in racing_line_prep.gd)
@@ -81,7 +81,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/net/account.ts
 - [x] apps/client/src/net/connection.ts
 - [x] apps/client/src/net/localRoom.ts
-- [x] apps/client/src/net/p2p.ts (LAN WebSocket instead of WebRTC: the engine needs a native extension for it)
+- [x] apps/client/src/net/p2p.ts (WebRTC through the webrtc-native extension)
 - [x] apps/client/src/net/remote.ts
 
 ## apps/client/src/ui
@@ -96,7 +96,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/ui/images.ts (replaced by UIKit / UIW)
 - [x] apps/client/src/ui/overlays.ts
 - [x] apps/client/src/ui/pitMenu.ts
-- [ ] apps/client/src/ui/reel.ts
+- [x] apps/client/src/ui/reel.ts
 - [x] apps/client/src/ui/settingsPanel.ts
 - [x] apps/client/src/ui/social.ts
 - [x] apps/client/src/ui/timingScreen.ts
