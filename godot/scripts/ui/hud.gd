@@ -239,7 +239,7 @@ func _build() -> void:
 	_draft.modulate.a = 0.0
 	add_child(_draft)
 	_style(_reset_hint, 16, 500)
-	_reset_hint.text = I18n.t("Press R to reset to the track")
+	_reset_hint.text = I18n.t("Tap R to reset to the track") if DisplayServer.is_touchscreen_available() else I18n.t("Press R to reset to the track")
 	_reset_hint.visible = false
 	add_child(_reset_hint)
 	add_child(timing)

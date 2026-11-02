@@ -27,6 +27,7 @@ static func t(en: String, vars: Dictionary = {}) -> String:
 			var f := FileAccess.get_file_as_string("res://data/i18n_es.json")
 			if f != "":
 				_es = JSON.parse_string(f)
+			_es.merge(I18nExtra.ES, false)
 		if _es.has(en):
 			s = _es[en]
 	if not vars.is_empty():

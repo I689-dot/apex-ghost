@@ -47,7 +47,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/taa.ts (engine TAA: Viewport.use_taa)
 - [x] apps/client/src/game/topView.ts
 - [~] apps/client/src/game/track.ts (all but the kerb crisp-paint shader, the structure depth push and the decal polygon offset)
-- [ ] apps/client/src/game/trackEditor.ts
+- [ ] apps/client/src/game/trackEditor.ts (dev tool of the web build, not shipped)
 - [x] apps/client/src/game/trackLimits.ts
 - [x] apps/client/src/game/tvCameras.ts
 - [x] apps/client/src/game/vegetation.ts (forest.gd, grass_blades.gd)
@@ -69,7 +69,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [~] apps/client/src/audio/engine-worklet.js (recorded-loop engine only; no procedural layer)
 - [x] apps/client/src/audio/engineBank.ts
 - [x] apps/client/src/audio/engineProfiles.ts
-- [ ] apps/client/src/audio/radio.ts
+- [ ] apps/client/src/audio/radio.ts (disabled in the web game too: no voice files are shipped)
 - [x] apps/client/src/audio/sessionAudio.ts
 
 ## apps/client/src/input
