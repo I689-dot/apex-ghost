@@ -1,0 +1,16 @@
+config_version=5
+
+[application]
+config/name="Apex Ghost"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+
+[display]
+window/handheld/orientation=1
+
+[physics]
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=120
+
+[rendering]
+renderer/rendering_method="mobile"
