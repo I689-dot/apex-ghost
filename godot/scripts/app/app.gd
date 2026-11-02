@@ -63,7 +63,12 @@ func _ready() -> void:
 	gamepad.connected_changed.connect(func(on, name): toast(I18n.t("Controller connected: {name}", {"name": name}) if on else I18n.t("Controller disconnected")))
 	Account.changed.connect(func(_a): if screen == "menu": show_menu())
 	show_menu()
-	if OS.get_environment("APEX_AUTO") != "":
+	var auto := OS.get_environment("APEX_AUTO")
+	if auto == "intro" or (auto == "" and not Settings.data.get("introSeen", false)):
+		_play_intro()
+	if auto == "intro":
+		_shots_only.call_deferred()
+	elif auto != "":
 		_autotest.call_deferred()
 
 func _build_layers() -> void:
@@ -397,8 +402,17 @@ func start_loading(race: Dictionary, start_at) -> void:
 	col.add_child(UIKit.label(info, 20, UIKit.MUTED))
 	col.add_child(bar)
 	col.add_child(label)
-	var root := CenterContainer.new()
-	root.add_child(col)
+	var root := Control.new()
+	var my_car = null
+	for c in cars.cars:
+		if c.id == my_info().get("carId"):
+			my_car = {"url": "res://assets/ui/cars/%s.webp" % c.id, "name": c.name}
+	var reel := CinematicReel.new(CinematicReel.track_reel(str(tr.get("map", "")), I18n.t(tr.get("name", "")), my_car, I18n.t("RACE") if race.kind == "race" else I18n.t("QUALIFYING")), {"loop": true, "shotMs": 4600.0})
+	root.add_child(reel)
+	var center := CenterContainer.new()
+	UIKit.full(center)
+	center.add_child(col)
+	root.add_child(center)
 	set_ui(root)
 	var slot: int = race.slots.get(me, 0) + 1
 	var s := RaceSession.new(race, room, me, cars, conn, {
@@ -557,4 +571,53 @@ func _autotest() -> void:
 	await get_tree().create_timer(6.0).timeout
 	await shot.call("race2")
 	print("autotest done, screen=", screen)
+	get_tree().quit()
+
+## The intro when the game opens (once per install and after updates; a tap or a key skips it): the logo over a short reel of
+## the circuit and a car, then the menu (port of playIntro in main.ts).
+func _play_intro() -> void:
+	var intro := Control.new()
+	UIKit.full(intro)
+	var black := ColorRect.new()
+	black.color = Color.BLACK
+	UIKit.full(black)
+	intro.add_child(black)
+	var intro_cars := ["ferrari_296_gt3_verstappen", "corvette_z06_gt3r", "mclaren_720s_gt3_inception_racing", "lamborghini_huracan_gt3_evo2", "2025_bmw_m4_gt3_evo_g82", "2024_porsche_992_gt3_r"]
+	var car_id: String = intro_cars[randi() % intro_cars.size()]
+	var shots := [
+		{"photo": "photo_aerial_spa.webp", "move": "rise"},
+		{"photo": "photo_hero_zandvoort.webp", "move": "car", "car": "res://assets/ui/cars/%s.webp" % car_id, "kicker": "GT3", "title": "APEX GHOST"},
+		{"photo": "photo_grid.webp", "move": "pan", "kicker": I18n.t("ONLINE · SOLO"), "title": I18n.t("Ready to race")},
+	]
+	var reel := CinematicReel.new(shots, {"shotMs": 2600.0})
+	intro.add_child(reel)
+	var top := CenterContainer.new()
+	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	top.offset_top = 90
+	top.offset_bottom = 180
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(UIW.logo(64))
+	intro.add_child(top)
+	var bottom := CenterContainer.new()
+	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	bottom.offset_top = -110
+	bottom.offset_bottom = -70
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.add_child(UIKit.label(I18n.t("Tap or press any key to skip"), 16, UIKit.MUTED))
+	intro.add_child(bottom)
+	var done := func():
+		if is_instance_valid(intro):
+			var tw := intro.create_tween()
+			tw.tween_property(intro, "modulate:a", 0.0, 0.7)
+			tw.tween_callback(intro.queue_free)
+		Settings.data.introSeen = true
+		Settings.save()
+	reel.finished.connect(done)
+	intro.gui_input.connect(func(e): if e is InputEventMouseButton or e is InputEventScreenTouch or e is InputEventKey: done.call())
+	overlay_layer.add_child(intro)
+
+func _shots_only() -> void:
+	for t in [1.0, 3.2, 6.0]:
+		await get_tree().create_timer(t).timeout
+		get_viewport().get_texture().get_image().save_png("%s/intro_%d.png" % [OS.get_environment("SHOT_DIR"), int(t)])
 	get_tree().quit()

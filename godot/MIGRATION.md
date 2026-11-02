@@ -81,7 +81,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/net/account.ts
 - [x] apps/client/src/net/connection.ts
 - [x] apps/client/src/net/localRoom.ts
-- [ ] apps/client/src/net/p2p.ts
+- [x] apps/client/src/net/p2p.ts (LAN WebSocket instead of WebRTC: the engine needs a native extension for it)
 - [x] apps/client/src/net/remote.ts
 
 ## apps/client/src/ui

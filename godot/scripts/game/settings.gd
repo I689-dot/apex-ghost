@@ -45,7 +45,7 @@ static func default_settings() -> Dictionary:
 		"nickname": "", "language": I18n.default_lang(), "quality": "medium", "qualityAuto": true, "graphics": {},
 		"resolutionScale": 1.0, "dynamicResolution": true, "refreshRate": 60, "fov": 58, "seatHeight": 0.0, "seatForward": 0.0,
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,
-		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "showPerf": true,
+		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "showPerf": false,
 		"headMovement": 1.0, "cameraShake": 1.0,
 		"overlays": {"relative": true, "inputs": true, "spotter": true, "deltaBar": true, "trackMap": true},
 		"audio": {"master": 0.8, "engine": 0.9, "effects": 0.8, "ambience": 0.6, "radio": 0.9, "opponents": 0.9, "tyres": 0.9, "chimes": true},

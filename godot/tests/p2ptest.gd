@@ -5,7 +5,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	var r := await P2p.host_race()
-	print("host: ", r, " address ", P2p.local_address())
+	print("host: ", r, " webrtc: ", P2p.available())
 	if r.has("error"):
 		get_tree().quit(1)
 		return
