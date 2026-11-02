@@ -568,6 +568,8 @@ func _attach_my_car_extras(entry: Dictionary) -> void:
 		mirror = RearMirror.new(vehicle, entry.dims)
 		mirror.every = int(Settings.quality_config().mirrorEvery)
 		add_child(mirror)
+		dash = DashDisplays.new(my_visual)
+		add_child(dash)
 
 func _attach_line_extras(_tuned: Dictionary) -> void:
 	pass

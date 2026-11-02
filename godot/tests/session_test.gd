@@ -20,7 +20,7 @@ func _run() -> void:
 	conn.message.connect(func(m): msgs.append(m))
 	await conn.connect_to_room()
 	var cars := CarsDb.selectable()
-	conn.send_json({"t": "selectCar", "carId": cars[0].id})
+	conn.send_json({"t": "selectCar", "carId": OS.get_environment("CAR_ID") if OS.get_environment("CAR_ID") != "" else cars[0].id})
 	conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "ready", "ready": true})
@@ -59,6 +59,14 @@ func _run() -> void:
 			next_shot += 2.0
 			get_viewport().get_texture().get_image().save_png("%s/session_%02d.png" % [shot_dir, int(elapsed)])
 	print("phase msgs: ", msgs.filter(func(m): return m is Dictionary).map(func(m): return m.t).slice(-12))
+	if session.dash != null:
+		print("dash screens: ", session.dash.count())
+	for n in CarVisual._walk(session.my_visual):
+		if n is MeshInstance3D and n.mesh != null:
+			for i in n.mesh.get_surface_count():
+				var m = n.mesh.surface_get_material(i)
+				if m != null and ("isp" in m.resource_name or "creen" in m.resource_name):
+					print("mat: ", m.resource_name, " on ", n.name, " visible=", n.is_visible_in_tree())
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
 	session.dispose()
 	get_tree().quit()
