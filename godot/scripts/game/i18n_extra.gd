@@ -21,6 +21,7 @@ const ES := {
 	"race": "carrera",
 	"WebRTC is not available on this device.": "WebRTC no está disponible en este dispositivo.",
 	"Tap R to reset to the track": "Toca R para volver a la pista",
+	"Tap to skip": "Toca para saltar",
 	"Arrow buttons": "Botones de flecha",
 	"Tilt the phone": "Inclinar el móvil",
 	"Invert tilt": "Invertir inclinación",

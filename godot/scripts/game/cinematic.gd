@@ -143,7 +143,7 @@ func _build_ui(entrants: Array, info: Dictionary) -> void:
 	crow.add_child(who)
 	_card.add_child(crow)
 	el.add_child(_card)
-	_skip = UIKit.label(I18n.t("Enter: skip"), 14, UIKit.MUTED)
+	_skip = UIKit.label(I18n.t("Tap to skip") if DisplayServer.is_touchscreen_available() else I18n.t("Enter: skip"), 14, UIKit.MUTED)
 	_skip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_skip.offset_left = -140
 	_skip.offset_top = -48
