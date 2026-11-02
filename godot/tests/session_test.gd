@@ -14,6 +14,8 @@ func _find(t: String) -> Array:
 func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	var seconds := float(args[1]) if args.size() > 1 else 8.0
+	if OS.get_environment("LINE") != "":
+		Settings.data.racingLine = OS.get_environment("LINE")
 	LocalRoom.create()
 	var conn := Connection.new().setup(LocalRoom.LOCAL_CODE, "Max")
 	add_child(conn)

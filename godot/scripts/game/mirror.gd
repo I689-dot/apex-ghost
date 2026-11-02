@@ -57,7 +57,7 @@ func _process(_dt: float) -> void:
 	if not visible:
 		viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		return
-	var r := screen_rect(rect.get_viewport_rect().size)
+	var r := screen_rect(get_viewport().get_visible_rect().size)
 	rect.position = r.position
 	rect.size = r.size
 	var px := Vector2i(maxi(64, int(r.size.x * 1.5)), maxi(16, int(r.size.y * 1.5)))

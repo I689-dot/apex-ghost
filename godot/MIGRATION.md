@@ -22,7 +22,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/cockpit.ts
 - [ ] apps/client/src/game/crashFx.ts
 - [ ] apps/client/src/game/crowd.ts
-- [ ] apps/client/src/game/dashDisplay.ts
+- [x] apps/client/src/game/dashDisplay.ts
 - [~] apps/client/src/game/environment.ts (sky, sun, fog, rain done; windshield rain/crack, stars, moon pending)
 - [ ] apps/client/src/game/forest.ts
 - [x] apps/client/src/game/ghost.ts
@@ -49,7 +49,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [~] apps/client/src/game/track.ts (scene, collision, culling, wetness, lights done; surface shaders pending)
 - [ ] apps/client/src/game/trackEditor.ts
 - [x] apps/client/src/game/trackLimits.ts
-- [ ] apps/client/src/game/tvCameras.ts
+- [x] apps/client/src/game/tvCameras.ts
 - [ ] apps/client/src/game/vegetation.ts
 - [x] apps/client/src/game/wallCut.ts
 

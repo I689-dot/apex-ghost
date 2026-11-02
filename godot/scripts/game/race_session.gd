@@ -571,8 +571,11 @@ func _attach_my_car_extras(entry: Dictionary) -> void:
 		dash = DashDisplays.new(my_visual)
 		add_child(dash)
 
-func _attach_line_extras(_tuned: Dictionary) -> void:
-	pass
+func _attach_line_extras(tuned: Dictionary) -> void:
+	if not spectator:
+		racing_line = RacingLineFx.new(track_data, tuned.specs, track.ground_query, air.airDensity)
+		racing_line.set_mode(Settings.data.racingLine)
+		add_child(racing_line)
 
 func _build_cinematic(entries: Dictionary) -> void:
 	var entrants: Array = []
