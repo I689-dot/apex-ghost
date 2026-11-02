@@ -56,6 +56,7 @@ func _init(weather_plan: Dictionary, q: Dictionary) -> void:
 	sky_mat.set_shader_parameter("tLut", lut_viewport.get_texture())
 	sky_mat.set_shader_parameter("tNoise", load("res://assets_static/sky/cloud_noise.png"))
 	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
+	_apply_post(q)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	sky.process_mode = Sky.PROCESS_MODE_REALTIME
@@ -81,6 +82,7 @@ func _init(weather_plan: Dictionary, q: Dictionary) -> void:
 	add_child(sun)
 	_build_rain()
 	RenderingServer.directional_shadow_atlas_set_size(clampi(int(q.shadowMapSize), 1024, 8192), true)
+	_apply_post(q)
 
 func _build_rain() -> void:
 	var drops: int = int(quality.rainParticles)
@@ -222,9 +224,22 @@ func _update_lut(sun_v: Vector3, haze: float, force: bool = false) -> void:
 func env_intensity() -> float:
 	return 0.25 + 0.75 * (1.0 - night)
 
+func _apply_post(q: Dictionary) -> void:
+	# bloom (only the sun, headlights and floodlights pass the threshold) and the filmic grade of High / Ultra
+	env.glow_enabled = bool(q.bloom)
+	env.glow_hdr_threshold = 4.0
+	env.glow_intensity = 0.32
+	env.glow_bloom = 0.0
+	env.adjustment_enabled = bool(q.grade)
+	env.adjustment_contrast = 1.07
+	env.adjustment_saturation = 1.05
+	# the sun's cascades: two are enough on a phone
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+
 func set_quality(q: Dictionary) -> void:
 	quality = q
 	sun.shadow_enabled = bool(q.shadows)
 	sun.directional_shadow_max_distance = maxf(60.0, float(q.shadowRange) * 3.0)
 	RenderingServer.directional_shadow_atlas_set_size(clampi(int(q.shadowMapSize), 1024, 8192), true)
 	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
+	_apply_post(q)

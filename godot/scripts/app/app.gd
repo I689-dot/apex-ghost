@@ -40,6 +40,7 @@ var _filled := false
 var _brief_clock: Label = null
 var touch: TouchControls = null
 var perf: PerfOverlay = null
+var graphics: Graphics = null
 
 func _ready() -> void:
 	Settings.data.language = Settings.data.get("language", I18n.default_lang())
@@ -50,6 +51,8 @@ func _ready() -> void:
 	track_index = TrackData.list_layouts()
 	audio = GameAudio.new()
 	add_child(audio)
+	graphics = Graphics.new()
+	add_child(graphics)
 	gamepad = GamepadInput.new()
 	gamepad.driving = func(): return screen == "race" and pause_ui == null and session != null
 	gamepad.spectating = func(): return spectating
@@ -480,7 +483,8 @@ func open_settings() -> void:
 				show_menu()
 		if session != null:
 			session.apply_settings()
-		audio.set_levels(Settings.data.audio))
+		audio.set_levels(Settings.data.audio)
+		graphics.apply_quality())
 	overlay_layer.add_child(panel)
 
 # --------------------------------------------------------------- results ---
