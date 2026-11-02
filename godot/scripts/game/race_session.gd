@@ -406,6 +406,9 @@ func load_session(progress: Callable) -> void:
 	for p in room.players:
 		hud.set_driver(p.id, p.get("country"), p.get("num"))
 	timing = hud.timing
+	if mirror != null:
+		hud.add_child(mirror.rect)
+		hud.move_child(mirror.rect, 0)
 	if not spectator:
 		var model_for_lines: PackedScene = Assets.load_car_model(my_entry, 1, false).lods[0]
 		var lines: TopView.Lines = await TopView.render_top_lines(self, model_for_lines)
@@ -560,14 +563,42 @@ func _load_forest(_q: Dictionary) -> void:
 func _attach_world_extras(_q: Dictionary) -> void:
 	pass
 
-func _attach_my_car_extras(_entry: Dictionary) -> void:
-	pass
+func _attach_my_car_extras(entry: Dictionary) -> void:
+	if not spectator:
+		mirror = RearMirror.new(vehicle, entry.dims)
+		mirror.every = int(Settings.quality_config().mirrorEvery)
+		add_child(mirror)
 
 func _attach_line_extras(_tuned: Dictionary) -> void:
 	pass
 
-func _build_cinematic(_entries: Dictionary) -> void:
-	pass
+func _build_cinematic(entries: Dictionary) -> void:
+	var entrants: Array = []
+	for id in race.grid:
+		var p = _player(id)
+		var e = entries.get(p.carId) if p != null and p.carId != null else null
+		if p == null or e == null:
+			continue
+		entrants.append({"slot": race.slots.get(id, 0), "nick": p.nick, "carName": e.name, "color": e.color, "me": id == me, "bot": p.get("bot", false)})
+	var w0 := weather
+	var hh := int(floorf(w0.hour))
+	var mm := int(floorf((w0.hour - hh) * 60.0))
+	var facts: Array = ["%.3f km" % (float(track_data.length) / 1000.0)]
+	if track_data.get("turns") != null:
+		facts.append(I18n.t("{n} turns", {"n": int(track_data.turns)}))
+	facts.append("%02d:%02d" % [hh, mm])
+	facts.append(I18n.t(Weather.LABEL[race.weather.kind]))
+	facts.append(I18n.t("Wet track") if w0.wetness > 0.3 else (I18n.t("Damp track") if w0.wetness > 0.05 else I18n.t("Dry track")))
+	facts.append(I18n.t("{n} drivers", {"n": entrants.size()}))
+	var format: String
+	if race.kind == "race":
+		format = I18n.t("Race · {min} minutes + 1 lap · grid from qualifying", {"min": roundi(race.raceMs / 60000.0)}) if race.get("raceMs", 0) > 0 else I18n.t("Race · {n} laps · grid from qualifying", {"n": race.laps})
+	elif race.kind == "practice":
+		format = I18n.t("{min}-minute free practice · learn the track, try your setup", {"min": roundi(race.sessionMs / 60000.0)})
+	else:
+		format = I18n.t("{min}-minute qualifying · best valid lap wins · pit lane open", {"min": roundi(race.sessionMs / 60000.0)})
+	cinematic = Cinematic.new(track_data, entrants, {"trackName": track_data.name, "facts": facts, "format": format})
+	add_child(cinematic.camera)
 
 func _collect_env_materials() -> void:
 	pass

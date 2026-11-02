@@ -39,6 +39,7 @@ var _alone_since := 0.0
 var _filled := false
 var _brief_clock: Label = null
 var touch: TouchControls = null
+var perf: PerfOverlay = null
 
 func _ready() -> void:
 	Settings.data.language = Settings.data.get("language", I18n.default_lang())
@@ -342,6 +343,16 @@ func render_briefing() -> void:
 	set_ui(LobbyScreen.build_briefing(self))
 
 func _process(_dt: float) -> void:
+	# the performance overlay follows the setting (Settings → General)
+	if Settings.data.showPerf and perf == null:
+		perf = PerfOverlay.new()
+		overlay_layer.add_child(perf)
+	elif not Settings.data.showPerf and perf != null:
+		perf.queue_free()
+		perf = null
+	if perf != null:
+		perf.conn = conn
+		perf.remotes = func(): return session.remotes.values().map(func(r): return r.buffer) if session != null else []
 	if screen == "briefing" and _brief_clock != null and is_instance_valid(_brief_clock) and conn != null and room.get("briefingUntil") != null:
 		var left := maxf(0.0, room.briefingUntil - conn.server_now())
 		_brief_clock.text = "%d s" % ceili(left / 1000.0)
@@ -406,6 +417,8 @@ func start_loading(race: Dictionary, start_at) -> void:
 		hud.get_parent().remove_child(hud)
 	hud_layer.add_child(hud)
 	UIKit.full(hud)
+	if s.cinematic != null:
+		hud_layer.add_child(s.cinematic.el)
 	hud_layer.move_child(countdown, -1)
 	touch = TouchControls.new()
 	touch.key_action.connect(_touch_key)

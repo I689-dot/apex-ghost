@@ -18,7 +18,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/atmosphere.ts
 - [x] apps/client/src/game/carSetup.ts
 - [x] apps/client/src/game/carVisual.ts
-- [ ] apps/client/src/game/cinematic.ts
+- [x] apps/client/src/game/cinematic.ts
 - [x] apps/client/src/game/cockpit.ts
 - [ ] apps/client/src/game/crashFx.ts
 - [ ] apps/client/src/game/crowd.ts
@@ -31,8 +31,8 @@ Legend: [ ] todo, [~] partly, [x] done
 - [ ] apps/client/src/game/grassMask.ts
 - [ ] apps/client/src/game/grassShells.ts
 - [x] apps/client/src/game/lapDelta.ts
-- [ ] apps/client/src/game/mirror.ts
-- [ ] apps/client/src/game/perf.ts
+- [x] apps/client/src/game/mirror.ts
+- [x] apps/client/src/game/perf.ts
 - [x] apps/client/src/game/pitCrew.ts
 - [x] apps/client/src/game/pitLane.ts
 - [x] apps/client/src/game/pitService.ts
