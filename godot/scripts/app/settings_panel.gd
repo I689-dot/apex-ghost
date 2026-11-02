@@ -148,6 +148,7 @@ static func _general(col: Control, changed: Callable) -> void:
 	_head(col, I18n.t("Display"))
 	_select(col, I18n.t("Speed units"), "", S, "units", [["kmh", "km/h"], ["mph", "mph"]], changed)
 	_toggle(col, I18n.t("Performance overlay"), I18n.t("Frame time, network and draw calls in a corner"), S, "showPerf", changed)
+	_toggle(col, I18n.t("Opening titles"), I18n.t("The studio cinematic when the game starts"), S, "introCinematic", changed)
 	_head(col, I18n.t("Race overlays"))
 	var o: Dictionary = S.overlays
 	_toggle(col, I18n.t("Relative"), I18n.t("The cars just ahead and behind on the road, with the time to each"), o, "relative", changed)

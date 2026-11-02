@@ -64,7 +64,7 @@ func _ready() -> void:
 	Account.changed.connect(func(_a): if screen == "menu": show_menu())
 	show_menu()
 	var auto := OS.get_environment("APEX_AUTO")
-	if auto == "intro" or (auto == "" and not Settings.data.get("introSeen", false)):
+	if auto == "intro" or (auto == "" and Settings.data.get("introCinematic", true)):
 		_play_intro()
 	if auto == "intro":
 		_shots_only.call_deferred()
@@ -117,11 +117,11 @@ func _build_layers() -> void:
 	cc.set_anchors_preset(Control.PRESET_CENTER)
 	cc.alignment = BoxContainer.ALIGNMENT_CENTER
 	countdown.add_child(cc)
-	_count_big = UIKit.label("", 120, UIKit.TEXT, true, 700)
+	_count_big = UIKit.label("", 84, UIKit.TEXT, true, 700)
 	_count_big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_count_sub = UIKit.label("", 28, UIKit.TEXT, true, 600)
+	_count_sub = UIKit.label("", 22, UIKit.TEXT, true, 600)
 	_count_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_count_info = UIKit.label("", 20, UIKit.MUTED)
+	_count_info = UIKit.label("", 16, UIKit.MUTED)
 	_count_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	cc.add_child(_count_big)
 	cc.add_child(_count_sub)
@@ -188,6 +188,12 @@ func show_menu(error: String = "") -> void:
 	set_backdrop("hero")
 	Account.set_presence({"state": "menu", "room": null, "trackId": null, "session": null})
 	set_ui(MenuScreen.build(self, error))
+
+## The solo career's page (rank, licence, Driver Rating, record, achievements).
+func show_career() -> void:
+	screen = "career"
+	set_backdrop("pole")
+	set_ui(CareerScreen.build(self))
 
 func join(code: String, nick: String, spectate: bool = false) -> String:
 	spectating = spectate
@@ -469,7 +475,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	touch.spectator_key.connect(func(code): var k := KeyMap.key_of(code); _key_event(k, true); _key_event(k, false))
 	touch_layer.add_child(touch)
 	touch.spectating = spectating
-	touch.set_active(DisplayServer.is_touchscreen_available())
+	touch.set_active(UIKit.touch())
 	DisplayServer.screen_set_keep_on(true)
 	s.start()
 	Account.set_presence({"state": "watching" if spectating else "racing", "room": null if LocalRoom.is_local_code(conn.code) else conn.code, "trackId": race.trackId, "session": race.kind})
@@ -547,6 +553,7 @@ func show_results(m: Dictionary) -> void:
 			"kind": "race" if m.kind == "race" else ("practice" if m.kind == "practice" else "qualifying"),
 			"position": mine.position if ok else 0, "field": m.rows.size(),
 			"start": session.race.grid.find(me) + 1, "difficulty": Settings.data.ai.difficulty,
+			"map": str(track_entry(pending_race.get("trackId", "")).get("map", "")),
 		}, true)
 		gain = CareerData.add_session(s)
 	_drop_session()
@@ -615,48 +622,32 @@ func _autotest() -> void:
 ## The intro when the game opens (once per install and after updates; a tap or a key skips it): the logo over a short reel of
 ## the circuit and a car, then the menu (port of playIntro in main.ts).
 func _play_intro() -> void:
-	var intro := Control.new()
-	UIKit.full(intro)
-	var black := ColorRect.new()
-	black.color = Color.BLACK
-	UIKit.full(black)
-	intro.add_child(black)
 	var intro_cars := ["ferrari_296_gt3_verstappen", "corvette_z06_gt3r", "mclaren_720s_gt3_inception_racing", "lamborghini_huracan_gt3_evo2", "2025_bmw_m4_gt3_evo_g82", "2024_porsche_992_gt3_r"]
-	var car_id: String = intro_cars[randi() % intro_cars.size()]
-	var shots := [
-		{"photo": "photo_aerial_spa.webp", "move": "rise"},
-		{"photo": "photo_hero_zandvoort.webp", "move": "car", "car": "res://assets/ui/cars/%s.webp" % car_id, "kicker": "GT3", "title": "APEX GHOST"},
-		{"photo": "photo_grid.webp", "move": "pan", "kicker": I18n.t("ONLINE · SOLO"), "title": I18n.t("Ready to race")},
-	]
-	var reel := CinematicReel.new(shots, {"shotMs": 2600.0})
-	intro.add_child(reel)
-	var top := CenterContainer.new()
-	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.offset_top = 90
-	top.offset_bottom = 180
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	top.add_child(UIW.logo(64))
-	intro.add_child(top)
-	var bottom := CenterContainer.new()
-	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_top = -110
-	bottom.offset_bottom = -70
-	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bottom.add_child(UIKit.label(I18n.t("Tap or press any key to skip"), 16, UIKit.MUTED))
-	intro.add_child(bottom)
-	var done := func():
-		if is_instance_valid(intro):
-			var tw := intro.create_tween()
-			tw.tween_property(intro, "modulate:a", 0.0, 0.7)
-			tw.tween_callback(intro.queue_free)
+	var pool: Array = cars.cars.filter(func(c): return intro_cars.has(c.id))
+	if pool.is_empty():
+		pool = cars.cars.filter(func(c): return c.role != "safety")
+	if pool.is_empty():
+		return
+	var intro := IntroCinematic.new(pool[randi() % pool.size()])
+	# the studio is drawn by itself: the menu and its backdrop wait under it
+	bg.visible = false
+	ui.visible = false
+	add_child(intro)
+	var over := intro.overlay()
+	overlay_layer.add_child(over)
+	intro.finished.connect(func():
 		Settings.data.introSeen = true
 		Settings.save()
-	reel.finished.connect(done)
-	intro.gui_input.connect(func(e): if e is InputEventMouseButton or e is InputEventScreenTouch or e is InputEventKey: done.call())
-	overlay_layer.add_child(intro)
+		bg.visible = true
+		ui.visible = true
+		ui.modulate.a = 0.0
+		ui.create_tween().tween_property(ui, "modulate:a", 1.0, 0.5)
+		over.queue_free()
+		intro.queue_free())
+	intro.play()
 
 func _shots_only() -> void:
-	for t in [1.0, 3.2, 6.0]:
+	for t in [1.0, 2.6, 4.2, 6.8, 9.6]:
 		await get_tree().create_timer(t).timeout
 		get_viewport().get_texture().get_image().save_png("%s/intro_%d.png" % [OS.get_environment("SHOT_DIR"), int(t)])
 	get_tree().quit()
@@ -669,6 +660,9 @@ func _ui_shots() -> void:
 		get_viewport().get_texture().get_image().save_png("%s/ui_%s.png" % [dir, n])
 	await get_tree().create_timer(1.5).timeout
 	await shot.call("menu")
+	show_career()
+	await shot.call("career")
+	show_menu()
 	SocialUI.sign_in_modal(self, func(): pass)
 	await shot.call("signin")
 	for c in overlay_layer.get_children():
@@ -699,6 +693,8 @@ func _notification(what: int) -> void:
 				session.toggle_pause()
 			elif screen == "menu":
 				get_tree().quit()
+			elif screen == "career":
+				show_menu()
 			elif screen == "lobby" and LobbyScreen.back_page():
 				render_lobby()
 			elif screen == "results" or screen == "lobby" or screen == "briefing" or screen == "watch":
@@ -708,7 +704,7 @@ func _notification(what: int) -> void:
 		NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED:
 			AudioServer.set_bus_mute(0, true)
 			# a race you are driving waits in the pause menu (the web game pauses when the tab is hidden)
-			if screen == "race" and session != null and not spectating and pause_ui == null:
+			if screen == "race" and session != null and not spectating and pause_ui == null and OS.get_environment("APEX_AUTO") == "":
 				session.toggle_pause(true)
 		NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_RESUMED:
 			AudioServer.set_bus_mute(0, false)

@@ -49,6 +49,20 @@ var _board_key := ""
 var _hud_key := ""
 var _flag_kind := ""
 var _flag_blink := 0.0
+## Small note over the speedometer (camera, gearbox): the iRacing on-screen display, not a message.
+var _osd := Label.new()
+var _msg_kind := ""
+## The mirror is drawn at the top centre: the messages go under it.
+var _mirror_on := false
+## Touch controls on screen: the map and the tyres move out from under the pedals and the steering pad.
+var touch := UIKit.touch()
+var _board_panel: PanelContainer
+
+## Colour tag of a message by what it is about.
+const KIND_COLOUR := {
+	"info": Color("8b9099"), "lap": Color("f2f3f5"), "pb": Color("30d158"), "best": Color("bf5af2"), "good": Color("30d158"),
+	"warn": Color("ffd60a"), "bad": Color("ff453a"), "flag": Color("ffd60a"),
+}
 
 ## Race (after qualifying): positions and gaps on the board instead of best laps.
 var race_laps := 0
@@ -110,7 +124,12 @@ func _build() -> void:
 	board_panel.custom_minimum_size.x = 170
 	_board.add_theme_constant_override("separation", 0)
 	board_panel.add_child(_board)
-	_tl.add_child(board_panel)
+	_board_panel = board_panel
+	# on a phone the tower goes under the lap and position (the top bar's buttons are beside them)
+	if touch:
+		add_child(board_panel)
+	else:
+		_tl.add_child(board_panel)
 
 	# top-right: times, delta, delta bar, relative
 	_tr.add_theme_constant_override("separation", 3)
@@ -204,8 +223,8 @@ func _build() -> void:
 	add_child(overlays.mirror_delta)
 
 	# centre banners
-	_wrong_panel.add_theme_stylebox_override("panel", UIKit.box(UIKit.BAD, Color(0, 0, 0, 0), 0, 6, Vector2(22, 2)))
-	_style(_wrong, 48, 800)
+	_wrong_panel.add_theme_stylebox_override("panel", UIKit.box(UIKit.BAD, Color(0, 0, 0, 0), 0, 5, Vector2(16, 1)))
+	_style(_wrong, 26, 800)
 	_wrong.text = I18n.t("WRONG WAY")
 	_wrong_panel.add_child(_wrong)
 	_wrong_panel.visible = false
@@ -213,24 +232,22 @@ func _build() -> void:
 	_msg_panel.add_theme_stylebox_override("panel", _msg_box())
 	_msg.add_theme_font_override("font", UIKit.font(false, 600))
 	_msg.add_theme_font_size_override("font_size", 15)
-	_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_msg.custom_minimum_size.x = 380
 	_msg_panel.add_child(_msg)
 	_msg_panel.visible = false
 	add_child(_msg_panel)
-	_fin_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.5), Color(0, 0, 0, 0), 0, 6, Vector2(13, 2)))
-	_style(_fin, 20, 500)
+	_fin_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.55), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1)))
+	_style(_fin, 15, 600)
 	_fin_panel.add_child(_fin)
 	_fin_panel.visible = false
 	add_child(_fin_panel)
-	_pit_panel.add_theme_stylebox_override("panel", UIKit.box(UIKit.ACCENT_2, Color(0, 0, 0, 0), 0, 4, Vector2(14, 2)))
-	_style(_pit_banner, 17, 500, Color("111111"))
+	_pit_panel.add_theme_stylebox_override("panel", UIKit.box(UIKit.ACCENT_2, Color(0, 0, 0, 0), 0, 4, Vector2(10, 1)))
+	_style(_pit_banner, 14, 600, Color("111111"))
 	_pit_panel.add_child(_pit_banner)
 	_pit_panel.visible = false
 	add_child(_pit_panel)
-	_flag_panel.add_theme_stylebox_override("panel", UIKit.box(Color("ffd60a"), Color(0, 0, 0, 0), 0, 4, Vector2(16, 3)))
-	_style(_flag, 18, 500, Color("111111"))
+	_flag_panel.add_theme_stylebox_override("panel", UIKit.box(Color("ffd60a"), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1)))
+	_style(_flag, 14, 600, Color("111111"))
 	_flag_panel.add_child(_flag)
 	_flag_panel.visible = false
 	add_child(_flag_panel)
@@ -238,7 +255,10 @@ func _build() -> void:
 	_draft.text = I18n.t("SLIPSTREAM")
 	_draft.modulate.a = 0.0
 	add_child(_draft)
-	_style(_reset_hint, 16, 500)
+	_style(_osd, 14, 600, Color(1, 1, 1, 0.8))
+	_osd.visible = false
+	add_child(_osd)
+	_style(_reset_hint, 15, 500)
 	_reset_hint.text = I18n.t("Tap R to reset to the track") if DisplayServer.is_touchscreen_available() else I18n.t("Press R to reset to the track")
 	_reset_hint.visible = false
 	add_child(_reset_hint)
@@ -250,10 +270,10 @@ var _times_cur_lbl: Label
 var _speedo: HBoxContainer
 var _fuel_panel: PanelContainer
 
-func _msg_box() -> StyleBoxFlat:
-	var s := UIKit.box(Color(10 / 255.0, 12 / 255.0, 16 / 255.0, 0.78), Color(0, 0, 0, 0), 0, 4, Vector2(14, 5))
-	s.border_width_left = 3
-	s.border_color = UIKit.ACCENT_2
+func _msg_box(kind: String = "info") -> StyleBoxFlat:
+	var s := UIKit.box(Color(10 / 255.0, 12 / 255.0, 16 / 255.0, 0.8), Color(0, 0, 0, 0), 0, 4, Vector2(10, 3))
+	s.border_width_left = 4
+	s.border_color = KIND_COLOUR.get(kind, KIND_COLOUR.info)
 	return s
 
 ## Places the blocks (anchors by hand: the web's absolute positions).
@@ -271,10 +291,24 @@ func _layout() -> void:
 	_bc.size = Vector2(0, 0)
 	_bc.position = Vector2((s.x - _bc.get_combined_minimum_size().x * sc) / 2.0, s.y - 22.0 - _bc.get_combined_minimum_size().y * sc)
 	_bc.scale = Vector2(sc, sc)
-	_br.position = Vector2(s.x - 18.0 - 220.0 * sc, s.y - 18.0 - 220.0 * sc)
-	_br.scale = Vector2(sc, sc)
-	_bl.position = Vector2(18, s.y - 18.0 - status.size.y * sc)
-	_bl.scale = Vector2(sc, sc)
+	if touch:
+		# the pedals and the steering pad take the bottom corners: the map sits at the right edge above the pedals'
+		# buttons, the tyres above the steering pad
+		var k := clampf(s.y / 400.0, 1.0, 4.0)
+		var u := float(TouchPrefs.get_pref("size"))
+		var full: bool = Settings.data.overlays.trackMap
+		var mw: float = CircuitMap.W if full else MiniMap.SIZE
+		var msc := sc * (190.0 if full else 136.0) / mw
+		_br.position = Vector2(s.x - 14.0 - mw * msc, s.y * 0.25)
+		_br.scale = Vector2(msc, msc)
+		var steer_top := s.y - 12.0 * k - 118.0 * u * k
+		_bl.position = Vector2(14, steer_top - 10.0 - status.size.y * sc * 0.8)
+		_bl.scale = Vector2(sc * 0.8, sc * 0.8)
+	else:
+		_br.position = Vector2(s.x - 18.0 - 220.0 * sc, s.y - 18.0 - 220.0 * sc)
+		_br.scale = Vector2(sc, sc)
+		_bl.position = Vector2(18, s.y - 18.0 - status.size.y * sc)
+		_bl.scale = Vector2(sc, sc)
 	damage_panel.position = Vector2(20, s.y * 0.26)
 	damage_panel.scale = Vector2(sc, sc)
 	overlays.spot_l.position = Vector2(0, 0)
@@ -282,14 +316,31 @@ func _layout() -> void:
 	overlays.spot_r.position = Vector2(s.x - 14, 0)
 	overlays.spot_r.size = Vector2(14, s.y)
 	overlays.mirror_delta.position = Vector2(s.x / 2.0 - 30.0, 66)
-	_center(_wrong_panel, s.y * 0.28)
-	_center(_msg_panel, 124)
-	_center(_fin_panel, 14)
-	_center(_pit_panel, 52)
-	_center(_flag_panel, 86)
+	_center(_wrong_panel, s.y * 0.3)
+	_stack_banners()
 	_center(_draft, s.y - 118.0 - 14.0)
 	_center(_reset_hint, s.y - 140.0 - 24.0)
 	timing.position = Vector2((s.x - timing.size.x) / 2.0, s.y * 0.12)
+
+## The race's notices, one compact stack at the top centre (under the mirror when it is shown, under the touch
+## buttons on a phone): flag, session, pit lane, then the latest message.
+func _stack_banners() -> void:
+	var s := size
+	var y := 14.0
+	if touch:
+		y = 6.0 * clampf(s.y / 400.0, 1.0, 4.0) + 40.0 * clampf(s.y / 400.0, 1.0, 4.0) + 8.0
+	if _mirror_on:
+		y = maxf(y, RearMirror.screen_rect(s).end.y + 8.0)
+	for p in [_flag_panel, _fin_panel, _pit_panel, _msg_panel]:
+		if not p.visible:
+			continue
+		var m: Vector2 = p.get_combined_minimum_size()
+		p.size = m
+		p.position = Vector2((s.x - m.x) / 2.0, y)
+		y += m.y + 5.0
+	if _osd.visible:
+		var b := _bc.position.y - _osd.get_combined_minimum_size().y - 6.0
+		_osd.position = Vector2((s.x - _osd.get_combined_minimum_size().x) / 2.0, b)
 
 func _center(c: Control, y: float) -> void:
 	c.position = Vector2((size.x - c.get_combined_minimum_size().x) / 2.0, y)
@@ -328,6 +379,9 @@ func draw_map(dots: Array, me_x: float, me_z: float, fx: float, fz: float) -> vo
 ## The circuit map's cars (~10 Hz): the full map (iRacing's) or the turning one, as set.
 func set_map_cars(cars: Array) -> void:
 	var full: bool = Settings.data.overlays.trackMap
+	if touch and circuit_map.visible != full:
+		circuit_map.visible = full
+		_layout()
 	circuit_map.visible = full
 	mini_map.visible = not full
 	if full:
@@ -404,7 +458,19 @@ func update_state(s: Dictionary) -> void:
 	_wrong_panel.visible = s.wrongWay
 	status.update_status(s.tyreTemps, s.damageZones, s.abs, s.tc, s.compound, s.tyreWear, s.brakeTemps)
 	_draft.modulate.a = 1.0 if s.slipstream > 0.25 else 0.0
-	_set_text_panel(_msg_panel, _msg, s.message)
+	var kind: String = s.get("messageKind", "info")
+	_mirror_on = s.get("mirrorOn", false)
+	if kind == "osd":
+		_set_text_panel(_msg_panel, _msg, "")
+		if _osd.text != s.message:
+			_osd.text = s.message
+		_osd.visible = s.message != ""
+	else:
+		_osd.visible = false
+		if kind != _msg_kind:
+			_msg_kind = kind
+			_msg_panel.add_theme_stylebox_override("panel", _msg_box(kind))
+		_set_text_panel(_msg_panel, _msg, s.message)
 	_set_text_panel(_fin_panel, _fin, s.sessionText)
 	_fin.add_theme_color_override("font_color", Color("111111") if s.sessionText == I18n.t("CHEQUERED FLAG · LAST LAP") else Color.WHITE)
 	_set_text_panel(_pit_panel, _pit_banner, s.pitText)
@@ -441,8 +507,11 @@ func _layout_dynamic() -> void:
 	var sc := float(Settings.data.hud.scale)
 	_tr.position.x = s.x - 20.0 - _tr.get_combined_minimum_size().x * sc
 	_bc.position = Vector2((s.x - _bc.get_combined_minimum_size().x * sc) / 2.0, s.y - 22.0 - _bc.get_combined_minimum_size().y * sc)
-	for p in [_msg_panel, _fin_panel, _pit_panel, _flag_panel, _wrong_panel]:
-		p.position.x = (s.x - p.get_combined_minimum_size().x) / 2.0
+	_wrong_panel.position.x = (s.x - _wrong_panel.get_combined_minimum_size().x) / 2.0
+	_stack_banners()
+	if touch and _board_panel != null:
+		_board_panel.position = Vector2(20, 18 + _tl.get_combined_minimum_size().y * sc + 6.0)
+		_board_panel.scale = Vector2(sc, sc)
 
 func _set_text_panel(panel: Control, label: Label, text: String) -> void:
 	if label.text != text:
@@ -452,14 +521,14 @@ func _set_text_panel(panel: Control, label: Label, text: String) -> void:
 func _flag_box(kind: String) -> StyleBoxFlat:
 	match kind:
 		"blue":
-			return UIKit.box(Color("1f6fff"), Color(0, 0, 0, 0), 0, 4, Vector2(16, 3))
+			return UIKit.box(Color("1f6fff"), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1))
 		"green":
-			return UIKit.box(Color("19c15a"), Color(0, 0, 0, 0), 0, 4, Vector2(16, 3))
+			return UIKit.box(Color("19c15a"), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1))
 		"meatball":
-			return UIKit.box(Color("111111"), Color("ff7a00"), 2, 4, Vector2(16, 3))
+			return UIKit.box(Color("111111"), Color("ff7a00"), 2, 4, Vector2(10, 1))
 		"dt":
-			return UIKit.box(Color("111111"), Color.WHITE, 2, 4, Vector2(16, 3))
-	return UIKit.box(Color("ffd60a"), Color(0, 0, 0, 0), 0, 4, Vector2(16, 3))
+			return UIKit.box(Color("111111"), Color.WHITE, 2, 4, Vector2(10, 1))
+	return UIKit.box(Color("ffd60a"), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1))
 
 ## Timing screen around the player's position: best lap for the leader, gaps for the others.
 ## The tower's rows: the top three, then you with two cars either side, a divider where rows are skipped.

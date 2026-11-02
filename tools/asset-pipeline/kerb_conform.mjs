@@ -17,6 +17,9 @@ const CELL = 2;
 const SAME_LEVEL = 0.3;
 /** Ground behind a lowered kerb follows it down over this distance (no step where the kerb ends). */
 const BLEND = 1.5;
+/** Ground within LIFT of a kerb and more than LIFT_FROM under it is raised towards it (to LIFT_FROM under, fading). */
+const LIFT = 1.2;
+const LIFT_FROM = 0.03;
 
 function topOf(parts) {
   const grid = new Map();
@@ -110,10 +113,143 @@ export function conformKerbs(asphaltParts, kerbParts, groundParts = []) {
         ground++;
       }
     }
-  return { moved, maxMove, ground };
+  // the ground behind a kerb that lies well below it rises to meet it (a wheel leaving the kerb's outer edge must not
+  // drop into a step: real circuits run the grass or astroturf flush with the kerb's back)
+  const kerbAt = new Map();
+  for (const { pos } of kerbParts)
+    for (let i = 0; i < pos.length; i += 3) {
+      const k = `${Math.floor(pos[i] / CELL)},${Math.floor(pos[i + 2] / CELL)}`;
+      let l = kerbAt.get(k);
+      if (!l) kerbAt.set(k, (l = []));
+      l.push(pos[i], pos[i + 1], pos[i + 2]);
+    }
+  let lifted = 0;
+  for (const { pos } of groundParts)
+    for (let i = 0; i < pos.length; i += 3) {
+      const x = pos[i];
+      const z = pos[i + 2];
+      const y = pos[i + 1];
+      let want = y;
+      for (let gx = Math.floor((x - LIFT) / CELL); gx <= Math.floor((x + LIFT) / CELL); gx++)
+        for (let gz = Math.floor((z - LIFT) / CELL); gz <= Math.floor((z + LIFT) / CELL); gz++) {
+          const l = kerbAt.get(`${gx},${gz}`);
+          if (!l) continue;
+          for (let j = 0; j < l.length; j += 3) {
+            const d = Math.hypot(l[j] - x, l[j + 2] - z);
+            const ky = l[j + 1];
+            if (d >= LIFT || ky - y < LIFT_FROM || ky - y > SAME_LEVEL) continue;
+            want = Math.max(want, y + (ky - LIFT_FROM - y) * (1 - d / LIFT));
+          }
+        }
+      if (want > y) {
+        pos[i + 1] = want;
+        lifted++;
+      }
+    }
+  return { moved, maxMove, ground, lifted };
 }
 
 function* chunk4(l) {
   if (!l) return;
   for (let i = 0; i < l.length; i += 4) yield [l[i], l[i + 1], l[i + 2], l[i + 3]];
+}
+
+/**
+ * Splits a part's triangles until no edge is longer than maxEdge (m, on the ground plane), longest edge first.
+ * A source kerb can be one triangle 13 m long: its corners sit on the road, but where the road dips in between the
+ * kerb floats above it as a step (Spa, before turn 9). With short edges conformKerbs can follow the road.
+ * Returns a new { pos: Float32Array, idx: Int32Array } (shared vertices on split edges are reused).
+ */
+export function subdivide(pos, idx, maxEdge = 0.75) {
+  const P = Array.from(pos);
+  const mids = new Map();
+  const mid = (a, b) => {
+    const k = a < b ? `${a},${b}` : `${b},${a}`;
+    let m = mids.get(k);
+    if (m === undefined) {
+      m = P.length / 3;
+      P.push((P[a * 3] + P[b * 3]) / 2, (P[a * 3 + 1] + P[b * 3 + 1]) / 2, (P[a * 3 + 2] + P[b * 3 + 2]) / 2);
+      mids.set(k, m);
+    }
+    return m;
+  };
+  const len = (a, b) => Math.hypot(P[a * 3] - P[b * 3], P[a * 3 + 2] - P[b * 3 + 2]);
+  const out = [];
+  const stack = [];
+  for (let t = 0; t < idx.length; t += 3) stack.push([idx[t], idx[t + 1], idx[t + 2]]);
+  while (stack.length) {
+    const [a, b, c] = stack.pop();
+    const e = [len(a, b), len(b, c), len(c, a)];
+    const m = Math.max(...e);
+    if (m <= maxEdge) {
+      out.push(a, b, c);
+      continue;
+    }
+    // split the longest edge, keeping the winding
+    if (e[0] === m) {
+      const d = mid(a, b);
+      stack.push([a, d, c], [d, b, c]);
+    } else if (e[1] === m) {
+      const d = mid(b, c);
+      stack.push([a, b, d], [a, d, c]);
+    } else {
+      const d = mid(c, a);
+      stack.push([a, b, d], [d, b, c]);
+    }
+  }
+  return { pos: new Float32Array(P), idx: new Int32Array(out) };
+}
+
+/**
+ * A skirt along every kerb's free outer edge: a strip SKIRT m wide from the kerb's edge down (or up) to the ground
+ * beside it. Source models leave gaps of a hand's width between a kerb and the grass; a wheel ray falls through
+ * one and the car drops a corner off the kerb (Spa, turn 9). Under existing ground the skirt is never the top surface.
+ * Returns { pos, idx } for a ground (grass) part.
+ */
+export function kerbSkirts(asphaltParts, kerbParts, groundParts, width = 0.45) {
+  const road = topOf(asphaltParts);
+  const ground = topOf(groundParts);
+  const pos = [];
+  const idx = [];
+  for (const p of kerbParts) {
+    // free edges: used by one triangle only
+    const use = new Map();
+    for (let t = 0; t < p.idx.length; t += 3)
+      for (const [a, b] of [[p.idx[t], p.idx[t + 1]], [p.idx[t + 1], p.idx[t + 2]], [p.idx[t + 2], p.idx[t]]]) {
+        const k = a < b ? `${a},${b}` : `${b},${a}`;
+        const e = use.get(k);
+        if (e) e.n++;
+        else use.set(k, { a, b, n: 1 });
+      }
+    for (const { a, b, n } of use.values()) {
+      if (n !== 1) continue;
+      const ax = p.pos[a * 3], ay = p.pos[a * 3 + 1], az = p.pos[a * 3 + 2];
+      const bx = p.pos[b * 3], by = p.pos[b * 3 + 1], bz = p.pos[b * 3 + 2];
+      const len = Math.hypot(bx - ax, bz - az);
+      if (len < 1e-4) continue;
+      // the side away from the road (the kerb's back); an edge with road on both sides or neither is skipped
+      let nx = -(bz - az) / len;
+      let nz = (bx - ax) / len;
+      const mx = (ax + bx) / 2, mz = (az + bz) / 2, my = (ay + by) / 2;
+      const roadL = road(mx + nx * 0.3, mz + nz * 0.3, my) > -Infinity;
+      const roadR = road(mx - nx * 0.3, mz - nz * 0.3, my) > -Infinity;
+      if (roadL === roadR) continue;
+      if (roadL) {
+        nx = -nx;
+        nz = -nz;
+      }
+      const out = (x, y, z) => {
+        const ox = x + nx * width, oz = z + nz * width;
+        const g = ground(ox, oz, y);
+        return [ox, g > -Infinity ? g : y - 0.06, oz];
+      };
+      const a2 = out(ax, ay, az);
+      const b2 = out(bx, by, bz);
+      const i = pos.length / 3;
+      // a little under the kerb's edge, so the kerb stays the top surface where they meet
+      pos.push(ax, ay - 0.005, az, bx, by - 0.005, bz, ...a2, ...b2);
+      idx.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
+    }
+  }
+  return { pos: new Float32Array(pos), idx: new Int32Array(idx) };
 }

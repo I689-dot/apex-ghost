@@ -149,7 +149,7 @@ static func build(app: App, error: String = "") -> Control:
 		tab_btns[key] = b
 		tabs.add_child(b)
 	style_tabs.call()
-	tabs.add_child(UIKit.button(I18n.t("Records"), func(): SocialUI.records_modal(app)))
+	tabs.add_child(UIKit.button(I18n.t("Career"), app.show_career))
 	tabs.add_child(UIKit.button(I18n.t("Settings"), app.open_settings))
 
 	var career := CareerData.load_career()
@@ -159,8 +159,30 @@ static func build(app: App, error: String = "") -> Control:
 	var badge_p := PanelContainer.new()
 	badge_p.add_theme_stylebox_override("panel", UIKit.box(Color(CareerData.LICENCE_COLOUR[lic]), Color(0, 0, 0, 0), 0, 3, Vector2(8, 3)))
 	badge_p.add_child(badge)
-	chip.add_child(badge_p)
-	chip.add_child(UIKit.label(I18n.t("Lv {n}", {"n": CareerData.level_of(career.xp).level}), 14, UIKit.MUTED))
+	# licence, rank and level: one button to the career page
+	var lv: int = CareerData.level_of(career.xp).level
+	var rk := CareerData.rank_of(lv)
+	var prof := Button.new()
+	prof.focus_mode = Control.FOCUS_NONE
+	prof.flat = true
+	var pr := UIW.hbox(8)
+	pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge_p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pr.add_child(badge_p)
+	var rcol := UIW.vbox(0)
+	rcol.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var rl := UIKit.label(I18n.t(rk.name).to_upper(), 14, rk.colour, true, 700)
+	var ll := UIKit.label(I18n.t("Lv {n}", {"n": lv}), 13, UIKit.MUTED)
+	for l in [rl, ll]:
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		rcol.add_child(l)
+	pr.add_child(rcol)
+	prof.add_child(pr)
+	pr.position = Vector2(4, 4)
+	prof.custom_minimum_size = pr.get_combined_minimum_size() + Vector2(8, 8)
+	pr.resized.connect(func(): prof.custom_minimum_size = pr.get_combined_minimum_size() + Vector2(8, 8))
+	prof.pressed.connect(app.show_career)
+	chip.add_child(prof)
 	if signed_in != null:
 		chip.add_child(UIKit.label(("%s · %s" % [signed_in.user.nick, signed_in.user.abbr]) if signed_in.user.get("abbr") else signed_in.user.nick, 18, UIKit.TEXT, false, 700))
 		chip.add_child(UIKit.button(I18n.t("Edit driver profile"), func(): SocialUI.profile_modal(app, func(): app.show_menu())))

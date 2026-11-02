@@ -37,7 +37,7 @@ import { fillHoles, fillTerrain, groundPartsFromGlb, writeFillGlb } from './fill
 import { applySignage } from './signage.mjs';
 import { snapStackedLayers } from './flatten_layers.mjs';
 import { dropBuriedPaint } from './buried_paint.mjs';
-import { conformKerbs } from './kerb_conform.mjs';
+import { conformKerbs, kerbSkirts, subdivide } from './kerb_conform.mjs';
 import { roadPartsFromGlbs, weldPositions } from './road_collision.mjs';
 import { carSpecs } from './car_specs.mjs';
 import { trackLimitsFromLines } from './track_limits.mjs';
@@ -1327,13 +1327,21 @@ async function collision(mapOut, dstDir) {
   }
   // kerbs within a few cm of the road beside them: no ramps, no steps (kerb_conform.mjs)
   {
+    // long kerb triangles first cut to short ones, so their middles can follow the road too
+    for (const p of parts) if (SURF[p.si] === 'curb') Object.assign(p, subdivide(p.pos, p.idx));
     const k = conformKerbs(
       parts.filter((p) => SURF[p.si] === 'asphalt'),
       parts.filter((p) => SURF[p.si] === 'curb'),
       parts.filter((p) => SURF[p.si] === 'grass' || SURF[p.si] === 'gravel' || SURF[p.si] === 'sand'),
     );
+    const skirt = kerbSkirts(
+      parts.filter((p) => SURF[p.si] === 'asphalt'),
+      parts.filter((p) => SURF[p.si] === 'curb'),
+      parts.filter((p) => SURF[p.si] === 'grass' || SURF[p.si] === 'gravel' || SURF[p.si] === 'sand'),
+    );
+    parts.push({ si: SURF.indexOf('grass'), ...skirt });
     log(
-      `collision curb: ${k.moved} vertices brought within the road's reach (up to ${(k.maxMove * 100).toFixed(1)} cm), ${k.ground} ground vertices behind them followed`,
+      `collision curb: ${skirt.idx.length / 6} kerb edges skirted, ${k.moved} vertices brought within the road's reach (up to ${(k.maxMove * 100).toFixed(1)} cm), ${k.ground} ground vertices behind them followed, ${k.lifted} raised to meet a kerb`,
     );
   }
   // ground holes in the source model (sky showing through, cars falling out of the world): fill them with grass

@@ -149,6 +149,9 @@ var ghost_loading := false
 var wake_cars: Array = []
 var message := ""
 var message_until := 0.0
+## What a message is about (the HUD's colour tag): info, lap, pb, best, good, warn, bad, flag; "osd" is a small note
+## over the speedometer (camera, gearbox), not a message.
+var message_kind := "info"
 ## Race control's flags and course state (from the server).
 var rc: Dictionary = RaceControl.green_state(0)
 var green_until := 0.0
@@ -255,8 +258,9 @@ func remote_by_id(id: String) -> Remote:
 			return r
 	return null
 
-func flash(msg: String, ms: float = 2500.0) -> void:
+func flash(msg: String, ms: float = 2500.0, kind: String = "info") -> void:
 	message = msg
+	message_kind = kind
 	message_until = Time.get_ticks_msec() + ms
 
 # ------------------------------------------------------------ loading ---
@@ -664,15 +668,15 @@ func _on_message(m: Dictionary) -> void:
 			var mine: bool = m.playerId == me
 			var pname: String = names.get(m.playerId, I18n.t("A driver"))
 			if m.get("driveThrough", false):
-				flash(I18n.t("DRIVE-THROUGH: {what} · serve it within 3 laps", {"what": what}) if mine else I18n.t("{name}: drive-through, {what}", {"name": pname, "what": what}), 6000.0 if mine else 3000.0)
+				flash(I18n.t("DRIVE-THROUGH: {what} · serve it within 3 laps", {"what": what}) if mine else I18n.t("{name}: drive-through, {what}", {"name": pname, "what": what}), 6000.0 if mine else 3000.0, "bad" if mine else "info")
 			else:
-				flash(I18n.t("+{s} s: {what}", {"s": "%.0f" % (m.ms / 1000.0), "what": what}) if mine else I18n.t("{name}: +{s} s, {what}", {"name": pname, "s": "%.0f" % (m.ms / 1000.0), "what": what}), 4000.0)
+				flash(I18n.t("+{s} s: {what}", {"s": "%.0f" % (m.ms / 1000.0), "what": what}) if mine else I18n.t("{name}: +{s} s, {what}", {"name": pname, "s": "%.0f" % (m.ms / 1000.0), "what": what}), 4000.0, "bad" if mine else "info")
 			if mine:
 				_chime("invalid")
 				_say("penalty_dt" if m.get("driveThrough", false) else "penalty_time", 2, {"key": "penalty", "cooldown": 8})
 		"served":
 			if m.playerId == me:
-				flash(I18n.t("Mandatory stop done") if m.what == "stop" else I18n.t("Drive-through served"), 3000.0)
+				flash(I18n.t("Mandatory stop done") if m.what == "stop" else I18n.t("Drive-through served"), 3000.0, "good")
 		"raceControl":
 			if m.raceId == race.raceId:
 				_on_race_control(m.state)
@@ -680,7 +684,7 @@ func _on_message(m: Dictionary) -> void:
 			if m.raceId != race.raceId:
 				return
 			flagged = true
-			flash(I18n.t("CHEQUERED FLAG: session over") if pit != null and pit.in_lane else I18n.t("CHEQUERED FLAG: finish your lap, it still counts"), 5000.0)
+			flash(I18n.t("CHEQUERED FLAG: session over") if pit != null and pit.in_lane else I18n.t("CHEQUERED FLAG: finish your lap, it still counts"), 5000.0, "flag")
 			_chime("lap")
 		"sector":
 			if m.playerId == me and best_sectors.size() > m.sector:
@@ -698,7 +702,7 @@ func _on_message(m: Dictionary) -> void:
 				for i in standings.size():
 					if standings[i].id == me:
 						pos = i + 1
-				flash("%s%s" % [I18n.t("FINISHED") if race.kind == "race" else I18n.t("SESSION COMPLETE"), " · P%d" % pos if pos > 0 else ""], 8000.0)
+				flash("%s%s" % [I18n.t("FINISHED") if race.kind == "race" else I18n.t("SESSION COMPLETE"), " · P%d" % pos if pos > 0 else ""], 8000.0, "good")
 				if race.kind == "race":
 					_say("win" if pos == 1 else ("podium" if pos > 0 and pos <= 3 else ("points" if pos > 0 and pos <= 10 else "finish")), 3, {"ttl": 15})
 				else:
@@ -737,7 +741,7 @@ func _on_my_lap(m: Dictionary) -> void:
 		fuel_at_lap = fuel
 	if m.outLap:
 		career.lapIncidents = 0
-		flash(I18n.t("Out lap {time} (not timed) · timed lap starts now · Tab: timing", {"time": fmt_lap(m.lapMs)}), 4000.0)
+		flash(I18n.t("Out lap done · timed lap starts now"), 3000.0)
 		return
 	lap_times.append(m.lapMs)
 	career.laps += 1
@@ -759,7 +763,7 @@ func _on_my_lap(m: Dictionary) -> void:
 	elif m.best:
 		tag = I18n.t("  ·  FASTEST LAP") if session_best else I18n.t("  ·  personal best")
 	var pen := I18n.t("  ·  incl. +{s} s penalties", {"s": "%.1f" % (m.penaltyMs / 1000.0)}) if m.penaltyMs > 0 else ""
-	flash(I18n.t("Lap {n}: {time}", {"n": m.lap - 1, "time": fmt_lap(m.lapMs)}) + tag + pen, 3500.0)
+	flash(I18n.t("Lap {n}: {time}", {"n": m.lap - 1, "time": fmt_lap(m.lapMs)}) + tag + pen, 3500.0, "bad" if not m.valid else (("best" if session_best else "pb") if m.best else "lap"))
 	if m.valid:
 		_chime(("session-best" if session_best else "best") if m.best else "lap")
 	if m.valid and m.best:
@@ -790,7 +794,7 @@ func _on_race_control(state: Dictionary) -> void:
 			text = I18n.t("SAFETY CAR IN THIS LAP · no overtaking until the line")
 		_:
 			text = I18n.t("GREEN FLAG · racing resumes")
-	flash(text, 5000.0)
+	flash(text, 5000.0, "good" if state.course == "green" else "flag")
 	if state.course == "green":
 		green_until = Time.get_ticks_msec() + 4000.0
 	_chime("lap" if state.course == "green" else "invalid")
@@ -1225,7 +1229,7 @@ func impact_damage(impulse: float, push: Vector3, is_car: bool = false) -> void:
 	incident(4 if is_car else 2)
 	var sev := minf(1.0, impulse / (vehicle.mass * 7.0))
 	if damage.punctured.count(true) > flats:
-		flash(I18n.t("Puncture! Bring it back to the pits"), 3500.0)
+		flash(I18n.t("Puncture! Bring it back to the pits"), 3500.0, "bad")
 		if snd != null:
 			snd.impact(1.0)
 		_say("puncture", 3, {"key": "damage", "cooldown": 6})
@@ -1336,7 +1340,7 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 				text = I18n.t("Track limits: warning {n} of {max}", {"n": e.warning, "max": RaceTracker.PENALTY.limitsWarnings})
 			else:
 				text = I18n.t("Off track: lost time, no strike")
-			flash(text, 3200.0 if e.get("invalidated", false) or e.get("blackWhite", false) else 2200.0)
+			flash(text, 3200.0 if e.get("invalidated", false) or e.get("blackWhite", false) else 2200.0, "bad" if e.get("invalidated", false) or e.get("blackWhite", false) else "warn")
 			if e.get("warning", 0) != 0 or e.get("invalidated", false):
 				_chime("invalid")
 			if not e.get("contact", false) and (e.get("warning", 0) != 0 or e.get("invalidated", false) or e.get("blackWhite", false)):
@@ -1356,7 +1360,7 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 				text2 = I18n.t("Reset: +{s} s penalty", {"s": s})
 			else:
 				text2 = I18n.t("Shortcut: +{s} s penalty", {"s": s})
-			flash(text2, 3200.0)
+			flash(text2, 3200.0, "bad")
 			_chime("invalid")
 			_say("penalty_time", 2, {"key": "penalty", "cooldown": 8})
 	if tr.passed < 0 or tr.laps == 0:
@@ -1544,7 +1548,7 @@ func _process_inner(dt: float) -> void:
 		vehicle.frozen = false
 		update_countdown(-1.0)
 		if my_laps == 0 and race_t < 2000.0:
-			flash(_start_hint(), 7000.0)
+			flash(_start_hint(), 6000.0)
 	elif race_t < 1500.0:
 		update_countdown(-1.0)
 	else:
@@ -1701,11 +1705,11 @@ func _process_inner(dt: float) -> void:
 func _start_hint() -> String:
 	if race.kind == "race":
 		if race.get("raceMs", 0) > 0:
-			return I18n.t("Race: {min} minutes from a standing start; the leader takes the flag on the first lap after the time is up.", {"min": roundi(race.raceMs / 60000.0)})
-		return I18n.t("Race: {n} laps from a standing start. Go at the green light; penalties are added to your race time.", {"n": race.laps})
+			return I18n.t("RACE · {min} MIN + 1 LAP · standing start", {"min": roundi(race.raceMs / 60000.0)})
+		return I18n.t("RACE · {n} LAPS · standing start", {"n": race.laps})
 	if race.kind == "practice":
-		return I18n.t("Free practice: {min} minutes to learn the track and try your setup. Nothing is decided here.", {"min": roundi(race.sessionMs / 60000.0)})
-	return I18n.t("Qualifying: {min} minutes to set your best lap (clock at the top). Out lap first: warm the tyres, timing starts at the line.", {"min": roundi(race.sessionMs / 60000.0)})
+		return I18n.t("FREE PRACTICE · {min} MIN", {"min": roundi(race.sessionMs / 60000.0)})
+	return I18n.t("QUALIFYING · {min} MIN · out lap first, timing starts at the line", {"min": roundi(race.sessionMs / 60000.0)})
 
 func handle_keys(server_now: float) -> void:
 	var show_timing := kb.held("timing")
@@ -1731,7 +1735,7 @@ func handle_keys(server_now: float) -> void:
 	if kb.tapped("toggleGearbox"):
 		Settings.data.manualGearbox = not Settings.data.manualGearbox
 		vehicle.drivetrain.manual = bool(Settings.data.manualGearbox)
-		flash(I18n.t("Manual gearbox") if Settings.data.manualGearbox else I18n.t("Automatic gearbox"), 1500.0)
+		flash(I18n.t("Manual gearbox") if Settings.data.manualGearbox else I18n.t("Automatic gearbox"), 1500.0, "osd")
 	if kb.tapped("resetCar"):
 		request_reset()
 	if freeze_until > 0.0 and server_now >= freeze_until and start_at != null and server_now >= start_at and not pit_hold:
@@ -1902,7 +1906,7 @@ func cycle_camera() -> void:
 	Settings.data.camera = modes[(i + 1) % modes.size()]
 	Settings.save()
 	chase.reset()
-	flash(I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0)
+	flash(I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0, "osd")
 
 func tv_wanted() -> bool:
 	if spectator:
@@ -1914,7 +1918,7 @@ func toggle_tv() -> void:
 	tv_view = not tv_view
 	if tv != null:
 		tv.reset()
-	flash(I18n.t("TV cameras") if tv_view else I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0)
+	flash(I18n.t("TV cameras") if tv_view else I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0, "osd")
 
 ## Placed the first time they are wanted: a sightline check per tower against the circuit's collision.
 func tv_cameras():
@@ -1969,7 +1973,7 @@ func _on_spectator_key(e: InputEventKey) -> void:
 		spec_tv = not spec_tv
 		if tv != null:
 			tv.reset()
-		flash(I18n.t("TV cameras") if spec_tv else I18n.t("Chase camera"), 1200.0)
+		flash(I18n.t("TV cameras") if spec_tv else I18n.t("Chase camera"), 1200.0, "osd")
 		return
 	if e.keycode == KEY_RIGHT:
 		i = (i + 1) % ids.size()
@@ -2442,7 +2446,7 @@ func update_pit(server_now: float) -> void:
 		_say("pit_limiter", 2, {"cooldown": 30, "ttl": 3})
 		conn.send_json({"t": "pit", "in": true})
 		local_tracker.pit_in(me, server_now)
-		flash(I18n.t("Pit lane · limiter {n} km/h · stop in the yellow box for service", {"n": int(pit.lane.speedLimitKmh)}), 4000.0)
+		flash(I18n.t("Stop in the yellow box for service"), 4000.0)
 	elif ev == "exit":
 		conn.send_json({"t": "pit", "in": false})
 		local_tracker.pit_out(me, track_data.pitLane.exitS, server_now)
@@ -2517,7 +2521,7 @@ func finish_service(plan: Dictionary) -> void:
 		v.drivetrain.power_scale = damage.power_scale()
 		conn.send_json({"t": "damage", "zones": _round_zones()})
 		damage_version_sent = damage.version
-	flash(I18n.t("Service complete · GO!"), 2500.0)
+	flash(I18n.t("Service complete · GO!"), 2500.0, "good")
 	release_from_box()
 
 func release_from_box() -> void:
@@ -2742,7 +2746,7 @@ func update_spectator_ui(server_now: float, dt: float) -> void:
 		"lapLabel": str(st.laps + 1) if st != null else "", "lapPenaltyMs": st.lapPenaltyMs if st != null else 0, "lapInvalid": false,
 		"liveDelta": null, "position": st.position if st != null else 0, "total": race.grid.size(), "currentLapMs": 0.0,
 		"bestLapMs": st.bestLapMs if st != null else null, "lastLapMs": st.lastLapMs if st != null else null, "sectorDelta": null,
-		"damage": 0.0, "damageZones": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "wrongWay": false, "abs": false, "tc": false, "message": message,
+		"damage": 0.0, "damageZones": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "wrongWay": false, "abs": false, "tc": false, "message": message, "messageKind": message_kind, "mirrorOn": mirror != null and mirror.visible,
 		"sessionText": session_text(server_now), "pitText": I18n.t("WATCHING · {name} · ←/→ change car", {"name": nm}),
 		"throttle": 0.0, "brake": 0.0, "steer": 0.0, "compound": "medium", "tyreWear": [0.0, 0.0, 0.0, 0.0],
 		"brakeTemps": [0.0, 0.0, 0.0, 0.0], "slipstream": 0.0, "resetHint": false, "tyreTemps": [0.0, 0.0, 0.0, 0.0],
@@ -2804,7 +2808,7 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 		"liveDelta": (live_delta + pen_ms) if my_laps > 0 and finished_ms == null and live_delta != null else null,
 		"position": position, "total": race.grid.size(), "currentLapMs": cur_lap, "bestLapMs": best_lap,
 		"lastLapMs": lap_times.back() if not lap_times.is_empty() else null, "sectorDelta": sector_delta, "damage": damage.total(),
-		"wrongWay": wrong_way_time > 1.2, "abs": tel.absActive, "tc": tel.tcActive, "message": message, "sessionText": session_text(server_now),
+		"wrongWay": wrong_way_time > 1.2, "abs": tel.absActive, "tc": tel.tcActive, "message": message, "messageKind": message_kind, "mirrorOn": mirror != null and mirror.visible, "sessionText": session_text(server_now),
 		"pitText": I18n.t("PIT BOX") if pit_hold else (I18n.t("PIT LANE · LIMITER {n}", {"n": int(pit.lane.speedLimitKmh)}) if pit != null and pit.in_lane else ""),
 		"compound": v.compound.id, "tyreWear": v.wheels.map(func(w): return w.wear), "brakeTemps": v.wheels.map(func(w): return w.brake_temp),
 		"slipstream": v.wake.strength, "resetHint": stuck_time > 3.0, "tyreTemps": v.wheels.map(func(w): return w.temp),

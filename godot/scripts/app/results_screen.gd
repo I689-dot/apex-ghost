@@ -235,20 +235,36 @@ static func career_block(g: Dictionary) -> Control:
 	row.add_child(xp)
 	var side := UIW.vbox(4)
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	side.add_child(UIKit.label("%s   %d / %d XP" % [I18n.t("Level {n}", {"n": lv.level}), int(lv.into), lv.need], 16, UIKit.TEXT, false, 700))
+	var rank := CareerData.rank_of(lv.level)
+	side.add_child(UIKit.label("%s · %s   %d / %d XP" % [I18n.t(rank.name).to_upper(), I18n.t("Level {n}", {"n": lv.level}), int(lv.into), lv.need], 16, rank.colour, true, 700))
+	# the bar fills from where it was to where it is now (from zero after a level up)
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
 	bar.max_value = lv.need
-	bar.value = lv.into
-	bar.custom_minimum_size = Vector2(0, 10)
+	var before := CareerData.level_of(g.get("xpBefore", c.xp))
+	bar.value = before.into if before.level == lv.level else 0.0
+	bar.custom_minimum_size = Vector2(0, 12)
+	bar.add_theme_stylebox_override("background", UIKit.box(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0), 0, 6))
+	bar.add_theme_stylebox_override("fill", UIKit.box(rank.colour, Color(0, 0, 0, 0), 0, 6))
+	bar.ready.connect(func(): bar.create_tween().tween_property(bar, "value", lv.into, 1.4).set_delay(0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT))
 	side.add_child(bar)
 	if g.levelAfter > g.levelBefore:
 		side.add_child(UIKit.label(I18n.t("Level up! Level {n}", {"n": g.levelAfter}), 16, UIKit.GOOD, true, 700))
+	if g.get("rankAfter", "") != g.get("rankBefore", ""):
+		side.add_child(UIKit.label(I18n.t("New rank: {rank}", {"rank": I18n.t(g.rankAfter)}).to_upper(), 18, rank.colour, true, 800))
 	var lic: String = g.licenceAfter
 	side.add_child(UIKit.label("%s %.2f   %s · %s %s" % [lic, c.sr, I18n.t(CareerData.LICENCE_NAME[lic]), I18n.t("Safety Rating"), sr_text], 15, Color(CareerData.LICENCE_COLOUR[lic]).lightened(0.35)))
 	if lic != g.licenceBefore:
 		var up: bool = CareerData.LICENCES.find(lic) > CareerData.LICENCES.find(g.licenceBefore)
 		side.add_child(UIKit.label(I18n.t("Promoted to {lic}!", {"lic": I18n.t(CareerData.LICENCE_NAME[lic])}) if up else I18n.t("Back to {lic}: keep it clean", {"lic": I18n.t(CareerData.LICENCE_NAME[lic])}), 16, UIKit.GOOD if up else UIKit.BAD, true, 700))
+	var d_r: int = int(g.get("ratingAfter", 0)) - int(g.get("ratingBefore", 0))
+	if g.has("ratingAfter"):
+		side.add_child(UIKit.label("%s %d   %s" % [I18n.t("Driver Rating"), int(g.ratingAfter), ("+%d" % d_r) if d_r > 0 else (("%d" % d_r) if d_r < 0 else "±0")], 15, UIKit.GOOD if d_r > 0 else (UIKit.BAD if d_r < 0 else UIKit.MUTED), false, 700))
+	for a in g.get("achievements", []):
+		var ap := PanelContainer.new()
+		ap.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.ACCENT_2, 0.12), Color(UIKit.ACCENT_2, 0.7), 1, 4, Vector2(10, 3)))
+		ap.add_child(UIKit.label("★  %s · %s  +%d XP" % [I18n.t(a[1]), I18n.t(a[2]), a[3]], 14, UIKit.ACCENT_2, false, 700))
+		side.add_child(ap)
 	row.add_child(side)
 	var col := UIW.vbox(6)
 	col.add_child(UIW.h3(I18n.t("Career")))

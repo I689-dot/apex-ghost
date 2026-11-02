@@ -17,6 +17,8 @@
     "_why": "the road is stacked (base asphalt, rubbered and resurfaced layers, paint a few cm apart): rebuilt from the render chunks as at Zandvoort (road_collision.mjs)",
     "overlay": "^(lines|asph_spa_g|asph_spa_joint)"
   },
+  "_smoothRoad": "Before turn 9 (3.24-3.30 km) two road layers of the source model disagree by up to 35 cm, first across one half of the road, then the other: a slab that threw cars running there. The wheels ride a smoothed surface over this stretch (roadPatches).",
+  "smoothRoad": { "spa": [[3228, 3300]] },
   "analysis": {
     "id": "spa",
     "name": "Circuit de Spa-Francorchamps",

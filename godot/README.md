@@ -43,3 +43,13 @@ Pixel: a button is about 48 dp); the race keeps the base scale. To check the lay
 `APEX_TOUCH=1 APEX_UI_SCALE=1.5 APEX_AUTO=solo SHOT_DIR=/tmp/lb godot --path godot --resolution 1616x720`.
 The lobby (`lobby_screen.gd`) is a hub (car, circuit, conditions, session, rules, drivers, one big start/ready button) with
 a full page for each; a car is picked automatically (the last one used).
+
+## Track surface checks
+
+* `python3 tools/godot/kerb_scan.py spa [file.apxc] [from to]`: kerb steps over 5 cm against the road or ground beside them.
+* `python3 tools/godot/road_bumps.py spa [file.apxc]`: abrupt height changes of the driven surface along the lap.
+* `TRACK=spa FROM=3150 TO=3420 LANE=-5.8 godot --path godot --resolution 960x540 res://tests/runner.tscn -- res://tests/kerb_test.gd`:
+  drives a stretch with the car held on a lateral line (onto the kerbs) and prints the roll and vertical speed.
+* `node tools/asset-pipeline/conform_apxc.mjs <collision.apxc>`: subdivides long kerb triangles, brings kerbs within a few cm of
+  the road, lifts the ground behind them and closes the gaps with a skirt (the pipeline does the same in optimize.mjs).
+* Stretches whose source road is broken get `smoothRoad` in the map's config (tools/asset-pipeline/maps/<map>.json).
