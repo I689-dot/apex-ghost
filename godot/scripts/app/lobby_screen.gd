@@ -1,14 +1,18 @@
 class_name LobbyScreen
 extends RefCounted
-## The lobby (port of App.renderLobby / lobbySetup / prepPanel / renderBriefing / renderWatch): a stepped setup
-## (circuit, conditions, session, rules, car) the host edits and everyone sees, the driver list, and the briefing where
-## each driver chooses tyres, wing, brake balance, fuel and the deeper setup for the final conditions.
+## The lobby (port of App.renderLobby / lobbySetup / prepPanel / renderBriefing / renderWatch), laid out for a thumb:
+## one hub with the car and the session at a glance and a single big action (start / ready), and a full page for each
+## thing you can change (circuit, conditions, session, rules, car, drivers). The briefing, where each driver chooses
+## tyres, wing, brake balance, fuel and the deeper setup for the final conditions, follows.
 
 const MAP_COUNTRY := {"zandvoort": "NL", "spa": "BE"}
 const CIRCUIT_NAME := {"nurburgring": "Nürburgring", "zandvoort": "Circuit Zandvoort", "spa": "Circuit de Spa-Francorchamps"}
-const STEPS := ["circuit", "conditions", "session", "rules", "car"]
 
-static var _step := {"room": "", "step": "car"}
+static var _room_code := ""
+static var _page := "hub"
+static var _preview := ""
+static var _car_filter := ""
+static var _car_sent_for := ""
 static var _adv_open := false
 
 static func circuit_of(tr: Dictionary) -> String:
@@ -18,103 +22,327 @@ static func circuit_of(tr: Dictionary) -> String:
 static func hp(kw: float) -> int:
 	return roundi(kw * 1.341)
 
+## The phone's back button: from a page to the hub (true), or false when already on the hub.
+static func back_page() -> bool:
+	if _page == "hub":
+		return false
+	_page = "hub"
+	return true
+
+static func _cars(app: App) -> Array:
+	return app.cars.cars.filter(func(c): return c.role != "safety")
+
+static func _car_by_id(cars: Array, id: Variant) -> Dictionary:
+	for c in cars:
+		if c.id == id:
+			return c
+	return {}
+
+## A driver starts with a car (the one they drove last): READY is never greyed out for "no car".
+static func ensure_car(app: App) -> void:
+	var room: Dictionary = app.room
+	var mine := app.my_info()
+	if room.is_empty() or mine.is_empty() or app.spectating or room.phase != "lobby" or mine.get("carId") != null or mine.get("waiting", false):
+		return
+	if _car_sent_for == room.code + app.me:
+		return
+	var cars := _cars(app)
+	var pick := ""
+	var last: String = str(Settings.data.get("lastCar", ""))
+	for c in [_car_by_id(cars, last)] + cars:
+		if c.is_empty():
+			continue
+		var owner = room.carLocks.get(c.id)
+		if owner == null or owner == app.me:
+			pick = c.id
+			break
+	if pick != "":
+		_car_sent_for = room.code + app.me
+		app.send({"t": "selectCar", "carId": pick})
+
 # ----------------------------------------------------------------- lobby ---
 
 static func build(app: App) -> Control:
 	var room: Dictionary = app.room
+	if _room_code != room.code:
+		_room_code = room.code
+		_page = "hub"
+		_preview = ""
 	var mine := app.my_info()
 	var is_host: bool = mine.get("host", false)
-	var all_cars: Array = app.cars.cars.filter(func(c): return c.role != "safety")
-	var connected: Array = room.players.filter(func(p): return p.connected)
-	var all_ready := connected.size() > 0 and connected.all(func(p): return p.carId != null and p.ready)
+	var edit: bool = is_host and room.phase == "lobby"
+	var cars := _cars(app)
+	match _page:
+		"circuit", "conditions", "session", "rules":
+			return _setting_page(app, _page, edit, is_host)
+		"car":
+			return _car_page(app, room, cars, mine)
+		"drivers":
+			return _drivers_page(app, room, cars, is_host and room.phase == "lobby")
+	return _hub(app, room, cars, mine, is_host, edit)
 
-	var side := UIW.vbox(10)
-	side.custom_minimum_size = Vector2(300, 0)
-	if LocalRoom.is_hosted_code(room.code):
-		side.add_child(UIW.h3(I18n.t("HOSTED ON THIS DEVICE")))
-		side.add_child(UIKit.label(room.code, 40, UIKit.TEXT, true, 700))
-	elif LocalRoom.is_local_code(room.code):
-		side.add_child(UIW.h3(I18n.t("Solo · offline")))
+static func _go(app: App, page: String) -> void:
+	_page = page
+	_preview = ""
+	app.render_lobby()
+
+## The common page: a back arrow and title on top, the body, an optional bottom bar.
+static func _frame(title: String, sub: String, on_back: Callable, body: Control, trailing: Control = null, bottom: Control = null, back_text: String = "") -> Control:
+	var top := UIW.hbox(14)
+	var back := UIKit.button("‹  " + (back_text if back_text != "" else I18n.t("Back")), on_back)
+	top.add_child(back)
+	var head := UIW.vbox(0)
+	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.alignment = BoxContainer.ALIGNMENT_CENTER
+	head.add_child(UIKit.label(title, 30, UIKit.TEXT, true, 700))
+	if sub != "":
+		head.add_child(UIKit.label(sub, 15, UIKit.MUTED))
+	top.add_child(head)
+	if trailing != null:
+		top.add_child(trailing)
+	var col := UIW.vbox(12)
+	col.add_child(top)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(body)
+	if bottom != null:
+		col.add_child(bottom)
+	return UIW.margin(col, 18)
+
+## A big tappable row: accent bar, kicker, value, detail and a chevron.
+static func _row_card(kicker: String, value: String, detail: String, on: Variant, lead: Control = null) -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(0, 76)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		b.add_theme_stylebox_override(st, UIKit.box(Color(0.03, 0.035, 0.045, 0.88) if st != "pressed" else Color(UIKit.ACCENT, 0.55), Color(1, 1, 1, 0.14), 1, 4))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UIKit.full(row)
+	row.offset_left = 0
+	row.offset_right = -14
+	var bar := ColorRect.new()
+	bar.color = UIKit.ACCENT
+	bar.custom_minimum_size = Vector2(5, 0)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(bar)
+	if lead != null:
+		lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lead.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(lead)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var k := UIKit.label(kicker.to_upper(), 13, UIKit.ACCENT_2, true, 700)
+	var v := UIKit.label(value, 23, UIKit.TEXT, true, 700)
+	v.clip_text = true
+	var d := UIKit.label(detail, 14, UIKit.MUTED)
+	d.clip_text = true
+	for l in [k, v, d]:
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_child(l)
+	row.add_child(col)
+	var chev := UIKit.label("›" if on != null else "", 34, UIKit.MUTED, true, 700)
+	chev.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chev.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(chev)
+	b.add_child(row)
+	if on != null:
+		b.pressed.connect(on)
 	else:
-		side.add_child(UIW.h3(I18n.t("ROOM CODE")))
-		var row := UIW.hbox(8)
-		row.add_child(UIKit.label(room.code, 40, UIKit.TEXT, true, 700))
-		row.add_child(UIKit.button(I18n.t("Copy"), func():
-			DisplayServer.clipboard_set(room.code)
-			app.toast(I18n.t("Room code copied"))))
-		side.add_child(row)
-	side.add_child(UIW.h3(I18n.t("Drivers {n}/{max}", {"n": room.players.size(), "max": Const.MAX_PLAYERS})))
-	var list := UIW.vbox(4)
-	for p in room.players:
-		list.add_child(_player_row(app, p, all_cars, is_host and room.phase == "lobby"))
-	side.add_child(UIW.scroll(list))
-	if is_host and room.phase == "lobby":
-		var add := UIKit.button(I18n.t("+ Add bot"), func(): app.send({"t": "addBot"}))
-		add.disabled = room.players.size() >= Const.MAX_PLAYERS
-		side.add_child(add)
-	var ready_btn := UIKit.button(I18n.t("Ready"), func(): app.send({"t": "ready", "ready": not mine.get("ready", false)}), mine.get("ready", false))
-	ready_btn.disabled = mine.get("carId") == null or room.phase != "lobby" or mine.get("waiting", false)
-	side.add_child(ready_btn)
-	if is_host:
-		var start := UIKit.button(I18n.t("Start race"), func(): app.send({"t": "start"}), true)
-		start.disabled = not all_ready or room.phase != "lobby"
-		side.add_child(start)
-	else:
-		side.add_child(UIW.muted(I18n.t("Waiting for the host to start") if all_ready else I18n.t("Waiting for everyone to be ready")))
-	var foot := UIW.hbox(8)
-	foot.add_child(UIKit.button(I18n.t("Settings"), app.open_settings))
-	foot.add_child(UIKit.button(I18n.t("Leave"), app.leave))
-	side.add_child(foot)
+		b.disabled = true
+		b.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	return b
 
-	var main := UIW.vbox(10)
-	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	if room.phase != "lobby":
-		main.add_child(UIKit.label(I18n.t("A race is in progress. You will join the next one."), 18, UIKit.ACCENT_2))
-	var setup := UIW.panel(_setup(app, is_host, all_cars, mine))
-	setup.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main.add_child(setup)
-
-	var root := UIW.hbox(18)
-	root.add_child(UIW.panel(side, true))
-	root.add_child(main)
-	return UIW.margin(root, 20)
-
-static func _player_row(app: App, p: Dictionary, all_cars: Array, can_remove: bool) -> Control:
-	var row := UIW.hbox(8)
-	var nick := UIKit.label(p.nick, 17, UIKit.ACCENT_2 if p.id == app.me else UIKit.TEXT, false, 700)
-	nick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(nick)
-	if p.host:
-		row.add_child(UIKit.label(I18n.t("HOST"), 11, UIKit.ACCENT_2, true, 700))
-	if p.bot:
-		row.add_child(UIKit.label(I18n.t("BOT"), 11, UIKit.MUTED, true, 700))
-	var tyre := UIW.image("res://assets/ui/tyre_%s.webp" % p.get("tyre", "medium"), Vector2(22, 22))
-	row.add_child(tyre)
-	var car_name := I18n.t("choosing…")
-	if p.carId != null:
-		car_name = p.carId
-		for c in all_cars:
-			if c.id == p.carId:
-				car_name = c.name
-	elif p.waiting:
-		car_name = I18n.t("next race")
-	var car := UIKit.label(car_name, 13, UIKit.MUTED)
-	car.clip_text = true
-	car.custom_minimum_size = Vector2(90, 0)
-	row.add_child(car)
-	row.add_child(UIKit.label(I18n.t("READY") if p.ready else "", 12, UIKit.GOOD, true, 700) if p.connected else UIKit.label(I18n.t("OFFLINE"), 12, UIKit.BAD, true, 700))
-	if p.bot and can_remove:
-		row.add_child(UIKit.button("×", func(): app.send({"t": "removeBot", "id": p.id})))
+## A labelled bar from 0 to 1 (the car's stats).
+static func _stat_bar(label: String, value: String, frac: float) -> Control:
+	var row := UIW.hbox(10)
+	var lb := UIKit.label(label.to_upper(), 13, UIKit.MUTED, true, 700)
+	lb.custom_minimum_size = Vector2(92, 0)
+	row.add_child(lb)
+	var pb := ProgressBar.new()
+	pb.show_percentage = false
+	pb.max_value = 1.0
+	pb.value = clampf(frac, 0.04, 1.0)
+	pb.custom_minimum_size = Vector2(0, 8)
+	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pb.add_theme_stylebox_override("background", UIKit.box(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0), 0, 4))
+	pb.add_theme_stylebox_override("fill", UIKit.box(UIKit.ACCENT, Color(0, 0, 0, 0), 0, 4))
+	row.add_child(pb)
+	var vl := UIKit.label(value, 15, UIKit.TEXT, false, 700)
+	vl.custom_minimum_size = Vector2(86, 0)
+	vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(vl)
 	return row
 
-static func _setup(app: App, is_host: bool, all_cars: Array, mine: Dictionary) -> Control:
+static func _car_stats(car: Dictionary) -> Control:
+	var s: Dictionary = car.specs
+	var power := hp(s.powerKw)
+	var col := UIW.vbox(5)
+	col.add_child(_stat_bar(I18n.t("Power"), I18n.t("{n} hp", {"n": power}), power / 700.0))
+	col.add_child(_stat_bar(I18n.t("Top speed"), "%d km/h" % s.topSpeedKmh, float(s.topSpeedKmh) / 330.0))
+	col.add_child(_stat_bar(I18n.t("Weight"), "%d kg" % s.massKg, float(s.massKg) / 1600.0))
+	return col
+
+static var _hero_rects: Dictionary = {}
+
+## The car's menu picture without its empty margins (data/car_hero_rects.json, from tools/godot/make-car-bbox.py).
+static func _car_image(car: Dictionary, size: Vector2) -> TextureRect:
+	var img := UIW.image("res://assets/ui/cars/%s.webp" % car.id, size)
+	if img.texture == null:
+		img.texture = UIW.tex(car.thumbnail)
+		return img
+	if _hero_rects.is_empty():
+		var f := FileAccess.get_file_as_string("res://data/car_hero_rects.json")
+		_hero_rects = JSON.parse_string(f) if f != "" else {"": []}
+	var r: Array = _hero_rects.get(car.id, [])
+	if r.size() == 4:
+		var at := AtlasTexture.new()
+		at.atlas = img.texture
+		at.region = Rect2(r[0], r[1], r[2], r[3])
+		img.texture = at
+	return img
+
+static func _race_label(k: String) -> String:
+	var n := int(k.substr(1))
+	if k[0] == "T":
+		return I18n.t("Race: {m} min + 1 lap", {"m": n})
+	return I18n.t("Qualifying only") if n == 0 else I18n.t("Race: {n} laps", {"n": n})
+
+static func _race_key(room: Dictionary) -> String:
+	return ("T%d" % room.raceMinutes) if int(room.get("raceMinutes", 0)) > 0 else ("L%d" % room.raceLaps)
+
+# ------------------------------------------------------------------- hub ---
+
+static func _hub(app: App, room: Dictionary, cars: Array, mine: Dictionary, is_host: bool, edit: bool) -> Control:
+	var c: Dictionary = room.conditions
+	var track: Dictionary = app.track_entry(c.trackId)
+	if track.is_empty():
+		track = app.track_index[0]
+	var plan := Weather.plan_weather(int(c.seed), c)
+	var rules: Dictionary = room.get("rules", {})
+	var rules_on := ["contact", "pitWindow", "fuel", "raceControl"].filter(func(k): return rules.get(k, false)).size()
+	var car := _car_by_id(cars, mine.get("carId"))
+	var solo := LocalRoom.is_local_code(room.code)
+
+	# the car: a big card, tap to change
+	var hero := Button.new()
+	hero.focus_mode = Control.FOCUS_NONE
+	hero.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	hero.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hero.size_flags_stretch_ratio = 0.8
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		hero.add_theme_stylebox_override(st, UIKit.box(Color(0.03, 0.035, 0.045, 0.88) if st != "pressed" else Color(UIKit.ACCENT, 0.4), Color(1, 1, 1, 0.14), 1, 4))
+	var hc := VBoxContainer.new()
+	hc.add_theme_constant_override("separation", 4)
+	hc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UIKit.full(hc)
+	hc.offset_left = 14
+	hc.offset_right = -14
+	hc.offset_top = 10
+	hc.offset_bottom = -10
+	if car.is_empty():
+		hc.alignment = BoxContainer.ALIGNMENT_CENTER
+		hc.add_child(UIKit.label(I18n.t("Pick a car"), 30, UIKit.TEXT, true, 700))
+	else:
+		var img := _car_image(car, Vector2(0, 120))
+		img.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		hc.add_child(img)
+		hc.add_child(UIKit.label(car.name, 26, UIKit.TEXT, true, 700))
+		hc.add_child(UIKit.label("%s · %s" % [car.manufacturer, car.category], 14, UIKit.MUTED))
+		hc.add_child(_car_stats(car))
+	var change := UIKit.label(I18n.t("Change car") + "  ›", 17, UIKit.ACCENT_2, true, 700)
+	change.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hc.add_child(change)
+	for ch in hc.get_children():
+		ch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(hc)
+	hero.disabled = room.phase != "lobby"
+	hero.pressed.connect(func(): _go(app, "car"))
+
+	# the session: a card for each thing the host can change
+	var outline := TrackOutline.new(track.id, Vector2(52, 52))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid.size_flags_stretch_ratio = 1.0
+	var open := func(p: String) -> Callable: return func(): _go(app, p)
+	var km := "%.2f km" % (float(track.length) / 1000.0)
+	grid.add_child(_row_card(I18n.t("Circuit"), I18n.t(track.get("name", "")), km, open.call("circuit"), outline))
+	grid.add_child(_row_card(I18n.t("Conditions"), I18n.t(Weather.LABEL[plan.kind]), Weather.format_hour(plan.startHour), open.call("conditions")))
+	grid.add_child(_row_card(I18n.t("Session"), _race_label.call(_race_key(room)), I18n.t("{m} min", {"m": room.sessionMinutes}) + " " + I18n.t("Qualifying").to_lower(), open.call("session")))
+	grid.add_child(_row_card(I18n.t("Rules"), I18n.t("{n} of {max} on", {"n": rules_on, "max": 4}) if rules_on > 0 else I18n.t("Ghost cars"), I18n.t("Car contact") + ", " + I18n.t("Fuel and refuelling").to_lower() + "…", open.call("rules")))
+	var drivers := _row_card(I18n.t("Drivers"), "%d / %d" % [room.players.size(), Const.MAX_PLAYERS], I18n.t("Add AI cars") if edit else I18n.t("Who is racing"), open.call("drivers"))
+	var side := UIW.vbox(10)
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.size_flags_stretch_ratio = 1.15
+	side.add_child(grid)
+	side.add_child(drivers)
+	var content := UIW.hbox(14)
+	content.add_child(hero)
+	content.add_child(side)
+
+	# the bottom: what is missing, and the one big action
+	var hint := UIKit.label("", 16, UIKit.MUTED)
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var connected: Array = room.players.filter(func(p): return p.connected)
+	var others_ready := connected.all(func(p): return p.id == app.me or (p.carId != null and p.ready))
+	var is_ready: bool = mine.get("ready", false)
+	var act := UIKit.button("", Callable(), true)
+	act.custom_minimum_size = Vector2(300, 72)
+	act.add_theme_font_size_override("font_size", 28)
+	if room.phase != "lobby" or mine.get("waiting", false):
+		act.text = I18n.t("Waiting…").to_upper()
+		act.disabled = true
+		hint.text = I18n.t("A race is in progress. You will join the next one.")
+	elif car.is_empty():
+		act.text = I18n.t("Pick a car").to_upper()
+		act.pressed.connect(func(): _go(app, "car"))
+	elif is_host:
+		act.text = I18n.t("Start race").to_upper()
+		act.disabled = not others_ready
+		hint.text = "" if others_ready else I18n.t("Waiting for everyone to be ready")
+		act.pressed.connect(func():
+			if not is_ready:
+				app.send({"t": "ready", "ready": true})
+			app.send({"t": "start"}))
+	else:
+		act.text = (I18n.t("Ready") + " ✓" if is_ready else I18n.t("Ready")).to_upper()
+		hint.text = I18n.t("Waiting for the host to start") if is_ready else ""
+		act.pressed.connect(func(): app.send({"t": "ready", "ready": not is_ready}))
+	var bottom := UIW.hbox(14)
+	bottom.add_child(hint)
+	bottom.add_child(act)
+
+	# the top: leave, where we are, settings
+	var sub := ""
+	if LocalRoom.is_hosted_code(room.code):
+		sub = I18n.t("HOSTED ON THIS DEVICE") + " · " + I18n.t("ROOM CODE") + " " + room.code
+	elif not solo:
+		sub = I18n.t("ROOM CODE") + " " + room.code
+	else:
+		sub = I18n.t("Solo · offline")
+	var right := UIW.hbox(8)
+	if not solo:
+		right.add_child(UIKit.button(I18n.t("Copy"), func():
+			DisplayServer.clipboard_set(room.code)
+			app.toast(I18n.t("Room code copied"))))
+	right.add_child(UIKit.button(I18n.t("Settings"), app.open_settings))
+	return _frame(I18n.t("Race setup"), sub, app.leave, content, right, bottom, I18n.t("Menu"))
+
+# ------------------------------------------------------------- setting pages ---
+
+static func _setting_page(app: App, page: String, edit: bool, is_host: bool) -> Control:
 	var room: Dictionary = app.room
 	var c: Dictionary = room.conditions
-	var edit: bool = is_host and room.phase == "lobby"
-	if _step.room != room.code:
-		_step = {"room": room.code, "step": "circuit" if is_host else "car"}
-	var step: String = _step.step
 	var tracks: Array = app.track_index
 	var track: Dictionary = app.track_entry(c.trackId)
 	if track.is_empty():
@@ -123,12 +351,6 @@ static func _setup(app: App, is_host: bool, all_cars: Array, mine: Dictionary) -
 	var w0 := Weather.weather_at(plan, 0.0)
 	var temp0 := Weather.temperatures(plan, w0, track.get("map", "nurburgring"))
 	var rules: Dictionary = room.get("rules", {})
-	var race_key := ("T%d" % room.raceMinutes) if int(room.get("raceMinutes", 0)) > 0 else ("L%d" % room.raceLaps)
-	var race_label := func(k: String) -> String:
-		var n := int(k.substr(1))
-		if k[0] == "T":
-			return I18n.t("Race: {m} min + 1 lap", {"m": n})
-		return I18n.t("Qualifying only") if n == 0 else I18n.t("Race: {n} laps", {"n": n})
 	var send := func(patch: Dictionary): var m := {"t": "setConditions"}; m.merge(patch); app.send(m)
 	var rule_items := [
 		["contact", I18n.t("Car contact"), I18n.t("Cars collide and take damage (off: ghost cars that pass through each other)")],
@@ -136,76 +358,43 @@ static func _setup(app: App, is_host: bool, all_cars: Array, mine: Dictionary) -
 		["fuel", I18n.t("Fuel and refuelling"), I18n.t("Engines burn fuel, you choose your fuel load, stops can refuel (endurance)")],
 		["raceControl", I18n.t("Race control"), I18n.t("Yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties")],
 	]
-	var rules_on := rule_items.filter(func(r): return rules.get(r[0], false)).size()
-	var car_name := ""
-	for car in all_cars:
-		if car.id == mine.get("carId"):
-			car_name = car.name
-	var steps := [
-		["circuit", I18n.t("Circuit"), I18n.t(track.get("name", ""))],
-		["conditions", I18n.t("Conditions"), "%s · %s" % [I18n.t(Weather.LABEL[plan.kind]), Weather.format_hour(plan.startHour)]],
-		["session", I18n.t("Session"), race_label.call(race_key)],
-		["rules", I18n.t("Rules"), I18n.t("{n} of {max} on", {"n": rules_on, "max": rule_items.size()}) if rules_on > 0 else I18n.t("Ghost cars")],
-		["car", I18n.t("Car"), car_name if car_name != "" else I18n.t("Pick a car")],
-	]
-	var go := func(s: String): _step.step = s; app.render_lobby()
-	var at := STEPS.find(step)
-
+	var title := ""
 	var pane: Control
-	match step:
+	match page:
 		"circuit":
+			title = I18n.t("Circuit")
 			pane = _circuit_pane(app, tracks, track, edit, send)
 		"conditions":
+			title = I18n.t("Conditions")
 			pane = _conditions_pane(c, plan, w0, temp0, edit, send)
 		"session":
-			pane = _session_pane(app, room, race_key, race_label, edit, is_host)
-		"rules":
-			var col := UIW.vbox(14)
+			title = I18n.t("Session")
+			pane = _session_pane(app, room, _race_key(room), _race_label, edit, is_host)
+		_:
+			title = I18n.t("Rules")
+			var col := UIW.vbox(16)
 			for r in rule_items:
 				var k: String = r[0]
 				col.add_child(UIW.toggle(r[1], r[2], rules.get(k, false), (func(v): app.send({"t": "setRules", "rules": {k: v}})) if edit else null))
 			pane = col
-		_:
-			pane = _car_pane(app, room, all_cars, mine)
-
-	var nav := UIW.hbox(6)
-	for i in steps.size():
-		var s: Array = steps[i]
-		var b := Button.new()
-		b.focus_mode = Control.FOCUS_NONE
-		b.text = "%02d  %s\n%s" % [i + 1, String(s[1]).to_upper(), s[2]]
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.clip_text = true
-		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		var on: bool = s[0] == step
-		for st in ["normal", "hover", "pressed"]:
-			b.add_theme_stylebox_override(st, UIKit.box(Color(UIKit.ACCENT, 0.9) if on else Color(1, 1, 1, 0.05 if i >= at else 0.1), UIKit.LINE, 1, 3, Vector2(12, 8)))
-		b.add_theme_font_size_override("font_size", 14)
-		var key: String = s[0]
-		b.pressed.connect(func(): go.call(key))
-		nav.add_child(b)
-	var foot := UIW.hbox(8)
-	if at > 0:
-		var pk: String = STEPS[at - 1]
-		foot.add_child(UIKit.button("‹ " + String(steps[at - 1][1]), func(): go.call(pk)))
-	foot.add_child(UIW.spacer())
-	if at < STEPS.size() - 1:
-		var nk: String = STEPS[at + 1]
-		foot.add_child(UIKit.button(String(steps[at + 1][1]) + " ›", func(): go.call(nk), true))
-
-	var col := UIW.vbox(10)
-	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(nav)
+	var sub := "" if edit else I18n.t("Only the host can change this")
 	var body := UIW.scroll(pane)
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_child(body)
-	col.add_child(foot)
-	return col
+	return _frame(title, sub, func(): _go(app, "hub"), UIW.panel(body))
 
 static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool, send: Callable) -> Control:
-	var col := UIW.vbox(12)
-	var info := UIW.vbox(6)
-	info.add_child(UIKit.label(I18n.t("Selected circuit") if edit else I18n.t("The host chose"), 13, UIKit.ACCENT_2, true, 700))
+	var col := UIW.vbox(14)
+	var head := UIW.hbox(16)
+	var preview := TextureRect.new()
+	preview.custom_minimum_size = Vector2(300, 150)
+	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	var map: String = track.get("map", "nurburgring")
+	var sfx := "" if map == "nurburgring" or map == "nordschleife" else "_" + map
+	preview.texture = UIW.tex("res://assets/ui/photo_aerial%s.webp" % sfx)
+	head.add_child(preview)
+	var info := UIW.vbox(4)
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.alignment = BoxContainer.ALIGNMENT_CENTER
 	info.add_child(UIW.h2(I18n.t(track.name)))
 	var facts := "%.2f km · %s" % [float(track.length) / 1000.0, MAP_COUNTRY.get(track.get("map", ""), "DE")]
 	if track.get("turns") != null:
@@ -215,18 +404,11 @@ static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool
 	if layouts.size() > 1:
 		info.add_child(UIKit.label(I18n.t("Layout"), 13, UIKit.ACCENT_2, true, 700))
 		info.add_child(UIW.chips(track.id, layouts.map(func(t): return [t.id, "%s · %.2f km" % [I18n.t(t.name).trim_prefix("Nürburgring ").strip_edges(), float(t.length) / 1000.0]]), func(v): send.call({"trackId": v}), edit))
-	var preview := TextureRect.new()
-	preview.custom_minimum_size = Vector2(0, 170)
-	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	var map: String = track.get("map", "nurburgring")
-	var sfx := "" if map == "nurburgring" or map == "nordschleife" else "_" + map
-	preview.texture = UIW.tex("res://assets/ui/photo_aerial%s.webp" % sfx)
-	col.add_child(preview)
-	col.add_child(info)
+	head.add_child(info)
+	col.add_child(head)
 	var cards := HFlowContainer.new()
-	cards.add_theme_constant_override("h_separation", 8)
-	cards.add_theme_constant_override("v_separation", 8)
+	cards.add_theme_constant_override("h_separation", 10)
+	cards.add_theme_constant_override("v_separation", 10)
 	var seen := {}
 	for t in tracks:
 		var key := circuit_of(t)
@@ -238,15 +420,15 @@ static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool
 		var shown: Dictionary = track if on else group[0]
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(200, 170)
+		b.custom_minimum_size = Vector2(215, 170)
 		var inner := VBoxContainer.new()
 		inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		inner.alignment = BoxContainer.ALIGNMENT_CENTER
 		UIKit.full(inner)
-		var ol := TrackOutline.new(shown.id, Vector2(80, 80))
+		var ol := TrackOutline.new(shown.id, Vector2(86, 86))
 		ol.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		inner.add_child(ol)
-		var l1 := UIKit.label(I18n.t(CIRCUIT_NAME.get(key, shown.name)), 16, UIKit.TEXT, true, 700)
+		var l1 := UIKit.label(I18n.t(CIRCUIT_NAME.get(key, shown.name)), 17, UIKit.TEXT, true, 700)
 		l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var l2 := UIKit.label(I18n.t("{n} layouts", {"n": group.size()}) if group.size() > 1 else "%.2f km" % (float(shown.length) / 1000.0), 14, UIKit.MUTED)
@@ -266,7 +448,7 @@ static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool
 	return col
 
 static func _conditions_pane(c: Dictionary, plan: Dictionary, w0: Dictionary, temp0: Dictionary, edit: bool, send: Callable) -> Control:
-	var col := UIW.vbox(14)
+	var col := UIW.vbox(16)
 	var weather_opts: Array = [["random", I18n.t("Random")]]
 	for k in Weather.KINDS:
 		weather_opts.append([k, I18n.t(Weather.LABEL[k])])
@@ -282,9 +464,8 @@ static func _conditions_pane(c: Dictionary, plan: Dictionary, w0: Dictionary, te
 		change = I18n.t("{weather} from about minute {min}", {"weather": I18n.t(Weather.LABEL[plan.change.to]), "min": maxi(1, roundi(plan.change.atSec / 60.0))})
 	var fc := UIW.vbox(4)
 	fc.add_child(UIKit.label(I18n.t("Forecast"), 13, UIKit.ACCENT_2, true, 700))
-	fc.add_child(UIKit.label("%s · %s" % [I18n.t(Weather.LABEL[plan.kind]), Weather.format_hour(plan.startHour)], 24, UIKit.TEXT, true, 700))
-	fc.add_child(UIKit.label(I18n.t("%s track" % state), 16, UIKit.MUTED))
-	fc.add_child(UIKit.label(change, 16, UIKit.MUTED))
+	fc.add_child(UIKit.label("%s · %s" % [I18n.t(Weather.LABEL[plan.kind]), Weather.format_hour(plan.startHour)], 26, UIKit.TEXT, true, 700))
+	fc.add_child(UIKit.label(I18n.t("%s track" % state) + " · " + change, 16, UIKit.MUTED))
 	fc.add_child(UIKit.label("%s %d °C · %s %d °C" % [I18n.t("Air"), roundi(temp0.airC), I18n.t("Track"), roundi(temp0.trackC)], 18))
 	if edit:
 		fc.add_child(UIKit.button(I18n.t("New forecast"), func(): send.call({"reroll": true})))
@@ -304,7 +485,7 @@ static func _session_pane(app: App, room: Dictionary, race_key: String, race_lab
 		var rm: int = int(room.get("raceMinutes", 0))
 		if int(room.get("practiceMinutes", 0)) == f[2] and room.sessionMinutes == f[3] and ((rm == f[5]) if f[5] > 0 else (rm == 0 and room.raceLaps == f[4])):
 			fmt_now = f[0]
-	var col := UIW.vbox(14)
+	var col := UIW.vbox(16)
 	col.add_child(UIW.field(I18n.t("Format"), UIW.chips(fmt_now, formats.map(func(f): return [f[0], f[1]]), func(v):
 		for f in formats:
 			if f[0] == v:
@@ -332,50 +513,52 @@ static func _session_pane(app: App, room: Dictionary, race_key: String, race_lab
 		col.add_child(UIW.field(I18n.t("Room"), UIW.toggle(I18n.t("Public room"), I18n.t("Public: listed, anyone can join or watch"), room.isPublic, (func(v): app.send({"t": "setPublic", "isPublic": v})) if edit else null)))
 	return col
 
-static func _car_pane(app: App, room: Dictionary, all_cars: Array, mine: Dictionary) -> Control:
-	var browsing: Dictionary = {}
-	for c in all_cars:
-		if c.id == (app.browsing if app.browsing != "" else mine.get("carId")):
-			browsing = c
-	if browsing.is_empty():
-		for c in all_cars:
-			if c.id == mine.get("carId"):
-				browsing = c
-	var root := UIW.hbox(14)
-	var spec := UIW.vbox(4)
-	spec.custom_minimum_size = Vector2(300, 0)
-	if browsing.is_empty():
-		spec.add_child(UIW.h2(I18n.t("Pick a car")))
-	else:
-		var hero := UIW.image("res://assets/ui/cars/%s.webp" % browsing.id, Vector2(300, 170))
-		if hero.texture == null:
-			hero.texture = UIW.tex(browsing.thumbnail)
-		spec.add_child(hero)
-		spec.add_child(UIW.h2(browsing.name))
-		spec.add_child(UIKit.label("%s%s · %s" % [browsing.manufacturer, (" · %d" % browsing.year) if browsing.get("year") else "", browsing.category], 15, UIKit.MUTED))
-		var s: Dictionary = browsing.specs
-		var rows := [
-			[I18n.t("Power"), I18n.t("{n} hp", {"n": hp(s.powerKw)})], [I18n.t("Weight (with driver)"), "%d kg" % s.massKg],
-			[I18n.t("Drivetrain"), s.drivetrain], [I18n.t("Top speed"), "%d km/h" % s.topSpeedKmh], [I18n.t("Gears"), str(s.gears.size())],
-			[I18n.t("Steering lock"), "%d°" % SteeringLock.lock_deg(browsing.id)],
-			[I18n.t("Power-to-weight"), "%.2f kg/hp" % (float(s.massKg) / hp(s.powerKw))],
-		]
-		if browsing.get("info") != null:
-			rows.append_array([[I18n.t("Engine"), I18n.t(browsing.info.engine)], [I18n.t("Gearbox"), I18n.t(browsing.info.gearbox)], [I18n.t("Team"), I18n.t(browsing.info.team)]])
-		for r in rows:
-			var line := UIW.hbox(8)
-			var k := UIKit.label(r[0], 14, UIKit.MUTED)
-			k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			line.add_child(k)
-			line.add_child(UIKit.label(str(r[1]), 14, UIKit.TEXT, false, 600))
-			spec.add_child(line)
-	root.add_child(spec)
+# -------------------------------------------------------------- car page ---
+
+static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary) -> Control:
+	var editable: bool = room.phase == "lobby"
+	var mine_car := _car_by_id(cars, mine.get("carId"))
+	var shown := _car_by_id(cars, _preview)
+	if shown.is_empty():
+		shown = mine_car if not mine_car.is_empty() else (cars[0] if not cars.is_empty() else {})
+
+	# the car being looked at: a big picture, the numbers and the button that takes it
+	var left := UIW.vbox(8)
+	left.custom_minimum_size = Vector2(380, 0)
+	if not shown.is_empty():
+		var img := _car_image(shown, Vector2(0, 100))
+		img.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		left.add_child(img)
+		left.add_child(UIKit.label(shown.name, 26, UIKit.TEXT, true, 700))
+		var s: Dictionary = shown.specs
+		left.add_child(UIKit.label("%s%s · %s · %s · %d %s" % [shown.manufacturer, (" · %d" % shown.year) if shown.get("year") else "", shown.category, s.drivetrain, s.gears.size(), I18n.t("Gears").to_lower()], 14, UIKit.MUTED))
+		left.add_child(_car_stats(shown))
+		var owner = room.carLocks.get(shown.id)
+		var chosen: bool = mine.get("carId") == shown.id
+		var take := UIKit.button(I18n.t("Selected") + " ✓" if chosen else I18n.t("Select this car"), Callable(), not chosen)
+		take.custom_minimum_size = Vector2(0, 58)
+		take.disabled = chosen or not editable or (owner != null and owner != app.me)
+		var cid: String = shown.id
+		take.pressed.connect(func():
+			Settings.data["lastCar"] = cid
+			Settings.save()
+			app.send({"t": "selectCar", "carId": cid})
+			_go(app, "hub"))
+		left.add_child(take)
+
+	# the cars, by class
+	var cats: Array = []
+	for c in cars:
+		if not cats.has(c.category):
+			cats.append(c.category)
+	var chips := UIW.chips(_car_filter, [["", I18n.t("All")]] + cats.map(func(x): return [x, x]), func(v): _car_filter = v; app.render_lobby())
 	var grid := GridContainer.new()
 	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for c in all_cars:
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	for c in cars:
+		if _car_filter != "" and c.category != _car_filter:
+			continue
 		var owner = room.carLocks.get(c.id)
 		var taken := ""
 		if owner != null and owner != app.me:
@@ -384,36 +567,88 @@ static func _car_pane(app: App, room: Dictionary, all_cars: Array, mine: Diction
 					taken = p.nick
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
-		b.disabled = taken != "" or room.phase != "lobby"
-		b.custom_minimum_size = Vector2(0, 120)
+		b.custom_minimum_size = Vector2(0, 142)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var selected: bool = mine.get("carId") == c.id
+		var chosen: bool = mine.get("carId") == c.id
+		var looking: bool = not shown.is_empty() and shown.id == c.id
 		for st in ["normal", "hover", "pressed", "disabled"]:
-			b.add_theme_stylebox_override(st, UIKit.box(Color(UIKit.ACCENT, 0.35) if selected else Color(1, 1, 1, 0.05), UIKit.ACCENT if selected else UIKit.LINE, 1, 3))
+			b.add_theme_stylebox_override(st, UIKit.box(Color(UIKit.ACCENT, 0.3) if looking else Color(0.03, 0.035, 0.045, 0.85), UIKit.ACCENT if (looking or chosen) else UIKit.LINE, 2 if (looking or chosen) else 1, 4))
 		var col := VBoxContainer.new()
 		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.add_theme_constant_override("separation", 1)
 		UIKit.full(col)
-		col.offset_left = 6
-		col.offset_right = -6
-		col.offset_top = 4
-		var img := UIW.image(c.thumbnail, Vector2(0, 70))
-		img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		col.offset_left = 8
+		col.offset_right = -8
+		col.offset_top = 6
+		col.offset_bottom = -6
+		var img := UIW.image(c.thumbnail, Vector2(0, 76))
+		img.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		img.modulate = Color(1, 1, 1, 0.45 if taken != "" else 1.0)
 		col.add_child(img)
-		var nm := UIKit.label(c.name, 13, UIKit.TEXT, false, 600)
+		var nm := UIKit.label(c.name, 15, UIKit.TEXT, false, 700)
 		nm.clip_text = true
-		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		col.add_child(nm)
-		var sub := UIKit.label(taken if taken != "" else c.category, 12, UIKit.ACCENT_2 if taken != "" else UIKit.MUTED)
-		sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sub := UIKit.label(("✓ " + I18n.t("Your car")) if chosen else (taken if taken != "" else c.category), 13, UIKit.GOOD if chosen else (UIKit.ACCENT_2 if taken != "" else UIKit.MUTED))
 		col.add_child(sub)
+		for l in col.get_children():
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(col)
 		var cid: String = c.id
-		b.pressed.connect(func():
-			app.browsing = cid
-			app.send({"t": "selectCar", "carId": cid}))
+		b.pressed.connect(func(): _preview = cid; app.render_lobby())
 		grid.add_child(b)
-	root.add_child(grid)
-	return root
+	var right := UIW.vbox(10)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_child(chips)
+	right.add_child(UIW.scroll(grid))
+	var body := UIW.hbox(16)
+	body.add_child(UIW.panel(left, true))
+	body.add_child(right)
+	return _frame(I18n.t("Pick a car"), "" if editable else I18n.t("A race is in progress. You will join the next one."), func(): _go(app, "hub"), body)
+
+# ----------------------------------------------------------- drivers page ---
+
+static func _drivers_page(app: App, room: Dictionary, cars: Array, can_edit: bool) -> Control:
+	var list := UIW.vbox(6)
+	for p in room.players:
+		var row := _player_row(app, p, cars, can_edit)
+		list.add_child(UIW.panel(row))
+	var body := UIW.vbox(10)
+	body.add_child(UIW.scroll(list))
+	if can_edit:
+		var add := UIKit.button("+ " + I18n.t("Add bot"), func(): app.send({"t": "addBot"}))
+		add.disabled = room.players.size() >= Const.MAX_PLAYERS
+		add.custom_minimum_size = Vector2(0, 60)
+		body.add_child(add)
+	return _frame(I18n.t("Drivers {n}/{max}", {"n": room.players.size(), "max": Const.MAX_PLAYERS}), "", func(): _go(app, "hub"), body)
+
+static func _player_row(app: App, p: Dictionary, all_cars: Array, can_remove: bool) -> Control:
+	var row := UIW.hbox(12)
+	var nick := UIKit.label(p.nick, 20, UIKit.ACCENT_2 if p.id == app.me else UIKit.TEXT, false, 700)
+	nick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(nick)
+	if p.host:
+		row.add_child(UIKit.label(I18n.t("HOST"), 13, UIKit.ACCENT_2, true, 700))
+	if p.bot:
+		row.add_child(UIKit.label(I18n.t("BOT"), 13, UIKit.MUTED, true, 700))
+	row.add_child(UIW.image("res://assets/ui/tyre_%s.webp" % p.get("tyre", "medium"), Vector2(28, 28)))
+	var car_name := I18n.t("choosing…")
+	if p.carId != null:
+		car_name = p.carId
+		for c in all_cars:
+			if c.id == p.carId:
+				car_name = c.name
+	elif p.waiting:
+		car_name = I18n.t("next race")
+	var car := UIKit.label(car_name, 15, UIKit.MUTED)
+	car.clip_text = true
+	car.custom_minimum_size = Vector2(190, 0)
+	row.add_child(car)
+	var state := UIKit.label(I18n.t("READY") if p.ready else "", 14, UIKit.GOOD, true, 700) if p.connected else UIKit.label(I18n.t("OFFLINE"), 14, UIKit.BAD, true, 700)
+	state.custom_minimum_size = Vector2(70, 0)
+	row.add_child(state)
+	if p.bot and can_remove:
+		row.add_child(UIKit.button("×", func(): app.send({"t": "removeBot", "id": p.id})))
+	return row
 
 # --------------------------------------------------------------- briefing ---
 
@@ -475,6 +710,18 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	fc.add_child(UIKit.label(change, 15, UIKit.MUTED))
 	fc.add_child(UIKit.label(I18n.t("Air {air} °C · track {track} °C at the start", {"air": roundi(temp0.airC), "track": roundi(temp0.trackC)}), 15, UIKit.MUTED))
 	col.add_child(UIW.panel(fc))
+	# the engineer's advice comes first: one tap sets the tyre and wing for these conditions
+	var eng := UIW.hbox(14)
+	var note := UIW.muted(I18n.t("Engineer: {note}.", {"note": rec.note}), 16)
+	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	eng.add_child(note)
+	var use := UIKit.button(I18n.t("Use {tyre} + {wing} wing", {"tyre": I18n.t(Tyres.COMPOUNDS[rec.tyre].name), "wing": I18n.t(CarSetup.WING[rec.wing].label).split(" (")[0].to_lower()}), func():
+		cs.tyre = rec.tyre
+		cs.wing = rec.wing
+		app.send({"t": "setTyre", "tyre": rec.tyre})
+		save.call(), cs.tyre != rec.tyre or cs.wing != rec.wing)
+	eng.add_child(use)
+	col.add_child(UIW.panel(eng))
 	col.add_child(UIW.h3(I18n.t("Your car")))
 	# tyres
 	var tyres := HFlowContainer.new()
@@ -515,16 +762,6 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	if room.get("rules", {}).get("fuel", false):
 		col.add_child(_fuel_row(room, float(track.get("length", 5000)), cs))
 	col.add_child(_advanced(app, cs, temp0.airC))
-	var eng := UIW.hbox(10)
-	var note := UIW.muted(I18n.t("Engineer: {note}.", {"note": rec.note}))
-	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	eng.add_child(note)
-	eng.add_child(UIKit.button(I18n.t("Use {tyre} + {wing} wing", {"tyre": I18n.t(Tyres.COMPOUNDS[rec.tyre].name), "wing": I18n.t(CarSetup.WING[rec.wing].label).split(" (")[0].to_lower()}), func():
-		cs.tyre = rec.tyre
-		cs.wing = rec.wing
-		app.send({"t": "setTyre", "tyre": rec.tyre})
-		save.call()))
-	col.add_child(UIW.panel(eng))
 	return col
 
 static func _tyre_guide() -> Control:

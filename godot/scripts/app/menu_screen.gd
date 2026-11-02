@@ -10,12 +10,10 @@ static func build(app: App, error: String = "") -> Control:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var err := UIKit.label(error, 16, UIKit.BAD)
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# the nickname lives in a hidden field; the chip in the top bar edits it in a small dialog
 	var nick := LineEdit.new()
-	nick.max_length = 16
-	nick.placeholder_text = I18n.t("Your nickname")
 	nick.text = signed_in.user.nick if signed_in != null else Settings.data.get("nickname", "")
-	nick.editable = signed_in == null
-	nick.custom_minimum_size = Vector2(200, 0)
+	var nick_btn := UIKit.button("", Callable())
 	var code := LineEdit.new()
 	code.max_length = 7
 	code.placeholder_text = I18n.t("ROOM CODE")
@@ -25,11 +23,43 @@ static func build(app: App, error: String = "") -> Control:
 	var online: bool = signed_in != null or Account.accounts_enabled() == false
 	if not online and Account.accounts_enabled() == null:
 		_probe(app, error)
+	var edit_nick := func() -> void:
+		var m := UIW.modal(app.overlay_layer, 440)
+		var b: VBoxContainer = m.body
+		b.add_child(UIW.h2(I18n.t("Your nickname")))
+		var le := LineEdit.new()
+		le.max_length = 16
+		le.placeholder_text = I18n.t("Your nickname")
+		le.text = nick.text
+		le.custom_minimum_size = Vector2(0, 56)
+		le.add_theme_font_size_override("font_size", 22)
+		b.add_child(le)
+		var msg := UIKit.label("", 15, UIKit.BAD)
+		b.add_child(msg)
+		var row := UIW.hbox(10)
+		row.add_child(UIKit.button(I18n.t("Cancel"), func(): m.root.queue_free()))
+		var save := func():
+			var r := Validation.sanitize_nickname(le.text)
+			if not r.ok:
+				msg.text = r.error
+				return
+			nick.text = r.nick
+			Settings.data.nickname = r.nick
+			Settings.save()
+			nick_btn.text = (r.nick + "  ✎").to_upper()
+			err.text = ""
+			m.root.queue_free()
+		row.add_child(UIKit.button(I18n.t("Save"), save, true))
+		le.text_submitted.connect(func(_t): save.call())
+		b.add_child(row)
+		le.grab_focus.call_deferred()
+	nick_btn.pressed.connect(edit_nick)
+	nick_btn.text = ((nick.text if nick.text != "" else I18n.t("Your nickname")) + "  ✎").to_upper()
 	var read_nick := func() -> String:
 		var r := Validation.sanitize_nickname(nick.text)
 		if not r.ok:
 			err.text = r.error
-			nick.grab_focus()
+			edit_nick.call()
 			return ""
 		Settings.data.nickname = r.nick
 		Settings.save()
@@ -104,9 +134,21 @@ static func build(app: App, error: String = "") -> Control:
 
 	var tabs := HBoxContainer.new()
 	tabs.add_theme_constant_override("separation", 6)
+	var tab_btns := {}
+	var style_tabs := func():
+		for k in tab_btns:
+			var on: bool = tab[0] == k
+			for st in ["normal", "hover", "pressed", "focus"]:
+				if on:
+					tab_btns[k].add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT, UIKit.ACCENT, 1, UIKit.RADIUS, UIKit.btn_pad()))
+				else:
+					tab_btns[k].remove_theme_stylebox_override(st)
 	for t in [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")]]:
-		var b := UIKit.button(t[1], func(): tab[0] = t[0]; render.call())
+		var key: String = t[0]
+		var b := UIKit.button(t[1], func(): tab[0] = key; render.call(); style_tabs.call())
+		tab_btns[key] = b
 		tabs.add_child(b)
+	style_tabs.call()
 	tabs.add_child(UIKit.button(I18n.t("Records"), func(): SocialUI.records_modal(app)))
 	tabs.add_child(UIKit.button(I18n.t("Settings"), app.open_settings))
 
@@ -124,8 +166,7 @@ static func build(app: App, error: String = "") -> Control:
 		chip.add_child(UIKit.button(I18n.t("Edit driver profile"), func(): SocialUI.profile_modal(app, func(): app.show_menu())))
 		chip.add_child(UIKit.button(I18n.t("Sign out"), func(): await Account.logout(); app.show_menu()))
 	else:
-		chip.add_child(nick)
-		chip.add_child(UIKit.label(I18n.t("Offline · solo only"), 13, UIKit.MUTED))
+		chip.add_child(nick_btn)
 		chip.add_child(UIKit.button(I18n.t("Sign in"), sign_in, true))
 
 	var top := UIW.hbox(18)
@@ -133,18 +174,20 @@ static func build(app: App, error: String = "") -> Control:
 	top.add_child(tabs)
 	top.add_child(UIW.spacer())
 	top.add_child(chip)
-	var hero := UIW.vbox(0)
-	hero.add_child(UIKit.label(I18n.t("GT3 · Nürburgring · Spa · Zandvoort"), 16, UIKit.ACCENT_2, true, 700))
-	hero.add_child(UIKit.label(I18n.t("Ready to race"), 64, UIKit.TEXT, true, 700))
+	nick.visible = false
+	top.add_child(nick)
 	var root := VBoxContainer.new()
 	root.add_theme_constant_override("separation", 14)
 	root.add_child(top)
-	root.add_child(hero)
+	# the big headline is for a big screen: a phone gives the room to the mode tiles
+	if not UIKit.touch():
+		var hero := UIW.vbox(0)
+		hero.add_child(UIKit.label(I18n.t("GT3 · Nürburgring · Spa · Zandvoort"), 16, UIKit.ACCENT_2, true, 700))
+		hero.add_child(UIKit.label(I18n.t("Ready to race"), 64, UIKit.TEXT, true, 700))
+		root.add_child(hero)
 	root.add_child(body)
-	var margin := UIW.margin(root, 26)
+	var margin := UIW.margin(root, 18 if UIKit.touch() else 26)
 	render.call()
-	if nick.editable and nick.text == "":
-		nick.grab_focus.call_deferred()
 	return margin
 
 static func _probe(app: App, error: String) -> void:
@@ -230,9 +273,9 @@ static func _tile(photo: String, kicker: String, title: String, sub: String, on:
 	col.offset_left = 16
 	col.offset_right = -16
 	col.offset_bottom = -14
-	col.add_child(UIKit.label(kicker, 13, UIKit.ACCENT_2, true, 700))
-	col.add_child(UIKit.label(title.to_upper(), 26, UIKit.TEXT, true, 700))
-	var s := UIW.muted(sub, 14)
+	col.add_child(UIKit.label(kicker, 14, UIKit.ACCENT_2, true, 700))
+	col.add_child(UIKit.label(title.to_upper(), 29, UIKit.TEXT, true, 700))
+	var s := UIW.muted(sub, 16)
 	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(s)
 	if lock != "":

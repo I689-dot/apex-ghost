@@ -28,7 +28,7 @@ static func _pct(v: float) -> String:
 	return "%d %%" % roundi(v * 100.0)
 
 static func build(app: App, on_change: Callable) -> Control:
-	var m := UIW.modal(app.overlay_layer, 760)
+	var m := UIW.modal(app.overlay_layer, 760, UIKit.touch())
 	var root: Control = m.root
 	var body: VBoxContainer = m.body
 	var changed := func():
@@ -40,11 +40,18 @@ static func build(app: App, on_change: Callable) -> Control:
 	head.add_child(title)
 	head.add_child(UIKit.button(I18n.t("Close"), func(): root.queue_free(), true))
 	body.add_child(head)
-	var tabs_row := HFlowContainer.new()
-	tabs_row.add_theme_constant_override("h_separation", 6)
-	body.add_child(tabs_row)
+	# one scrolling row of tabs on a phone, so the settings themselves get the height
+	var tabs_row: Container = HBoxContainer.new() if UIKit.touch() else HFlowContainer.new()
+	tabs_row.add_theme_constant_override("separation" if UIKit.touch() else "h_separation", 6)
+	if UIKit.touch():
+		var tabs_scroll := ScrollContainer.new()
+		tabs_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		tabs_scroll.add_child(tabs_row)
+		body.add_child(tabs_scroll)
+	else:
+		body.add_child(tabs_row)
 	var holder := MarginContainer.new()
-	holder.custom_minimum_size = Vector2(0, 380)
+	holder.custom_minimum_size = Vector2(0, 120 if UIKit.touch() else 380)
 	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(holder)
 	var is_touch := DisplayServer.is_touchscreen_available()
@@ -81,7 +88,7 @@ static func build(app: App, on_change: Callable) -> Control:
 			var b := tabs_row.get_child(i) as Button
 			var on: bool = tabs[i][0] == key
 			for st in ["normal", "hover", "pressed"]:
-				b.add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT if on else Color(1, 1, 1, 0.06), UIKit.LINE, 1, 3, Vector2(16, 8)))
+				b.add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT if on else Color(1, 1, 1, 0.06), UIKit.LINE, 1, 3, UIKit.btn_pad()))
 	for t in tabs:
 		var key: String = t[0]
 		var b := UIKit.button(t[1], func(): show.call(key))

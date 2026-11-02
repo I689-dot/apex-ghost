@@ -17,6 +17,27 @@ const RADIUS := 3
 
 static var _fonts := {}
 
+## A phone or tablet (APEX_TOUCH=1 pretends on the desktop, to check the layouts).
+static func touch() -> bool:
+	return DisplayServer.is_touchscreen_available() or OS.get_environment("APEX_TOUCH") != ""
+
+## How much the menu screens are enlarged: a button should be about 48 dp (finger-sized) on any phone or tablet.
+static func ui_scale() -> float:
+	if not touch():
+		return 1.0
+	if OS.get_environment("APEX_UI_SCALE") != "":
+		return float(OS.get_environment("APEX_UI_SCALE"))
+	var win := DisplayServer.window_get_size()
+	var dpi := float(DisplayServer.screen_get_dpi())
+	if dpi <= 0.0 or win.y <= 0:
+		return 1.5
+	var unit_dp := (float(win.y) / 720.0) / (dpi / 160.0)
+	return clampf(0.86 / unit_dp, 1.0, 2.0)
+
+## Padding of a button: roomier on a touch screen.
+static func btn_pad() -> Vector2:
+	return Vector2(20, 14) if touch() else Vector2(16, 9)
+
 ## display: Barlow Condensed (headings, numbers, buttons); body: Barlow. weight: 400, 500, 600, 700, 800.
 static func font(display: bool, weight: int = 500, italic: bool = false) -> Font:
 	var key := "%s%d%s" % ["d" if display else "b", weight, "i" if italic else ""]
@@ -50,7 +71,7 @@ static func box(bg: Color, border: Color = Color(0, 0, 0, 0), border_w: int = 0,
 static func build_theme() -> Theme:
 	var th := Theme.new()
 	th.default_font = font(false, 500)
-	th.default_font_size = 16
+	th.default_font_size = 18 if touch() else 16
 	th.set_color("font_color", "Label", TEXT)
 	th.set_font("font", "Label", font(false, 500))
 	# buttons
@@ -68,9 +89,9 @@ static func build_theme() -> Theme:
 			"focus":
 				bg = Color(1, 1, 1, 0.1)
 				bd = Color(1, 1, 1, 0.5)
-		th.set_stylebox(state, "Button", box(bg, bd, 1, RADIUS, Vector2(16, 9)))
+		th.set_stylebox(state, "Button", box(bg, bd, 1, RADIUS, btn_pad()))
 	th.set_font("font", "Button", font(true, 700))
-	th.set_font_size("font_size", "Button", 18)
+	th.set_font_size("font_size", "Button", 20 if touch() else 18)
 	th.set_color("font_color", "Button", TEXT)
 	th.set_color("font_hover_color", "Button", Color.WHITE)
 	th.set_color("font_pressed_color", "Button", Color.WHITE)
@@ -105,7 +126,7 @@ static func button(text: String, cb: Callable = Callable(), primary: bool = fals
 	if primary:
 		for state in ["normal", "hover", "pressed", "focus"]:
 			var c := ACCENT if state != "hover" else Color("ff2b1f")
-			b.add_theme_stylebox_override(state, box(c, c, 1, RADIUS, Vector2(18, 10)))
+			b.add_theme_stylebox_override(state, box(c, c, 1, RADIUS, btn_pad() + Vector2(2, 1)))
 	if cb.is_valid():
 		b.pressed.connect(cb)
 	return b

@@ -342,6 +342,7 @@ func render_lobby() -> void:
 	if not mine.is_empty() and (room.phase == "lobby" or room.phase == "briefing") and mine.get("tyre") != Settings.data.carSetup.tyre and _tyre_sent_for != room.code:
 		_tyre_sent_for = room.code
 		send({"t": "setTyre", "tyre": Settings.data.carSetup.tyre})
+	LobbyScreen.ensure_car(self)
 	set_ui(LobbyScreen.build(self))
 
 func render_watch() -> void:
@@ -358,7 +359,23 @@ func render_briefing() -> void:
 	set_backdrop("aerial", room.conditions.trackId)
 	set_ui(LobbyScreen.build_briefing(self))
 
+## Menus and modals are enlarged on a touch screen; the race (HUD, touch pads) keeps the base scale.
+func _apply_ui_scale() -> void:
+	var want := 1.0
+	if UIKit.touch():
+		var in_race := screen == "race" or screen == "loading"
+		var modal_open := false
+		for c in overlay_layer.get_children():
+			if c != toasts and c != perf:
+				modal_open = true
+		if not in_race or modal_open:
+			want = UIKit.ui_scale()
+	var win := get_window()
+	if not is_equal_approx(win.content_scale_factor, want):
+		win.content_scale_factor = want
+
 func _process(_dt: float) -> void:
+	_apply_ui_scale()
 	# the performance overlay follows the setting (Settings → General)
 	if Settings.data.showPerf and perf == null:
 		perf = PerfOverlay.new()
@@ -549,9 +566,9 @@ func _autotest() -> void:
 	var err := await join(LocalRoom.create(), "Max")
 	print("join: ", err)
 	await get_tree().create_timer(0.6).timeout
-	await shot.call("lobby_circuit")
-	for step in ["conditions", "session", "rules", "car"]:
-		LobbyScreen._step.step = step
+	await shot.call("lobby_hub")
+	for step in ["circuit", "conditions", "session", "rules", "car", "drivers"]:
+		LobbyScreen._page = step
 		render_lobby()
 		await get_tree().create_timer(0.3).timeout
 		await shot.call("lobby_" + step)
@@ -682,6 +699,8 @@ func _notification(what: int) -> void:
 				session.toggle_pause()
 			elif screen == "menu":
 				get_tree().quit()
+			elif screen == "lobby" and LobbyScreen.back_page():
+				render_lobby()
 			elif screen == "results" or screen == "lobby" or screen == "briefing" or screen == "watch":
 				leave()
 			elif pause_ui != null and session != null:

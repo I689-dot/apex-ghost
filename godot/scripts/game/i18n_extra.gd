@@ -3,6 +3,16 @@ extends RefCounted
 ## Spanish for the strings the Godot client added to the web game's (data/i18n_es.json is exported from the web game).
 
 const ES := {
+	"Race setup": "Preparar carrera",
+	"Back": "Atrás",
+	"Change car": "Cambiar de coche",
+	"Select this car": "Elegir este coche",
+	"Selected": "Elegido",
+	"All": "Todos",
+	"Add AI cars": "Añadir coches IA",
+	"Who is racing": "Quién corre",
+	"Only the host can change this": "Solo el anfitrión puede cambiarlo",
+	"Waiting…": "Esperando…",
 	"Tap or press any key to skip": "Toca o pulsa cualquier tecla para saltar",
 	"Watching room {code}": "Viendo la sala {code}",
 	"Cannot reach the game server. Check your connection.": "No se puede conectar con el servidor. Revisa tu conexión.",

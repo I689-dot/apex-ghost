@@ -74,7 +74,7 @@ static func chips(current: Variant, options: Array, on: Callable, enabled: bool 
 		b.disabled = not enabled and o[0] != current
 		if b.button_pressed:
 			for st in ["normal", "hover", "pressed", "disabled"]:
-				b.add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT, UIKit.ACCENT, 1, UIKit.RADIUS, Vector2(14, 8)))
+				b.add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT, UIKit.ACCENT, 1, UIKit.RADIUS, UIKit.btn_pad()))
 		var val = o[0]
 		b.pressed.connect(func(): if enabled: on.call(val))
 		flow.add_child(b)
@@ -141,7 +141,7 @@ static func image(path: String, size: Vector2 = Vector2.ZERO, expand: bool = fal
 	return r
 
 ## A modal card over a dimmed screen. Returns {root, body}: add content to body; free root to close.
-static func modal(parent: Node, min_width: int = 460) -> Dictionary:
+static func modal(parent: Node, min_width: int = 460, full_height: bool = false) -> Dictionary:
 	var root := Control.new()
 	UIKit.full(root)
 	var dim := ColorRect.new()
@@ -154,6 +154,8 @@ static func modal(parent: Node, min_width: int = 460) -> Dictionary:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UIKit.box(UIKit.PANEL_SOLID, UIKit.LINE, 1, UIKit.RADIUS, Vector2(22, 20)))
 	card.custom_minimum_size = Vector2(min_width, 0)
+	if full_height:
+		card.custom_minimum_size.y = maxf(0.0, parent.get_viewport().get_visible_rect().size.y - 36.0)
 	center.add_child(card)
 	var body := UIW.vbox(10)
 	card.add_child(body)
