@@ -58,25 +58,12 @@ func _run() -> void:
 	chase.camera.current = cam_mode != "cockpit"
 	print("ready: ", car.name, " on ", data.name, " cam=", cam_mode)
 
+var gameenv: GameEnvironment
+var weather_plan := Weather.plan_weather(7, {"weather": "clear", "time": "afternoon", "changes": "off"})
+
 func _environment() -> void:
-	var env := WorldEnvironment.new()
-	var e := Environment.new()
-	var sky := Sky.new()
-	var pm := ProceduralSkyMaterial.new()
-	pm.sky_top_color = Color(0.3, 0.5, 0.8)
-	pm.sky_horizon_color = Color(0.7, 0.8, 0.9)
-	sky.sky_material = pm
-	e.background_mode = Environment.BG_SKY
-	e.sky = sky
-	e.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.environment = e
-	add_child(env)
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-45, 35, 0)
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 120.0
-	add_child(sun)
+	gameenv = GameEnvironment.new(weather_plan, Settings.quality_config())
+	add_child(gameenv)
 
 func _physics_process(dt: float) -> void:
 	if vehicle == null:
@@ -107,6 +94,8 @@ func _process(dt: float) -> void:
 		chase.update(dt, vehicle, vehicle.linear_velocity, "chase", false)
 	var cam_pos := (cockpit.world_position() if cc else chase.camera.global_position)
 	track.update_visibility(cam_pos, Settings.quality_config())
+	var cam := cockpit.camera if cc else chase.camera
+	gameenv.update(dt, Weather.weather_at(weather_plan, elapsed), cam, vehicle.global_position, vehicle.linear_velocity)
 	visual.set_pose(vehicle.steer_angle, vehicle.wheels[0].angle, vehicle.wheels[2].angle, [0, 0, 0, 0])
 	visual.set_lights(vehicle.pedals.brake > 0.3, false, 0.0)
 	if shot_dir != "" and elapsed > (shots + 1) * 3.0:

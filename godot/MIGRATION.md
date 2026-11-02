@@ -15,7 +15,7 @@ Legend: [ ] todo, [~] partly, [x] done
 ## apps/client/src/game
 - [x] apps/client/src/game/ai.ts
 - [x] apps/client/src/game/assets.ts
-- [ ] apps/client/src/game/atmosphere.ts
+- [x] apps/client/src/game/atmosphere.ts
 - [x] apps/client/src/game/carSetup.ts
 - [x] apps/client/src/game/carVisual.ts
 - [ ] apps/client/src/game/cinematic.ts
@@ -23,7 +23,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [ ] apps/client/src/game/crashFx.ts
 - [ ] apps/client/src/game/crowd.ts
 - [ ] apps/client/src/game/dashDisplay.ts
-- [ ] apps/client/src/game/environment.ts
+- [~] apps/client/src/game/environment.ts (sky, sun, fog, rain done; windshield rain/crack, stars, moon pending)
 - [ ] apps/client/src/game/forest.ts
 - [x] apps/client/src/game/ghost.ts
 - [ ] apps/client/src/game/graphics.ts
@@ -43,7 +43,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/roadPatches.ts
 - [ ] apps/client/src/game/roadWear.ts
 - [ ] apps/client/src/game/session.ts
-- [ ] apps/client/src/game/sky.ts
+- [x] apps/client/src/game/sky.ts
 - [ ] apps/client/src/game/taa.ts
 - [ ] apps/client/src/game/topView.ts
 - [~] apps/client/src/game/track.ts (scene, collision, culling, wetness, lights done; surface shaders pending)
