@@ -27,7 +27,7 @@ func _run() -> void:
 	conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "ready", "ready": true})
 	await get_tree().create_timer(0.3).timeout
-	conn.send_json({"t": "setConditions", "weather": "clear", "time": "midday", "changes": "off"})
+	conn.send_json({"t": "setConditions", "weather": OS.get_environment("WEATHER") if OS.get_environment("WEATHER") != "" else "clear", "time": OS.get_environment("TIME") if OS.get_environment("TIME") != "" else "midday", "changes": "off"})
 	conn.send_json({"t": "start"})
 	await get_tree().create_timer(0.3).timeout
 	conn.send_json({"t": "briefed"})

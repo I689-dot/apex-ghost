@@ -269,10 +269,11 @@ func burst(type: String, f: float, q: float, dur: float, vol: float, bus: String
 	var key := "burst_%s_%d_%.2f_%.2f" % [type, int(f), q, dur]
 	if not _cache.has(key):
 		var n := int((dur * 2.0 + 0.1) * RATE)
-		var x := noise.slice(0, n)
+		var x := PackedFloat32Array()
+		x.resize(n)
 		for i in n:
 			var t := float(i) / RATE
-			x[i] *= 1.0 if t < 0.005 else exp(-(t - 0.005) / (dur / 3.0))
+			x[i] = noise[i % noise.size()] * (1.0 if t < 0.005 else exp(-(t - 0.005) / (dur / 3.0)))
 		_cache[key] = to_stream(biquad(type, f, q, x))
 	play_stream(_cache[key], vol, 1.0, bus, pan)
 

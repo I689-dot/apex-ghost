@@ -411,6 +411,9 @@ func load_session(progress: Callable) -> void:
 	if mirror != null:
 		hud.add_child(mirror.rect)
 		hud.move_child(mirror.rect, 0)
+	if windshield != null:
+		hud.add_child(windshield)
+		hud.move_child(windshield, 0)
 	if not spectator:
 		var model_for_lines: PackedScene = Assets.load_car_model(my_entry, 1, false).lods[0]
 		var lines: TopView.Lines = await TopView.render_top_lines(self, model_for_lines)
@@ -576,6 +579,7 @@ func _attach_my_car_extras(entry: Dictionary) -> void:
 		add_child(dash)
 		crash_fx = CrashFx.new()
 		add_child(crash_fx)
+		windshield = WindshieldFx.new()
 
 func _attach_line_extras(tuned: Dictionary) -> void:
 	if not spectator:

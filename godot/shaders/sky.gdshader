@@ -106,6 +106,24 @@ void sky() {
 			col = mix(col, sky_c * 0.55 + uCloudSun * (0.45 + hg(mu, 0.6) * 2.0), ca);
 		}
 	}
+	// night: stars (2500 over the dome in the web game) and the moon opposite the sun
+	if (!AT_CUBEMAP_PASS && uNight > 0.01 && dir.y > 0.0) {
+		float vis = uNight * (1.0 - uCover) * (1.0 - uFogMix);
+		vec3 p = dir * 70.0;
+		vec3 cell = floor(p);
+		float hs = fract(sin(dot(cell, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+		if (hs > 0.972 && vis > 0.0) {
+			vec3 c = cell + 0.2 + 0.6 * vec3(fract(hs * 7.31), fract(hs * 13.7), fract(hs * 29.1));
+			float d = distance(p, c);
+			col += vec3(0.9, 0.93, 1.0) * smoothstep(0.045, 0.0, d) * vis * (0.5 + 0.9 * fract(hs * 91.7));
+		}
+		vec3 mdir = normalize(vec3(-uSun.x, abs(uSun.y) + 0.133, -uSun.z));
+		float ang = acos(clamp(dot(dir, mdir), -1.0, 1.0));
+		float halo = (1.0 - smoothstep(0.0158, 0.0317, ang)) * 0.25;
+		float core = 1.0 - smoothstep(0.0127, 0.0158, ang);
+		col = mix(col, vec3(0.78, 0.82, 1.0), halo * uNight * (1.0 - uCover * 0.9));
+		col = mix(col, vec3(1.0, 1.0, 0.94) * 1.4, core * uNight * (1.0 - uCover * 0.9));
+	}
 	col = mix(col, uFogColor, uFogMix);
 	COLOR = col;
 }
