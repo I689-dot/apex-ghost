@@ -35,3 +35,11 @@ the editor settings; Godot's debug keystore signs it). A release build needs a k
 
 Phone adaptations (a Pixel 10a is the reference): physics at 60 Hz (the lap time holds within 0.3 %), dynamic resolution from the GPU's
 time, forest and far scenery capped on Medium, ground overlays and shells for High / Ultra, the mirror without the far scenery.
+
+## Touch UI
+
+On a phone or tablet (`UIKit.touch()`), the menus, modals and the pause menu are enlarged (`App._apply_ui_scale`, about 1.5x on a
+Pixel: a button is about 48 dp); the race keeps the base scale. To check the layouts on the desktop:
+`APEX_TOUCH=1 APEX_UI_SCALE=1.5 APEX_AUTO=solo SHOT_DIR=/tmp/lb godot --path godot --resolution 1616x720`.
+The lobby (`lobby_screen.gd`) is a hub (car, circuit, conditions, session, rules, drivers, one big start/ready button) with
+a full page for each; a car is picked automatically (the last one used).
