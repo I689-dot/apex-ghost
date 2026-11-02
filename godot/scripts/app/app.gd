@@ -181,6 +181,7 @@ func send(m: Dictionary) -> void:
 
 func show_menu(error: String = "") -> void:
 	screen = "menu"
+	DisplayServer.screen_set_keep_on(false)
 	set_pause(false)
 	set_countdown("", "")
 	teardown_connection()
@@ -452,6 +453,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	touch_layer.add_child(touch)
 	touch.spectating = spectating
 	touch.set_active(DisplayServer.is_touchscreen_available())
+	DisplayServer.screen_set_keep_on(true)
 	s.start()
 	Account.set_presence({"state": "watching" if spectating else "racing", "room": null if LocalRoom.is_local_code(conn.code) else conn.code, "trackId": race.trackId, "session": race.kind})
 
@@ -653,3 +655,23 @@ func _ui_shots() -> void:
 		await shot.call("settings_" + tab)
 		panel.queue_free()
 	get_tree().quit()
+
+## The phone's back button, and the app going to the background.
+func _notification(what: int) -> void:
+	match what:
+		NOTIFICATION_WM_GO_BACK_REQUEST:
+			if screen == "race" and session != null:
+				session.toggle_pause()
+			elif screen == "menu":
+				get_tree().quit()
+			elif screen == "results" or screen == "lobby" or screen == "briefing" or screen == "watch":
+				leave()
+			elif pause_ui != null and session != null:
+				session.toggle_pause(false)
+		NOTIFICATION_APPLICATION_FOCUS_OUT, NOTIFICATION_APPLICATION_PAUSED:
+			AudioServer.set_bus_mute(0, true)
+			# a race you are driving waits in the pause menu (the web game pauses when the tab is hidden)
+			if screen == "race" and session != null and not spectating and pause_ui == null:
+				session.toggle_pause(true)
+		NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_RESUMED:
+			AudioServer.set_bus_mute(0, false)
