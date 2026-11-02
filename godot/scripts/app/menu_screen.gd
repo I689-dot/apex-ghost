@@ -22,6 +22,9 @@ static func build(app: App, error: String = "") -> Control:
 	code.custom_minimum_size = Vector2(220, 0)
 	code.text_changed.connect(func(t): code.text = t.to_upper(); code.caret_column = code.text.length())
 
+	var online: bool = signed_in != null or Account.accounts_enabled() == false
+	if not online and Account.accounts_enabled() == null:
+		_probe(app, error)
 	var read_nick := func() -> String:
 		var r := Validation.sanitize_nickname(nick.text)
 		if not r.ok:
@@ -55,10 +58,18 @@ static func build(app: App, error: String = "") -> Control:
 			err.text = I18n.t("Enter the 5-character room code.")
 			code.grab_focus()
 			return
-		await go.call(func(n): return await app.join(c, n, spectate))
-	var online: bool = signed_in != null or Account.accounts_enabled() == false
-	if not online and Account.accounts_enabled() == null:
-		_probe(app, error)
+		await go.call(func(n):
+			# a race hosted on a device: straight to it (no account needed, as on a LAN)
+			var hosted: bool = await P2p.is_p2p_code(c)
+			if not hosted and not online:
+				return I18n.t("Online needs an account")
+			return await app.join(c, n, spectate))
+	var host := func():
+		await go.call(func(n):
+			var r: Dictionary = await P2p.host_race()
+			if r.has("error"):
+				return r.error
+			return await app.join(r.code, n))
 	var sign_in := func(): SocialUI.sign_in_modal(app, func(): app.show_menu())
 
 	var render := Callable()
@@ -83,7 +94,7 @@ static func build(app: App, error: String = "") -> Control:
 			tiles.custom_minimum_size = Vector2(0, 260)
 			body.add_child(col)
 		elif tab[0] == "online":
-			body.add_child(_online_tab(app, online, code, err, join_it, create, sign_in))
+			body.add_child(_online_tab(app, online, code, err, join_it, create, sign_in, host))
 		else:
 			body.add_child(SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("Sign in to add friends, see where they are and join their lobbies."), sign_in))
 
@@ -149,7 +160,7 @@ static func _gate(title: String, text: String, sign_in: Callable) -> Control:
 	col.add_child(UIKit.button(I18n.t("Sign in / create account"), sign_in, true))
 	return UIW.panel(col)
 
-static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join_it: Callable, create: Callable, sign_in: Callable) -> Control:
+static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join_it: Callable, create: Callable, sign_in: Callable, host: Callable) -> Control:
 	var col := UIW.vbox(12)
 	if online:
 		var p := UIW.vbox(10)
@@ -162,11 +173,28 @@ static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join
 		p.add_child(UIKit.button(I18n.t("Create room"), create))
 		p.add_child(err)
 		col.add_child(UIW.panel(p))
+		col.add_child(_host_panel(host))
 		col.add_child(SocialUI.room_list(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)))
 	else:
 		col.add_child(_gate(I18n.t("Online needs an account"), I18n.t("Sign in to create rooms, join friends and watch live sessions. Solo races work without one."), sign_in))
+		col.add_child(_host_panel(host))
+		var jp := UIW.vbox(8)
+		jp.add_child(UIW.h3(I18n.t("Join a race hosted on a device")))
+		var jr := UIW.hbox(8)
+		jr.add_child(code)
+		jr.add_child(UIKit.button(I18n.t("Join"), func(): join_it.call(false), true))
+		jp.add_child(jr)
+		col.add_child(UIW.panel(jp))
 		col.add_child(err)
 	return UIW.scroll(col)
+
+## Races on the same Wi-Fi: hosted on this device, the friends join with its code and connect straight to it.
+static func _host_panel(host: Callable) -> Control:
+	var p := UIW.vbox(8)
+	p.add_child(UIW.h3(I18n.t("Race on the same Wi-Fi")))
+	p.add_child(UIW.muted(I18n.t("Host the race on this device (a phone works): your friends join with its code and connect straight to you. No account needed.")))
+	p.add_child(UIKit.button(I18n.t("Host on this device"), host, true))
+	return UIW.panel(p)
 
 ## A big mode tile: a photo, a kicker, a title and one line.
 static func _tile(photo: String, kicker: String, title: String, sub: String, on: Callable, lock: String) -> Control:

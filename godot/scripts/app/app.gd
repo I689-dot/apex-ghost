@@ -199,6 +199,8 @@ func join(code: String, nick: String, spectate: bool = false) -> String:
 	return ""
 
 func teardown_connection() -> void:
+	if conn != null and P2p.instance != null and conn.code == P2p.instance.code:
+		P2p.stop_hosting()
 	if conn != null:
 		conn.close_connection()
 		conn.queue_free()

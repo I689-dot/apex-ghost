@@ -19,7 +19,7 @@ var rtt := 0.0
 var stats := {"sent": 0, "recv": 0, "binRecv": 0, "lastSeqGaps": 0}
 
 var _ws: WebSocketPeer = null
-var _local: LocalRoom.LocalSocket = null
+var _local = null  # LocalRoom.LocalSocket (offline) or P2p.P2pSocket (a race hosted on a device)
 var _samples: Array = []
 var _offset := 0.0
 var _ping_at := -1.0
@@ -125,8 +125,8 @@ func _url() -> String:
 
 func _open() -> void:
 	_close_socket()
-	if LocalRoom.is_local_code(code):
-		_local = LocalRoom.LocalSocket.new()
+	if LocalRoom.is_local_code(code) or P2p.is_known(code):
+		_local = LocalRoom.LocalSocket.new() if LocalRoom.is_local_code(code) else P2p.P2pSocket.new(code)
 		_local.on_open = _on_open
 		_local.on_message = _on_data
 		_local.on_close = _on_close
@@ -156,7 +156,8 @@ func _is_open() -> bool:
 func _on_open() -> void:
 	_reconnect_attempt = 0
 	var acc = Account.account()
-	var online := not spectate and not LocalRoom.is_local_code(code)
+	# (a race hosted on a device is no place for the account's token)
+	var online := not spectate and not LocalRoom.is_local_code(code) and not P2p.is_known(code)
 	var hello := {
 		"t": "hello", "v": Const.PROTOCOL_VERSION, "nick": nick,
 		"session": null if spectate else Settings.get_session(code), "spectate": spectate,
@@ -308,6 +309,8 @@ func leave() -> void:
 
 func _process(_delta: float) -> void:
 	var now := _now_ms()
+	if _local != null and _local.has_method("poll"):
+		_local.poll()
 	if _ws != null:
 		_ws.poll()
 		var rs := _ws.get_ready_state()
