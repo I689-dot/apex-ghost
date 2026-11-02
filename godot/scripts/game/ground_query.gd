@@ -24,4 +24,7 @@ func cast(origin: Vector3, dir: Vector3, max_dist: float) -> Dictionary:
 	var col: Object = hit.collider
 	if col != null and col.has_meta("surface"):
 		surface = col.get_meta("surface")
-	return {"dist": origin.distance_to(hit.position), "pos": hit.position, "normal": hit.normal, "surface": surface}
+	var normal: Vector3 = hit.normal
+	if normal.dot(dir) > 0.0:
+		normal = -normal
+	return {"dist": origin.distance_to(hit.position), "pos": hit.position, "normal": normal, "surface": surface}

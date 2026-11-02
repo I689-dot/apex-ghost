@@ -51,7 +51,7 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/game/trackLimits.ts
 - [ ] apps/client/src/game/tvCameras.ts
 - [ ] apps/client/src/game/vegetation.ts
-- [ ] apps/client/src/game/wallCut.ts
+- [x] apps/client/src/game/wallCut.ts
 
 ## apps/client/src/physics
 - [x] apps/client/src/physics/damage.ts
@@ -115,16 +115,16 @@ Legend: [ ] todo, [x] done
 ## packages/shared/src
 - [ ] packages/shared/src/accounts.ts
 - [ ] packages/shared/src/cars.ts
-- [ ] packages/shared/src/clock.ts
-- [ ] packages/shared/src/constants.ts
+- [x] packages/shared/src/clock.ts
+- [x] packages/shared/src/constants.ts
 - [ ] packages/shared/src/index.ts
-- [ ] packages/shared/src/prng.ts
-- [ ] packages/shared/src/protocol.ts
-- [ ] packages/shared/src/race.ts
-- [ ] packages/shared/src/raceControl.ts
-- [ ] packages/shared/src/track.ts
-- [ ] packages/shared/src/validation.ts
-- [ ] packages/shared/src/weather.ts
+- [x] packages/shared/src/prng.ts
+- [x] packages/shared/src/protocol.ts
+- [x] packages/shared/src/race.ts
+- [x] packages/shared/src/raceControl.ts
+- [x] packages/shared/src/track.ts
+- [x] packages/shared/src/validation.ts
+- [x] packages/shared/src/weather.ts
 
 ## apps/server/src
 - [ ] apps/server/src/accounts.ts
