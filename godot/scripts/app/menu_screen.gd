@@ -74,6 +74,10 @@ static func build(app: App, error: String = "") -> Control:
 
 	var render := Callable()
 	render = func():
+		# the error line and the code box are shared by the tabs: detach them before the old tab is freed
+		for shared in [err, code]:
+			if shared.get_parent() != null:
+				shared.get_parent().remove_child(shared)
 		for c in body.get_children():
 			c.queue_free()
 		if tab[0] == "play":
