@@ -8,6 +8,7 @@ config/features=PackedStringArray("4.7", "Mobile")
 [autoload]
 
 Settings="*res://scripts/game/settings.gd"
+Account="*res://scripts/net/account.gd"
 
 [display]
 window/handheld/orientation=1

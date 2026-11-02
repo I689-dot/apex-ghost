@@ -5,8 +5,8 @@ Legend: [ ] todo, [x] done
 ## apps/client/src
 - [ ] apps/client/src/app.ts
 - [ ] apps/client/src/career.ts
-- [ ] apps/client/src/championship.ts
-- [ ] apps/client/src/config.ts
+- [x] apps/client/src/championship.ts
+- [x] apps/client/src/config.ts
 - [x] apps/client/src/i18n.ts
 - [ ] apps/client/src/main.ts
 - [x] apps/client/src/settings.ts
@@ -16,7 +16,7 @@ Legend: [ ] todo, [x] done
 - [x] apps/client/src/game/ai.ts
 - [ ] apps/client/src/game/assets.ts
 - [ ] apps/client/src/game/atmosphere.ts
-- [ ] apps/client/src/game/carSetup.ts
+- [x] apps/client/src/game/carSetup.ts
 - [ ] apps/client/src/game/carVisual.ts
 - [ ] apps/client/src/game/cinematic.ts
 - [ ] apps/client/src/game/cockpit.ts
@@ -25,17 +25,17 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/game/dashDisplay.ts
 - [ ] apps/client/src/game/environment.ts
 - [ ] apps/client/src/game/forest.ts
-- [ ] apps/client/src/game/ghost.ts
+- [x] apps/client/src/game/ghost.ts
 - [ ] apps/client/src/game/graphics.ts
 - [ ] apps/client/src/game/grassBlades.ts
 - [ ] apps/client/src/game/grassMask.ts
 - [ ] apps/client/src/game/grassShells.ts
-- [ ] apps/client/src/game/lapDelta.ts
+- [x] apps/client/src/game/lapDelta.ts
 - [ ] apps/client/src/game/mirror.ts
 - [ ] apps/client/src/game/perf.ts
 - [ ] apps/client/src/game/pitCrew.ts
 - [x] apps/client/src/game/pitLane.ts
-- [ ] apps/client/src/game/pitService.ts
+- [x] apps/client/src/game/pitService.ts
 - [ ] apps/client/src/game/preview.ts
 - [ ] apps/client/src/game/racingLineFx.ts
 - [ ] apps/client/src/game/racingLinePrep.ts
@@ -48,7 +48,7 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/game/topView.ts
 - [ ] apps/client/src/game/track.ts
 - [ ] apps/client/src/game/trackEditor.ts
-- [ ] apps/client/src/game/trackLimits.ts
+- [x] apps/client/src/game/trackLimits.ts
 - [ ] apps/client/src/game/tvCameras.ts
 - [ ] apps/client/src/game/vegetation.ts
 - [x] apps/client/src/game/wallCut.ts
@@ -78,11 +78,11 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/input/padSetup.ts
 
 ## apps/client/src/net
-- [ ] apps/client/src/net/account.ts
-- [ ] apps/client/src/net/connection.ts
-- [ ] apps/client/src/net/localRoom.ts
+- [x] apps/client/src/net/account.ts
+- [x] apps/client/src/net/connection.ts
+- [x] apps/client/src/net/localRoom.ts
 - [ ] apps/client/src/net/p2p.ts
-- [ ] apps/client/src/net/remote.ts
+- [x] apps/client/src/net/remote.ts
 
 ## apps/client/src/ui
 - [ ] apps/client/src/ui/carLines.ts
