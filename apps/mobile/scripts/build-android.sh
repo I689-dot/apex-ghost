@@ -34,7 +34,7 @@ echo "sdk.dir=$ANDROID_HOME" > "$here/android/local.properties"
 export APEX_VERSION_CODE="${APEX_VERSION_CODE:-$(date -u +%y%m%d%H)}"
 # the version players see: a plain number, one step per build (apps/mobile/version.json keeps the count); the
 # version code stays date-based so Android always accepts the update over an older build
-VERSION_FILE="$(dirname "$0")/../version.json"
+VERSION_FILE="$here/version.json"
 [ -f "$VERSION_FILE" ] || echo '{"major":1,"minor":0}' > "$VERSION_FILE"
 NEXT_MINOR=$(node -e "const v=require(process.argv[1]);process.stdout.write(String(v.minor+1))" "$(realpath "$VERSION_FILE")")
 MAJOR=$(node -e "const v=require(process.argv[1]);process.stdout.write(String(v.major))" "$(realpath "$VERSION_FILE")")
