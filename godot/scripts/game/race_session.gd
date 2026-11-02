@@ -449,7 +449,8 @@ func update_room(snapshot: Dictionary) -> void:
 	room = snapshot
 	for p in snapshot.players:
 		names[p.id] = p.nick
-		hud.set_driver(p.id, p.get("country"), p.get("num"))
+		if hud != null:
+			hud.set_driver(p.id, p.get("country"), p.get("num"))
 		if p.get("num") != null:
 			numbers[p.id] = p.num
 	# hide cars of players who left the room
@@ -928,7 +929,7 @@ func _create_local_bots(entries: Dictionary) -> void:
 		b.stop_lap = win.open + (r.slot % (win.close - win.open + 1))
 		r.bot = b
 		# the stand-in node is the bot's own vehicle: its visual hangs from it
-		v.add_child(r.visual)
+		r.visual.reparent(v, false)
 		r.visual.position = Vector3.ZERO
 		r.visual.rotation = Vector3.ZERO
 		r.node = v

@@ -104,7 +104,9 @@ func _pull_ground_pieces() -> void:
 				pieces.append(n)
 	add_child(ground)
 	for p in pieces:
-		p.reparent(ground, true)
+		var tr := _rel(p)
+		p.reparent(ground, false)
+		p.transform = tr
 
 ## A node's transform relative to this scene (works before the scene is in the tree).
 func _rel(node: Node3D) -> Transform3D:

@@ -42,7 +42,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/racingLineWorker.ts (thread in racing_line_prep.gd)
 - [x] apps/client/src/game/roadPatches.ts
 - [ ] apps/client/src/game/roadWear.ts
-- [ ] apps/client/src/game/session.ts
+- [~] apps/client/src/game/session.ts (loads and runs offline end to end; optional subsystems still being attached)
 - [x] apps/client/src/game/sky.ts
 - [ ] apps/client/src/game/taa.ts
 - [x] apps/client/src/game/topView.ts
@@ -73,8 +73,8 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/audio/sessionAudio.ts
 
 ## apps/client/src/input
-- [ ] apps/client/src/input/gamepad.ts
-- [ ] apps/client/src/input/padMap.ts
+- [x] apps/client/src/input/gamepad.ts
+- [x] apps/client/src/input/padMap.ts
 - [ ] apps/client/src/input/padSetup.ts
 
 ## apps/client/src/net

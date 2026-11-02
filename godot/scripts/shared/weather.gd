@@ -138,7 +138,7 @@ static func temperatures(plan: Dictionary, w: Dictionary, map_id: String = "nurb
 	var hl: Array = c.highLow[month]
 	var high: float = hl[0]
 	var low: float = hl[1]
-	var anomaly := (Prng.new(plan.seed ^ 0x51ed270b).next() - 0.5) * 7.0
+	var anomaly := (Prng.new(int(plan.seed) ^ 0x51ed270b).next() - 0.5) * 7.0
 	var h := fposmod(fposmod(w.hour, 24.0) + 24.0, 24.0)
 	var day: float
 	if h >= 5.0 and h <= 15.0:
