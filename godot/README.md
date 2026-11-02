@@ -1,0 +1,36 @@
+# Apex Ghost (Godot)
+
+The game ported to Godot 4.7 (Mobile renderer, Jolt physics) for Android; the web / Capacitor game and the Cloudflare server
+are untouched and the Godot client reuses the server for online play. `MIGRATION.md` lists every source file of the web game
+and where it went.
+
+## Set up
+
+```
+tools/godot/sync-assets.sh                # copies the web game's assets into godot/assets, unpacks the GLBs, packs the forests
+python3 tools/godot/make-ground-textures.py && python3 tools/godot/make-grass-blades.py
+godot --headless --path godot --import    # first import (long)
+python3 tools/godot/set-import-defaults.py && godot --headless --path godot --import   # VRAM-compressed textures with mipmaps
+```
+
+`godot/assets`, `godot/data` and `godot/.godot` are not committed. The WebRTC extension (`addons/webrtc_native`, from
+godotengine/webrtc-native 1.2.2) carries the Linux x86_64 and Android arm64 builds only.
+
+## Run and test
+
+* `tools/godot/gd.sh tests/compile_all.gd` compiles every script.
+* `tools/godot/gd.sh tests/<name>.gd`: `simtest` (vehicle), `tracktest`, `roomtest`, `ailap` (`HZ=60` for the phone's physics rate),
+  `conntest`, `prngtest`, `audiotest`, `p2ptest` (a race hosted on this device, needs network).
+* `tests/session_test.gd` runs a whole offline race (non-headless: it renders). Environment: `CAR_ID`, `WEATHER`, `TIME`,
+  `TELEPORT=<lap metres>`, `LATERAL=<m>`, `LINE=full`, `SHOT_DIR=<dir>` for screenshots.
+* `APEX_AUTO=solo SHOT_DIR=… godot --path godot` plays menu → lobby → briefing → race by itself; `APEX_AUTO=intro` shows the intro.
+* `APEX_PROF=1` prints a per-section CPU profile; the performance overlay (Settings → General) shows it on a device.
+
+## Android
+
+`export_presets.cfg` has the Android preset (arm64, package `app.apexghost.racing.godot`, so it installs next to the old app).
+Debug build: `godot --headless --path godot --export-debug Android ../build/apex-ghost-godot.apk` (the Android SDK and JDK paths are in
+the editor settings; Godot's debug keystore signs it). A release build needs a keystore in the preset's options.
+
+Phone adaptations (a Pixel 10a is the reference): physics at 60 Hz (the lap time holds within 0.3 %), dynamic resolution from the GPU's
+time, forest and far scenery capped on Medium, ground overlays and shells for High / Ultra, the mirror without the far scenery.

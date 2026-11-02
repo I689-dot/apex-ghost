@@ -89,6 +89,7 @@ func load_scene() -> TrackScene:
 		chunks.append(ch)
 	_pull_ground_pieces()
 	_prepare_materials()
+	_lift_decals()
 	collision_bodies = TrackCollision.build(self, data)
 	return self
 
@@ -185,6 +186,48 @@ func _prepare_materials() -> void:
 		if culled != null:
 			var aabb := _rel(mesh) * mesh.get_aabb()
 			culled.append({"mesh": mesh, "center": aabb.get_center(), "radius": aabb.size.length() / 2.0})
+
+## Depth layers of the circuit's flat parts (measured with tools/e2e/decalheight.mjs on the GP: of the paint's vertices 5 %
+## lie under the asphalt and 39 % within a centimetre of it, of the kerbs 32 % under it and 92 % within a centimetre).
+## Under the road the lines broke into dashes; level with it they flickered with distance. Paint and kerbs are drawn a
+## little higher (world up, in the vertices: the collision, and so the physics, are untouched). The web game also pulls
+## them forwards in depth with a polygon offset, which the engine's materials do not have.
+const DECAL_LAYERS := [["(?i)^(lines|redline|box_decal|nurb_decal)", 0.035], ["(?i)^curb", 0.045]]
+
+func _lift_decals() -> void:
+	var res: Array = []
+	for d in DECAL_LAYERS:
+		res.append(RegEx.create_from_string(d[0]))
+	for n in CarVisual._walk(self):
+		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null or not ((n as MeshInstance3D).mesh is ArrayMesh):
+			continue
+		var mi := n as MeshInstance3D
+		var mesh := mi.mesh as ArrayMesh
+		var lifts: Dictionary = {}
+		for s in mesh.get_surface_count():
+			var m := mesh.surface_get_material(s)
+			if m == null:
+				continue
+			for k in res.size():
+				if res[k].search(m.resource_name) != null:
+					lifts[s] = DECAL_LAYERS[k][1]
+		if lifts.is_empty():
+			continue
+		# world up in the mesh's own space
+		var up_local := (_rel(mi).basis.inverse() * Vector3.UP)
+		var rebuilt := ArrayMesh.new()
+		for s in mesh.get_surface_count():
+			var arrays := mesh.surface_get_arrays(s)
+			if lifts.has(s):
+				var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				var off: Vector3 = up_local * float(lifts[s])
+				for i in verts.size():
+					verts[i] += off
+				arrays[Mesh.ARRAY_VERTEX] = verts
+			var mats := []
+			rebuilt.add_surface_from_arrays(mesh.surface_get_primitive_type(s), arrays)
+			rebuilt.surface_set_material(rebuilt.get_surface_count() - 1, mesh.surface_get_material(s))
+		mi.mesh = rebuilt
 
 ## Builds the wheel ground query (rays against the collision bodies, with the smoothed road patches).
 func build_ground_query(world: World3D) -> GroundQuery:
