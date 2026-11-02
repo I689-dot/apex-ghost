@@ -236,12 +236,25 @@ static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool
 		var group: Array = tracks.filter(func(x): return circuit_of(x) == key)
 		var on := circuit_of(track) == key
 		var shown: Dictionary = track if on else group[0]
-		var b := UIKit.button("\n\n\n\n%s\n%s" % [I18n.t(CIRCUIT_NAME.get(key, shown.name)), I18n.t("{n} layouts", {"n": group.size()}) if group.size() > 1 else "%.2f km" % (float(shown.length) / 1000.0)])
-		b.custom_minimum_size = Vector2(190, 150)
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(200, 170)
+		var inner := VBoxContainer.new()
+		inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		inner.alignment = BoxContainer.ALIGNMENT_CENTER
+		UIKit.full(inner)
 		var ol := TrackOutline.new(shown.id, Vector2(80, 80))
-		ol.set_anchors_preset(Control.PRESET_CENTER_TOP)
-		ol.position = Vector2(55, 8)
-		b.add_child(ol)
+		ol.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		inner.add_child(ol)
+		var l1 := UIKit.label(I18n.t(CIRCUIT_NAME.get(key, shown.name)), 16, UIKit.TEXT, true, 700)
+		l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		var l2 := UIKit.label(I18n.t("{n} layouts", {"n": group.size()}) if group.size() > 1 else "%.2f km" % (float(shown.length) / 1000.0), 14, UIKit.MUTED)
+		l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		for l in [l1, l2]:
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			inner.add_child(l)
+		b.add_child(inner)
 		b.disabled = not edit and not on
 		if on:
 			for st in ["normal", "hover", "pressed", "disabled"]:

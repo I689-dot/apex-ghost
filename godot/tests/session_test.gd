@@ -19,6 +19,8 @@ func _run() -> void:
 	if OS.get_environment("QUALITY") != "":
 		Settings.data.quality = OS.get_environment("QUALITY")
 		Settings.data.graphics = {}
+	if OS.get_environment("CAMERA") != "":
+		Settings.data.camera = OS.get_environment("CAMERA")
 	LocalRoom.create()
 	var conn := Connection.new().setup(LocalRoom.LOCAL_CODE, "Max")
 	add_child(conn)
@@ -99,6 +101,7 @@ func _run() -> void:
 	print("avg process ms: ", proc / maxf(1, frames) * 1000.0, " physics ms/frame: ", phys / maxf(1, frames) * 1000.0, " fps ", Engine.get_frames_per_second(), " draws ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	for k in gpu:
 		print("gpu ms ", k, ": ", gpu[k] / maxf(1, frames))
+	print("tris ", Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME), " draws ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), " quality ", Settings.data.quality)
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
 	session.dispose()
 	get_tree().quit()
