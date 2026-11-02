@@ -3,14 +3,14 @@
 Legend: [ ] todo, [~] partly, [x] done
 
 ## apps/client/src
-- [~] apps/client/src/app.ts (menu, lobby, briefing, loading, race, pause, results, championship, settings done; p2p hosting, reels, showroom pending)
+- [x] apps/client/src/app.ts (scripts/app/*: every screen; the unused Showroom aside)
 - [x] apps/client/src/career.ts
 - [x] apps/client/src/championship.ts
 - [x] apps/client/src/config.ts
 - [x] apps/client/src/i18n.ts
-- [~] apps/client/src/main.ts (scenes/main.tscn + scripts/app/app.gd; intro reel pending)
+- [x] apps/client/src/main.ts (scenes/main.tscn, app.gd incl. the intro reel)
 - [x] apps/client/src/settings.ts
-- [ ] apps/client/src/styles.css
+- [x] apps/client/src/styles.css (replaced by the UIKit theme and the screens in code)
 
 ## apps/client/src/game
 - [x] apps/client/src/game/ai.ts
@@ -42,11 +42,11 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/racingLineWorker.ts (thread in racing_line_prep.gd)
 - [x] apps/client/src/game/roadPatches.ts
 - [x] apps/client/src/game/roadWear.ts
-- [~] apps/client/src/game/session.ts (loads and runs offline end to end; optional subsystems still being attached)
+- [x] apps/client/src/game/session.ts (race_session.gd; every optional subsystem attached except the radio)
 - [x] apps/client/src/game/sky.ts
 - [x] apps/client/src/game/taa.ts (engine TAA: Viewport.use_taa)
 - [x] apps/client/src/game/topView.ts
-- [~] apps/client/src/game/track.ts (scene, collision, culling, wetness, lights done; surface shaders pending)
+- [~] apps/client/src/game/track.ts (all but the kerb crisp-paint shader, the structure depth push and the decal polygon offset)
 - [ ] apps/client/src/game/trackEditor.ts
 - [x] apps/client/src/game/trackLimits.ts
 - [x] apps/client/src/game/tvCameras.ts
@@ -106,9 +106,9 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/mobile/appShell.ts (n/a: native app)
 - [x] apps/client/src/mobile/assetCache.ts (n/a: native app)
 - [x] apps/client/src/mobile/installScreen.ts (n/a: native app)
-- [ ] apps/client/src/mobile/mobile.css
+- [x] apps/client/src/mobile/mobile.css (n/a: native app)
 - [x] apps/client/src/mobile/platform.ts (n/a: native app)
-- [ ] apps/client/src/mobile/refreshRate.ts
+- [ ] apps/client/src/mobile/refreshRate.ts (120 Hz: not wanted for the moment)
 - [x] apps/client/src/mobile/touchControls.ts (ui/touch_controls.gd)
 - [x] apps/client/src/mobile/touchSettings.ts (settings panel Touch tab)
 
@@ -117,7 +117,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] packages/shared/src/cars.ts (CarsDb)
 - [x] packages/shared/src/clock.ts
 - [x] packages/shared/src/constants.ts
-- [ ] packages/shared/src/index.ts
+- [x] packages/shared/src/index.ts (scripts/shared/*)
 - [x] packages/shared/src/prng.ts
 - [x] packages/shared/src/protocol.ts
 - [x] packages/shared/src/race.ts
@@ -133,6 +133,6 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/server/src/signal.ts (unchanged: the Cloudflare server is reused)
 
 ## Assets
-- [ ] cars (GLB) + cars.json
-- [ ] tracks Nordschleife GP/short/24h, Spa, Zandvoort + collision.apxc + forest.json
-- [ ] textures, audio engine profiles + surface sounds, i18n strings
+- [x] cars (GLB) + cars.json
+- [x] tracks Nordschleife GP/short/24h, Spa, Zandvoort + collision.apxc + forest.json
+- [x] textures, audio engine profiles + surface sounds, i18n strings
