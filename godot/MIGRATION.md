@@ -7,13 +7,13 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/career.ts
 - [ ] apps/client/src/championship.ts
 - [ ] apps/client/src/config.ts
-- [ ] apps/client/src/i18n.ts
+- [x] apps/client/src/i18n.ts
 - [ ] apps/client/src/main.ts
-- [ ] apps/client/src/settings.ts
+- [x] apps/client/src/settings.ts
 - [ ] apps/client/src/styles.css
 
 ## apps/client/src/game
-- [ ] apps/client/src/game/ai.ts
+- [x] apps/client/src/game/ai.ts
 - [ ] apps/client/src/game/assets.ts
 - [ ] apps/client/src/game/atmosphere.ts
 - [ ] apps/client/src/game/carSetup.ts
@@ -34,13 +34,13 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/game/mirror.ts
 - [ ] apps/client/src/game/perf.ts
 - [ ] apps/client/src/game/pitCrew.ts
-- [ ] apps/client/src/game/pitLane.ts
+- [x] apps/client/src/game/pitLane.ts
 - [ ] apps/client/src/game/pitService.ts
 - [ ] apps/client/src/game/preview.ts
 - [ ] apps/client/src/game/racingLineFx.ts
 - [ ] apps/client/src/game/racingLinePrep.ts
 - [ ] apps/client/src/game/racingLineWorker.ts
-- [ ] apps/client/src/game/roadPatches.ts
+- [x] apps/client/src/game/roadPatches.ts
 - [ ] apps/client/src/game/roadWear.ts
 - [ ] apps/client/src/game/session.ts
 - [ ] apps/client/src/game/sky.ts
@@ -127,10 +127,10 @@ Legend: [ ] todo, [x] done
 - [x] packages/shared/src/weather.ts
 
 ## apps/server/src
-- [ ] apps/server/src/accounts.ts
-- [ ] apps/server/src/index.ts
+- [x] apps/server/src/accounts.ts (unchanged: the Cloudflare server is reused)
+- [x] apps/server/src/index.ts (unchanged: the Cloudflare server is reused)
 - [x] apps/server/src/room.ts
-- [ ] apps/server/src/signal.ts
+- [x] apps/server/src/signal.ts (unchanged: the Cloudflare server is reused)
 
 ## Assets
 - [ ] cars (GLB) + cars.json

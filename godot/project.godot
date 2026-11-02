@@ -5,6 +5,10 @@ config/name="Apex Ghost"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 
+[autoload]
+
+Settings="*res://scripts/game/settings.gd"
+
 [display]
 window/handheld/orientation=1
 
