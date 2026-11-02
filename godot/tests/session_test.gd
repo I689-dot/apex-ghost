@@ -16,6 +16,9 @@ func _run() -> void:
 	var seconds := float(args[1]) if args.size() > 1 else 8.0
 	if OS.get_environment("LINE") != "":
 		Settings.data.racingLine = OS.get_environment("LINE")
+	if OS.get_environment("QUALITY") != "":
+		Settings.data.quality = OS.get_environment("QUALITY")
+		Settings.data.graphics = {}
 	LocalRoom.create()
 	var conn := Connection.new().setup(LocalRoom.LOCAL_CODE, "Max")
 	add_child(conn)

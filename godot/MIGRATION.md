@@ -27,7 +27,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/forest.ts (packed cells, near models, impostors)
 - [x] apps/client/src/game/ghost.ts
 - [~] apps/client/src/game/graphics.ts (AA, scale, dynamic res, bloom, grade; no AO on the Mobile renderer)
-- [ ] apps/client/src/game/grassBlades.ts (High/Ultra only: not used on Medium)
+- [x] apps/client/src/game/grassBlades.ts (High / Ultra)
 - [x] apps/client/src/game/grassMask.ts (baked per layout: tests/bake_masks.gd)
 - [x] apps/client/src/game/grassShells.ts
 - [x] apps/client/src/game/lapDelta.ts
@@ -50,7 +50,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [ ] apps/client/src/game/trackEditor.ts
 - [x] apps/client/src/game/trackLimits.ts
 - [x] apps/client/src/game/tvCameras.ts
-- [ ] apps/client/src/game/vegetation.ts
+- [x] apps/client/src/game/vegetation.ts (forest.gd, grass_blades.gd)
 - [x] apps/client/src/game/wallCut.ts
 
 ## apps/client/src/physics

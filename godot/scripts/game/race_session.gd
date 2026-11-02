@@ -572,6 +572,11 @@ func _attach_world_extras(q: Dictionary) -> void:
 	shells = GrassShells.build(track, track.lawn_materials, track_data, mask)
 	if shells != null:
 		add_child(shells)
+	# real blades on top of the shells: High and Ultra only (placing them takes seconds)
+	if float(q.grassBladeRadius) > 0.0 and not spectator:
+		blades = GrassBlades.build(track_data, track.ground_query, {"blades": q.grassBlades, "perM2": q.grassDensity, "band": q.grassBand}, mask)
+		if blades != null:
+			add_child(blades)
 
 func _attach_my_car_extras(entry: Dictionary) -> void:
 	if not spectator:
@@ -1524,6 +1529,7 @@ func _process_inner(dt: float) -> void:
 	dt = minf(dt, MAX_FRAME_DT)
 	var server_now := conn.server_now()
 	var race_t: float = server_now - start_at if start_at != null else -INF
+	Prof.start()
 	handle_keys(server_now)
 
 	# countdown & start lights
@@ -1542,6 +1548,7 @@ func _process_inner(dt: float) -> void:
 	if spectator:
 		vehicle.frozen = true
 
+	Prof.mark("p.keys_countdown")
 	# weather (deterministic from seed + race clock)
 	weather_timer -= dt
 	if weather_timer <= 0.0:
@@ -1553,6 +1560,7 @@ func _process_inner(dt: float) -> void:
 	if contact:
 		send_bumps()
 
+	Prof.mark("p.weather_sc")
 	# visuals of my car
 	var v := vehicle
 	var susp := [0.0, 0.0, 0.0, 0.0]
@@ -1565,6 +1573,7 @@ func _process_inner(dt: float) -> void:
 	my_visual.set_lights(braking, headlights_on, env.night)
 	my_visual.update_smoke(dt, damage.zones[4], self)
 
+	Prof.mark("p.my_visual")
 	# camera
 	var car_vel := v.linear_velocity
 	var yaw_rate := v.angular_velocity.y
@@ -1625,10 +1634,12 @@ func _process_inner(dt: float) -> void:
 		if not spectator:
 			racing_line.update_line(loc.index, maxf(0.0, vehicle.telemetry.forwardSpeed))
 
+	Prof.mark("p.cameras")
 	# the other drivers' cars
 	for r: Remote in remotes.values():
 		update_remote(r, server_now, dt, cam_pos)
 
+	Prof.mark("p.remotes")
 	# environment
 	Prof.b("env")
 	env.update(dt, weather, view_cam, vehicle.global_position, car_vel)
@@ -1652,9 +1663,18 @@ func _process_inner(dt: float) -> void:
 		shells.update_shells(cam_pos, q, cinematic != null and cinematic.aerial)
 	if blades != null:
 		blades.update_blades(cam_pos, 0.0 if cinematic != null and cinematic.aerial else float(q.grassBladeRadius))
+		var gcars: Array = [Vector3(vehicle.global_position.x, vehicle.global_position.z, minf(1.0, vehicle.telemetry.speed / 40.0))]
+		for rr: Remote in remotes.values():
+			if gcars.size() >= GrassBlades.GRASS_CARS:
+				break
+			if rr.visual.visible:
+				gcars.append(Vector3(rr.visual.global_position.x, rr.visual.global_position.z, minf(1.0, rr.vel.length() / 40.0)))
+		blades.set_frame(Vector2(1.2, 0.5) * (0.6 + 0.8 * weather.rain), weather.wetness, gcars)
 	Prof.b("audio")
+	Prof.mark("p.track_shells")
 	update_audio(dt, view_cam)
 	Prof.e("audio")
+	Prof.mark("p.audio")
 	update_wake()
 	update_ghost(server_now)
 
@@ -1665,6 +1685,7 @@ func _process_inner(dt: float) -> void:
 		update_race_ui(server_now, race_t, _ui_acc)
 		Prof.e("ui")
 		_ui_acc = 0.0
+	Prof.mark("p.wake_ghost_ui")
 	update_pit(server_now)
 	update_limiters(server_now)
 	update_bot_pits(server_now)
