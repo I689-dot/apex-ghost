@@ -23,7 +23,7 @@ var _last_q: Dictionary = {}
 var _last_n := -1
 
 ## Shells over the lawn of these materials near the racing line (null: no lawn).
-static func build(track_root: Node3D, lawn: Array, track: Dictionary) -> GrassShells:
+static func build(track_root: Node3D, lawn: Array, track: Dictionary, mask: GrassMask = null) -> GrassShells:
 	if lawn.is_empty():
 		return null
 	var lawn_set := {}
@@ -63,6 +63,9 @@ static func build(track_root: Node3D, lawn: Array, track: Dictionary) -> GrassSh
 				var c := xf * verts[ic]
 				var k := _key((a.x + b.x + c.x) / 3.0, (a.z + b.z + c.z) / 3.0)
 				if not near.has(k):
+					continue
+				# under a grandstand or building: no blades (they showed over the stands' floors)
+				if mask != null and mask.covers((a.x + b.x + c.x) / 3.0, (a.z + b.z + c.z) / 3.0):
 					continue
 				if not by_cell.has(k):
 					by_cell[k] = {"p": PackedVector3Array(), "n": PackedVector3Array()}

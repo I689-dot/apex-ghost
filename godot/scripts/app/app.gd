@@ -68,6 +68,8 @@ func _ready() -> void:
 		_play_intro()
 	if auto == "intro":
 		_shots_only.call_deferred()
+	elif auto == "ui":
+		_ui_shots.call_deferred()
 	elif auto != "":
 		_autotest.call_deferred()
 
@@ -620,4 +622,34 @@ func _shots_only() -> void:
 	for t in [1.0, 3.2, 6.0]:
 		await get_tree().create_timer(t).timeout
 		get_viewport().get_texture().get_image().save_png("%s/intro_%d.png" % [OS.get_environment("SHOT_DIR"), int(t)])
+	get_tree().quit()
+
+## Dev: APEX_AUTO=ui screenshots the menu's modals and the settings tabs.
+func _ui_shots() -> void:
+	var dir := OS.get_environment("SHOT_DIR")
+	var shot := func(n: String):
+		await get_tree().create_timer(0.7).timeout
+		get_viewport().get_texture().get_image().save_png("%s/ui_%s.png" % [dir, n])
+	await get_tree().create_timer(1.5).timeout
+	await shot.call("menu")
+	SocialUI.sign_in_modal(self, func(): pass)
+	await shot.call("signin")
+	for c in overlay_layer.get_children():
+		if c != toasts and c != perf:
+			c.queue_free()
+	ChampionshipUI.open(self, func(): return "Max")
+	await shot.call("champ")
+	for c in overlay_layer.get_children():
+		if c != toasts and c != perf:
+			c.queue_free()
+	SocialUI.records_modal(self)
+	await shot.call("records")
+	for c in overlay_layer.get_children():
+		if c != toasts and c != perf:
+			c.queue_free()
+	for tab in ["general", "graphics", "camera", "driving", "sound", "controls", "controller"]:
+		SettingsPanel._tab = tab
+		var panel := SettingsPanel.build(self, func(): pass)
+		await shot.call("settings_" + tab)
+		panel.queue_free()
 	get_tree().quit()

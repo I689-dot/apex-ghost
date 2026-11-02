@@ -566,7 +566,10 @@ func _attach_world_extras(q: Dictionary) -> void:
 	if crowd != null:
 		add_child(crowd)
 	Forest.ensure_globals()
-	shells = GrassShells.build(track, track.lawn_materials, track_data)
+	var mask := GrassMask.load_baked(track_data.id)
+	if mask == null:
+		mask = GrassMask.build(track.chunks, track_data, track.ground_materials)
+	shells = GrassShells.build(track, track.lawn_materials, track_data, mask)
 	if shells != null:
 		add_child(shells)
 

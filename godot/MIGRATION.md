@@ -28,7 +28,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/ghost.ts
 - [~] apps/client/src/game/graphics.ts (AA, scale, dynamic res, bloom, grade; no AO on the Mobile renderer)
 - [ ] apps/client/src/game/grassBlades.ts (High/Ultra only: not used on Medium)
-- [ ] apps/client/src/game/grassMask.ts (footprint mask for blades/shells under stands)
+- [x] apps/client/src/game/grassMask.ts (baked per layout: tests/bake_masks.gd)
 - [x] apps/client/src/game/grassShells.ts
 - [x] apps/client/src/game/lapDelta.ts
 - [x] apps/client/src/game/mirror.ts

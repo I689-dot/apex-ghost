@@ -10,6 +10,7 @@ and where it went.
 tools/godot/sync-assets.sh                # copies the web game's assets into godot/assets, unpacks the GLBs, packs the forests
 python3 tools/godot/make-ground-textures.py && python3 tools/godot/make-grass-blades.py
 godot --headless --path godot --import    # first import (long)
+godot --headless --path godot res://tests/runner.tscn -- res://tests/bake_masks.gd   # grass masks under the stands (assets/masks)
 python3 tools/godot/set-import-defaults.py && godot --headless --path godot --import   # VRAM-compressed textures with mipmaps
 ```
 
