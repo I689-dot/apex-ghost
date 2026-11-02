@@ -20,8 +20,8 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/carVisual.ts
 - [x] apps/client/src/game/cinematic.ts
 - [x] apps/client/src/game/cockpit.ts
-- [ ] apps/client/src/game/crashFx.ts
-- [ ] apps/client/src/game/crowd.ts
+- [x] apps/client/src/game/crashFx.ts
+- [x] apps/client/src/game/crowd.ts
 - [x] apps/client/src/game/dashDisplay.ts
 - [~] apps/client/src/game/environment.ts (sky, sun, fog, rain done; windshield rain/crack, stars, moon pending)
 - [ ] apps/client/src/game/forest.ts
@@ -37,11 +37,11 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/pitLane.ts
 - [x] apps/client/src/game/pitService.ts
 - [ ] apps/client/src/game/preview.ts
-- [ ] apps/client/src/game/racingLineFx.ts
+- [x] apps/client/src/game/racingLineFx.ts
 - [x] apps/client/src/game/racingLinePrep.ts
 - [x] apps/client/src/game/racingLineWorker.ts (thread in racing_line_prep.gd)
 - [x] apps/client/src/game/roadPatches.ts
-- [ ] apps/client/src/game/roadWear.ts
+- [x] apps/client/src/game/roadWear.ts
 - [~] apps/client/src/game/session.ts (loads and runs offline end to end; optional subsystems still being attached)
 - [x] apps/client/src/game/sky.ts
 - [ ] apps/client/src/game/taa.ts

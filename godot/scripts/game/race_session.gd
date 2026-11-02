@@ -560,8 +560,10 @@ func _load_forest(_q: Dictionary) -> void:
 				track.forest = forest
 				add_child(forest)
 
-func _attach_world_extras(_q: Dictionary) -> void:
-	pass
+func _attach_world_extras(q: Dictionary) -> void:
+	var crowd := Crowd.build(track, track_data, float(q.crowd))
+	if crowd != null:
+		add_child(crowd)
 
 func _attach_my_car_extras(entry: Dictionary) -> void:
 	if not spectator:
@@ -570,12 +572,16 @@ func _attach_my_car_extras(entry: Dictionary) -> void:
 		add_child(mirror)
 		dash = DashDisplays.new(my_visual)
 		add_child(dash)
+		crash_fx = CrashFx.new()
+		add_child(crash_fx)
 
 func _attach_line_extras(tuned: Dictionary) -> void:
 	if not spectator:
 		racing_line = RacingLineFx.new(track_data, tuned.specs, track.ground_query, air.airDensity)
 		racing_line.set_mode(Settings.data.racingLine)
 		add_child(racing_line)
+	road_wear = RoadWear.new(track_data, tuned.specs, track.ground_query, air.airDensity)
+	add_child(road_wear)
 
 func _build_cinematic(entries: Dictionary) -> void:
 	var entrants: Array = []
