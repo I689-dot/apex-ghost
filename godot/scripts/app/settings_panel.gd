@@ -75,7 +75,7 @@ static func build(app: App, on_change: Callable) -> Control:
 				else:
 					_controls(col, changed, show)
 			"controller":
-				_controller(col, changed)
+				_controller(col, changed, app)
 		holder.add_child(UIW.scroll(col))
 		for i in tabs_row.get_child_count():
 			var b := tabs_row.get_child(i) as Button
@@ -323,9 +323,11 @@ static func _touch(col: Control) -> void:
 	hp.toggled.connect(func(v): TouchPrefs.set_pref("haptics", v))
 	col.add_child(_row(I18n.t("Vibration"), hp, I18n.t("Short vibration on gear shifts and button presses")))
 
-static func _controller(col: Control, changed: Callable) -> void:
+static func _controller(col: Control, changed: Callable, app: App = null) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Controller"))
+	if app != null and app.gamepad != null:
+		col.add_child(PadSetup.new(app.gamepad))
 	_head(col, I18n.t("Steering wheel"))
 	col.add_child(UIW.muted(I18n.t("Logitech, Thrustmaster, Fanatec, Moza, Simucube and Simagic wheels are recognised. Set the wheel to 900° in its own software and the same here: each car then turns as its real lock allows."), 13))
 	_select(col, I18n.t("Device"), "", S.wheel, "mode", [["auto", I18n.t("Recognise wheels automatically")], ["wheel", I18n.t("Always a steering wheel")], ["pad", I18n.t("Always a gamepad")]], changed)

@@ -170,6 +170,7 @@ func _prepare_materials() -> void:
 			# walls too: the source maps flip some of their triangles
 			if sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or _match("(?i)^wall", nm):
 				sm.cull_mode = BaseMaterial3D.CULL_DISABLED
+			GroundDetail.apply(sm)
 			if _match(GROUND_MAT_RE, nm) or nm == "grass_fill":
 				ground_materials.append(sm)
 				if _match("(?i)grass|fill|turf", nm):

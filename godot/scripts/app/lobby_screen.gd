@@ -236,7 +236,12 @@ static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool
 		var group: Array = tracks.filter(func(x): return circuit_of(x) == key)
 		var on := circuit_of(track) == key
 		var shown: Dictionary = track if on else group[0]
-		var b := UIKit.button("%s\n%s" % [I18n.t(CIRCUIT_NAME.get(key, shown.name)), I18n.t("{n} layouts", {"n": group.size()}) if group.size() > 1 else "%.2f km" % (float(shown.length) / 1000.0)])
+		var b := UIKit.button("\n\n\n\n%s\n%s" % [I18n.t(CIRCUIT_NAME.get(key, shown.name)), I18n.t("{n} layouts", {"n": group.size()}) if group.size() > 1 else "%.2f km" % (float(shown.length) / 1000.0)])
+		b.custom_minimum_size = Vector2(190, 150)
+		var ol := TrackOutline.new(shown.id, Vector2(80, 80))
+		ol.set_anchors_preset(Control.PRESET_CENTER_TOP)
+		ol.position = Vector2(55, 8)
+		b.add_child(ol)
 		b.disabled = not edit and not on
 		if on:
 			for st in ["normal", "hover", "pressed", "disabled"]:
