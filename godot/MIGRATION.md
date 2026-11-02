@@ -45,7 +45,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [ ] apps/client/src/game/session.ts
 - [x] apps/client/src/game/sky.ts
 - [ ] apps/client/src/game/taa.ts
-- [ ] apps/client/src/game/topView.ts
+- [x] apps/client/src/game/topView.ts
 - [~] apps/client/src/game/track.ts (scene, collision, culling, wetness, lights done; surface shaders pending)
 - [ ] apps/client/src/game/trackEditor.ts
 - [x] apps/client/src/game/trackLimits.ts
@@ -85,21 +85,21 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/net/remote.ts
 
 ## apps/client/src/ui
-- [ ] apps/client/src/ui/carLines.ts
-- [ ] apps/client/src/ui/carStatus.ts
+- [x] apps/client/src/ui/carLines.ts
+- [x] apps/client/src/ui/carStatus.ts
 - [ ] apps/client/src/ui/careerBlock.ts
-- [ ] apps/client/src/ui/circuitMap.ts
-- [ ] apps/client/src/ui/damagePanel.ts
+- [x] apps/client/src/ui/circuitMap.ts
+- [x] apps/client/src/ui/damagePanel.ts
 - [ ] apps/client/src/ui/dom.ts
-- [ ] apps/client/src/ui/hud.ts
+- [x] apps/client/src/ui/hud.ts
 - [ ] apps/client/src/ui/icons.ts
 - [ ] apps/client/src/ui/images.ts
-- [ ] apps/client/src/ui/overlays.ts
+- [x] apps/client/src/ui/overlays.ts
 - [ ] apps/client/src/ui/pitMenu.ts
 - [ ] apps/client/src/ui/reel.ts
 - [ ] apps/client/src/ui/settingsPanel.ts
 - [ ] apps/client/src/ui/social.ts
-- [ ] apps/client/src/ui/timingScreen.ts
+- [x] apps/client/src/ui/timingScreen.ts
 - [ ] apps/client/src/ui/trackMap.ts
 
 ## apps/client/src/mobile
