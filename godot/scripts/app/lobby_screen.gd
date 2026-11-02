@@ -209,7 +209,7 @@ static func _circuit_pane(app: App, tracks: Array, track: Dictionary, edit: bool
 	info.add_child(UIW.h2(I18n.t(track.name)))
 	var facts := "%.2f km · %s" % [float(track.length) / 1000.0, MAP_COUNTRY.get(track.get("map", ""), "DE")]
 	if track.get("turns") != null:
-		facts += " · " + I18n.t("{n} turns", {"n": track.turns})
+		facts += " · " + I18n.t("{n} turns", {"n": int(track.turns)})
 	info.add_child(UIKit.label(facts, 18, UIKit.MUTED))
 	var layouts: Array = tracks.filter(func(t): return circuit_of(t) == circuit_of(track))
 	if layouts.size() > 1:
