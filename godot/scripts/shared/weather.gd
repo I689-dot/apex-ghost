@@ -146,7 +146,7 @@ static func temperatures(plan: Dictionary, w: Dictionary, map_id: String = "nurb
 	else:
 		day = 0.5 + 0.5 * cos(PI * (fposmod(h - 15.0 + 24.0, 24.0) / 14.0))
 	var mean := (high + low) / 2.0
-	var amp := ((high - low) / 2.0) * (1.0 - 0.5 * w.clouds)
+	var amp: float = ((high - low) / 2.0) * (1.0 - 0.5 * w.clouds)
 	var air_c: float = mean + anomaly + amp * (2.0 * day - 1.0) - 2.5 * w.rain
 	var sun := maxf(0.0, sin(sun_position(plan.dayOfYear, h).elevation))
 	var dry: float = 1.0 - w.wetness

@@ -408,7 +408,7 @@ func _on_gate(p: PlayerRaceState, gi: int, tc: float, out: Array) -> void:
 				p.off_carried = true
 			var penalty_ms := 0 if out_lap else p.lap_penalty_ms
 			var timed := lap_ms + penalty_ms
-			var valid := not out_lap and lap_ms >= tr.minLapMs and not p.lap_invalid
+			var valid: bool = not out_lap and lap_ms >= tr.minLapMs and not p.lap_invalid
 			var best: bool = valid and (p.best_lap_ms == null or timed < p.best_lap_ms)
 			if best:
 				p.best_lap_ms = timed

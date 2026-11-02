@@ -113,8 +113,8 @@ Legend: [ ] todo, [x] done
 - [ ] apps/client/src/mobile/touchSettings.ts
 
 ## packages/shared/src
-- [ ] packages/shared/src/accounts.ts
-- [ ] packages/shared/src/cars.ts
+- [x] packages/shared/src/accounts.ts
+- [x] packages/shared/src/cars.ts (CarsDb)
 - [x] packages/shared/src/clock.ts
 - [x] packages/shared/src/constants.ts
 - [ ] packages/shared/src/index.ts
@@ -129,7 +129,7 @@ Legend: [ ] todo, [x] done
 ## apps/server/src
 - [ ] apps/server/src/accounts.ts
 - [ ] apps/server/src/index.ts
-- [ ] apps/server/src/room.ts
+- [x] apps/server/src/room.ts
 - [ ] apps/server/src/signal.ts
 
 ## Assets

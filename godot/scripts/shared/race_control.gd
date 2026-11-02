@@ -136,7 +136,7 @@ func _init(race_tracker: RaceTracker, full_rules: bool) -> void:
 func set_damage(id: String, worst: float) -> void:
 	_damage[id] = worst
 
-func _set(patch: Dictionary) -> void:
+func _set_state(patch: Dictionary) -> void:
 	state = state.merged(patch, true)
 	version += 1
 
@@ -184,7 +184,7 @@ func update(t: float, out: Array = []) -> Array:
 	var rounded: Array = yellows.map(func(y): return [roundi(y[0]), roundi(y[1])])
 	var cur: Array = state.yellows.map(func(y): return [roundi(y[0]), roundi(y[1])])
 	if str(rounded) != str(cur):
-		_set({"yellows": rounded})
+		_set_state({"yellows": rounded})
 
 	if full and tr.is_race:
 		_course(t, fcy_cars, serious)
@@ -196,19 +196,19 @@ func update(t: float, out: Array = []) -> Array:
 func _course(t: float, fcy_cars: int, serious: bool) -> void:
 	var st := state
 	var tr := tracker
-	var leader := _leader()
+	var leader = _leader()
 	if st.course == "green" and fcy_cars > 0:
 		_fcy_incident_at = t
 		if fcy_cars >= C.scCars or serious:
 			_deploy_sc(t, leader)
 		else:
-			_set({"course": "fcy", "since": t, "limitAt": t + C.fcyWarningMs, "sc": null})
+			_set_state({"course": "fcy", "since": t, "limitAt": t + C.fcyWarningMs, "sc": null})
 		return
 	if st.course == "fcy":
 		var limit_at: float = st.limitAt if st.limitAt != null else t
 		var clear_long: bool = _clear_since != null and t - _clear_since >= C.clearForMs and t - limit_at >= C.fcyMinMs - C.fcyWarningMs
 		if clear_long:
-			_set({"course": "green", "since": t, "limitAt": null})
+			_set_state({"course": "green", "since": t, "limitAt": null})
 		elif fcy_cars >= C.scCars or serious or (fcy_cars > 0 and t - _fcy_incident_at >= C.scAfterFcyMs):
 			_deploy_sc(t, leader)
 		return
@@ -218,18 +218,18 @@ func _course(t: float, fcy_cars: int, serious: bool) -> void:
 			var entry: float = tr.track.get("pitEntryS", null) if tr.track.get("pitEntryS", null) != null else 0.0
 			var nsc: Dictionary = sc.duplicate()
 			nsc.inAt = safety_car_reaches(path, sc.t0, sc.s0, t, entry)
-			_set({"course": "sc-in", "sc": nsc})
+			_set_state({"course": "sc-in", "sc": nsc})
 			_restart_laps = null
 		return
 	if st.course == "sc-in" and sc != null and sc.inAt != null and t >= sc.inAt:
 		if _restart_laps == null:
 			_restart_laps = leader.laps if leader != null else 0
 		elif leader == null or leader.laps > _restart_laps:
-			_set({"course": "green", "since": t, "sc": null, "limitAt": null})
+			_set_state({"course": "green", "since": t, "sc": null, "limitAt": null})
 
 func _deploy_sc(t: float, leader) -> void:
 	var s0: float = (leader.progress_s if leader != null else 0.0) + C.scAheadM
-	_set({"course": "sc", "since": t, "limitAt": null, "sc": {"t0": t, "s0": s0, "inAt": null}})
+	_set_state({"course": "sc", "since": t, "limitAt": null, "sc": {"t0": t, "s0": s0, "inAt": null}})
 
 func _leader():
 	var best = null
@@ -260,7 +260,7 @@ func _blue_flags(t: float, cars: Array, L: float, out: Array) -> void:
 			tracker.add_drive_through(c.id, "blue-flags", out)
 			_blue_since[c.id] = t
 	if ",".join(blue) != ",".join(state.blue):
-		_set({"blue": blue})
+		_set_state({"blue": blue})
 
 ## Overtaking under a caution and passing the safety car: pending for giveBackMs; a drive-through if not given back.
 func _overtakes(t: float, cars: Array, L: float, out: Array) -> void:
