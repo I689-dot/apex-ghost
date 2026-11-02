@@ -27,9 +27,9 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/forest.ts (packed cells, near models, impostors)
 - [x] apps/client/src/game/ghost.ts
 - [~] apps/client/src/game/graphics.ts (AA, scale, dynamic res, bloom, grade; no AO on the Mobile renderer)
-- [ ] apps/client/src/game/grassBlades.ts
-- [ ] apps/client/src/game/grassMask.ts
-- [ ] apps/client/src/game/grassShells.ts
+- [ ] apps/client/src/game/grassBlades.ts (High/Ultra only: not used on Medium)
+- [ ] apps/client/src/game/grassMask.ts (footprint mask for blades/shells under stands)
+- [x] apps/client/src/game/grassShells.ts
 - [x] apps/client/src/game/lapDelta.ts
 - [x] apps/client/src/game/mirror.ts
 - [x] apps/client/src/game/perf.ts
@@ -44,7 +44,7 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/game/roadWear.ts
 - [~] apps/client/src/game/session.ts (loads and runs offline end to end; optional subsystems still being attached)
 - [x] apps/client/src/game/sky.ts
-- [ ] apps/client/src/game/taa.ts
+- [x] apps/client/src/game/taa.ts (engine TAA: Viewport.use_taa)
 - [x] apps/client/src/game/topView.ts
 - [~] apps/client/src/game/track.ts (scene, collision, culling, wetness, lights done; surface shaders pending)
 - [ ] apps/client/src/game/trackEditor.ts
@@ -75,7 +75,7 @@ Legend: [ ] todo, [~] partly, [x] done
 ## apps/client/src/input
 - [x] apps/client/src/input/gamepad.ts
 - [x] apps/client/src/input/padMap.ts
-- [ ] apps/client/src/input/padSetup.ts
+- [x] apps/client/src/input/padSetup.ts
 
 ## apps/client/src/net
 - [x] apps/client/src/net/account.ts
@@ -90,27 +90,27 @@ Legend: [ ] todo, [~] partly, [x] done
 - [x] apps/client/src/ui/careerBlock.ts
 - [x] apps/client/src/ui/circuitMap.ts
 - [x] apps/client/src/ui/damagePanel.ts
-- [ ] apps/client/src/ui/dom.ts
+- [x] apps/client/src/ui/dom.ts (replaced by UIKit / UIW)
 - [x] apps/client/src/ui/hud.ts
-- [ ] apps/client/src/ui/icons.ts
-- [ ] apps/client/src/ui/images.ts
+- [x] apps/client/src/ui/icons.ts (replaced by UIKit / UIW)
+- [x] apps/client/src/ui/images.ts (replaced by UIKit / UIW)
 - [x] apps/client/src/ui/overlays.ts
 - [x] apps/client/src/ui/pitMenu.ts
 - [ ] apps/client/src/ui/reel.ts
 - [x] apps/client/src/ui/settingsPanel.ts
 - [x] apps/client/src/ui/social.ts
 - [x] apps/client/src/ui/timingScreen.ts
-- [ ] apps/client/src/ui/trackMap.ts
+- [x] apps/client/src/ui/trackMap.ts
 
 ## apps/client/src/mobile
-- [ ] apps/client/src/mobile/appShell.ts
-- [ ] apps/client/src/mobile/assetCache.ts
-- [ ] apps/client/src/mobile/installScreen.ts
+- [x] apps/client/src/mobile/appShell.ts (n/a: native app)
+- [x] apps/client/src/mobile/assetCache.ts (n/a: native app)
+- [x] apps/client/src/mobile/installScreen.ts (n/a: native app)
 - [ ] apps/client/src/mobile/mobile.css
-- [ ] apps/client/src/mobile/platform.ts
+- [x] apps/client/src/mobile/platform.ts (n/a: native app)
 - [ ] apps/client/src/mobile/refreshRate.ts
-- [ ] apps/client/src/mobile/touchControls.ts
-- [ ] apps/client/src/mobile/touchSettings.ts
+- [x] apps/client/src/mobile/touchControls.ts (ui/touch_controls.gd)
+- [x] apps/client/src/mobile/touchSettings.ts (settings panel Touch tab)
 
 ## packages/shared/src
 - [x] packages/shared/src/accounts.ts
