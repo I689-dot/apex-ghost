@@ -29,5 +29,6 @@ GRAPHICS-IMPROVEMENT/
 Grass.usdz
 godot/.godot/
 godot/assets/
-godot/data/
+godot/data/*
+!godot/data/ai_learned/
 build/
