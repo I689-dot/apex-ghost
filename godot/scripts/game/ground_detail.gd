@@ -37,10 +37,14 @@ static func overlay(kind: String, strength: float, hue: bool, detail: float) -> 
 		m.set_shader_parameter("detail_mean", LAWN_MEAN)
 	return m
 
+const LAWN_TINT := Color(0.62, 1.0, 0.72)
+
 ## Every map's lawn wears Spa's: a sharp photo of real circuit grass, tiled every 5.5 m in world space.
 static func use_spa_lawn(sm: StandardMaterial3D) -> void:
 	sm.albedo_texture = _tex("res://assets/textures/lawn_spa.jpg")
-	sm.albedo_color = Color.WHITE
+	# the photo is olive (red almost as high as green); measured mown grass reflects about twice as much green as
+	# red (~0.06 / 0.12 / 0.04 linear): this tint brings the lawn there
+	sm.albedo_color = LAWN_TINT
 	sm.uv1_triplanar = true
 	sm.uv1_world_triplanar = true
 	sm.uv1_scale = Vector3.ONE / SPA_LAWN_TILE_M

@@ -40,7 +40,7 @@ void fragment() {
 	float fade = 1.0 - smoothstep(shell_radius * 0.5, shell_radius, distance(v_w, CAMERA_POSITION_WORLD));
 	// no blade this high here, or beyond what the distance fade leaves: the upper layers go first
 	if (bh < v_l || v_l > fade) discard;
-	vec3 base = texture(lawn, p / lawn_tile).rgb * vec3(0.93, 1.03, 0.86);
+	vec3 base = texture(lawn, p / lawn_tile).rgb * vec3(0.62, 1.0, 0.72); // GroundDetail.LAWN_TINT
 	// dark roots inside the sward, lighter tips, a little colour per blade
 	ALBEDO = base * mix(0.62, 1.3, v_l * v_l) * mix(0.86, 1.12, b1.g);
 	ROUGHNESS = 1.0;

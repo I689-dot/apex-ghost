@@ -51,7 +51,7 @@ void fragment() {
 		float along = dot(normalize(v.xz + vec2(1e-4)), sd);
 		f *= 1.0 + lay * (0.06 + 0.13 * along * (1.0 - abs(v.y) * 0.6));
 		// a lusher, deeper green
-		f *= vec3(0.93, 1.03, 0.86);
+		// (the lawn's colour itself is the base material's tint, GroundDetail.LAWN_TINT)
 		// under the 3D blades near the camera (grass shells): soil and shade between them
 		if (shell_ground > 0.0) f *= 1.0 - 0.12 * (1.0 - smoothstep(shell_ground * 0.5, shell_ground, distance(v_w, CAMERA_POSITION_WORLD)));
 	} else if (kind == 3 && detail > 0.0) {

@@ -107,5 +107,10 @@ func _run() -> void:
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
 	if session.wet_fx != null:
 		print("wetness=", session.weather.wetness, " rain=", session.weather.rain, " puddles=", session.wet_fx.puddles.size(), " level=", session.wet_fx.level, " sprays=", session.sprays.size())
+	if OS.get_environment("DUMP_MATS") != "":
+		for r in session.track.road_materials:
+			var m: StandardMaterial3D = r.mat
+			print("road mat ", m.resource_name, " albedo ", m.albedo_color, " tex ", m.albedo_texture.resource_path if m.albedo_texture else "-", " metal ", m.metallic, " rough ", m.roughness, " spec ", m.metallic_specular, " next ", m.next_pass, " ao ", m.ao_enabled, " normal ", m.normal_enabled)
+		print("env ambient ", session.env.env.ambient_light_energy, " sky contrib ", session.env.env.ambient_light_sky_contribution, " sun ", session.env.sun.light_energy, " exposure ", session.env.env.tonemap_exposure)
 	session.dispose()
 	get_tree().quit()

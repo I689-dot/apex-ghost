@@ -159,7 +159,7 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 		sun.light_color = c
 		var air_mass := clampf(sqrt((0.2126 * st.r + 0.7152 * st.g + 0.0722 * st.b) / 0.86), 0.35, 1.05)
 		# three's physical lights: irradiance 3.6 -> radiance albedo * 3.6 / pi; Godot's energy 1 is albedo * 1
-		sun.light_energy = (4.0 * day * direct * air_mass + 0.0001) / PI
+		sun.light_energy = (3.6 * day * direct * air_mass + 0.0001) / PI
 	else:
 		# moonlight from the opposite side of the sky
 		var m := Vector3(-sun_v.x, maxf(0.35, -sun_v.y), -sun_v.z).normalized()
@@ -172,7 +172,10 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	# ambient comes from the sky itself (Environment.ambient_light_source = SKY); its strength follows the day
 	# a clear day: the sun several times the sky's fill (deep, blue-ish shadows); under cloud the light is the sky's
 	env.ambient_light_energy = (0.34 + 1.0 * day * (0.64 + overcast * 0.66)) * 0.62
-	env.ambient_light_sky_contribution = 1.0
+	# the sky's light is blue, but what fills a shadow is also the light the ground and the stands bounce back
+	# (warm grey): part of the ambient is that neutral colour, so shadows are cool, not cyan
+	env.ambient_light_sky_contribution = 0.7
+	env.ambient_light_color = Color(0.78, 0.76, 0.72) * (0.35 + 0.65 * day)
 
 	# fog: the horizon colours of the sky in the same direction (towards / away from the sun), grey under cloud
 	var heavy_fog := _smoothstep(0.0, 1.0, 1.0 - w.visibility / 900.0)
@@ -247,8 +250,8 @@ func _apply_post(q: Dictionary) -> void:
 	env.glow_intensity = 0.32
 	env.glow_bloom = 0.0
 	env.adjustment_enabled = bool(q.grade)
-	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 1.12
+	env.adjustment_contrast = 1.06
+	env.adjustment_saturation = 1.0
 	# the sun's cascades: two are enough on a phone
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 
