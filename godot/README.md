@@ -53,3 +53,9 @@ a full page for each; a car is picked automatically (the last one used).
 * `node tools/asset-pipeline/conform_apxc.mjs <collision.apxc>`: subdivides long kerb triangles, brings kerbs within a few cm of
   the road, lifts the ground behind them and closes the gaps with a skirt (the pipeline does the same in optimize.mjs).
 * Stretches whose source road is broken get `smoothRoad` in the map's config (tools/asset-pipeline/maps/<map>.json).
+
+## Bots that learned the circuits
+
+`TRACK=spa LAPS=8 godot --path godot --resolution 320x180 res://tests/runner.tscn -- res://tests/ai_learn.gd` (real time: the
+physics does not survive a faster clock) drives laps with the AI alone and writes `data/ai_learned/<layout>.json`, a grip
+multiplier per 25 m that every bot plans with (AiDriver.learned_grip). Retrain after changing the tyres or the cars.
