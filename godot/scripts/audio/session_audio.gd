@@ -65,6 +65,9 @@ func update(dt: float, o: Dictionary) -> void:
 	var kerb := 0.0
 	var gravel := 0.0
 	var grass := 0.0
+	var sand := 0.0
+	var road := 0.0
+	var water := 0.0
 	var tp = v.tire.p
 	for w in v.wheels:
 		if not w.contact:
@@ -72,14 +75,19 @@ func update(dt: float, o: Dictionary) -> void:
 		if w.surface == "asphalt" or w.surface == "curb":
 			var s := maxf(absf(w.slip_ratio) / tp.kappa_peak, absf(w.slip_angle) / tp.alpha_peak)
 			slip = maxf(slip, s - 0.85)
+		water = maxf(water, w.water)
+		if w.surface == "asphalt" or w.surface == "curb":
+			road += 0.25
 		if w.surface == "curb":
 			kerb += 0.25
-		elif w.surface == "gravel" or w.surface == "sand":
+		elif w.surface == "gravel":
 			gravel += 0.25
+		elif w.surface == "sand":
+			sand += 0.25
 		elif w.surface == "grass":
 			grass += 0.25
 	_car.level(Settings.data.audio.tyres)
-	_car.update(tel.speed, maxf(0.0, slip), kerb, gravel, grass, o.rain, o.inCockpit)
+	_car.update(tel.speed, maxf(0.0, slip), kerb, gravel, grass, o.rain, o.inCockpit, sand, road, o.get("wet", 0.0), water)
 	# ---- other cars: voices for the nearest few
 	var near: Array = []
 	var listener: Vector3 = o.listener
@@ -151,6 +159,10 @@ func pit_event(kind: String, pan: float) -> void:
 		a.air_jack(kind == "jackUp", pan)
 	else:
 		a.clunk(pan)
+
+## A wheel through a puddle (0..1).
+func splash(strength: float) -> void:
+	a.play_sample("splash", 0.5 + 0.9 * strength, 0.9 + 0.2 * randf(), 0.0)
 
 func impact(severity: float) -> void:
 	a.impact(severity)

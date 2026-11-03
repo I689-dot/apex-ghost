@@ -52,5 +52,35 @@
   "author": "squareal",
   "loop": false,
   "seconds": 4.0
+ },
+ "grass_tyre": {
+  "freesound": 668552,
+  "author": "felix.blume",
+  "loop": true,
+  "seconds": 6.0
+ },
+ "sand": {
+  "freesound": 685230,
+  "author": "felix.blume",
+  "loop": true,
+  "seconds": 6.0
+ },
+ "road": {
+  "freesound": 591079,
+  "author": "orlandorizo",
+  "loop": true,
+  "seconds": 6.0
+ },
+ "wet_road": {
+  "freesound": 614175,
+  "author": "videofueralle",
+  "loop": true,
+  "seconds": 6.0
+ },
+ "splash": {
+  "freesound": 563021,
+  "author": "cookies+policy",
+  "loop": false,
+  "seconds": 3.0
  }
 }

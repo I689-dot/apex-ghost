@@ -19,7 +19,7 @@ SRC = ROOT / "tools/asset-pipeline/out/surface"
 DST = ROOT / "apps/client/public/assets/audio/surface"
 SR = 32000
 
-# name: (freesound id, preview url, author, start s, length s, loop, level dBFS rms)
+# name: (freesound id, preview url, author, start s, length s, loop, level dBFS rms[, low-pass Hz])
 SOUNDS = {
     "gravel": (577504, "https://cdn.freesound.org/previews/577/577504_97550-hq.mp3", "TRP", 2.0, 4.0, True, -20),
     "kerb": (62652, "https://cdn.freesound.org/previews/62/62652_791247-hq.mp3", "bsumusictech", 4.0, 7.0, True, -18),
@@ -30,12 +30,23 @@ SOUNDS = {
     "crash_medium": (807437, "https://cdn.freesound.org/previews/807/807437_3797507-hq.mp3", "Logicogonist", 0.0, 1.0, False, -14),
     "crash_heavy": (592388, "https://cdn.freesound.org/previews/592/592388_11537497-hq.mp3", "magnuswaker", 0.0, 2.5, False, -13),
     "crash_debris": (237375, "https://cdn.freesound.org/previews/237/237375_1502374-hq.mp3", "squareal", 0.0, 4.0, False, -16),
+    # tyres on turf: an off-road car on soft ground, the crunch filtered out (the old wind-in-grass loop is the brushing)
+    "grass_tyre": (668552, "https://cdn.freesound.org/previews/668/668552_1661766-hq.mp3", "felix.blume", 240.0, 6.0, True, -21, 900),
+    # a sand trap: tyres ploughing loose ground, softer than gravel
+    "sand": (685230, "https://cdn.freesound.org/previews/685/685230_1661766-hq.mp3", "felix.blume", 96.5, 6.0, True, -21, 1400),
+    # the tyres' roar on asphalt from inside a car (pitched with speed in the game)
+    "road": (591079, "https://cdn.freesound.org/previews/591/591079_6411813-hq.mp3", "orlandorizo", 63.0, 6.0, True, -20),
+    # tyres on a wet road from inside the car, rain on the roof (the hiss under the engine when it rains)
+    "wet_road": (614175, "https://cdn.freesound.org/previews/614/614175_1130120-hq.mp3", "videofueralle", 29.5, 6.0, True, -21),
+    # a wheel through a puddle
+    "splash": (563021, "https://cdn.freesound.org/previews/563/563021_10713160-hq.mp3", "cookies+policy", 0.3, 3.0, False, -14),
 }
 XFADE = 0.25
 
 
-def load(path: Path) -> np.ndarray:
-    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"], capture_output=True, check=True).stdout
+def load(path: Path, lowpass: float = 0) -> np.ndarray:
+    af = ["-af", f"lowpass=f={lowpass}:p=2,lowpass=f={lowpass}:p=2"] if lowpass else []
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), *af, "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"], capture_output=True, check=True).stdout
     return np.frombuffer(raw, np.float32).copy()
 
 
@@ -43,12 +54,12 @@ def main() -> None:
     SRC.mkdir(parents=True, exist_ok=True)
     DST.mkdir(parents=True, exist_ok=True)
     meta = {}
-    for name, (sid, url, author, start, length, loop, level) in SOUNDS.items():
+    for name, (sid, url, author, start, length, loop, level, *opt) in SOUNDS.items():
         src = SRC / f"{sid}.mp3"
         if not src.exists():
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             src.write_bytes(urllib.request.urlopen(req).read())
-        x = load(src)
+        x = load(src, opt[0] if opt else 0)
         a = int(start * SR)
         n = int(length * SR)
         if loop:

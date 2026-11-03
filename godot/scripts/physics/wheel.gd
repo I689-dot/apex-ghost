@@ -54,6 +54,8 @@ var wear := 0.0
 var brake_temp := 60.0
 ## ABS: the share of the pedal's torque this wheel's valve lets through (1 = all).
 var abs_factor := 1.0
+## Water under the tyre now (0..1, WetFx puddles): grip lost to aquaplaning and drag through it.
+var water := 0.0
 var cold_psi := 22.5
 var set_c := 32.0
 var pressure := 22.5

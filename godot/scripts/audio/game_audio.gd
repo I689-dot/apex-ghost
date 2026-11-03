@@ -6,8 +6,8 @@ extends Node
 ## AudioStreamWAV buffers (cached) and played through panning buses, which costs no per-frame DSP.
 
 const RATE := 44100
-const SAMPLE_NAMES := ["gravel", "kerb", "grass", "squeal", "scrape", "crash_light", "crash_medium", "crash_heavy", "crash_debris"]
-const LOOPED := ["gravel", "kerb", "grass", "squeal", "scrape"]
+const SAMPLE_NAMES := ["gravel", "kerb", "grass", "squeal", "scrape", "crash_light", "crash_medium", "crash_heavy", "crash_debris", "grass_tyre", "sand", "road", "wet_road", "splash"]
+const LOOPED := ["gravel", "kerb", "grass", "squeal", "scrape", "grass_tyre", "sand", "road", "wet_road"]
 const PAN_STEPS := 8
 
 ## There is no worklet / main-thread distinction here: the engine voices are always the cheap recorded-loop kind.

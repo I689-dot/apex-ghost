@@ -61,6 +61,8 @@ func _run() -> void:
 		var pt := TrackMath.point_at_distance(session.track_data, float(OS.get_environment("TELEPORT")))
 		var lat := float(OS.get_environment("LATERAL")) if OS.get_environment("LATERAL") != "" else 0.0
 		session.vehicle.place(pt.x + cos(pt.yaw) * lat, pt.y + 0.5, pt.z - sin(pt.yaw) * lat, pt.yaw)
+	if OS.get_environment("AUTODRIVE") != "":
+		session.autodrive = AiDriver.new(session.track_data, session.vehicle, 0.95, 0.0)
 	var shot_dir := OS.get_environment("SHOT_DIR")
 	var elapsed := 0.0
 	var next_shot := 0.0
@@ -103,5 +105,7 @@ func _run() -> void:
 		print("gpu ms ", k, ": ", gpu[k] / maxf(1, frames))
 	print("tris ", Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME), " draws ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), " quality ", Settings.data.quality)
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
+	if session.wet_fx != null:
+		print("wetness=", session.weather.wetness, " rain=", session.weather.rain, " puddles=", session.wet_fx.puddles.size(), " level=", session.wet_fx.level, " sprays=", session.sprays.size())
 	session.dispose()
 	get_tree().quit()

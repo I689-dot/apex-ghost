@@ -71,7 +71,8 @@ func _set_proc(name: String, vol: float, tc: float, dt: float, pitch: float = 1.
 	p.pitch_scale = clampf(pitch, 0.1, 8.0)
 
 ## slip: 0..1 how far past the grip peak the tyres are (asphalt); kerb: 0..1; gravel / grass: fraction of wheels on them.
-func update(speed: float, slip: float, kerb: float, gravel: float, grass: float, rain: float, in_cockpit: bool) -> void:
+## sand / road: fraction of wheels in sand / on asphalt or kerbs; wet: the track's wetness; water: under a wheel (puddle).
+func update(speed: float, slip: float, kerb: float, gravel: float, grass: float, rain: float, in_cockpit: bool, sand: float = 0.0, road: float = 1.0, wet: float = 0.0, water: float = 0.0) -> void:
 	var t := Time.get_ticks_msec() / 1000.0
 	var dt := clampf(t - _last_t, 0.0, 0.2)
 	_last_t = t
@@ -84,13 +85,20 @@ func update(speed: float, slip: float, kerb: float, gravel: float, grass: float,
 	var sq := minf(1.0, slip * 1.25) * minf(1.0, speed / 6.0) * near
 	var sq_rec := _layer("squeal", 0.45 * sq, 0.95 + 0.15 * minf(1.0, slip), dt)
 	_set_proc("squeal", minf(0.32, slip * 0.4) * minf(1.0, speed / 6.0) * near * (0.35 if sq_rec else 1.0), 0.04, dt, (750.0 + 500.0 * minf(1.0, slip)) / 900.0)
-	_set_proc("road", 0.32 * sp * near, 0.1, dt)
+	# the tyres' roar on the road: a recording from inside a car, faster and louder with speed (the shaped noise under it)
+	var r_rec := _layer("road", 0.62 * pow(sp, 0.8) * road * near * (1.0 - 0.5 * wet), 0.7 + 0.65 * sp, dt)
+	_set_proc("road", 0.32 * sp * near * (0.35 if r_rec else 1.0), 0.1, dt)
+	# a wet road hisses under the tyres, and a puddle roars
+	_layer("wet_road", (0.85 * clampf(wet * 1.4, 0.0, 1.0) * minf(1.0, speed / 15.0) * road + 1.2 * water * minf(1.0, speed / 10.0)) * (1.0 if in_cockpit else 0.45), 0.85 + 0.35 * sp, dt)
 	# a kerb's stripes come at the speed the car crosses them: the recording (a rumble strip at ~100 km/h) faster or slower
 	var k_rec := _layer("kerb", 1.0 * kerb * minf(1.0, speed / 10.0) * near, clampf(speed / 28.0, 0.5, 1.7), dt)
 	_set_proc("kerb", 0.25 * kerb * minf(1.0, speed / 10.0) * near * (0.35 if k_rec else 1.0), 0.02, dt, maxf(4.0, speed) / 20.0)
 	var g_rec := _layer("gravel", 1.1 * gravel * moving * near, 0.75 + 0.5 * minf(1.0, speed / 40.0), dt)
 	_set_proc("gravel", 0.35 * gravel * moving * near * (0.35 if g_rec else 1.0), 0.05, dt)
-	var gr_rec := _layer("grass", 0.9 * grass * moving * near, 0.8 + 0.4 * minf(1.0, speed / 30.0), dt)
+	# turf: the tyres' soft rumble over uneven ground, the grass brushing the car
+	_layer("grass_tyre", 1.0 * grass * moving * near, 0.75 + 0.5 * minf(1.0, speed / 30.0), dt)
+	_layer("sand", 1.15 * sand * moving * near, 0.7 + 0.5 * minf(1.0, speed / 35.0), dt)
+	var gr_rec := _layer("grass", 0.5 * grass * moving * near, 0.8 + 0.4 * minf(1.0, speed / 30.0), dt)
 	_set_proc("grass", 0.3 * grass * moving * near * (0.6 if gr_rec else 1.0), 0.05, dt)
 	_scrape_level *= exp(-dt * 5.0)
 	_layer("scrape", 0.8 * _scrape_level * minf(1.0, speed / 4.0) * (1.0 if in_cockpit else 0.5), 0.8 + 0.4 * minf(1.0, speed / 40.0), dt)

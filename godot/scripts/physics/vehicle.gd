@@ -35,6 +35,8 @@ var rubber := 1.0
 var compound: Dictionary = Tyres.COMPOUNDS.medium
 ## Track water 0..1 (tyre wear).
 var wetness := 0.0
+## The track's puddles (WetFx), or null: each wheel asks how much water is under it.
+var puddles = null
 ## Aerodynamic wake of a car ahead.
 var wake := {"drag": 1.0, "downforce": 1.0, "strength": 0.0}
 ## Pit lane speed limiter (m/s), or -1 when off.
@@ -481,7 +483,9 @@ func step(dt: float, c: Controls) -> void:
 			w.n = h.normal
 			w.surface = h.surface
 			rumble = maxf(rumble, C.SURFACE_PROPS[h.surface].bumpy)
+			w.water = puddles.depth_at(h.pos.x, h.pos.z) if puddles != null and h.surface != "grass" else 0.0
 		else:
+			w.water = 0.0
 			w.contact = false
 			w.spring_len = w.rest_len
 			w.compression = 0.0
@@ -615,7 +619,8 @@ func step(dt: float, c: Controls) -> void:
 		var off: float = lean - CH.camberRoll * CH.camberRollRef
 		var camber_grip: float = 1.0 - minf(0.08, CH.camberGrip * off * off)
 		var mu: float = (mu_base * surf.grip * dmg.grip_scale(w.key) * C.tyre_temp_grip(w.temp, compound.optimumC)
-			* Tyres.wear_grip(w.wear) * C.pressure_grip(w.pressure) * camber_grip * (1.0 - 0.06 * w.flat_spot))
+			* Tyres.wear_grip(w.wear) * C.pressure_grip(w.pressure) * camber_grip * (1.0 - 0.06 * w.flat_spot)
+			* WetFx.aquaplane_grip(w.water, absf(vx), compound.get("id", "") == "wet"))
 		var fz := w.fz
 		var R := w.radius
 		var den := maxf(absf(vx), 2.5)
@@ -654,7 +659,7 @@ func step(dt: float, c: Controls) -> void:
 		var fy_t := fy_sum / SUB
 		# rolling resistance and deep-surface drag
 		var roll := minf(1.0, absf(vx) / 0.5)
-		fx_t -= signf(vx) * roll * fz * (surf.rolling + (surf.drag * absf(vx)) / 1000.0)
+		fx_t -= signf(vx) * roll * fz * (surf.rolling + (surf.drag * absf(vx)) / 1000.0 + w.water * 0.035 * minf(1.0, absf(vx) / 20.0))
 		w.fx = fx_t
 		w.fy = fy_t
 		w.angle += w.omega * dt

@@ -30,3 +30,10 @@ Freesound (https://freesound.org), all released under Creative Commons 0 (public
 | crash_medium | "car crash long 1" by Logicogonist (#807437) |
 | crash_heavy | "Car Crash (with Glass)" by magnuswaker (#592388) |
 | crash_debris | "Car Crash" by squareal (#237375) |
+| grass_tyre | "Car driving in exterior, Toyota Landcruiser 4x4 … offroad" by felix.blume (#668552), low-passed |
+| sand | "Car driving on gravel dirt road, close recording from outside" by felix.blume (#685230), low-passed |
+| road | "Car rolling on asphalt" by orlandorizo (#591079) |
+| wet_road | "Inside_driving_car_in_rain_city_stop_n_go" by videofueralle (#614175) |
+| splash | "Water Puddle Splash" by cookies+policy (#563021) |
+
+The added recordings carry their authors' Freesound licences (Creative Commons, some with attribution): credited here.

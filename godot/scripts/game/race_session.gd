@@ -197,6 +197,10 @@ var dash = null
 var crash_fx = null
 var forest = null
 var shells = null
+## Puddles on a wet track (felt by every car's tyres) and the spray behind each car.
+var wet_fx: WetFx = null
+var sprays := {}
+var _in_water := false
 var blades = null
 var perf = null
 var timing: TimingScreen
@@ -575,6 +579,10 @@ func _attach_world_extras(q: Dictionary) -> void:
 	var mask := GrassMask.load_baked(track_data.id)
 	if mask == null:
 		mask = GrassMask.build(track.chunks, track_data, track.ground_materials)
+	wet_fx = WetFx.new()
+	add_child(wet_fx)
+	var gq: GroundQuery = track.ground_query
+	wet_fx.build(track_data, func(x, yt, z, md): return gq.height_below(x, yt, z, md), hash(str(track_data.id)))
 	shells = GrassShells.build(track, track.lawn_materials, track_data, mask)
 	if shells != null:
 		add_child(shells)
@@ -1664,6 +1672,7 @@ func _process_inner(dt: float) -> void:
 		Prof.b("track.vis")
 		track.update_visibility(cam_pos, q)
 		Prof.e("track.vis")
+	_update_spray(dt, cam_pos)
 	if windshield != null and not spectator:
 		windshield.update_fx(dt, weather.rain, v.telemetry.speed, get_viewport().get_visible_rect().size.aspect(), 1.0 - env.night * 0.8, cockpit.looking_forward and not outside and not pit_cam_on and not tv_on)
 		windshield.set_crack(damage.zones[0], cockpit.looking_forward and not outside and not pit_cam_on and not tv_on)
@@ -1784,6 +1793,9 @@ func _apply_weather() -> void:
 	var rubber := VehicleConsts.track_rubber(conn.server_now() - start_at if start_at != null else 0.0, w.wetness)
 	vehicle.rubber = rubber
 	vehicle.wetness = w.wetness
+	vehicle.puddles = wet_fx
+	if wet_fx != null:
+		wet_fx.set_weather(w.wetness, w.rain)
 	# air and track temperature, air density: the tyres, brakes, aero and engines (shared, so all clients agree)
 	air = Weather.temperatures(race.weather, w, track_data.map)
 	vehicle.set_air(air.airC, air.trackC, air.airDensity)
@@ -1794,6 +1806,7 @@ func _apply_weather() -> void:
 		bv.weather_grip = Tyres.compound_grip(bv.compound, w.wetness, w.rain)
 		bv.rubber = rubber
 		bv.wetness = w.wetness
+		bv.puddles = wet_fx
 		bv.set_air(air.airC, air.trackC, air.airDensity)
 	if env != null:
 		track.set_night(env.night)
@@ -1895,7 +1908,7 @@ func update_audio(dt: float, view_cam: Camera3D) -> void:
 	snd.update(dt, {
 		"listener": view_cam.global_position, "right": view_cam.global_transform.basis.x,
 		"inCockpit": cinematic == null and not spectator and not tv_on, "myPos": vehicle.global_position,
-		"myVel": vehicle.linear_velocity, "vehicle": vehicle, "others": others, "rain": weather.rain, "day": 1.0 - env.night,
+		"myVel": vehicle.linear_velocity, "vehicle": vehicle, "others": others, "rain": weather.rain, "wet": weather.wetness, "day": 1.0 - env.night,
 	})
 
 # ------------------------------------------------------------ cameras ---
@@ -2920,6 +2933,39 @@ func update_relative(p: Vector3, fx: float, fz: float) -> void:
 	spot.behindS = -same_behind[0].gapS if not same_behind.is_empty() else null
 
 # ------------------------------------------------------------ teardown ---
+
+## Spray behind every car near the camera on a wet track, and a splash (with its sound) where my wheels hit a puddle.
+func _update_spray(dt: float, cam_pos: Vector3) -> void:
+	if wet_fx == null:
+		return
+	var wet: float = weather.wetness
+	var visuals: Array = [my_visual]
+	for r: Remote in remotes.values():
+		visuals.append(r.visual)
+	for vis in visuals:
+		if vis == null or not is_instance_valid(vis):
+			continue
+		var sp: CarSpray = sprays.get(vis)
+		if sp == null:
+			if wet < 0.08:
+				continue
+			sp = CarSpray.new(float(vis.entry.dims.length), float(vis.entry.dims.width))
+			vis.add_child(sp)
+			sprays[vis] = sp
+		sp.update(dt, wet, cam_pos.distance_to(vis.global_position) < 160.0)
+	if my_visual == null or vehicle == null or not sprays.has(my_visual):
+		return
+	var water := 0.0
+	for w in vehicle.wheels:
+		water = maxf(water, w.water)
+	var speed: float = vehicle.telemetry.speed
+	var hit := water > 0.12 and speed > 10.0
+	if hit and not _in_water:
+		var strength := clampf(water * 1.5, 0.0, 1.0) * clampf(speed / 40.0, 0.2, 1.0)
+		sprays[my_visual].splash(strength)
+		if snd != null:
+			snd.splash(strength)
+	_in_water = hit
 
 func dispose() -> void:
 	running = false
