@@ -12,7 +12,8 @@ class TireParams:
 	func _init(kp: float, ap: float, sx: float, sy: float, ls: float) -> void:
 		kappa_peak = kp; alpha_peak = ap; slide_x = sx; slide_y = sy; load_sens = ls
 
-static var SLICK := TireParams.new(0.1, 0.115, 0.82, 0.8, 0.12)
+## A GT3 slick: the force past the peak falls ~15 % (the slide is progressive, as the sims' newer tyre models), not 20 %.
+static var SLICK := TireParams.new(0.1, 0.115, 0.85, 0.84, 0.12)
 
 var p: TireParams
 var cx: float
@@ -40,8 +41,11 @@ func curve(sigma: float, b: float, c: float) -> float:
 func force(kappa: float, alpha: float, fz: float, fz0: float, mu: float) -> Vector2:
 	if fz <= 0.0:
 		return Vector2.ZERO
-	var sx := kappa / p.kappa_peak
-	var sy := tan(alpha) / tan(p.alpha_peak)
+	# a loaded tyre's carcass deflects more before it slides: its peak slip comes later (cornering stiffness grows
+	# less than the load), a light one peaks earlier
+	var r := clampf(fz / fz0, 0.3, 2.5)
+	var sx := kappa / (p.kappa_peak * pow(r, 0.1))
+	var sy := tan(alpha) / tan(p.alpha_peak * pow(r, 0.25))
 	var sigma := Vector2(sx, sy).length()
 	if sigma < 1e-6:
 		return Vector2.ZERO

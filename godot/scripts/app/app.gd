@@ -600,6 +600,7 @@ func _autotest() -> void:
 	if OS.get_environment("AUTODRIVE") != "":
 		# the AI drives my car through the whole session: the results screen, the career, the lobby after it
 		session.autodrive = AiDriver.new(session.track_data, session.vehicle, 0.95, 0.0)
+		session.autodrive.human = false
 		var t0 := Time.get_ticks_msec()
 		var n := 0
 		while screen != "results" and Time.get_ticks_msec() - t0 < 9 * 60 * 1000:

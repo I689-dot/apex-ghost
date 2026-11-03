@@ -34,6 +34,9 @@ var _boost := 0.0
 var _last_load := 0.0
 var _cut_until := 0.0
 var _fade := 1.0
+## Overrun: seconds left of crackling after a lift from high revs, and when the next pop comes.
+var _overrun := 0.0
+var _next_pop := 0.0
 
 func _init(audio: GameAudio, prof: Dictionary) -> void:
 	a = audio
@@ -42,6 +45,17 @@ func _init(audio: GameAudio, prof: Dictionary) -> void:
 	_counter += 1
 	_bus = "EV%d" % _counter
 	_panner = a.voice_bus(_bus, "Engine")
+	# the car's own tone over the shared recording
+	var tone: Array = prof.get("tone", [0.0, 0.0, 0.0])
+	if tone.any(func(g): return absf(float(g)) > 0.01):
+		var eq := AudioEffectEQ6.new()
+		eq.set_band_gain_db(0, float(tone[0]))
+		eq.set_band_gain_db(1, float(tone[0]) * 0.6)
+		eq.set_band_gain_db(2, float(tone[1]))
+		eq.set_band_gain_db(3, float(tone[1]) * 0.5 + float(tone[2]) * 0.5)
+		eq.set_band_gain_db(4, float(tone[2]))
+		eq.set_band_gain_db(5, float(tone[2]) * 0.7)
+		AudioServer.add_bus_effect(AudioServer.get_bus_index(_bus), eq, 0)
 	if not bank.is_empty():
 		for i in 4:
 			var lp: Dictionary = bank.loops[0]
@@ -88,6 +102,9 @@ func set_state(rpm: float, load: float, gear_ratio: float, gain: float, pan: flo
 ## Ignition cut for a gear change (the crisp "bap" of a sequential box).
 func shift() -> void:
 	_cut_until = Time.get_ticks_msec() + 55.0
+	# the bark of a sequential upshift under power: the cut, then the exhaust catching
+	if _load > 0.6 and not stopped:
+		a.burst("lowpass", 420.0, 0.9, 0.06, 0.14 * _gain, "Engine", _pan)
 
 func stop() -> void:
 	if stopped:
@@ -110,8 +127,23 @@ func _process(dt: float) -> void:
 	_pan += (_t_pan - _pan) * (1.0 - exp(-dt / 0.05))
 	_panner.pan = clampf(_pan, -1.0, 1.0)
 	var p: Dictionary = profile
-	var cut := 1.0 if Time.get_ticks_msec() < _cut_until else 0.0
+	var now := Time.get_ticks_msec()
+	var cut := 1.0 if now < _cut_until else 0.0
 	var rn := minf(1.0, _raw_rpm / p.redline)
+	# on the limiter the ignition cuts in and out (~12 Hz): the rev limiter's stutter
+	if rn > 0.995 and _load > 0.8 and fmod(now / 1000.0, 0.085) < 0.032:
+		cut = 1.0
+	# the overrun: lifting off from high revs, unburnt fuel pops in the exhaust for a moment
+	if _last_load > 0.6 and _load < 0.15 and rn > 0.55:
+		_overrun = 0.6 + 0.9 * float(p.get("pops", 0.6))
+	if _overrun > 0.0:
+		_overrun -= dt
+		if _load > 0.3 or _raw_rpm < p.idle * 1.6:
+			_overrun = 0.0
+		elif now >= _next_pop and not stopped:
+			var strength := float(p.get("pops", 0.6)) * (0.5 + 0.5 * rn) * randf_range(0.4, 1.0)
+			a.burst("bandpass", randf_range(700.0, 2200.0), 1.4, randf_range(0.02, 0.05), 0.2 * _gain * strength, "Engine", _pan)
+			_next_pop = now + randf_range(40.0, 220.0) / maxf(0.3, float(p.get("pops", 0.6)))
 	if not bank.is_empty():
 		_update_engine(cut, rn)
 	# straight-cut sequential gearbox: the GT3 whine, loudest off-throttle
@@ -135,7 +167,7 @@ func _process(dt: float) -> void:
 
 func _update_engine(cut: float, rn: float) -> void:
 	var loops: Array = bank.loops
-	var r := maxf(300.0, _rpm * float(profile.cyl) / float(bank.cyl))
+	var r := maxf(300.0, _rpm * float(profile.cyl) / float(bank.cyl) * float(profile.get("pitch", 1.0)))
 	var k := 0
 	while k < loops.size() - 2 and loops[k + 1].rpm < r:
 		k += 1

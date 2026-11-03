@@ -107,7 +107,8 @@ static func car_limits(specs: Dictionary, skill: float = 1.0, air_density: float
 
 ## Quasi-steady-state speed profile along the racing line: cornering limit with downforce, a backward braking pass
 ## that shares grip with cornering (friction ellipse), optionally a forward power-limited pass.
-static func speed_profile(line: Dictionary, car: Dictionary, weather_grip: float = 1.0, forward: bool = false) -> PackedFloat32Array:
+## gmul: per centreline point, how much of the planned grip the bots dare use there (learned_grip), or empty.
+static func speed_profile(line: Dictionary, car: Dictionary, weather_grip: float = 1.0, forward: bool = false, gmul: PackedFloat32Array = PackedFloat32Array()) -> PackedFloat32Array:
 	var ds: PackedFloat32Array = line.ds
 	var curv: PackedFloat32Array = line.curvature
 	var n := ds.size()
@@ -119,15 +120,17 @@ static func speed_profile(line: Dictionary, car: Dictionary, weather_grip: float
 	var mu: float = car.mu * weather_grip
 	var mu_b: float = car.muBrake * weather_grip
 	var vmax: float = car.vMax
+	var has_g := gmul.size() == n
 	for i in n:
 		var kap := absf(curv[i])
-		var den := kap - mu * k
-		v[i] = vmax if den <= 1e-6 else minf(vmax, sqrt((mu * G) / den))
+		var mu_i := mu * (gmul[i] if has_g else 1.0)
+		var den := kap - mu_i * k
+		v[i] = vmax if den <= 1e-6 else minf(vmax, sqrt((mu_i * G) / den))
 	for pass_i in 2:
 		for j in range(n - 1, -1, -1):
 			var nxt := (j + 1) % n
 			var vn := v[nxt]
-			var grip := mu_b * (G + k * vn * vn)
+			var grip := mu_b * (gmul[nxt] if has_g else 1.0) * (G + k * vn * vn)
 			var lat := vn * vn * absf(curv[nxt])
 			var avail := sqrt(maxf(0.0, grip * grip - lat * lat))
 			var dec := avail + kd * vn * vn
@@ -153,6 +156,27 @@ static func profile_lap_time(line: Dictionary, v: PackedFloat32Array) -> float:
 	return t
 
 static var _line_cache := {} # track id -> line
+static var _learned_cache := {} # track id -> PackedFloat32Array (per centreline point)
+
+## What the bots learned driving this layout (tests/ai_learn.gd: laps on the game's physics, braking later and
+## carrying more speed where they had grip to spare, less where they ran wide, slid or left the track): a grip
+## multiplier per centreline point, from data/ai_learned/<layout>.json. Empty when there is none.
+static func learned_grip(track: Dictionary) -> PackedFloat32Array:
+	if _learned_cache.has(track.id):
+		return _learned_cache[track.id]
+	var out := PackedFloat32Array()
+	var f := FileAccess.get_file_as_string("res://data/ai_learned/%s.json" % track.id)
+	if f != "":
+		var d = JSON.parse_string(f)
+		if d is Dictionary and d.has("mult"):
+			var bin: float = d.binM
+			var mult: Array = d.mult
+			var cum: Array = track.cumS
+			out.resize(cum.size())
+			for i in cum.size():
+				out[i] = float(mult[clampi(int(cum[i] / bin), 0, mult.size() - 1)])
+	_learned_cache[track.id] = out
+	return out
 
 ## Racing lines are the same for every car: build once per track.
 static func racing_line_for(track: Dictionary) -> Dictionary:
@@ -202,6 +226,21 @@ var _box_done := false
 var _lane_idx := 0
 var _lane_stuck := 0.0
 var _last_s := 0.0
+## Human: the pace is never the same twice (a bit per 25 m stretch, new every lap, less for the better drivers), and
+## now and then a braking point is missed (too fast into the corner: the car runs wide or locks a wheel).
+## Off for learning laps (tests/ai_learn.gd) and when the AI drives the player's car.
+var human := true
+var _rng := RandomNumberGenerator.new()
+var _lap_salt := 0
+var _mistake_m := 0.0
+var _was_braking := false
+## The lap's pace factor of a stretch: deterministic per bot, lap and stretch.
+func _pace(s: float) -> float:
+	var b := int(s / 25.0)
+	var h := hash(Vector3i(get_instance_id() & 0xffff, _lap_salt, b))
+	var u := float(h % 10000) / 10000.0 - 0.5
+	var spread := 0.022 * clampf(1.06 - skill, 0.06, 0.25) / 0.15
+	return 1.0 + u * spread
 
 var track: Dictionary
 var vehicle: Vehicle
@@ -218,7 +257,8 @@ func _init(track_data: Dictionary, veh: Vehicle, skill_value: float, lane_offset
 	controls.digital = false
 	_line = racing_line_for(track)
 	_limits = car_limits(veh.specs, skill, veh.air_density)
-	_profile = speed_profile(_line, _limits)
+	_profile = speed_profile(_line, _limits, 1.0, false, learned_grip(track))
+	_rng.seed = hash(get_instance_id())
 
 func lane_index() -> int:
 	return _lane_idx
@@ -412,9 +452,21 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 	# speed: the profile a little ahead; rebuilt when the track gets wetter or drier
 	if absf(weather_grip - _profile_grip) > 0.02:
 		_profile_grip = weather_grip
-		_profile = speed_profile(_line, _limits, weather_grip * (1.0 - 0.35 * maxf(0.0, 1.0 - weather_grip)))
+		_profile = speed_profile(_line, _limits, weather_grip * (1.0 - 0.35 * maxf(0.0, 1.0 - weather_grip)), false, learned_grip(track))
 	var vt := _profile[index_at(t, s + 2.0 + speed * 0.12)]
 	var v_max: float = _limits.vMax
+	if human and race_started:
+		if s < _last_s - float(t.length) * 0.5:
+			_lap_salt += 1
+		vt *= _pace(s)
+		# a braking zone starts: rarely, one braked a little late (a less skilled driver more often)
+		var braking := vt < speed * 0.9
+		if braking and not _was_braking and _mistake_m <= 0.0 and _rng.randf() < 0.012 * clampf(1.1 - skill, 0.05, 0.3) / 0.1:
+			_mistake_m = 55.0
+		_was_braking = braking
+		if _mistake_m > 0.0:
+			_mistake_m -= speed * dt
+			vt *= 1.07
 	if vt < v_max * 0.9:
 		vt *= 1.0 - 0.35 * (1.0 - v.wake.downforce)
 	vt = minf(vt, speed_cap)
@@ -463,3 +515,8 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 		reset_requested = true
 		_need_blend = true
 	return c
+
+## Learning (tests/ai_learn.gd): a new grip multiplier per point, the profile rebuilt with it.
+func set_learned(g: PackedFloat32Array) -> void:
+	_learned_cache[track.id] = g
+	_profile = speed_profile(_line, _limits, _profile_grip, false, g)
