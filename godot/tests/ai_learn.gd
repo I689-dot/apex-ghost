@@ -1,13 +1,16 @@
 extends Node
-## The bots learn a circuit on the game's own physics: the AI drives laps alone; every 25 m stretch where it stayed on
-## its line with grip to spare gets a little more grip in its plan next lap (later braking, more corner speed), every
-## stretch where it ran wide, slid or left the track (and the braking zone before it) a little less. The result goes
+## The bots learn a circuit on the game's own physics: the AI drives laps alone, and for every 25 m stretch the time
+## from it to 75 m past it (the corner and its exit) is measured. Each stretch keeps the grip in its plan that gave
+## its best time and tries a step further each lap (later braking, more corner speed); a slower time sends it back to
+## its best with a smaller step the other way, and leaving the road or a big slide takes grip away at once. The result goes
 ## to data/ai_learned/<layout>.json, which every bot reads (AiDriver.learned_grip).
-##   TRACK=spa LAPS=10 SPEED=3 godot --path godot --resolution 320x180 res://tests/runner.tscn -- res://tests/ai_learn.gd
+##   TRACK=spa LAPS=10 godot --path godot --resolution 320x180 res://tests/runner.tscn -- res://tests/ai_learn.gd
 
 const BIN := 25.0
-const UP := 1.018
+const STEP := 0.04
 const DOWN := 0.955
+## Stretches counted after each one (its exit): 3 x 25 m.
+const EXIT := 3
 
 var msgs: Array = []
 
@@ -20,7 +23,8 @@ func _find(t: String) -> Array:
 func _run() -> void:
 	var track_id := OS.get_environment("TRACK") if OS.get_environment("TRACK") != "" else "spa"
 	var laps := int(OS.get_environment("LAPS")) if OS.get_environment("LAPS") != "" else 8
-	Engine.time_scale = float(OS.get_environment("SPEED")) if OS.get_environment("SPEED") != "" else 3.0
+	# a faster clock lengthens the physics step and the cars stop handling like themselves: real time only
+	Engine.time_scale = float(OS.get_environment("SPEED")) if OS.get_environment("SPEED") != "" else 1.0
 	Engine.max_physics_steps_per_frame = 24
 	LocalRoom.create()
 	var conn := Connection.new().setup(LocalRoom.LOCAL_CODE, "Max")
@@ -63,6 +67,14 @@ func _run() -> void:
 	var line := AiDriver.racing_line_for(td)
 	ai.set_learned(_per_point(td, mult))
 	var v := session.vehicle
+	var bin_t := PackedFloat32Array()
+	var best_cost := PackedFloat32Array()
+	best_cost.resize(nb)
+	best_cost.fill(INF)
+	var best_mult := mult.duplicate()
+	var step := PackedFloat32Array()
+	step.resize(nb)
+	step.fill(STEP)
 	var worst_err := PackedFloat32Array()
 	var worst_slip := PackedFloat32Array()
 	var bad := PackedByteArray()
@@ -74,6 +86,8 @@ func _run() -> void:
 	var t := 0.0
 	var reset_seen := false
 	var clear := func():
+		bin_t.resize(nb)
+		bin_t.fill(0.0)
 		worst_err.resize(nb)
 		worst_err.fill(0.0)
 		worst_slip.resize(nb)
@@ -102,6 +116,7 @@ func _run() -> void:
 		for w in v.wheels:
 			if w.contact and (w.surface == "grass" or w.surface == "gravel" or w.surface == "sand"):
 				off += 1
+		bin_t[b] += get_physics_process_delta_time()
 		worst_err[b] = maxf(worst_err[b], err)
 		worst_slip[b] = maxf(worst_slip[b], slip)
 		if off >= 2 or (ai.reset_requested and not reset_seen):
@@ -124,28 +139,35 @@ func _run() -> void:
 				var ups := 0
 				var downs := 0
 				for k in nb:
-					var wrong := bad[k] == 1 or worst_err[k] > 1.8 or worst_slip[k] > 1.35
+					var cost := 0.0
+					for e in EXIT + 1:
+						cost += bin_t[(k + e) % nb]
+					var wrong := bad[k] == 1 or worst_err[k] > 2.2 or worst_slip[k] > 1.5
 					if wrong:
-						# this stretch and the braking zone before it
+						# off the road or sliding: less grip here and in the braking zone before, the best forgotten
 						for back in 3:
 							var kb := posmod(k - back, nb)
 							mult[kb] = maxf(0.8, mult[kb] * (DOWN if back == 0 else 0.975))
+							best_mult[kb] = mult[kb]
+							best_cost[kb] = INF
 						downs += 1
-					elif worst_err[k] < 0.8 and worst_slip[k] < 0.9:
-						mult[k] = minf(1.2, mult[k] * UP)
+					elif cost < best_cost[k] - 0.004:
+						# faster: keep it, and go further the same way
+						best_cost[k] = cost
+						best_mult[k] = mult[k]
+						mult[k] = clampf(mult[k] * (1.0 + step[k]), 0.8, 1.35)
 						ups += 1
-				# a little smoothing: a plan does not change abruptly from one stretch to the next
-				var sm := mult.duplicate()
-				for k in nb:
-					sm[k] = (mult[posmod(k - 1, nb)] + 2.0 * mult[k] + mult[(k + 1) % nb]) / 4.0
-				mult = sm
+					else:
+						# no better: back to the best, a smaller step the other way
+						step[k] = -step[k] * 0.5 if absf(step[k]) > 0.004 else STEP
+						mult[k] = clampf(best_mult[k] * (1.0 + step[k]), 0.8, 1.35)
 				ai.set_learned(_per_point(td, mult))
-				print("lap %d: %s  (%d stretches faster, %d slower; mean grip x%.3f)" % [done, UIKit.fmt_lap(lt * 1000.0), ups, downs, _mean(mult)])
+				print("lap %d: %s  (%d stretches improved, %d off or sliding; best plan mean grip x%.3f)" % [done, UIKit.fmt_lap(lt * 1000.0), ups, downs, _mean(best_mult)])
 			lap_start = t
 			clear.call()
 		prev_s = s
 	var out := {"layout": track_id, "binM": BIN, "car": v.car.id, "lapTimes": lap_times.map(func(x): return snappedf(x, 0.001)),
-		"mult": Array(mult).map(func(x): return snappedf(x, 0.001))}
+		"mult": Array(best_mult).map(func(x): return snappedf(x, 0.001))}
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://data/ai_learned"))
 	var f := FileAccess.open(ProjectSettings.globalize_path("res://data/ai_learned/%s.json" % track_id), FileAccess.WRITE)
 	f.store_string(JSON.stringify(out))
