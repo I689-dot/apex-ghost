@@ -696,7 +696,7 @@ func _ui_shots() -> void:
 	for c in overlay_layer.get_children():
 		if c != toasts and c != perf:
 			c.queue_free()
-	for tab in ["general", "graphics", "camera", "driving", "sound", "controls", "controller"]:
+	for tab in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller"]:
 		SettingsPanel._tab = tab
 		var panel := SettingsPanel.build(self, func(): pass)
 		await shot.call("settings_" + tab)

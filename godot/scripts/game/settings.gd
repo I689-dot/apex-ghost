@@ -47,6 +47,11 @@ static func default_settings() -> Dictionary:
 	return {
 		"nickname": "", "language": I18n.default_lang(), "quality": "medium", "qualityAuto": true, "graphics": {},
 		"resolutionScale": 1.0, "dynamicResolution": true, "refreshRate": 60, "fov": 58, "seatHeight": 0.0, "seatForward": 0.0,
+		# the window and the picture (Display page): windowed / borderless / fullscreen, vsync, a frame-rate cap (0: none),
+		# the upscaler used under a resolution scale below 100 %, and contrast / saturation over the game's own grade
+		"display": {"windowMode": "windowed", "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0},
+		# the field-of-view calculator: the screen's visible width and the eyes' distance from it (cm)
+		"screen": {"widthCm": 60.0, "distanceCm": 70.0},
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,
 		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "deltaMode": "best", "showPerf": false, "introCinematic": true,
 		"headMovement": 1.0, "cameraShake": 1.0,
@@ -106,6 +111,14 @@ func set_session(room_code: String, token: Variant) -> void:
 
 # --------------------------------------------------------------- quality ---
 
+## Detail groups of this app beside the exported ones (data/quality.json "groups", from the web game's settings.ts):
+## each takes these keys from the preset it names.
+const EXTRA_GROUPS := {"mirrors": ["mirrorEvery"], "cockpit": ["cockpitDetail"], "carDetail": ["carLodScale"]}
+
+## True when some graphics setting differs from the preset (the page then says "Custom").
+func is_custom() -> bool:
+	return not (data.graphics as Dictionary).is_empty()
+
 func _quality() -> Dictionary:
 	if _quality_file.is_empty():
 		_quality_file = JSON.parse_string(FileAccess.get_file_as_string("res://data/quality.json"))
@@ -128,6 +141,12 @@ func quality_config() -> Dictionary:
 			continue
 		for k in groups[g]:
 			q[k] = presets()[from][k]
+	for g in EXTRA_GROUPS:
+		var from = o.get(g)
+		if from == null or not presets().has(from):
+			continue
+		for k in EXTRA_GROUPS[g]:
+			q[k] = presets()[from][k]
 	if o.has("antialias"):
 		q.antialias = o.antialias
 	if o.has("superSample"):
@@ -145,7 +164,7 @@ func detect_quality() -> String:
 	var r := RenderingServer.get_video_adapter_name().to_lower()
 	if r.is_empty() or RegEx.create_from_string("swiftshader|llvmpipe|software|basic render").search(r) != null:
 		return "low"
-	if RegEx.create_from_string("rtx\\s*(30[6-9]|40|50)|rx\\s*(6[7-9]|7[7-9]|9)\\d\\d|apple m[2-4] (pro|max)").search(r) != null:
+	if RegEx.create_from_string("rtx\\s*(30[6-9]|40|50)|rx\\s*(6[7-9]|7[6-9]|9)\\d\\d|apple m[2-4] (pro|max)").search(r) != null:
 		return "ultra"
 	if RegEx.create_from_string("rtx|gtx\\s*1(07|08)|rx\\s*(5[67]|6[0-6])\\d\\d|radeon pro|apple m[1-4]").search(r) != null:
 		return "high"

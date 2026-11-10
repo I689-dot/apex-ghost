@@ -249,9 +249,12 @@ func _apply_post(q: Dictionary) -> void:
 	env.glow_hdr_threshold = 4.0
 	env.glow_intensity = 0.32
 	env.glow_bloom = 0.0
-	env.adjustment_enabled = bool(q.grade)
-	env.adjustment_contrast = 1.06
-	env.adjustment_saturation = 1.0
+	# the player's contrast and saturation (Display page) over the grade, also without it
+	var d: Dictionary = Settings.data.display
+	var user_grade := not is_equal_approx(float(d.contrast), 1.0) or not is_equal_approx(float(d.saturation), 1.0)
+	env.adjustment_enabled = bool(q.grade) or user_grade
+	env.adjustment_contrast = (1.06 if bool(q.grade) else 1.0) * float(d.contrast)
+	env.adjustment_saturation = float(d.saturation)
 	# the sun's cascades: two are enough on a phone
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 

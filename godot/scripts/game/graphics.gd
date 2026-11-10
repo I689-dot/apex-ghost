@@ -30,12 +30,40 @@ func apply_quality() -> void:
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if aa == "smaa" else Viewport.SCREEN_SPACE_AA_DISABLED
 	vp.use_taa = aa == "taa"
 	_apply_scale()
-	Engine.max_fps = 0
+	_apply_display()
+
+## The Display page: window mode and vsync (desktop only: a phone is always full screen with the display's vsync) and
+## the frame-rate cap.
+func _apply_display() -> void:
+	var d: Dictionary = Settings.data.display
+	Engine.max_fps = int(d.maxFps)
+	if OS.has_feature("mobile"):
+		return
+	var mode: DisplayServer.WindowMode = {
+		"windowed": DisplayServer.WINDOW_MODE_WINDOWED, "borderless": DisplayServer.WINDOW_MODE_FULLSCREEN,
+		"fullscreen": DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN,
+	}.get(d.windowMode, DisplayServer.WINDOW_MODE_WINDOWED)
+	# leave a maximised window alone while the setting says windowed
+	var cur := DisplayServer.window_get_mode()
+	if mode != cur and not (mode == DisplayServer.WINDOW_MODE_WINDOWED and cur == DisplayServer.WINDOW_MODE_MAXIMIZED):
+		DisplayServer.window_set_mode(mode)
+	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if d.vsync else DisplayServer.VSYNC_DISABLED)
+
+## FSR 2 needs the Forward+ renderer; FSR 1 works on both.
+static func upscalers() -> Array:
+	var out: Array = [["bilinear", "Bilinear"], ["fsr", "AMD FSR 1.0"]]
+	if RenderingServer.get_current_rendering_method() == "forward_plus":
+		out.append(["fsr2", "AMD FSR 2.2"])
+	return out
 
 func _apply_scale() -> void:
 	var s := float(quality.superSample) * float(Settings.data.resolutionScale) * dyn_scale
 	var vp := get_viewport()
-	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	var up: String = Settings.data.display.upscaler
+	if up == "fsr2" and RenderingServer.get_current_rendering_method() != "forward_plus":
+		up = "fsr"
+	# an upscaler only below native: above it (supersampling) the plain filter downsamples best
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if s >= 1.0 or up == "bilinear" else (Viewport.SCALING_3D_MODE_FSR2 if up == "fsr2" else Viewport.SCALING_3D_MODE_FSR)
 	vp.scaling_3d_scale = clampf(s, 0.4, 2.0)
 
 ## Feed the GPU's time for the frame; lowers / raises the render resolution to keep it within the display's frame budget
