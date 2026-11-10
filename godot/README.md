@@ -53,9 +53,16 @@ a full page for each; a car is picked automatically (the last one used).
 * `node tools/asset-pipeline/conform_apxc.mjs <collision.apxc>`: subdivides long kerb triangles, brings kerbs within a few cm of
   the road, lifts the ground behind them and closes the gaps with a skirt (the pipeline does the same in optimize.mjs).
 * Stretches whose source road is broken get `smoothRoad` in the map's config (tools/asset-pipeline/maps/<map>.json).
+* Spa for this app is built from the new source model, apart from the web game's Spa:
+  `node tools/asset-pipeline/spa_godot/collision.mjs [--glb spa.glb]` writes `godot/assets/maps/spa/collision.apxc` from
+  `source/spa.glb` of `RESOURCES/CIRCUIT-MODELS/circuit-de-spa-francorchamps-2022-layout.zip` (default path
+  `~/apex-ghost-sources/spa/source/spa.glb`, or `SPA_GLB`), in the game's existing frame (`spa_godot/config.json`
+  `toGameFrame`, so the server's gates still time online laps). The rubber layers are left out of the collision and the kerbs
+  are levelled by `spa_godot/kerb_level.mjs`; no `smoothRoad`. Check with the three tools above.
 
 ## Bots that learned the circuits
 
-`TRACK=spa LAPS=8 godot --path godot --resolution 320x180 res://tests/runner.tscn -- res://tests/ai_learn.gd` (real time: the
+`TRACK=spa LAPS=8 godot --path godot --disable-vsync --always-on-top --resolution 320x180 res://tests/runner.tscn -- res://tests/ai_learn.gd`
+(on Wayland a covered, vsync'd window gets no frames and the laps crawl; real time: the
 physics does not survive a faster clock) drives laps with the AI alone and writes `data/ai_learned/<layout>.json`, a grip
 multiplier per 25 m that every bot plans with (AiDriver.learned_grip). Retrain after changing the tyres or the cars.

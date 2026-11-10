@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Finds bumps in a circuit's driven surface: the top collision surface across the road (asphalt and kerbs) every metre
 along the lap; flags where the height changes abruptly along the lap (second difference over 1 m above LIMIT), the
-kind of step a source model's stray or stacked triangle makes.
+kind of step a source model's stray or stacked triangle makes. The cross-section's direction is interpolated between the
+centreline's vertex tangents: with each segment's own normal the points off the centre jumped sideways at every vertex,
+which on a steep road (Raidillon, 14 %) read as a full-width bump of 7-15 cm that isn't in the surface.
   python3 tools/godot/road_bumps.py spa [collision.apxc]"""
 import gzip, json, struct, sys
 from collections import defaultdict
@@ -52,10 +54,13 @@ wl = np.array(td['widthL']); wr = np.array(td['widthR'])
 lats = np.arange(-7.0, 7.01, 0.5)
 ss = np.arange(0, L - 1, 1.0)
 grid = np.full((len(ss), len(lats)), np.nan)
+# tangent at each vertex: the mean of the segments on either side (the lap is closed)
+seg = np.roll(cl, -1, axis=0) - cl; seg[:, 1] = 0; seg /= np.linalg.norm(seg, axis=1, keepdims=True)
+vt = seg + np.roll(seg, 1, axis=0); vt /= np.linalg.norm(vt, axis=1, keepdims=True)
 for r, s in enumerate(ss):
     i = min(int(np.searchsorted(cum, s, 'right')) - 1, len(cl) - 2)
     u = (s - cum[i]) / (cum[i + 1] - cum[i]); p = cl[i] + (cl[i + 1] - cl[i]) * u
-    t = cl[i + 1] - cl[i]; t /= np.linalg.norm(t); nx, nz = -t[2], t[0]
+    t = vt[i] * (1 - u) + vt[i + 1] * u; t /= np.linalg.norm(t); nx, nz = -t[2], t[0]
     for c, lat in enumerate(lats):
         h = top(p[0] + nx * lat, p[2] + nz * lat, p[1])
         if h is not None: grid[r, c] = h

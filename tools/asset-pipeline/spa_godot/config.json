@@ -1,0 +1,60 @@
+{
+ "_comment": "Spa-Francorchamps for the Godot app, built from RESOURCES/CIRCUIT-MODELS/circuit-de-spa-francorchamps-2022-layout.zip (source/spa.glb). The web game keeps maps/spa.json and its own files.",
+ "toGameFrame": {
+  "_note": "game = s * R @ glTF world + t; fitted on marshal posts, start lights, flag poles, houses and grandstands (Umeyama ICP, 12k vertices, median 1.0 cm, rms 1.8 cm, rotation 0.0001 deg)",
+  "s": 1.0102612,
+  "R": [
+   [
+    1.0,
+    9e-07,
+    -3e-07
+   ],
+   [
+    -9e-07,
+    1.0,
+    4e-07
+   ],
+   [
+    3e-07,
+    -4e-07,
+    1.0
+   ]
+  ],
+  "t": [
+   10.6797,
+   -19.5539,
+   -47.3517
+  ]
+ },
+ "overlay": "^(groove|line|doted_line)",
+ "surfaceRules": [
+  [
+   "^(groove|line|doted_line)",
+   null
+  ],
+  [
+   "^(asph|road-ext-tile|parking|grilles)",
+   "asphalt"
+  ],
+  [
+   "^(kerb_new|curb_b)",
+   "curb"
+  ],
+  [
+   "^(grass|top-ext|carpet|sbancamento)",
+   "grass"
+  ],
+  [
+   "^sand(\\.|_new)",
+   "gravel"
+  ],
+  [
+   "^construction_dirt",
+   "sand"
+  ],
+  [
+   "^(grails|metals1|jersey|walls|barriers|concrete-barrie|stone-wall|ivy-wall|fences|fence2_at|fence-special)",
+   "wall"
+  ]
+ ]
+}
