@@ -143,6 +143,27 @@ var finished_ms = null
 var limits := TrackLimits.new()
 var lap_delta: LapDelta = null
 var live_delta = null
+## Something spoiled the sector being driven (a penalty, a reset, the pits): it can't become a best sector.
+var sector_dirty := false
+## Text chat (rooms this game hosts): the panel, and whether its input line is open (the car then gets no input).
+var chat: ChatPanel = null
+var chat_open := false
+var chat_closed_frame := -1
+## Replay (game/replay.gd): the last minutes of every car, watched from a camera of its own while the race goes on.
+const REPLAY_CAMERAS := ["Chase camera", "TV cameras", "Front camera"]
+var replay := Replay.new()
+var replay_open := false
+var replay_playing := true
+var replay_speed := 1.0
+var replay_t := 0.0
+var replay_car := 0
+var replay_cam_mode := 0
+var replay_cam: Camera3D = null
+var _replay_proxy := Node3D.new()
+var _replay_chase := ChaseCamera.new()
+var _replay_saved := {}
+var _replay_poses := PackedFloat32Array()
+var _replay_hint := -1
 var ghost := BestLapGhost.new()
 var ghost_visual: CarVisual = null
 var ghost_loading := false
@@ -418,6 +439,17 @@ func load_session(progress: Callable) -> void:
 	for p in room.players:
 		hud.set_driver(p.id, p.get("country"), p.get("num"))
 	timing = hud.timing
+	if LocalRoom.is_local_code(conn.code):
+		chat = ChatPanel.new()
+		chat.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		chat.grow_vertical = Control.GROW_DIRECTION_BEGIN
+		chat.offset_left = 16.0
+		chat.offset_bottom = -240.0
+		chat.submitted.connect(func(text: String): conn.send_json({"t": "chat", "text": text}))
+		chat.closed.connect(func():
+			chat_open = false
+			chat_closed_frame = Engine.get_process_frames())
+		hud.add_child(chat)
 	if mirror != null:
 		hud.add_child(mirror.rect)
 		hud.move_child(mirror.rect, 0)
@@ -489,7 +521,7 @@ func make_tracker(start_ms: float) -> RaceTracker:
 		else:
 			mode = {"raceLaps": race.laps, "pitWindow": bool(race.get("rules", {}).get("pitWindow", false))}
 	else:
-		mode = {"sessionMs": race.sessionMs}
+		mode = {"sessionMs": race.sessionMs, "cleanStreak": bool(race.get("rules", {}).get("cleanStreak", false))}
 	var tr := RaceTracker.new(track_data, start_ms, mode)
 	tr.add_player(me)
 	for r: Remote in remotes.values():
@@ -657,6 +689,9 @@ func _on_message(m: Dictionary) -> void:
 		"countdown":
 			if m.raceId == race.raceId:
 				set_start_at(m.startAt)
+		"chat":
+			if chat != null:
+				chat.add_line(String(m.nick), String(m.text), bool(m.get("rc", false)), Color(String(hud.colors.get(m.from, "#ffffff"))))
 		"standings":
 			if m.raceId != race.raceId:
 				return
@@ -936,9 +971,12 @@ func _physics_inner(dt: float) -> void:
 	var controls := smoother.update(dt, kb, vehicle.telemetry.forwardSpeed, vehicle.is_reverse())
 	if autodrive != null and race_t >= 0.0:
 		controls = autodrive.update(FIXED_DT, true, vehicle.weather_grip * vehicle.tyre_grip_avg(), -1.0)
-	if paused:
+	if paused or chat_open or replay_open:
 		controls.throttle = 0.0
 		controls.steer = 0.0
+		if chat_open or replay_open:
+			controls.brake = 0.0
+			controls.handbrake = 0.0
 	vehicle.controls = controls
 	if spectator:
 		vehicle.frozen = true
@@ -1321,10 +1359,18 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 	if lap_delta == null:
 		lap_delta = LapDelta.new(track_data.length)
 	var d := lap_delta
+	if tr.lap_invalid or tr.lap_penalty_ms > 0 or tr.in_pit or tr.out_lap:
+		sector_dirty = true
+	var lap_dist_now: float = tr.race_dist - tr.laps * float(track_data.length)
 	for e in ev:
-		if e.type == "lap":
+		if e.type == "sector" and e.playerId == me:
+			d.end_sector(int(e.sector), float(track_data.length) if int(e.sector) >= 2 else lap_dist_now, float(e.ms), not sector_dirty)
+			sector_dirty = tr.lap_invalid or tr.in_pit
+		elif e.type == "lap":
 			if e.valid and e.best:
 				d.commit_best()
+			if e.get("pending", false):
+				flash(I18n.t("Clean lap: one more clean lap in a row and your best will count"), 3200.0, "info")
 			ghost.lap_ended(e.valid and e.best)
 			if e.valid and e.best:
 				ensure_ghost_visual()
@@ -1382,7 +1428,223 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 	else:
 		ghost.abort_lap()
 	d.record(lap_dist, lap_ms)
-	live_delta = d.delta(lap_dist, lap_ms)
+	live_delta = d.delta(lap_dist, lap_ms, String(Settings.data.deltaMode))
+
+## ------------------------------------------------------------------ replay ---
+
+func _replay_visual(i: int) -> CarVisual:
+	var id: String = replay.ids[i]
+	if id == me:
+		return my_visual
+	var r := remote_by_id(id)
+	return r.visual if r != null else null
+
+## One sample of every car's pose, 20 times a second, from the cars as they were drawn this frame.
+func _replay_record(dt: float, server_now: float) -> void:
+	if start_at == null or server_now < start_at - 3000.0:
+		return
+	if replay.ids.is_empty():
+		var ids: Array = [] if spectator else [me]
+		for r: Remote in remotes.values():
+			ids.append(r.id)
+		replay.clear(ids)
+		_replay_poses.resize(ids.size() * Replay.STRIDE)
+	if not replay.due(dt):
+		return
+	for i in replay.ids.size():
+		var v := _replay_visual(i)
+		if v == null:
+			continue
+		Replay.put(_replay_poses, i, v.global_position, v.global_transform.basis.get_rotation_quaternion(), v.pose_steer, v.pose_rot_f, v.pose_rot_r, v.brake_on)
+	replay.add(float(Time.get_ticks_msec()), _replay_poses)
+
+func open_replay() -> void:
+	if replay_open or replay.size() < 40 or cinematic != null:
+		return
+	replay_open = true
+	replay_playing = true
+	replay_speed = 1.0
+	replay_t = maxf(replay.first_ms(), replay.last_ms() - 15000.0)
+	replay_car = 0
+	replay_cam_mode = 0
+	_replay_chase.reset()
+	_replay_saved.clear()
+	for i in replay.ids.size():
+		var v := _replay_visual(i)
+		if v != null:
+			_replay_saved[v] = v.transform
+	replay_cam = Camera3D.new()
+	replay_cam.near = 0.1
+	replay_cam.far = 9000.0
+	add_child(replay_cam)
+	add_child(_replay_proxy)
+	add_child(_replay_chase.camera)
+	hud.visible = false
+	if cb.has("on_replay_toggle"):
+		cb.on_replay_toggle.call(true)
+
+func close_replay() -> void:
+	if not replay_open:
+		return
+	replay_open = false
+	for v in _replay_saved:
+		if is_instance_valid(v):
+			v.transform = _replay_saved[v]
+	_replay_saved.clear()
+	if replay_cam != null:
+		replay_cam.queue_free()
+		replay_cam = null
+	if _replay_proxy.get_parent() == self:
+		remove_child(_replay_proxy)
+	if _replay_chase.camera.get_parent() == self:
+		remove_child(_replay_chase.camera)
+	hud.visible = true
+	if cb.has("on_replay_toggle"):
+		cb.on_replay_toggle.call(false)
+
+func replay_toggle_play() -> void:
+	if not replay_playing and ((replay_speed > 0.0 and replay_t >= replay.last_ms() - 1.0) or (replay_speed < 0.0 and replay_t <= replay.first_ms() + 1.0)):
+		replay_t = replay.first_ms() if replay_speed > 0.0 else replay.last_ms()
+	replay_playing = not replay_playing
+
+func replay_set_speed(sp: float) -> void:
+	replay_speed = sp
+	replay_playing = true
+
+## One recorded sample (a twentieth of a second) back or forward, paused.
+func replay_step(dir: int) -> void:
+	replay_playing = false
+	replay_t = clampf(replay_t + dir * 1000.0 / Replay.HZ, replay.first_ms(), replay.last_ms())
+
+func replay_jump(ms: float) -> void:
+	replay_t = clampf(replay_t + ms, replay.first_ms(), replay.last_ms())
+
+func replay_seek_fraction(f: float) -> void:
+	replay_t = replay.first_ms() + clampf(f, 0.0, 1.0) * replay.duration_ms()
+
+func replay_change_car(dir: int) -> void:
+	replay_car = posmod(replay_car + dir, maxi(1, replay.ids.size()))
+	_replay_chase.reset()
+
+func replay_change_camera() -> void:
+	replay_cam_mode = (replay_cam_mode + 1) % REPLAY_CAMERAS.size()
+	_replay_chase.reset()
+
+func replay_camera_name() -> String:
+	return REPLAY_CAMERAS[replay_cam_mode]
+
+func replay_car_name() -> String:
+	if replay_car >= replay.ids.size():
+		return ""
+	return String(names.get(replay.ids[replay_car], "?"))
+
+## Desktop keys while the replay is open (the bar has buttons for everything).
+func _replay_keys() -> void:
+	if Input.is_key_pressed(KEY_ESCAPE) or kb.tapped("pause") or kb.tapped("replay"):
+		close_replay()
+		return
+	if kb.tapped("handbrake") or _tapped_key(KEY_K):
+		replay_toggle_play()
+	if _tapped_key(KEY_COMMA):
+		replay_step(-1)
+	if _tapped_key(KEY_PERIOD):
+		replay_step(1)
+	if _tapped_key(KEY_LEFT) or _tapped_key(KEY_J):
+		replay_jump(-5000.0)
+	if _tapped_key(KEY_RIGHT) or _tapped_key(KEY_L):
+		replay_jump(5000.0)
+	if kb.tapped("camera"):
+		replay_change_camera()
+	if kb.tapped("steerLeft") and not _tapped_key(KEY_LEFT):
+		replay_change_car(-1)
+	if kb.tapped("steerRight") and not _tapped_key(KEY_RIGHT):
+		replay_change_car(1)
+
+func _tapped_key(k: int) -> bool:
+	return kb._pressed.has(k)
+
+## Playback time, and the camera on the car being watched. Returns the camera to look through.
+func _replay_update(dt: float) -> Camera3D:
+	if replay_playing:
+		replay_t += dt * 1000.0 * replay_speed
+		if replay_t >= replay.last_ms() and replay_speed > 0.0:
+			replay_t = replay.last_ms()
+			replay_playing = false
+		elif replay_t <= replay.first_ms() and replay_speed < 0.0:
+			replay_t = replay.first_ms()
+			replay_playing = false
+	var p := replay.pose(replay_t, replay_car)
+	if p.is_empty():
+		return null
+	_replay_proxy.global_transform = Transform3D(Basis(p.rot), p.pos)
+	var vel := replay.velocity(replay_t, replay_car)
+	if replay_cam_mode == 1 and tv_cameras() != null:
+		_tv_hint = TrackMath.nearest_centerline_index(track_data, p.pos.x, p.pos.y, p.pos.z, _tv_hint, 40)
+		var s := TrackMath.progress_at(track_data, _tv_hint, p.pos.x, p.pos.z)
+		var cams = tv_cameras()
+		if cams.update(dt, p.pos, vel, s):
+			return cams.camera
+	if replay_cam_mode == 2:
+		var fwd: Vector3 = p.rot * Vector3(0, 0, 1)
+		replay_cam.global_position = p.pos + fwd * 9.0 + Vector3(0, 1.1, 0)
+		replay_cam.look_at(p.pos + Vector3(0, 0.7, 0), Vector3.UP)
+		replay_cam.fov = 60.0
+		return replay_cam
+	_replay_chase.update(dt, _replay_proxy, vel, "chase", false)
+	return _replay_chase.camera
+
+## Puts every car where the replay has it (after the live update, so the live positions are only overdrawn).
+func _replay_apply() -> void:
+	for i in replay.ids.size():
+		var v := _replay_visual(i)
+		if v == null:
+			continue
+		var p := replay.pose(replay_t, i)
+		if p.is_empty():
+			continue
+		v.global_transform = Transform3D(Basis(p.rot), p.pos)
+		v.set_pose(p.steer, p.rot_f, p.rot_r, [0.0, 0.0, 0.0, 0.0])
+		v.set_lights(p.brake, headlights_on, env.night)
+		v.set_opacity(1.0)
+		v.visible = true
+
+## In-car adjustments (iRacing's F8 black box): they take effect at once and are kept for the next session.
+const BIAS_STEP := 0.005
+
+func adjust_brake_bias(dir: int) -> void:
+	var s: Dictionary = vehicle.specs
+	var bias := clampf(snappedf(float(s.brakeBiasFront) + dir * BIAS_STEP, BIAS_STEP), 0.54, 0.66)
+	s.brakeBiasFront = bias
+	Settings.data.carSetup.brakeBias = bias
+	Settings.save()
+	flash(I18n.t("Brake bias {pct} % front", {"pct": "%.1f" % (bias * 100.0)}), 1500.0, "osd")
+
+func cycle_traction_control() -> void:
+	var tc := (int(vehicle.assists.tc) + 1) % 3
+	vehicle.assists.tc = tc
+	Settings.data.assists.tc = tc
+	Settings.save()
+	var names := [I18n.t("Traction control: off"), I18n.t("Traction control: low"), I18n.t("Traction control: high")]
+	flash(names[tc], 1500.0, "osd")
+
+func toggle_abs() -> void:
+	var on := not bool(vehicle.assists.abs)
+	vehicle.assists.abs = on
+	Settings.data.assists.abs = on
+	Settings.save()
+	flash(I18n.t("ABS on") if on else I18n.t("ABS off"), 1500.0, "osd")
+
+## The delta key: best lap, then optimal lap, then optimal sectors (a mode without a reference yet is skipped).
+func cycle_delta_mode() -> void:
+	var i: int = LapDelta.MODES.find(String(Settings.data.deltaMode))
+	for _k in LapDelta.MODES.size():
+		i = (i + 1) % LapDelta.MODES.size()
+		if LapDelta.MODES[i] == "best" or (lap_delta != null and lap_delta.has(LapDelta.MODES[i])):
+			break
+	Settings.data.deltaMode = LapDelta.MODES[i]
+	Settings.save()
+	var names := {"best": I18n.t("Delta: your best lap"), "optimal": I18n.t("Delta: your optimal lap"), "sectors": I18n.t("Delta: your best sectors")}
+	flash(names[Settings.data.deltaMode], 1800.0, "osd")
 
 # ---------------------------------------------------------------- bots ---
 
@@ -1638,6 +1900,12 @@ func _process_inner(dt: float) -> void:
 		update_spectator_cam(dt)
 		view_cam = spec_cam
 		cam_pos = spec_cam.global_position
+	if replay_open:
+		var rc: Camera3D = _replay_update(dt)
+		if rc != null:
+			view_cam = rc
+			cam_pos = rc.global_position
+			cockpit.hidden = true
 	view_cam.current = true
 	var in_cockpit := view_cam == cockpit.camera
 	CarVisual.cockpit_glass = 1.0 if in_cockpit else 0.0
@@ -1656,6 +1924,10 @@ func _process_inner(dt: float) -> void:
 		update_remote(r, server_now, dt, cam_pos)
 
 	Prof.mark("p.remotes")
+	if replay_open:
+		_replay_apply()
+	else:
+		_replay_record(dt, server_now)
 	# environment
 	Prof.b("env")
 	env.update(dt, weather, view_cam, vehicle.global_position, car_vel)
@@ -1726,9 +1998,22 @@ func handle_keys(server_now: float) -> void:
 		timing.set_shown(show_timing)
 		if show_timing:
 			update_timing()
+	# typing in the chat: keys are text, and the key that closes the line must not also act
+	if chat_open or Engine.get_process_frames() == chat_closed_frame:
+		return
+	if replay_open:
+		_replay_keys()
+		return
 	if kb.tapped("pause"):
 		toggle_pause()
 	if paused:
+		return
+	if kb.tapped("replay") and replay.size() >= 40:
+		open_replay()
+		return
+	if chat != null and kb.tapped("chat") and not spectator:
+		chat_open = true
+		chat.open()
 		return
 	if kb.tapped("shiftUp"):
 		vehicle.shift(1)
@@ -1741,6 +2026,17 @@ func handle_keys(server_now: float) -> void:
 			cycle_camera()
 	if kb.tapped("tvCamera") and not spectator:
 		toggle_tv()
+	if kb.tapped("deltaMode") and not spectator:
+		cycle_delta_mode()
+	if not spectator:
+		if kb.tapped("brakeBiasUp"):
+			adjust_brake_bias(1)
+		if kb.tapped("brakeBiasDown"):
+			adjust_brake_bias(-1)
+		if kb.tapped("tcCycle"):
+			cycle_traction_control()
+		if kb.tapped("absToggle"):
+			toggle_abs()
 	if kb.tapped("toggleGearbox"):
 		Settings.data.manualGearbox = not Settings.data.manualGearbox
 		vehicle.drivetrain.manual = bool(Settings.data.manualGearbox)

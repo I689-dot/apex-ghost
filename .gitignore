@@ -32,3 +32,6 @@ godot/assets/
 godot/data/*
 !godot/data/ai_learned/
 build/
+
+# the user's reference material for the Spa and car rebuild (circuit and car downloads, the reference video, 1.3 GB): never committed
+RESOURCES/

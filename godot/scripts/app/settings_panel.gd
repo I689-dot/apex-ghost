@@ -8,6 +8,8 @@ const ACTION_LABEL := {
 	"shiftUp": "Shift up", "shiftDown": "Shift down", "resetCar": "Reset to track", "toggleGearbox": "Manual / automatic",
 	"lookLeft": "Look left", "lookRight": "Look right", "lookBack": "Look back", "timing": "Timing screen (hold)", "pause": "Pause menu",
 	"camera": "Change camera", "damage": "Damage report (hold)", "tvCamera": "TV cameras",
+	"deltaMode": "Delta reference (best / optimal / sectors)",
+	"brakeBiasUp": "Brake bias forward", "brakeBiasDown": "Brake bias rearward", "tcCycle": "Traction control level", "absToggle": "ABS on / off", "chat": "Text chat", "replay": "Replay",
 }
 const GROUPS := [
 	["shadows", "Shadows", "Shadow sharpness and how far they reach"], ["ao", "Ambient occlusion", "Soft contact shadows in corners and under cars"],

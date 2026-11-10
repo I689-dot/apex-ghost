@@ -478,12 +478,18 @@ static func _session_pane(app: App, room: Dictionary, race_key: String, race_lab
 		["quick", I18n.t("Quick race"), 0, 10, 5, 0],
 		["sprint", I18n.t("Sprint weekend"), 20, 15, 0, 30],
 		["endurance", I18n.t("Endurance"), 30, 20, 0, 60],
-		["hotlap", I18n.t("Hotlap"), 0, 30, 0, 0],
+		["hotlap", I18n.t("Hotlap"), 0, 30, 0, 0, false],
 	]
+	# Time trial (solo): 30 minutes alone, and the best lap is the fastest of consecutive clean laps
+	var local: bool = LocalRoom.is_local_code(room.code)
+	if local:
+		formats.append(["trial", I18n.t("Time trial"), 0, 30, 0, 0, true])
 	var fmt_now := ""
 	for f in formats:
 		var rm: int = int(room.get("raceMinutes", 0))
-		if int(room.get("practiceMinutes", 0)) == f[2] and room.sessionMinutes == f[3] and ((rm == f[5]) if f[5] > 0 else (rm == 0 and room.raceLaps == f[4])):
+		var streak_now: bool = room.get("rules", {}).get("cleanStreak", false)
+		if int(room.get("practiceMinutes", 0)) == f[2] and room.sessionMinutes == f[3] and ((rm == f[5]) if f[5] > 0 else (rm == 0 and room.raceLaps == f[4])) \
+				and (f.size() < 7 or streak_now == f[6]):
 			fmt_now = f[0]
 	var col := UIW.vbox(16)
 	col.add_child(UIW.field(I18n.t("Format"), UIW.chips(fmt_now, formats.map(func(f): return [f[0], f[1]]), func(v):
@@ -493,7 +499,9 @@ static func _session_pane(app: App, room: Dictionary, race_key: String, race_lab
 				app.send({"t": "setSession", "minutes": f[3]})
 				app.send({"t": "setRaceMinutes", "minutes": f[5]})
 				if f[5] == 0:
-					app.send({"t": "setRaceLaps", "laps": f[4]}), edit)))
+					app.send({"t": "setRaceLaps", "laps": f[4]})
+				if local:
+					app.send({"t": "setRules", "rules": {"cleanStreak": f.size() > 6 and f[6]}}), edit)))
 	col.add_child(UIW.field(I18n.t("Free practice"), UIW.chips(int(room.get("practiceMinutes", 0)), Const.PRACTICE_MINUTE_CHOICES.map(func(m): return [m, I18n.t("No practice") if m == 0 else I18n.t("{m} min", {"m": m})]), func(v): app.send({"t": "setPractice", "minutes": int(v)}), edit)))
 	col.add_child(UIW.field(I18n.t("Qualifying"), UIW.chips(int(room.sessionMinutes), Const.SESSION_MINUTES.map(func(m): return [m, I18n.t("{m} min", {"m": m})]), func(v): app.send({"t": "setSession", "minutes": int(v)}), edit)))
 	var race_opts: Array = []
@@ -762,7 +770,59 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	if room.get("rules", {}).get("fuel", false):
 		col.add_child(_fuel_row(room, float(track.get("length", 5000)), cs))
 	col.add_child(_advanced(app, cs, temp0.airC))
+	col.add_child(_setup_library(app, cs, save))
 	return col
+
+## Named setups, kept on this device, and the text code that shares one with a friend.
+static func _setup_library(app: App, cs: Dictionary, save: Callable) -> Control:
+	var box := UIW.vbox(8)
+	box.add_child(UIW.h3(I18n.t("Saved setups")))
+	var status := UIKit.label("", 14, UIKit.MUTED)
+	var name_in := LineEdit.new()
+	name_in.max_length = 24
+	name_in.placeholder_text = I18n.t("Name for this setup")
+	name_in.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var row := UIW.hbox(8)
+	row.add_child(name_in)
+	row.add_child(UIKit.button(I18n.t("Save"), func():
+		if name_in.text.strip_edges().is_empty():
+			status.text = I18n.t("Type a name first")
+			return
+		CarSetup.save_named(name_in.text, cs)
+		app.render_briefing()))
+	box.add_child(row)
+	for nm in CarSetup.saved_names():
+		var r := UIW.hbox(8)
+		var lb := UIKit.label(String(nm), 16)
+		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		r.add_child(lb)
+		var key: String = nm
+		r.add_child(UIKit.button(I18n.t("Load"), func():
+			CarSetup.load_into(cs, Settings.data.savedSetups[key])
+			app.send({"t": "setTyre", "tyre": cs.tyre})
+			save.call()))
+		r.add_child(UIKit.button(I18n.t("Share"), func():
+			DisplayServer.clipboard_set(CarSetup.to_code(Settings.data.savedSetups[key]))
+			status.text = I18n.t("Code copied: send it to a friend")))
+		r.add_child(UIKit.button(I18n.t("Delete"), func():
+			CarSetup.delete_named(key)
+			app.render_briefing()))
+		box.add_child(r)
+	var io := UIW.hbox(8)
+	io.add_child(UIKit.button(I18n.t("Copy code of the current setup"), func():
+		DisplayServer.clipboard_set(CarSetup.to_code(cs))
+		status.text = I18n.t("Code copied: send it to a friend")))
+	io.add_child(UIKit.button(I18n.t("Paste a friend's code"), func():
+		var imported = CarSetup.from_code(DisplayServer.clipboard_get())
+		if imported == null:
+			status.text = I18n.t("The clipboard doesn't hold a setup code")
+			return
+		CarSetup.load_into(cs, imported)
+		app.send({"t": "setTyre", "tyre": cs.tyre})
+		save.call()))
+	box.add_child(io)
+	box.add_child(status)
+	return UIW.panel(box)
 
 static func _tyre_guide() -> Control:
 	var note := {

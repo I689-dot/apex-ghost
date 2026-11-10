@@ -19,6 +19,15 @@ func _run() -> void:
 	if OS.get_environment("QUALITY") != "":
 		Settings.data.quality = OS.get_environment("QUALITY")
 		Settings.data.graphics = {}
+	if OS.get_environment("NO_INTERIOR_FIX") != "":
+		InteriorLook.enabled = false
+	if OS.get_environment("FOV") != "":
+		Settings.data.fov = float(OS.get_environment("FOV"))
+	if OS.get_environment("SEAT_HEIGHT") != "":
+		Settings.data.seatHeight = float(OS.get_environment("SEAT_HEIGHT"))
+	if OS.get_environment("SEAT_FORWARD") != "":
+		# only in memory, for the picture: the seat setting is not saved
+		Settings.data.seatForward = float(OS.get_environment("SEAT_FORWARD"))
 	if OS.get_environment("CAMERA") != "":
 		Settings.data.camera = OS.get_environment("CAMERA")
 	LocalRoom.create()
@@ -57,6 +66,14 @@ func _run() -> void:
 	await session.load_session(func(l, t, lbl): print("load ", lbl))
 	print("loaded in ", (Time.get_ticks_msec() - t0) / 1000.0, " s")
 	session.start()
+	print("stand-in wheel built: ", session.cockpit._dash_wheel != null)
+	if OS.get_environment("CAM_PITCH") != "":
+		session.cockpit.pitch = deg_to_rad(float(OS.get_environment("CAM_PITCH")))
+	if OS.get_environment("HIDE_OUTSIDE") != "" and session.my_visual._outside_root != null:
+		# debugging: is the exterior model drawn inside the cockpit view?
+		session.my_visual._outside_root.visible = false
+	if OS.get_environment("SKIP_INTRO") != "" and session.cinematic != null:
+		session.cinematic.skip()
 	if OS.get_environment("TELEPORT") != "":
 		var pt := TrackMath.point_at_distance(session.track_data, float(OS.get_environment("TELEPORT")))
 		var lat := float(OS.get_environment("LATERAL")) if OS.get_environment("LATERAL") != "" else 0.0

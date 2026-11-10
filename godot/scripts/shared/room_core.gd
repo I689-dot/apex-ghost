@@ -38,6 +38,7 @@ class Player:
 	var last_packet_at := 0.0
 	var bumps := 0
 	var bump_window := 0.0
+	var last_chat_at := -1e12
 
 var env: RoomEnv
 var code := ""
@@ -467,6 +468,32 @@ func _handle(p: Player, msg: Dictionary) -> void:
 			_handle_race_events(ev, who, now2)
 			if tracker != null and tracker.all_done():
 				end_race()
+		"chat":
+			# text chat, as iRacing's: everyone sees it; "/rc text" goes to the host (race control) and back to the sender
+			var now_c := _now()
+			if now_c - p.last_chat_at < Const.CHAT_MIN_GAP_MS:
+				return
+			p.last_chat_at = now_c
+			var text: String = msg.text
+			var to_host := false
+			if text.to_lower() == "/rc" or text.to_lower().begins_with("/rc "):
+				to_host = true
+				text = Validation.clean_chat(text.substr(3))
+				if text.is_empty():
+					return
+			var line := JSON.stringify({"t": "chat", "from": p.id, "nick": p.nick, "text": text, "rc": to_host})
+			if to_host:
+				var hp: Player = players.get(host_id)
+				if hp != null and hp.conn != null:
+					hp.conn.send(line)
+				if p.conn != null and p.id != host_id:
+					p.conn.send(line)
+			else:
+				for q in players.values():
+					if q.conn != null:
+						q.conn.send(line)
+				for c in spectators.values():
+					c.send(line)
 		"bump":
 			# contact rule: the hit, for whoever simulates the car that was hit (a bot: the host)
 			if race == null or not race.rules.contact or (phase != "racing" and phase != "countdown"):
@@ -679,7 +706,7 @@ func _maybe_begin_countdown(force: bool = false) -> void:
 		else:
 			mode = {"raceLaps": race.laps, "pitWindow": race.rules.pitWindow}
 	else:
-		mode = {"sessionMs": race.sessionMs}
+		mode = {"sessionMs": race.sessionMs, "cleanStreak": race.rules.get("cleanStreak", false)}
 	tracker = RaceTracker.new(_tracks().get(race.trackId, env.track), start_at, mode)
 	for id in race.grid:
 		tracker.add_player(id)

@@ -6,6 +6,8 @@ const GAME_NAME := "APEX GHOST"
 const PROTOCOL_VERSION := 8
 
 const MAX_PLAYERS := 12
+## Shortest time between two chat lines of one player.
+const CHAT_MIN_GAP_MS := 700.0
 ## Lap-count sessions (tests and tools only): timed laps after the out lap.
 const RACE_LAPS := 3
 ## Qualifying session length the host can choose (minutes).

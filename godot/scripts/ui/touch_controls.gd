@@ -134,6 +134,17 @@ func _layout() -> void:
 		var x := tx + i * (tw + 8.0 * k) + (172.0 * k if i >= 3 else 0.0)
 		var w := _widget(specs[i][2], Rect2(x, ty, tw, th), I18n.t(specs[i][0]) if specs[i][0] in ["TIMES", "BACK"] else specs[i][0], specs[i][1], Color.WHITE)
 		w.name = specs[i][3]
+	# the tuning row (brake bias, TC, ABS) opens from TUNE, under the buttons on the right
+	var tune := _widget("button", Rect2(tx + 3 * (tw + 8.0 * k), ty, tw, th), "TUNE", "", Color.WHITE)
+	tune.name = "tune"
+	var rows := [["BB-", "brakeBiasDown", "bb_down"], ["BB+", "brakeBiasUp", "bb_up"], ["TC", "tcCycle", "tc"], ["ABS", "absToggle", "abs"]]
+	for j in rows.size():
+		var tb := _widget("button", Rect2(tx + (3 + j) * (tw + 8.0 * k) + 172.0 * k, ty + th + 6.0 * k, tw, th), rows[j][0], rows[j][1], Color.WHITE)
+		tb.name = rows[j][2]
+	var chat_btn := _widget("button", Rect2(tx + 3 * (tw + 8.0 * k) + 172.0 * k - (tw + 8.0 * k), ty + th + 6.0 * k, tw, th), "CHAT", "chat", Color.WHITE)
+	chat_btn.name = "chat"
+	var dbtn := _widget("button", Rect2(tx + 6 * (tw + 8.0 * k) + 172.0 * k, ty, tw, th), "DELTA", "deltaMode", Color.WHITE)
+	dbtn.name = "delta"
 	# intro: skip; spectator: arrows
 	var skip := _widget("button", Rect2(vp.x - margin - inset_r - 150.0 * k, 56.0 * k + inset_t, 150.0 * k, 42.0 * k), I18n.t("Skip intro"), "", Color.WHITE)
 	skip.name = "skip"
@@ -145,6 +156,11 @@ func _layout() -> void:
 	if _mode == "tilt":
 		pass
 	queue_redraw()
+
+## The race has a text chat (rooms this game hosts): the CHAT button shows.
+var chat_enabled := false
+## The tuning row is open (TUNE button).
+var tune_open := false
 
 func _widget(kind: String, rect: Rect2, label: String, action: String, color: Color) -> Widget:
 	var w := Widget.new()
@@ -175,6 +191,10 @@ func _is_shown(w: Widget) -> bool:
 		return n in ["pause", "timing"]
 	if n == "up" or n == "down":
 		return bool(Settings.data.manualGearbox)
+	if n in ["bb_down", "bb_up", "tc", "abs"]:
+		return tune_open
+	if n == "chat":
+		return chat_enabled
 	return true
 
 # ---------------------------------------------------------------- input ---
@@ -236,6 +256,8 @@ func _press(index: int, w: Widget, pos: Vector2) -> void:
 				spectator_key.emit("ArrowLeft")
 			elif w.name == "spec_right":
 				spectator_key.emit("ArrowRight")
+			elif w.name == "tune":
+				tune_open = not tune_open
 			else:
 				_press_action(w.action, true)
 				_press_action(w.action, false)

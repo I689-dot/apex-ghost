@@ -14,6 +14,15 @@ static func _init_re() -> void:
 	_spaces = RegEx.create_from_string("\\s+")
 
 ## Trims, collapses whitespace, strips control/markup chars, enforces 2-16 chars. Returns {ok, nick | error}.
+## A chat line: control characters and markup removed, spaces squeezed, at most CHAT_MAX_LEN characters. "" if nothing is left.
+const CHAT_MAX_LEN := 120
+static func clean_chat(raw: String) -> String:
+	_init_re()
+	var s := _invisible.sub(raw, "", true)
+	s = _markup.sub(s, "", true)
+	s = _spaces.sub(s, " ", true).strip_edges()
+	return s.left(CHAT_MAX_LEN)
+
 static func sanitize_nickname(raw) -> Dictionary:
 	if typeof(raw) != TYPE_STRING:
 		return {"ok": false, "error": "Nickname is required."}

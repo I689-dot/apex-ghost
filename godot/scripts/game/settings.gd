@@ -5,7 +5,8 @@ extends Node
 
 const CONTROL_ACTIONS := [
 	"throttle", "brake", "steerLeft", "steerRight", "handbrake", "shiftUp", "shiftDown", "resetCar", "toggleGearbox",
-	"lookLeft", "lookRight", "lookBack", "timing", "pause", "camera", "damage", "tvCamera",
+	"lookLeft", "lookRight", "lookBack", "timing", "pause", "camera", "damage", "tvCamera", "deltaMode",
+	"brakeBiasUp", "brakeBiasDown", "tcCycle", "absToggle", "chat", "replay",
 ]
 const CAMERA_MODES := ["cockpit", "chase", "far"]
 
@@ -14,7 +15,8 @@ const ACTION_LABEL := {
 	"handbrake": "Handbrake", "shiftUp": "Shift up", "shiftDown": "Shift down", "resetCar": "Reset to track",
 	"toggleGearbox": "Manual / automatic", "lookLeft": "Look left", "lookRight": "Look right", "lookBack": "Look back",
 	"timing": "Timing screen (hold)", "pause": "Pause menu", "camera": "Change camera", "damage": "Damage report (hold)",
-	"tvCamera": "TV cameras",
+	"tvCamera": "TV cameras", "deltaMode": "Delta reference (best / optimal / sectors)",
+	"brakeBiasUp": "Brake bias forward", "brakeBiasDown": "Brake bias rearward", "tcCycle": "Traction control level", "absToggle": "ABS on / off", "chat": "Text chat", "replay": "Replay",
 }
 
 ## Key bindings by the web game's KeyboardEvent.code names (translated to Godot keys by InputMapper).
@@ -23,7 +25,8 @@ const DEFAULT_BINDINGS := {
 	"steerRight": ["KeyD", "ArrowRight"], "handbrake": ["Space"], "shiftUp": ["ShiftLeft", "KeyE"],
 	"shiftDown": ["ControlLeft", "KeyQ"], "resetCar": ["KeyR"], "toggleGearbox": ["KeyM"], "lookLeft": ["KeyZ"],
 	"lookRight": ["KeyC"], "lookBack": ["KeyX"], "timing": ["Tab"], "pause": ["Escape"], "camera": ["KeyV"],
-	"damage": ["KeyF"], "tvCamera": ["KeyT"],
+	"damage": ["KeyF"], "tvCamera": ["KeyT"], "deltaMode": ["KeyG"],
+	"brakeBiasUp": ["Equal"], "brakeBiasDown": ["Minus"], "tcCycle": ["KeyB"], "absToggle": ["KeyN"], "chat": ["KeyY"], "replay": ["KeyP"],
 }
 
 const SAVE_PATH := "user://settings.json"
@@ -45,7 +48,7 @@ static func default_settings() -> Dictionary:
 		"nickname": "", "language": I18n.default_lang(), "quality": "medium", "qualityAuto": true, "graphics": {},
 		"resolutionScale": 1.0, "dynamicResolution": true, "refreshRate": 60, "fov": 58, "seatHeight": 0.0, "seatForward": 0.0,
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,
-		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "showPerf": false, "introCinematic": true,
+		"camera": "cockpit", "pitCamera": "tv", "mirror": true, "units": "kmh", "racingLine": "corners", "deltaMode": "best", "showPerf": false, "introCinematic": true,
 		"headMovement": 1.0, "cameraShake": 1.0,
 		"overlays": {"relative": true, "inputs": true, "spotter": true, "deltaBar": true, "trackMap": true},
 		"audio": {"master": 0.8, "engine": 0.9, "effects": 0.8, "ambience": 0.6, "radio": 0.9, "opponents": 0.9, "tyres": 0.9, "chimes": true},
@@ -53,7 +56,7 @@ static func default_settings() -> Dictionary:
 		"hud": {"scale": 1.0, "opacity": 1.0, "timing": true, "lapInfo": true, "tyres": true, "revLights": true, "messages": true, "map": true},
 		"chase": {"distance": 1.0, "height": 1.0, "lag": 1.0}, "lookToApex": 1.0, "brightness": 1.0, "ai": {"difficulty": 1.0},
 		"carSetup": {"tyre": "medium", "wing": "medium", "brakeBias": 0.6, "pressure": null, "ride": [0, 0], "arb": [4, 4], "bump": [4, 4], "rebound": [4, 4], "fuelL": 60},
-		"ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
+		"savedSetups": {}, "ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
 		"wheel": {"mode": "auto", "rotationDeg": 900, "brakeCurve": 1.0},
 		"pad": {
 			"deadzone": 0.06, "steerCurve": 1.7, "steerSpeed": 1.0, "speedSens": 0.5, "brakeCurve": 1.4, "throttleDeadzone": 0.04,

@@ -33,6 +33,7 @@ var _count_big: Label
 var _count_sub: Label
 var _count_info: Label
 var pause_ui: Control = null
+var replay_ui: Control = null
 var _tyre_sent_for := ""
 var _fill_timer: SceneTreeTimer = null
 var _alone_since := 0.0
@@ -444,6 +445,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	var s := RaceSession.new(race, room, me, cars, conn, {
 		"on_countdown_text": func(text, sub = ""): set_countdown(text, sub),
 		"on_pause_toggle": func(open): set_pause(open),
+		"on_replay_toggle": func(open): set_replay(open),
 		"on_results": func(m): show_results(m),
 		"on_fatal": func(msg): show_menu(msg),
 		"audio": func(): return audio,
@@ -475,6 +477,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	touch.spectator_key.connect(func(code): var k := KeyMap.key_of(code); _key_event(k, true); _key_event(k, false))
 	touch_layer.add_child(touch)
 	touch.spectating = spectating
+	touch.chat_enabled = LocalRoom.is_local_code(conn.code) and not spectating
 	touch.set_active(UIKit.touch())
 	DisplayServer.screen_set_keep_on(true)
 	s.start()
@@ -515,12 +518,26 @@ func set_pause(open: bool) -> void:
 	b.add_child(UIW.h2(I18n.t("Paused")))
 	b.add_child(UIW.muted(I18n.t("The race keeps running.")))
 	b.add_child(UIKit.button(I18n.t("Resume"), func(): if session != null: session.toggle_pause(false), true))
+	if session != null and session.replay.size() >= 40:
+		b.add_child(UIKit.button(I18n.t("Replay"), func():
+			session.toggle_pause(false)
+			session.open_replay()))
 	b.add_child(UIKit.button(I18n.t("Reset to track (+5 s penalty)"), func():
 		if session != null:
 			session.toggle_pause(false)
 			session.request_reset()))
 	b.add_child(UIKit.button(I18n.t("Settings"), open_settings))
 	b.add_child(UIKit.button(I18n.t("Leave race"), leave))
+
+## The replay's control bar (RaceSession.open_replay / close_replay).
+func set_replay(open: bool) -> void:
+	if replay_ui != null:
+		replay_ui.queue_free()
+		replay_ui = null
+	if not open or session == null:
+		return
+	replay_ui = ReplayBar.new(session)
+	overlay_layer.add_child(replay_ui)
 
 func open_settings() -> void:
 	var lang := I18n.get_lang()

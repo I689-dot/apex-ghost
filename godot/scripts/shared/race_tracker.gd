@@ -47,6 +47,8 @@ class PlayerRaceState:
 	var drive_throughs: Array = []
 	var serving_dt := false
 	var valid_laps := 0
+	## The lap before was clean too (the Time trial rule).
+	var prev_valid := false
 	var next_gate := 0
 	var passed := 0
 	var lap_start_ms := 0.0
@@ -101,6 +103,9 @@ static func drive_through_cost_ms(t: Dictionary) -> int:
 	return int(roundf(minf(45.0, maxf(15.0, s)))) * 1000
 
 ## mode: an int (lap-count test mode), {sessionMs}, {raceLaps, pitWindow?} or {raceMs, pitWindow?}.
+## Time trial: the best lap is the fastest of consecutive clean laps (a clean lap counts once the lap before was clean).
+var clean_streak := false
+
 func _init(track_data: Dictionary, start: float, mode: Variant = Const.RACE_LAPS) -> void:
 	track = track_data
 	start_ms = start
@@ -121,6 +126,7 @@ func _init(track_data: Dictionary, start: float, mode: Variant = Const.RACE_LAPS
 	else:
 		laps = 0
 		flag_at = start + mode.sessionMs
+		clean_streak = mode.get("cleanStreak", false)
 
 ## The car enters the pit lane: the lap in progress is lost, gates are ignored inside the lane.
 func pit_in(id: String, t: float, out: Array = []) -> Array:
@@ -409,7 +415,9 @@ func _on_gate(p: PlayerRaceState, gi: int, tc: float, out: Array) -> void:
 			var penalty_ms := 0 if out_lap else p.lap_penalty_ms
 			var timed := lap_ms + penalty_ms
 			var valid: bool = not out_lap and lap_ms >= tr.minLapMs and not p.lap_invalid
-			var best: bool = valid and (p.best_lap_ms == null or timed < p.best_lap_ms)
+			var counts: bool = not clean_streak or p.prev_valid
+			var best: bool = valid and counts and (p.best_lap_ms == null or timed < p.best_lap_ms)
+			p.prev_valid = valid
 			if best:
 				p.best_lap_ms = timed
 				p.best_sectors = p.sectors.duplicate()
@@ -417,7 +425,7 @@ func _on_gate(p: PlayerRaceState, gi: int, tc: float, out: Array) -> void:
 				p.valid_laps += 1
 			p.last_lap_ms = lap_ms if out_lap else timed
 			p.laps += 1
-			out.append({"type": "lap", "playerId": p.id, "lap": p.laps, "lapMs": timed, "penaltyMs": penalty_ms, "sectors": p.sectors.duplicate(), "best": best, "valid": valid, "outLap": out_lap})
+			out.append({"type": "lap", "playerId": p.id, "lap": p.laps, "lapMs": timed, "penaltyMs": penalty_ms, "sectors": p.sectors.duplicate(), "best": best, "valid": valid, "outLap": out_lap, "pending": valid and not counts})
 			p.lap_start_ms = tc
 			p.sector_start_ms = tc
 			p.sectors = []

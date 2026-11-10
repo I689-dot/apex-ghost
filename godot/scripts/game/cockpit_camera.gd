@@ -10,6 +10,8 @@ const EYE_UP := 0.02
 
 var camera: Camera3D
 var _anchor := Node3D.new()
+## The view's tilt (radians, down is negative).
+var pitch := PITCH
 var _eye: Vector3
 var _offset := Vector3.ZERO
 var _off_vel := Vector3.ZERO
@@ -270,7 +272,7 @@ func update(dt: float, t: Dictionary, steer: float, look: Dictionary, yaw_rate: 
 	var la: float = Settings.data.lookToApex
 	var corner := clampf((steer * 0.35 + yaw_rate * 0.06) * la, -0.18 * la, 0.18 * la)
 	_corner_yaw += (corner - _corner_yaw) * minf(1.0, dt * 4.0)
-	camera.rotation = Vector3(PITCH, PI + _look_yaw + _corner_yaw, 0.0)
+	camera.rotation = Vector3(pitch, PI + _look_yaw + _corner_yaw, 0.0)
 	looking_forward = absf(_look_yaw) < 0.4
 	if _dash_wheel != null:
 		_dash_wheel.rotation.z = steer * 11.0

@@ -49,10 +49,17 @@ var _opacity := 1.0
 var static_comp: Array = [0.0, 0.0, 0.0, 0.0]
 ## How far each wheel is off its hub (m, FL, FR, RL, RR): the pit crew's work.
 var wheel_out := [0.0, 0.0, 0.0, 0.0]
+## The last pose and brake light set (the replay records them).
+var pose_steer := 0.0
+var pose_rot_f := 0.0
+var pose_rot_r := 0.0
+var brake_on := false
 ## Your own car with the cockpit model: that model inside, the normal LOD0 seen from outside (set_inside).
 var _inside_root: Node3D = null
 var _outside_root: Node3D = null
 var _inside = null
+## True while the cockpit model's materials are prepared (InteriorLook applies to those only).
+var _cockpit_pass := false
 
 ## model: Assets.load_car_model result. outside: the normal LOD0 scene for your own car's outside view (or null).
 func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: PackedScene = null) -> void:
@@ -71,7 +78,11 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 		if src == null:
 			continue
 		var root: Node3D = src.instantiate()
+		_cockpit_pass = local and i == 0
+		if _cockpit_pass and InteriorLook.BAKED_WHEELS.has(entry.id):
+			_cut_out_wheel(root, InteriorLook.BAKED_WHEELS[entry.id])
 		_prepare_materials(root, cache)
+		_cockpit_pass = false
 		var rig := _rig(root)
 		_levels.append(rig)
 		add_child(root)
@@ -87,10 +98,90 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 		_add_body(root2)
 		add_child(root2)
 		_outside_root = root2
-		set_inside(true)
 	_set_shadows(self)
+	# after _set_shadows (which draws everything): from the seat only the cockpit model is drawn, the exterior one
+	# just casts the car's shadow. Set before, it was undone and the exterior showed through the cockpit
+	# (the Vantage's white door and pillars in front of its black interior).
+	if _outside_root != null:
+		set_inside(true)
 	# remote cars always, and your own car when real spot lights are too expensive, get a projected light pool
 	_make_light_pool()
+
+## Moves a wheel modelled into the cockpit's "body" mesh to a node of its own (InteriorLook.BAKED_WHEELS), which _rig then
+## turns with the steering. A triangle goes when all its corners are inside the wheel's box.
+func _cut_out_wheel(root: Node3D, w: Dictionary) -> void:
+	var body := root.find_child("body", true, false) as MeshInstance3D
+	if body == null or body.mesh == null:
+		return
+	var to_root := DashDisplays._rel(body, root)
+	var n: Vector3 = (w.axis as Vector3).normalized()
+	var right := Vector3(-1, 0, 0)
+	right = (right - n * right.dot(n)).normalized()
+	var up := n.cross(right)
+	var centre: Vector3 = w.centre
+	var src: Mesh = body.mesh
+	var kept := ArrayMesh.new()
+	var rim := ArrayMesh.new()
+	for s in src.get_surface_count():
+		var arrays := src.surface_get_arrays(s)
+		var mat := src.surface_get_material(s)
+		var idx = arrays[Mesh.ARRAY_INDEX]
+		if mat == null or not (w.materials as Array).has(mat.resource_name) or idx == null:
+			kept.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			kept.surface_set_material(kept.get_surface_count() - 1, mat)
+			continue
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var inside := PackedByteArray()
+		inside.resize(verts.size())
+		for i in verts.size():
+			var d: Vector3 = to_root * verts[i] - centre
+			var a := d.dot(right)
+			var b := d.dot(up)
+			var c := d.dot(n)
+			inside[i] = 1 if absf(a) < w.right and b > w.up[0] and b < w.up[1] and c > w.depth[0] and c < w.depth[1] else 0
+		var stay := PackedInt32Array()
+		var move := PackedInt32Array()
+		for t in range(0, idx.size() - 2, 3):
+			var i0: int = idx[t]
+			var i1: int = idx[t + 1]
+			var i2: int = idx[t + 2]
+			var out := move if inside[i0] == 1 and inside[i1] == 1 and inside[i2] == 1 else stay
+			out.append(i0)
+			out.append(i1)
+			out.append(i2)
+		var rest := arrays.duplicate()
+		rest[Mesh.ARRAY_INDEX] = stay
+		kept.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, rest)
+		kept.surface_set_material(kept.get_surface_count() - 1, mat)
+		if move.is_empty():
+			continue
+		# the wheel's own mesh: vertices relative to its centre, in the model's scale
+		var moved := arrays.duplicate()
+		var pts := PackedVector3Array()
+		pts.resize(verts.size())
+		for i in verts.size():
+			pts[i] = to_root * verts[i] - centre
+		moved[Mesh.ARRAY_VERTEX] = pts
+		moved[Mesh.ARRAY_INDEX] = move
+		rim.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, moved)
+		rim.surface_set_material(rim.get_surface_count() - 1, mat)
+	if rim.get_surface_count() == 0:
+		return
+	body.mesh = kept
+	var holder := Node3D.new()
+	holder.name = "steering_rim"
+	holder.position = centre
+	var part := MeshInstance3D.new()
+	part.name = "steering_mesh"
+	part.mesh = rim
+	holder.add_child(part)
+	root.add_child(holder)
+	# the wheel's real axis (the entry's is another point of the column)
+	_steer_axis = n
+
+## The cockpit model's root (what is seen from the driver's seat), or null.
+func cockpit_root() -> Node3D:
+	return _inside_root
 
 ## LOD by visibility range on every mesh of a level: visible from begin to end metres (0 = unlimited).
 func _set_lod_range(root: Node, begin: float, end_m: float) -> void:
@@ -187,6 +278,8 @@ func _setup_material(sm: StandardMaterial3D) -> void:
 		sm.roughness = 0.85
 		sm.metallic = 0.0
 	_apply_look(sm)
+	if _cockpit_pass:
+		InteriorLook.apply(entry.id, sm)
 	if local and sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and _is_glass(nm):
 		_glass_mats.append([sm, sm.albedo_color])
 	if not local:
@@ -317,6 +410,9 @@ func add_headlights(shadows: bool) -> void:
 
 ## Update visual state: steer = road-wheel angle (rad), rot_f / rot_r wheel angles, susp = per-wheel compression delta from static (m).
 func set_pose(steer: float, rot_f: float, rot_r: float, susp) -> void:
+	pose_steer = steer
+	pose_rot_f = rot_f
+	pose_rot_r = rot_r
 	for lvl: LevelRig in _levels:
 		for i in lvl.wheels.size():
 			var w: WheelRig = lvl.wheels[i]
@@ -331,6 +427,7 @@ func set_pose(steer: float, rot_f: float, rot_r: float, susp) -> void:
 			lvl.steering.quaternion = Quaternion(_steer_axis, steer * _steer_ratio)
 
 func set_lights(brake: bool, headlights_on: bool, night: float) -> void:
+	brake_on = brake
 	var tail := 5.0 if brake else (1.1 if headlights_on or night > 0.3 else 0.12)
 	for m in _tail_mats:
 		m.emission_energy_multiplier = tail

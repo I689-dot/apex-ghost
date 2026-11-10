@@ -68,3 +68,90 @@ static func recommend_setup(plan: Dictionary) -> Dictionary:
 	if plan.startHour < 8.0 or plan.startHour > 20.0:
 		return {"tyre": "soft", "wing": "medium", "note": I18n.t("Cool air: softs warm up quickly")}
 	return {"tyre": "medium", "wing": "medium", "note": I18n.t("Dry: mediums for a long run, softs for one fast lap")}
+
+## ------------------------------------------------------------- saved setups ---
+## iRacing keeps setups per car, exports them and shares them with other drivers. Here they are named setups in
+## Settings.data.savedSetups, and a setup travels between friends as a short text code (copy it, send it in any chat,
+## paste it in the other game): "AG1:" + base64 of the setup's JSON.
+
+const CODE_PREFIX := "AG1:"
+const TYRES := ["soft", "medium", "hard", "wet"]
+
+## A setup from untrusted data (a pasted code): only known fields, every number clamped to its range. Null if it isn't one.
+static func sanitize(raw: Variant) -> Variant:
+	if typeof(raw) != TYPE_DICTIONARY:
+		return null
+	var pair := func(key: String, lo: float, hi: float, def: float, whole: bool) -> Array:
+		var a = raw.get(key)
+		var out: Array = []
+		for i in 2:
+			var v: float = def
+			if typeof(a) == TYPE_ARRAY and a.size() > i and (typeof(a[i]) == TYPE_FLOAT or typeof(a[i]) == TYPE_INT):
+				v = clampf(float(a[i]), lo, hi)
+			out.append(roundi(v) if whole else v)
+		return out
+	var tyre = raw.get("tyre")
+	var wing = raw.get("wing")
+	var bias = raw.get("brakeBias")
+	var fuel = raw.get("fuelL")
+	var pr = raw.get("pressure")
+	var pressure = null
+	if typeof(pr) == TYPE_ARRAY and pr.size() >= 2 and (typeof(pr[0]) == TYPE_FLOAT or typeof(pr[0]) == TYPE_INT) and (typeof(pr[1]) == TYPE_FLOAT or typeof(pr[1]) == TYPE_INT):
+		pressure = [clampf(float(pr[0]), 15.0, 40.0), clampf(float(pr[1]), 15.0, 40.0)]
+	return {
+		"tyre": tyre if tyre in TYRES else "medium",
+		"wing": wing if wing in WING else "medium",
+		"brakeBias": clampf(float(bias), 0.54, 0.66) if (typeof(bias) == TYPE_FLOAT or typeof(bias) == TYPE_INT) else 0.6,
+		"pressure": pressure,
+		"ride": pair.call("ride", -SETUP.rideMm, SETUP.rideMm, 0.0, true),
+		"arb": pair.call("arb", 1, SETUP.clicks, SETUP.baseline, true),
+		"bump": pair.call("bump", 1, SETUP.clicks, SETUP.baseline, true),
+		"rebound": pair.call("rebound", 1, SETUP.clicks, SETUP.baseline, true),
+		"fuelL": clampf(float(fuel), 5.0, 200.0) if (typeof(fuel) == TYPE_FLOAT or typeof(fuel) == TYPE_INT) else 60.0,
+	}
+
+static func to_code(setup: Dictionary) -> String:
+	var clean = sanitize(setup)
+	return CODE_PREFIX + Marshalls.raw_to_base64(JSON.stringify(clean).to_utf8_buffer())
+
+## The setup in a code, or null for anything that isn't a valid one.
+static func from_code(code: String) -> Variant:
+	var c := code.strip_edges()
+	if not c.begins_with(CODE_PREFIX) or c.length() > 2000:
+		return null
+	var body := c.substr(CODE_PREFIX.length())
+	var ok := RegEx.new()
+	ok.compile("^[A-Za-z0-9+/]+={0,2}$")
+	if ok.search(body) == null or body.length() % 4 != 0:
+		return null
+	var bytes := Marshalls.base64_to_raw(body)
+	if bytes.is_empty():
+		return null
+	return sanitize(JSON.parse_string(bytes.get_string_from_utf8()))
+
+## The saved setups' names, sorted.
+static func saved_names() -> Array:
+	var names: Array = Settings.data.get("savedSetups", {}).keys()
+	names.sort_custom(func(a, b): return String(a).naturalnocasecmp_to(String(b)) < 0)
+	return names
+
+static func save_named(name: String, setup: Dictionary) -> void:
+	var n := name.strip_edges().left(24)
+	if n.is_empty():
+		return
+	if not Settings.data.has("savedSetups"):
+		Settings.data.savedSetups = {}
+	Settings.data.savedSetups[n] = sanitize(setup)
+	Settings.save()
+
+static func delete_named(name: String) -> void:
+	Settings.data.get("savedSetups", {}).erase(name)
+	Settings.save()
+
+## Copies a saved (or any) setup into the live one, keeping the dictionary the UI holds.
+static func load_into(target: Dictionary, setup: Dictionary) -> void:
+	var s = sanitize(setup)
+	if s == null:
+		return
+	for k in s:
+		target[k] = s[k]

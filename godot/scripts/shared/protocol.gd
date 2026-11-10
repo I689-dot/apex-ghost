@@ -13,7 +13,8 @@ const CHANGE_CHOICES := ["random", "off", "on"]
 const SESSION_KINDS := ["practice", "qualifying", "race"]
 
 static func default_rules() -> Dictionary:
-	return {"contact": false, "pitWindow": false, "fuel": false, "raceControl": false}
+	## cleanStreak (Time trial, solo only): a lap counts as the best only after another clean lap in a row, as in iRacing.
+	return {"contact": false, "pitWindow": false, "fuel": false, "raceControl": false, "cleanStreak": false}
 
 static func _str(v, max_len: int = 64) -> bool:
 	return typeof(v) == TYPE_STRING and (v as String).length() <= max_len
@@ -66,6 +67,13 @@ static func parse_client_msg(raw: String) -> Dictionary:
 				if not (_num(x) and x >= 0 and x <= 1):
 					return {}
 			return {"t": "damage", "zones": z}
+		"chat":
+			# text chat (rooms this game hosts: solo and P2P). "/rc text" is for the host only.
+			var said = v.get("text")
+			if typeof(said) != TYPE_STRING:
+				return {}
+			var line := Validation.clean_chat(said)
+			return {"t": "chat", "text": line} if not line.is_empty() else {}
 		"leave":
 			return {"t": "leave"}
 		"addBot":
