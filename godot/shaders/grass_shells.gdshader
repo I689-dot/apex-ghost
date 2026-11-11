@@ -6,6 +6,8 @@ render_mode depth_draw_never, cull_back;
 
 global uniform float wind_time;
 global uniform float wind_strength;
+global uniform vec3 lawn_tint;
+global uniform float lawn_edge;
 
 const float SHELL_H = 0.075;
 
@@ -42,7 +44,10 @@ void fragment() {
 	if (bh < v_l || v_l > fade) discard;
 	vec3 base = texture(lawn, p / lawn_tile).rgb * vec3(0.62, 1.0, 0.72); // GroundDetail.LAWN_TINT
 	// dark roots inside the sward, lighter tips, a little colour per blade
-	ALBEDO = base * mix(0.62, 1.3, v_l * v_l) * mix(0.86, 1.12, b1.g);
+	float k = mix(0.62, 1.3, v_l * v_l) * mix(0.86, 1.12, b1.g);
+	// a lawn drawn as the shells draw it (lawn_edge > 0: SpaLook) takes over where they end: the shading settles on that lawn's
+	k = lawn_edge > 0.0 ? mix(lawn_edge, k, fade) : k;
+	ALBEDO = base * k * lawn_tint;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }

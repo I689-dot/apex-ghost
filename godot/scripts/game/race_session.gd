@@ -335,6 +335,8 @@ func load_session(progress: Callable) -> void:
 	await step.call(I18n.t("Setting up sky and weather"))
 	weather = Weather.weather_at(race.weather, 0.0)
 	env = GameEnvironment.new(race.weather, q)
+	if race.get("trackId", "") == "spa":
+		env.set_look(SpaLook.env_look())
 	add_child(env)
 	track.apply_quality(q)
 
@@ -640,8 +642,10 @@ func _attach_line_extras(tuned: Dictionary) -> void:
 		racing_line = RacingLineFx.new(track_data, tuned.specs, track.ground_query, air.airDensity)
 		racing_line.set_mode(Settings.data.racingLine)
 		add_child(racing_line)
-	road_wear = RoadWear.new(track_data, tuned.specs, track.ground_query, air.airDensity)
-	add_child(road_wear)
+	# Spa's source model has its own rubber layers (SpaLook): the generic wear decal would darken the road twice
+	if not SpaLook.own_wear(track_data):
+		road_wear = RoadWear.new(track_data, tuned.specs, track.ground_query, air.airDensity)
+		add_child(road_wear)
 
 func _build_cinematic(entries: Dictionary) -> void:
 	var entrants: Array = []
@@ -1473,6 +1477,9 @@ func open_replay() -> void:
 		var v := _replay_visual(i)
 		if v != null:
 			_replay_saved[v] = v.transform
+			# placed in world space while the replay runs: my car's model is a child of the live car, which rolls on
+			# under the physics between frames (the replayed car jittered with it)
+			v.top_level = true
 	replay_cam = Camera3D.new()
 	replay_cam.near = 0.1
 	replay_cam.far = 9000.0
@@ -1489,6 +1496,7 @@ func close_replay() -> void:
 	replay_open = false
 	for v in _replay_saved:
 		if is_instance_valid(v):
+			v.top_level = false
 			v.transform = _replay_saved[v]
 	_replay_saved.clear()
 	if replay_cam != null:
@@ -2780,8 +2788,9 @@ func update_pit(server_now: float) -> void:
 			finish_service(sv.plan)
 	if pit_menu != null:
 		pit_menu.set_clock(session_text(server_now))
-	# my car on the air jacks, drawn above its physics pose
-	my_visual.position.y = jack_lift
+	# my car on the air jacks, drawn above its physics pose (not while a replay places it in world space)
+	if not my_visual.top_level:
+		my_visual.position.y = jack_lift
 
 func open_pit_menu() -> void:
 	var v := vehicle

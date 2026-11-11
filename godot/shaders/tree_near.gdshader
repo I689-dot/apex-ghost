@@ -5,6 +5,7 @@ render_mode cull_disabled;
 
 global uniform float wind_time;
 global uniform float wind_strength;
+global uniform vec3 tree_tint;
 
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform vec3 tint = vec3(1.0);
@@ -39,7 +40,7 @@ void fragment() {
 		float a = t.a * (1.0 + lod * 0.1);
 		if (a < 0.5) discard;
 	}
-	ALBEDO = t.rgb * tint * COLOR.rgb;
+	ALBEDO = t.rgb * tint * COLOR.rgb * tree_tint;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 }

@@ -19,6 +19,9 @@ func _run() -> void:
 	if OS.get_environment("QUALITY") != "":
 		Settings.data.quality = OS.get_environment("QUALITY")
 		Settings.data.graphics = {}
+	if OS.get_environment("GFX") != "":
+		# group overrides, as the settings page stores them: {"shadows": "high", "trees": "medium", ...}
+		Settings.data.graphics = JSON.parse_string(OS.get_environment("GFX"))
 	if OS.get_environment("NO_INTERIOR_FIX") != "":
 		InteriorLook.enabled = false
 	if OS.get_environment("FOV") != "":
@@ -28,6 +31,11 @@ func _run() -> void:
 	if OS.get_environment("SEAT_FORWARD") != "":
 		# only in memory, for the picture: the seat setting is not saved
 		Settings.data.seatForward = float(OS.get_environment("SEAT_FORWARD"))
+	if OS.get_environment("SUN_EL") != "":
+		GameEnvironment.sun_override = {"elevation": deg_to_rad(float(OS.get_environment("SUN_EL"))), "azimuth": deg_to_rad(float(OS.get_environment("SUN_AZ")))}
+	if OS.get_environment("CHASE_DIST") != "":
+		ChaseCamera.tune = {"dist": float(OS.get_environment("CHASE_DIST")), "height": float(OS.get_environment("CHASE_H")), "fov": float(OS.get_environment("CHASE_FOV")),
+			"ahead": float(OS.get_environment("CHASE_AHEAD")) if OS.get_environment("CHASE_AHEAD") != "" else 10.0, "look_y": float(OS.get_environment("CHASE_LOOKY")) if OS.get_environment("CHASE_LOOKY") != "" else 0.95}
 	if OS.get_environment("CAMERA") != "":
 		Settings.data.camera = OS.get_environment("CAMERA")
 	LocalRoom.create()
@@ -37,8 +45,9 @@ func _run() -> void:
 	await conn.connect_to_room()
 	var cars := CarsDb.selectable()
 	conn.send_json({"t": "selectCar", "carId": OS.get_environment("CAR_ID") if OS.get_environment("CAR_ID") != "" else cars[0].id})
-	conn.send_json({"t": "addBot"})
-	conn.send_json({"t": "addBot"})
+	if OS.get_environment("NO_BOTS") == "":
+		conn.send_json({"t": "addBot"})
+		conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "ready", "ready": true})
 	await get_tree().create_timer(0.3).timeout
 	var cond := {"t": "setConditions", "weather": OS.get_environment("WEATHER") if OS.get_environment("WEATHER") != "" else "clear", "time": OS.get_environment("TIME") if OS.get_environment("TIME") != "" else "midday", "changes": "off"}
@@ -90,21 +99,33 @@ func _run() -> void:
 	for k in rids:
 		if rids[k].is_valid():
 			RenderingServer.viewport_set_measure_render_time(rids[k], true)
+	if OS.get_environment("TEST_SET") != "":
+		# experiment: preset values changed in memory, e.g. TEST_SET='{"treeShadows": false}' (what a setting costs)
+		var over: Dictionary = JSON.parse_string(OS.get_environment("TEST_SET"))
+		for k in over:
+			Settings.presets()[Settings.data.quality][k] = over[k]
+		Settings._cached_key = ""
 	var gpu := {}
 	var proc := 0.0
 	var phys := 0.0
 	var frames := 0
+	var dts := PackedFloat32Array()
 	while elapsed < seconds:
 		await get_tree().process_frame
 		elapsed += get_process_delta_time()
 		if elapsed > seconds * 0.5:
+			dts.append(get_process_delta_time())
 			proc += Performance.get_monitor(Performance.TIME_PROCESS)
 			phys += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
 			frames += 1
 			for k in rids:
 				if rids[k].is_valid():
 					gpu[k] = gpu.get(k, 0.0) + RenderingServer.viewport_get_measured_render_time_gpu(rids[k])
-		if shot_dir != "" and elapsed >= next_shot:
+		if OS.get_environment("SHOT_ONCE") != "" and elapsed >= float(OS.get_environment("SHOT_ONCE")):
+			get_viewport().get_texture().get_image().save_png("%s/%s.png" % [shot_dir, OS.get_environment("SHOT_NAME") if OS.get_environment("SHOT_NAME") != "" else "shot"])
+			get_tree().quit()
+			return
+		if shot_dir != "" and elapsed >= next_shot and OS.get_environment("SHOT_ONCE") == "":
 			next_shot += 2.0
 			get_viewport().get_texture().get_image().save_png("%s/session_%02d.png" % [shot_dir, int(elapsed)])
 	print("phase msgs: ", msgs.filter(func(m): return m is Dictionary).map(func(m): return m.t).slice(-12))
@@ -123,6 +144,24 @@ func _run() -> void:
 	print("avg process ms: ", proc / maxf(1, frames) * 1000.0, " physics ms/frame: ", phys / maxf(1, frames) * 1000.0, " fps ", Engine.get_frames_per_second(), " draws ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME))
 	for k in gpu:
 		print("gpu ms ", k, ": ", gpu[k] / maxf(1, frames))
+	if dts.size() > 0:
+		var sorted_dts := dts.duplicate()
+		sorted_dts.sort()
+		var total := 0.0
+		for d in dts:
+			total += d
+		# the 1 % low: the frame rate of the slowest 1 % of frames (their mean frame time)
+		var n_low := maxi(1, dts.size() / 100)
+		var low := 0.0
+		for i in n_low:
+			low += sorted_dts[sorted_dts.size() - 1 - i]
+		print("avg fps %.1f, 1%% low %.1f, worst frame %.1f ms (%d frames)" % [dts.size() / total, n_low / low, sorted_dts[sorted_dts.size() - 1] * 1000.0, dts.size()])
+	var vp := get_viewport().get_viewport_rid()
+	for pass_name in ["visible", "shadow"]:
+		var t := RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE if pass_name == "visible" else RenderingServer.VIEWPORT_RENDER_INFO_TYPE_SHADOW
+		print("%s pass: %d objects, %.1f M primitives, %d draw calls" % [pass_name, RenderingServer.viewport_get_render_info(vp, t, RenderingServer.VIEWPORT_RENDER_INFO_OBJECTS_IN_FRAME), RenderingServer.viewport_get_render_info(vp, t, RenderingServer.VIEWPORT_RENDER_INFO_PRIMITIVES_IN_FRAME) / 1e6, RenderingServer.viewport_get_render_info(vp, t, RenderingServer.VIEWPORT_RENDER_INFO_DRAW_CALLS_IN_FRAME)])
+	if session.forest != null:
+		print("forest near trees: ", session.forest.drawn())
 	print("tris ", Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME), " draws ", Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), " quality ", Settings.data.quality)
 	print("speed=", session.vehicle.telemetry.speed, " pos=", session.vehicle.global_position)
 	if session.wet_fx != null:

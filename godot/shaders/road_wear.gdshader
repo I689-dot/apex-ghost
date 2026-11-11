@@ -1,5 +1,6 @@
 shader_type spatial;
 render_mode unshaded, blend_mul, depth_draw_never, cull_disabled, fog_disabled;
+global uniform float mul_gain;
 // Lived-in asphalt as one multiplicative decal over the road (port of the shader in game/roadWear.ts).
 // UV = (metres from the centreline, racing line offset); UV2.x = lap distance; COLOR = (braking, cornering) wear.
 
@@ -50,6 +51,6 @@ void fragment() {
 	dark += in_patch * patch_tone;
 	float fade = 1.0 - smoothstep(fade_dist * 0.55, fade_dist, v_dist);
 	float k = clamp(dark * strength * fade * (1.0 - 0.35 * wet), -0.2, 0.6);
-	ALBEDO = vec3(1.0 - k);
+	ALBEDO = vec3(1.0 - k) * mul_gain;
 	ALPHA = 1.0;
 }

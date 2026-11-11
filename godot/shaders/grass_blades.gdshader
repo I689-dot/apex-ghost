@@ -4,6 +4,7 @@ render_mode cull_disabled, skip_vertex_transform;
 // buffers per stretch of track, swayed, bent by passing cars and faded into the shells by the vertex shader.
 
 uniform float u_time = 0.0;
+global uniform vec3 lawn_tint;
 uniform vec2 u_wind = vec2(1.0, 0.0);
 uniform vec3 u_cam = vec3(0.0);
 uniform float u_radius = 40.0;
@@ -66,7 +67,7 @@ void fragment() {
 	c *= mix(0.7, 1.08, pow(v_h, 0.8));
 	c = mix(c, c * vec3(1.12, 1.06, 0.8), v_dry * v_h * 0.35);
 	c *= 1.0 - 0.28 * u_wet;
-	ALBEDO = c;
+	ALBEDO = c * lawn_tint;
 	ROUGHNESS = 0.78 - 0.4 * u_wet;
 	SPECULAR = 0.2;
 	// a field is lit from the sky: most of the way to "up", whichever side of a blade we see

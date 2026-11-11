@@ -23,6 +23,7 @@ const STRIDE := 16
 
 class Species:
 	var mesh: ArrayMesh
+	var lod: ArrayMesh  # the lighter model past the hero range (the same mesh when the species file has no "<name>_lod")
 	var height: float
 	var w_frac: float
 	var near_share: float
@@ -33,6 +34,9 @@ var ymin := {}
 var ymax := {}
 var pinned := {}    # cell index → how many leading trees are trackside trees (never thinned)
 var species: Array = []
+## The species models: Spa has its own (scanned spruces and a beech, tools/asset-pipeline/spa_godot/build_trees.py).
+var species_file := "res://assets/vegetation/trees.glb"
+var near_scale := 1.0
 var quality: Dictionary = {}
 var _far_nodes := {}   # cell index → MultiMeshInstance3D
 var _far_mat := ShaderMaterial.new()
@@ -53,6 +57,20 @@ static func ensure_globals() -> void:
 		RenderingServer.global_shader_parameter_add("wind_strength", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 1.0)
 		RenderingServer.global_shader_parameter_add("sky_time", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 		RenderingServer.global_shader_parameter_add("shell_ground", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
+		# the 3D lawn's colour against its texture (SpaLook: Spa's grass; white elsewhere)
+		RenderingServer.global_shader_parameter_add("lawn_tint", RenderingServer.GLOBAL_VAR_TYPE_VEC3, Vector3.ONE)
+		# the shading the shells settle on where they end, matching the flat lawn below (SpaLook.LAWN_EDGE; 0: off)
+		RenderingServer.global_shader_parameter_add("lawn_edge", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
+		RenderingServer.global_shader_parameter_add("tree_tint", RenderingServer.GLOBAL_VAR_TYPE_VEC3, Vector3.ONE)
+		# what the multiply-blended ground passes (ground_overlay, road_wear) scale their output by. The Mobile renderer
+		# writes every pass at half value into its 10-bit buffer and decodes x2, a multiply pass included: each one
+		# halves what it covers (measured: Zandvoort's road 35/255 on Mobile, 158 on Forward+, 155 on Mobile with a gain
+		# of 2). The circuits were tuned on Mobile, so Forward+ (the PC) halves too and every circuit looks the same on
+		# both. MUL_GAIN overrides it (experiments).
+		var gain := 0.5 if RenderingServer.get_current_rendering_method() == "forward_plus" else 1.0
+		if OS.get_environment("MUL_GAIN") != "":
+			gain = float(OS.get_environment("MUL_GAIN"))
+		RenderingServer.global_shader_parameter_add("mul_gain", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, gain)
 
 ## Wind strength (0 calm … ~2 storm), from the weather.
 static func set_wind_strength(v: float) -> void:
@@ -74,6 +92,9 @@ static func load_forest(host: Node, track: TrackScene, track_data: Dictionary, q
 	return f
 
 func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
+	if track_data.get("id", "") == "spa" and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
+		species_file = "res://assets/vegetation/trees_spa.glb"
+		near_scale = SpaLook.FOREST_NEAR_SCALE
 	var ref = track_data.get("forest", null)
 	if ref != null:
 		var base := Assets.path(ref.file).get_base_dir()
@@ -148,20 +169,28 @@ func _merge_extra(extra: Array) -> void:
 
 ## Spruces and maple from the models, with the baked occlusion; impostor cards baked from them.
 func _make_species() -> void:
-	var scene = load("res://assets/vegetation/trees.glb")
+	var scene = load(species_file)
+	# the old models' textures needed a tint; the new species carry their real colours (the circuit's look tints them)
+	var own := species_file != "res://assets/vegetation/trees.glb"
 	if not (scene is PackedScene):
 		return
 	var root: Node = (scene as PackedScene).instantiate()
 	var specs: Array = []
 	for k in SPRUCES:
-		specs.append(["spruce_%d" % k, SPRUCE_H, SPRUCE_TINT, NEAR_SHARE[k]])
-	specs.append(["maple", BEECH_H, MAPLE_TINT, NEAR_SHARE[3]])
+		specs.append(["spruce_%d" % k, SPRUCE_H, Color.WHITE if own else SPRUCE_TINT, NEAR_SHARE[k]])
+	specs.append(["maple", BEECH_H, Color.WHITE if own else MAPLE_TINT, NEAR_SHARE[3]])
 	for sp in specs:
 		var node := root.find_child(sp[0], true, false) as MeshInstance3D
 		if node == null:
 			continue
 		var s := _species_from(node, sp[1], sp[2], sp[3])
 		if s != null:
+			s.lod = s.mesh
+			var lod_node := root.find_child(sp[0] + "_lod", true, false) as MeshInstance3D
+			if lod_node != null:
+				var l := _species_from(lod_node, sp[1], sp[2], sp[3], false)
+				if l != null:
+					s.lod = l.mesh
 			species.append(s)
 	root.free()
 	if species.size() != SPRUCES + 1:
@@ -169,12 +198,16 @@ func _make_species() -> void:
 		return
 	await _bake_cards()
 
-func _species_from(node: MeshInstance3D, height: float, tint: Color, near_share: float) -> Species:
+func _species_from(node: MeshInstance3D, height: float, tint: Color, near_share: float, register := true) -> Species:
 	var src := node.mesh
 	var xf := node.transform
 	var parts: Array = []  # {arrays, leaf, mat}
 	for s in src.get_surface_count():
 		var arrays := src.surface_get_arrays(s)
+		# only what the tree shader uses: other channels a model brings (custom data, a second UV set, skinning) can
+		# be in formats add_surface_from_arrays refuses (Spa's scanned species)
+		for k in [Mesh.ARRAY_TANGENT, Mesh.ARRAY_COLOR, Mesh.ARRAY_TEX_UV2, Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3, Mesh.ARRAY_BONES, Mesh.ARRAY_WEIGHTS]:
+			arrays[k] = null
 		var m := src.surface_get_material(s)
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 		var nors: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
@@ -218,7 +251,8 @@ func _species_from(node: MeshInstance3D, height: float, tint: Color, near_share:
 	s.height = height
 	s.w_frac = maxf(maxf(-lo.x, hi.x), maxf(-lo.z, hi.z)) * 2.0 * 1.04 / height
 	s.near_share = near_share
-	_near_mats.append(mats)
+	if register:
+		_near_mats.append(mats)
 	return s
 
 ## Crown normals and baked occlusion: leaf normals point out of the crown (a soft volume under the sun); vertex colours
@@ -358,17 +392,23 @@ func _build_far() -> void:
 		add_child(mmi)
 		_far_nodes[c] = mmi
 
+## Per species three near layers: _near[k] the full model within the hero range, _near[k + n] the lighter one out to
+## forestNear, _near[k + 2n] the lighter one again under the near trees to SHADOW_REACH x the hero range, casting their
+## shadows only (the full models' leaf cards in Ultra's 8192 px shadow map halved Spa's frame rate; every near tree's
+## light model cost a third of it). Without a separate light model the full one
+## casts its own shadows and the third layer stays empty.
 func _build_near() -> void:
-	for k in species.size():
+	for j in species.size() * 3:
+		var k := j % species.size()
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_colors = true
-		mm.mesh = (species[k] as Species).mesh
+		mm.mesh = (species[k] as Species).mesh if j < species.size() else (species[k] as Species).lod
 		mm.instance_count = 0
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
 		mmi.custom_aabb = AABB(Vector3(-20000, -2000, -20000), Vector3(40000, 4000, 40000))
-		mmi.name = "forest_near_%d" % k
+		mmi.name = "forest_near_%d%s" % [k, ["", "_lod", "_shadow"][j / species.size()]]
 		mmi.layers = 2
 		add_child(mmi)
 		_near.append(mmi)
@@ -381,7 +421,7 @@ func set_quality(q: Dictionary) -> void:
 	var dens: float = q.forestDensity
 	var near_r := Vector4(1, 1, 1, 1)
 	for k in species.size():
-		near_r[k] = float(q.forestNear) * (species[k] as Species).near_share
+		near_r[k] = near_range(q) * (species[k] as Species).near_share
 	_far_mat.set_shader_parameter("near_r", near_r)
 	for c in _far_nodes:
 		var mmi: MultiMeshInstance3D = _far_nodes[c]
@@ -389,8 +429,18 @@ func set_quality(q: Dictionary) -> void:
 		var keep := maxi(int(pinned[c]), ceili(count * dens))
 		mmi.multimesh.visible_instance_count = mini(count, keep)
 		mmi.visibility_range_end = far_d + grid.cell
+	var ns := species.size()
 	for k in _near.size():
-		(_near[k] as MultiMeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if q.treeShadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var sp := species[k % ns] as Species
+		var own_lod := sp.lod != sp.mesh
+		var mode := GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if k >= 2 * ns:
+			mode = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		elif not own_lod and q.treeShadows:
+			mode = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		(_near[k] as MultiMeshInstance3D).cast_shadow = mode
+		if k >= 2 * ns:
+			(_near[k] as MultiMeshInstance3D).visible = bool(q.treeShadows) and own_lod
 	_last_pos = Vector3(1e9, 0, 0)
 
 ## Re-select the near trees around the camera; cheap to call every frame (works only after ~20 m of travel, a few cells
@@ -404,7 +454,7 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 			return
 		_last_pos = cam
 		_work_pos = cam
-		var near_d: float = float(q.forestNear)
+		var near_d: float = near_range(q)
 		var cell: float = grid.cell
 		var ci0 := maxi(0, int(floorf((cam.x - near_d - grid.ox) / cell)))
 		var ci1 := mini(grid.nx - 1, int(floorf((cam.x + near_d - grid.ox) / cell)))
@@ -424,8 +474,11 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 	var budget := 2
 	var near_d2 := []
 	for k in species.size():
-		near_d2.append(pow(float(quality.forestNear) * (species[k] as Species).near_share, 2.0))
+		near_d2.append(pow(near_range(quality) * (species[k] as Species).near_share, 2.0))
 	var nd: float = quality.forestNearDensity
+	var hero_d2 := pow(hero_range(quality), 2.0)
+	var shadow_d2 := hero_d2 * SHADOW_REACH * SHADOW_REACH
+	var ns := species.size()
 	while budget > 0 and not _work.is_empty():
 		var c: int = _work.pop_back()
 		budget -= 1
@@ -439,19 +492,38 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 			var d2 := dx * dx + dz * dz
 			var kind := int(data[o + 15] + 0.5)
 			if d2 <= near_d2[kind]:
-				_tmp[kind].append_array(data.slice(o, o + STRIDE))
+				var tree := data.slice(o, o + STRIDE)
+				_tmp[kind if d2 <= hero_d2 else kind + ns].append_array(tree)
+				if d2 <= shadow_d2:
+					_tmp[kind + 2 * ns].append_array(tree)
 	if _work.is_empty():
 		_apply_near()
 
 func _apply_near() -> void:
 	_drawn_near = 0
 	for k in _near.size():
+		if k >= 2 * species.size() and not (_near[k] as MultiMeshInstance3D).visible:
+			(_near[k] as MultiMeshInstance3D).multimesh.instance_count = 0
+			continue
 		var mm: MultiMesh = (_near[k] as MultiMeshInstance3D).multimesh
 		var n: int = _tmp[k].size() / STRIDE
 		mm.instance_count = n
 		if n > 0:
 			mm.buffer = _tmp[k]
-		_drawn_near += n
+		if k < 2 * species.size():
+			_drawn_near += n
+
+## How far trees are drawn as models: the quality's forestNear, times the circuit's own scale (a dense forest close
+## to the track, as at Spa, has many times the trees in the same radius).
+func near_range(q: Dictionary) -> float:
+	return float(q.forestNear) * near_scale
+
+## How far trees are drawn as their full models (past that, as the lighter "_lod" model where the species has one):
+## the quality's "forestHero", else 60 m.
+const SHADOW_REACH := 1.5
+
+static func hero_range(q: Dictionary) -> float:
+	return float(q.get("forestHero", 60.0))
 
 ## Total trees drawn as models (near).
 func drawn() -> int:

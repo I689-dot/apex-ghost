@@ -5,6 +5,8 @@ extends RefCounted
 ## the height so kerbs and bumps don't shake the picture. Look back puts it ahead of the car, looking back.
 
 var camera := Camera3D.new()
+## Look comparisons (tests/session_test.gd CHASE_*): fixed distance / height / look-ahead / look height (m) and FOV.
+static var tune := {}
 var _init_done := false
 var _yaw := 0.0
 var _y := 0.0
@@ -45,6 +47,9 @@ func update(dt: float, car: Node3D, car_vel: Vector3, mode: String, back: bool) 
 	# framed as in GT7 / F1 25: the car in the lower third, the road and the next corner above it
 	var dist := ((8.6 if far else 5.9) + fast * (1.1 if far else 0.8)) * float(chase_cfg.distance)
 	var height := (2.9 if far else 2.0) * float(chase_cfg.height)
+	if not tune.is_empty() and not far:
+		dist = float(tune.get("dist", dist))
+		height = float(tune.get("height", height))
 	var yaw := _yaw + PI if back else _yaw
 	var fx := sin(yaw)
 	var fz := cos(yaw)
@@ -53,5 +58,11 @@ func update(dt: float, car: Node3D, car_vel: Vector3, mode: String, back: bool) 
 	_side += (side - _side) * (1.0 - exp(-dt * 3.0))
 	camera.global_position = Vector3(o.origin.x - fx * dist - fz * _side, _y + height, o.origin.z - fz * dist + fx * _side)
 	var ahead := 9.0 if far else 10.0
-	camera.look_at(Vector3(o.origin.x + fx * ahead, _y + (0.75 if far else 0.95), o.origin.z + fz * ahead), Vector3.UP)
+	var look_y := 0.75 if far else 0.95
+	if not tune.is_empty() and not far:
+		ahead = float(tune.get("ahead", ahead))
+		look_y = float(tune.get("look_y", look_y))
+	camera.look_at(Vector3(o.origin.x + fx * ahead, _y + look_y, o.origin.z + fz * ahead), Vector3.UP)
 	camera.fov = (54.0 if far else 58.0) + fast * 7.0
+	if not tune.is_empty() and not far and tune.has("fov"):
+		camera.fov = float(tune.fov)

@@ -9,6 +9,11 @@ const OVERCAST_C := Color(0.62, 0.66, 0.7)
 const DUSK_C := Color(0.42, 0.5, 0.75)
 const LUT_SIZE := Vector2i(128, 64)
 
+## Tests and look comparisons: the sun's {elevation, azimuth} (radians) instead of the clock's (empty: off).
+static var sun_override := {}
+## A circuit's own look (SpaLook.ENV): multipliers on haze, fog, sun, ambient, exposure, the sky's brightness (sky), the
+## tonemapper and its white, cloud cover. Empty for the other circuits (their look unchanged).
+var look := {}
 var plan: Dictionary
 var quality: Dictionary
 var world_env := WorldEnvironment.new()
@@ -132,7 +137,7 @@ static func _smoothstep(a: float, b: float, x: float) -> float:
 ## Update for the given weather state (a Weather.weather_at result). Cheap; called every frame.
 func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel: Vector3) -> void:
 	_time += dt
-	var se := Weather.sun_position(plan.dayOfYear, w.hour)
+	var se := Weather.sun_position(plan.dayOfYear, w.hour) if sun_override.is_empty() else sun_override
 	var elevation: float = se.elevation
 	var azimuth: float = se.azimuth
 	sun_elevation = elevation
@@ -143,7 +148,7 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	night = 1.0 - _smoothstep(-0.2, 0.02, elevation)
 	var overcast: float = w.clouds
 	# crisp blue on clear days, milky in haze and fog
-	var haze: float = 0.55 + overcast * 0.9 + w.fog * 4.0
+	var haze: float = 0.55 * float(look.get("haze", 1.0)) + overcast * 0.9 + w.fog * 4.0
 	_update_lut(sun_v, haze)
 	_refresh_colours(haze)
 
@@ -159,7 +164,7 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 		sun.light_color = c
 		var air_mass := clampf(sqrt((0.2126 * st.r + 0.7152 * st.g + 0.0722 * st.b) / 0.86), 0.35, 1.05)
 		# three's physical lights: irradiance 3.6 -> radiance albedo * 3.6 / pi; Godot's energy 1 is albedo * 1
-		sun.light_energy = (3.6 * day * direct * air_mass + 0.0001) / PI
+		sun.light_energy = (3.6 * day * direct * air_mass + 0.0001) / PI * float(look.get("sun", 1.0))
 	else:
 		# moonlight from the opposite side of the sky
 		var m := Vector3(-sun_v.x, maxf(0.35, -sun_v.y), -sun_v.z).normalized()
@@ -171,7 +176,7 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 
 	# ambient comes from the sky itself (Environment.ambient_light_source = SKY); its strength follows the day
 	# a clear day: the sun several times the sky's fill (deep, blue-ish shadows); under cloud the light is the sky's
-	env.ambient_light_energy = (0.34 + 1.0 * day * (0.64 + overcast * 0.66)) * 0.62
+	env.ambient_light_energy = (0.34 + 1.0 * day * (0.64 + overcast * 0.66)) * 0.62 * float(look.get("ambient", 1.0))
 	# the sky's light is blue, but what fills a shadow is also the light the ground and the stands bounce back
 	# (warm grey): part of the ambient is that neutral colour, so shadows are cool, not cyan
 	env.ambient_light_sky_contribution = 0.7
@@ -187,7 +192,7 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	env.fog_light_color = fog_away
 	env.fog_sun_scatter = clampf((fog_sun.get_luminance() - fog_away.get_luminance()) / maxf(0.05, fog_away.get_luminance() + 0.5), 0.0, 1.0)
 	# FogExp2 (density 1.95 / visibility) is nearly gone at the visibility distance: an exponential fog with the same reach
-	env.fog_density = 3.8 / maxf(120.0, float(w.visibility)) * fog_scale * 0.5
+	env.fog_density = 3.8 / maxf(120.0, float(w.visibility)) * fog_scale * 0.5 * float(look.get("fog", 1.0))
 	env.fog_height_density = 0.0
 
 	# sky: clouds lit by the sun's transmitted colour and the sky's ambient
@@ -209,9 +214,9 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	if push_sky:
 		sky_mat.set_shader_parameter("uCloudAmb", Vector3(cloud_amb.r, cloud_amb.g, cloud_amb.b))
 	if push_sky:
-		sky_mat.set_shader_parameter("uCover", minf(0.97, 0.12 + overcast * 0.85 + w.fog * 0.2))
+		sky_mat.set_shader_parameter("uCover", minf(0.97, float(look.get("cover", 0.12)) + overcast * 0.85 + w.fog * 0.2))
 	if push_sky:
-		sky_mat.set_shader_parameter("uCirrus", (1.0 - overcast) * 0.8)
+		sky_mat.set_shader_parameter("uCirrus", (1.0 - overcast) * 0.8 * float(look.get("cirrus", 1.0)))
 	if push_sky:
 		sky_mat.set_shader_parameter("uFogMix", heavy_fog)
 	if push_sky:
@@ -228,7 +233,22 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	var rc := Color(0.7, 0.74, 0.8) * (0.15 + 0.85 * day)
 	_rain_mat.set_shader_parameter("uColor", Vector3(rc.r, rc.g, rc.b))
 
-	env.tonemap_exposure = (1.0 + night * 1.1 + overcast * 0.12) * float(Settings.data.brightness)
+	env.tonemap_exposure = (1.0 + night * 1.1 + overcast * 0.12) * float(Settings.data.brightness) * float(look.get("exposure", 1.0))
+	env.background_energy_multiplier = float(look.get("sky", 1.0))
+
+## Applies a circuit's look (see `look`): the tonemapper and its white now, the rest every frame in update().
+func set_look(l: Dictionary) -> void:
+	look = l
+	match String(l.get("tonemap", "")):
+		"agx":
+			env.tonemap_mode = Environment.TONE_MAPPER_AGX
+		"filmic":
+			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+		"aces":
+			env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	if l.has("white"):
+		env.tonemap_white = float(l.white)
+	_apply_post(quality)
 
 func _update_lut(sun_v: Vector3, haze: float, force: bool = false) -> void:
 	if not force and absf(sun_v.y - _last_sun.y) < 0.0015 and absf(haze - _last_haze) < 0.02:
@@ -252,9 +272,10 @@ func _apply_post(q: Dictionary) -> void:
 	# the player's contrast and saturation (Display page) over the grade, also without it
 	var d: Dictionary = Settings.data.display
 	var user_grade := not is_equal_approx(float(d.contrast), 1.0) or not is_equal_approx(float(d.saturation), 1.0)
-	env.adjustment_enabled = bool(q.grade) or user_grade
-	env.adjustment_contrast = (1.06 if bool(q.grade) else 1.0) * float(d.contrast)
-	env.adjustment_saturation = float(d.saturation)
+	var lk := not look.is_empty() and (look.has("contrast") or look.has("saturation"))
+	env.adjustment_enabled = bool(q.grade) or user_grade or lk
+	env.adjustment_contrast = (float(look.get("contrast", 1.06)) if bool(q.grade) or lk else 1.0) * float(d.contrast)
+	env.adjustment_saturation = float(look.get("saturation", 1.0)) * float(d.saturation)
 	# the sun's cascades: two are enough on a phone
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 

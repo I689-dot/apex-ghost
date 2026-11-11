@@ -89,6 +89,12 @@ func load_scene() -> TrackScene:
 		chunks.append(ch)
 	_pull_ground_pieces()
 	_prepare_materials()
+	Forest.ensure_globals()
+	RenderingServer.global_shader_parameter_set("lawn_tint", SpaLook.global_tint("@lawn") if data.get("id", "") == "spa" else Vector3.ONE)
+	RenderingServer.global_shader_parameter_set("tree_tint", SpaLook.global_tint("@forest") if data.get("id", "") == "spa" else Vector3.ONE)
+	RenderingServer.global_shader_parameter_set("lawn_edge", SpaLook.LAWN_EDGE if data.get("id", "") == "spa" else 0.0)
+	if data.get("id", "") == "spa":
+		SpaLook.apply(self)
 	_lift_decals()
 	collision_bodies = TrackCollision.build(self, data)
 	return self
@@ -344,13 +350,15 @@ func extract_card_trees() -> Array:
 			var pine := false
 			for s in mi.mesh.get_surface_count():
 				var m := mi.mesh.surface_get_material(s)
-				if m != null and _match("(?i)pine", m.resource_name):
+				if m != null and (_match("(?i)pine", m.resource_name) or _match(SpaLook.CONIFER_RE, m.resource_name)):
 					pine = true
 			for s in mi.mesh.get_surface_count():
 				_card_trees_of_surface(mi, s, pine, out)
 		c.object.get_parent().remove_child(c.object)
 		c.object.queue_free()
 	chunks = chunks.filter(func(ch): return ch.kind != "trees")
+	if data.get("id", "") == "spa":
+		SpaLook.card_trees(out)
 	return out
 
 func _card_trees_of_surface(mi: MeshInstance3D, s: int, pine: bool, out: Array) -> void:

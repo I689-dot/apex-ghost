@@ -3,6 +3,7 @@ render_mode cull_disabled, skip_vertex_transform;
 // Far trees: camera-facing (cylindrical) impostor cards baked from the models, one draw call per cell for every species
 // (port of impostorMaterial in game/forest.ts). Instance transform: position, scale; instance colour: tint, alpha = species.
 
+global uniform vec3 tree_tint;
 uniform sampler2DArray cards : source_color, filter_linear_mipmap, repeat_disable;
 uniform vec4 card_w = vec4(12.0);   // card width (m) per species at scale 1
 uniform vec4 card_h = vec4(25.0);   // card height (m) per species at scale 1
@@ -39,7 +40,7 @@ void fragment() {
 	vec2 dy = dFdy(UV * ts);
 	float lod = clamp(0.5 * log2(max(dot(dx, dx), dot(dy, dy))), 0.0, 3.0);
 	if (t.a * (1.0 + lod * 0.12) < 0.45) discard;
-	ALBEDO = t.rgb * v_tint;
+	ALBEDO = t.rgb * v_tint * tree_tint;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 	NORMAL = (VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz;

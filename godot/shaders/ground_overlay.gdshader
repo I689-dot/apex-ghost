@@ -13,7 +13,11 @@ uniform bool hue = false;
 uniform float detail = 0.2;
 uniform sampler2D detail_tex : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec3 detail_mean = vec3(0.5);
+// the asphalt detail's mean (0.5: the photo is taken as balanced; a circuit can set the measured mean so the pass neither
+// darkens nor brightens its road on average: SpaLook)
+uniform float asph_mean = 0.5;
 
+global uniform float mul_gain;
 varying vec3 v_w;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -58,7 +62,7 @@ void fragment() {
 		// photo asphalt: the aggregate at two scales
 		vec3 a1 = texture(detail_tex, wp / 3.8).rgb;
 		vec3 a2 = texture(detail_tex, rot * wp / 11.3 + 0.41).rgb;
-		float alb = (a1.r * 0.62 + a2.r * 0.38) - 0.5;
+		float alb = (a1.r * 0.62 + a2.r * 0.38) - asph_mean;
 		f *= 1.0 + alb * detail * 4.5;
 	} else if (detail > 0.0) {
 		float fine = kind == 1 ? 0.32 : 1.6;
@@ -66,6 +70,6 @@ void fragment() {
 		float g = texture(detail_tex, wp / fine).r * 0.6 + texture(detail_tex, wp / coarse + 0.37).r * 0.4;
 		f *= 1.0 + (g - 0.5) * detail * 2.0;
 	}
-	ALBEDO = f;
+	ALBEDO = f * mul_gain;
 	ALPHA = 1.0;
 }
