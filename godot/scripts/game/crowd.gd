@@ -60,7 +60,15 @@ static func crowd_texture() -> ImageTexture:
 static func build(root: Node3D, track: Dictionary, density: float) -> MultiMeshInstance3D:
 	if density <= 0.0:
 		return null
-	var re := RegEx.create_from_string(STAND_MAT_RE)
+	var r := Rng.new(1234567)
+	var seats := seats_on_stands(root, track, density, STAND_MAT_RE, r)
+	if seats.is_empty():
+		return null
+	return _instances(seats, r)
+
+## [position, yaw to the track] for each spectator on the sloped faces of the stand_re materials.
+static func seats_on_stands(root: Node3D, track: Dictionary, density: float, stand_re: String, r: Rng) -> Array:
+	var re := RegEx.create_from_string(stand_re)
 	# the lap line every ~10 m: which way the track is from a seat
 	var cl: Array = track.centerline
 	var npts := cl.size() / 3
@@ -68,7 +76,6 @@ static func build(root: Node3D, track: Dictionary, density: float) -> MultiMeshI
 	var line := PackedVector2Array()
 	for i in range(0, npts, step):
 		line.append(Vector2(cl[i * 3], cl[i * 3 + 2]))
-	var r := Rng.new(1234567)
 	var seats: Array = []  # [Vector3 position, yaw]
 	for node in CarVisual._walk(root):
 		if not (node is MeshInstance3D) or (node as MeshInstance3D).mesh == null:
@@ -127,8 +134,9 @@ static func build(root: Node3D, track: Dictionary, density: float) -> MultiMeshI
 						v = 1.0 - v
 					var pos := a + (b - a) * u + (c - a) * v + Vector3(0, 0.02, 0)
 					seats.append([pos, yaw + (r.next() - 0.5) * 0.5])
-	if seats.is_empty():
-		return null
+	return seats
+
+static func _instances(seats: Array, r: Rng) -> MultiMeshInstance3D:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.55, 1.05)
 	quad.center_offset = Vector3(0, 0.52, 0)

@@ -39,6 +39,10 @@ static func overlay(kind: String, strength: float, hue: bool, detail: float) -> 
 
 const LAWN_TINT := Color(0.62, 1.0, 0.72)
 
+## Materials that keep their own texture and are not lawn, whatever their name (a circuit sets it before its materials
+## are prepared; "" for none): Spa's painted run-off is named "astroturf" (SpaLook.PAINT_RE).
+static var paint_re := ""
+
 ## Every map's lawn wears Spa's: a sharp photo of real circuit grass, tiled every 5.5 m in world space.
 static func use_spa_lawn(sm: StandardMaterial3D) -> void:
 	sm.albedo_texture = _tex("res://assets/textures/lawn_spa.jpg")
@@ -59,7 +63,7 @@ static func apply(sm: StandardMaterial3D) -> void:
 	var ground := RegEx.create_from_string("(?i)^(grass|top2|terrain_fill|astroturf|sand|gravel)").search(nm) != null or nm == "grass_fill"
 	var paved := RegEx.create_from_string("(?i)^(asph|conc_|pavement|pits|concrete|paddock_roof|ponyva|tiles)").search(nm) != null
 	if ground:
-		var is_grass := RegEx.create_from_string("(?i)grass|fill|turf").search(nm) != null
+		var is_grass := RegEx.create_from_string("(?i)grass|fill|turf").search(nm) != null and not is_paint(nm)
 		var is_gravel := RegEx.create_from_string("(?i)^(gravel|sand)").search(nm) != null
 		var top2 := RegEx.create_from_string("(?i)^top2").search(nm) != null
 		# the satellite terrain (top2) is only seen from afar: no close-up detail there; stones need contrast
@@ -74,3 +78,6 @@ static func apply(sm: StandardMaterial3D) -> void:
 		var det := 0.12 if RegEx.create_from_string("(?i)^(paddock_roof|ponyva)").search(nm) != null else (0.2 if asph else 0.22)
 		if overlays:
 			sm.next_pass = overlay("asphalt" if asph else "paved", 0.08, false, det)
+
+static func is_paint(nm: String) -> bool:
+	return paint_re != "" and RegEx.create_from_string(paint_re).search(nm) != null

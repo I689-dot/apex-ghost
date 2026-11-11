@@ -606,7 +606,7 @@ func _load_forest(q: Dictionary) -> void:
 		track.forest = forest
 
 func _attach_world_extras(q: Dictionary) -> void:
-	var crowd := Crowd.build(track, track_data, float(q.crowd))
+	var crowd := SpaCrowd.build(track, track_data, float(q.crowd)) if track_data.get("id", "") == "spa" else Crowd.build(track, track_data, float(q.crowd))
 	if crowd != null:
 		add_child(crowd)
 	Forest.ensure_globals()

@@ -67,6 +67,58 @@ const TARGET := [
 	["^sand_spa_dirt", [0.045, 0.042, 0.03]],
 ]
 
+## The painted run-off (the source's "astroturf" materials: a pale green, a blue and a strip of concrete, green paint and
+## white line; and the worn teal strip in the kerb atlas curb_spa_b): not lawn (GroundDetail.paint_re), and every painted
+## texel brought to the video's green paint. The video has no blue run-off.
+const PAINT_RE := "^(astroturf_spa|curb_spa_b)"
+## The video's green run-off paint as an albedo (linear): measured lit at the chicane and Pouhon, (0.005-0.016, 0.32,
+## 0.12), over the lit / albedo ratio of the lawn beside it.
+const PAINT_GREEN := Color(0.006, 0.22, 0.075)
+
+## The texture with its paint (green or blue texels) recoloured to PAINT_GREEN, the texels' brightness kept as grain.
+static var _painted := {}
+static func _paint(m: StandardMaterial3D) -> void:
+	var t := m.albedo_texture
+	if t == null:
+		return
+	if not _painted.has(t):
+		var img := t.get_image()
+		if img == null:
+			return
+		img = img.duplicate()
+		if img.is_compressed():
+			img.decompress()
+		img.clear_mipmaps()
+		img.convert(Image.FORMAT_RGBA8)
+		var paint := []
+		var sum := 0.0
+		for y in img.get_height():
+			for x in img.get_width():
+				var c := img.get_pixel(x, y)
+				if c.g > c.r * 1.25 or c.b > c.r * 1.4:
+					var l := c.srgb_to_linear()
+					var lum := l.r * 0.2126 + l.g * 0.7152 + l.b * 0.0722
+					paint.append([x, y, lum])
+					sum += lum
+		if paint.is_empty():
+			_painted[t] = t
+		else:
+			var mean := sum / paint.size()
+			for p in paint:
+				var k: float = clampf(p[2] / mean, 0.6, 1.4)
+				var c := Color(PAINT_GREEN.r * k, PAINT_GREEN.g * k, PAINT_GREEN.b * k).linear_to_srgb()
+				c.a = img.get_pixel(p[0], p[1]).a
+				img.set_pixel(p[0], p[1], c)
+			img.generate_mipmaps()
+			_painted[t] = ImageTexture.create_from_image(img)
+	m.albedo_texture = _painted[t]
+	m.albedo_color = Color(1, 1, 1, m.albedo_color.a)
+	# flat paint: no ground-detail pass (a multiply pass at half value on both renderers: Forest.ensure_globals'
+	# mul_gain), and little sheen (at a low angle the sky's reflection greyed it)
+	m.next_pass = null
+	m.metallic_specular = 0.15
+	m.roughness = 0.9
+
 ## The lawns the 3D grass grows on (GrassShells: every "grass" material): drawn as the shells draw it, so the two agree
 ## where the shells end (16 m on a phone, 60 m on Ultra). Before, they were coloured apart and the flat lawn had the
 ## default material's sky reflection, which the shells have not: past the shells a lighter, washed-out band.
@@ -227,6 +279,8 @@ static func apply(track: TrackScene) -> void:
 				_road_surface(m)
 			if RegEx.create_from_string(LAWN_RE).search(m.resource_name) != null:
 				_lawn(m)
+			if RegEx.create_from_string(PAINT_RE).search(m.resource_name) != null:
+				_paint(m)
 			for t in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
 					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path == ROAD_TEX else texture_mean(m.albedo_texture)
@@ -256,6 +310,8 @@ static func apply(track: TrackScene) -> void:
 			var sm := mm as StandardMaterial3D
 			if sm != null and sm.resource_name.begins_with("asph_spa_") and not sm.resource_name.begins_with("asph_spa_g"):
 				print("[spa look] final ", sm.resource_name, " tex ", sm.albedo_texture.resource_path if sm.albedo_texture else "-", " col ", sm.albedo_color, " vc ", sm.vertex_color_use_as_albedo, " rough ", sm.roughness, " nrm ", sm.normal_enabled, " tri ", sm.uv1_triplanar, " detail ", sm.detail_enabled, " next ", sm.next_pass != null, " shading ", sm.shading_mode)
+	# the repainted textures live on in their materials: no static reference left to outlive the scene (a leak at exit)
+	_painted.clear()
 	if not off.is_empty():
 		for n in CarVisual._walk(track):
 			if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:

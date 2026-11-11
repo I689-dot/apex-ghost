@@ -39,6 +39,8 @@ var ground_materials: Array = []
 var collision_bodies: Array[StaticBody3D] = []
 var ground_query: GroundQuery = null
 var forest = null
+## Spa's hills past the model's terrain (SpaFar), or null.
+var far: SpaFar = null
 var _hint := -1
 var _re := {}
 
@@ -88,6 +90,7 @@ func load_scene() -> TrackScene:
 		ch.radius = c.radius
 		chunks.append(ch)
 	_pull_ground_pieces()
+	GroundDetail.paint_re = SpaLook.PAINT_RE if data.get("id", "") == "spa" else ""
 	_prepare_materials()
 	Forest.ensure_globals()
 	RenderingServer.global_shader_parameter_set("lawn_tint", SpaLook.global_tint("@lawn") if data.get("id", "") == "spa" else Vector3.ONE)
@@ -95,6 +98,10 @@ func load_scene() -> TrackScene:
 	RenderingServer.global_shader_parameter_set("lawn_edge", SpaLook.LAWN_EDGE if data.get("id", "") == "spa" else 0.0)
 	if data.get("id", "") == "spa":
 		SpaLook.apply(self)
+		far = SpaFar.build()
+		if far != null:
+			add_child(far)
+		add_child(SpaProps.build(self))
 	_lift_decals()
 	collision_bodies = TrackCollision.build(self, data)
 	return self
@@ -180,7 +187,7 @@ func _prepare_materials() -> void:
 			GroundDetail.apply(sm)
 			if _match(GROUND_MAT_RE, nm) or nm == "grass_fill":
 				ground_materials.append(sm)
-				if _match("(?i)grass|fill|turf", nm):
+				if _match("(?i)grass|fill|turf", nm) and not GroundDetail.is_paint(nm):
 					lawn_materials.append(sm)
 			elif _match(PAVED_MAT_RE, nm) or _match(ROAD_MAT_RE, nm):
 				ground_materials.append(sm)
@@ -254,6 +261,8 @@ func materials() -> Array:
 
 ## Quality settings that act on the scene: shadow casting by kind.
 func apply_quality(q: Dictionary) -> void:
+	if far != null:
+		far.apply_quality(q)
 	for c: Chunk in chunks:
 		var cast: bool = q.treeShadows if c.kind == "trees" else (q.sceneryShadows if c.kind == "scenery" else false)
 		for n in CarVisual._walk(c.object):

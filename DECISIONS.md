@@ -1296,3 +1296,11 @@ References used for each item (researched, not from memory): iRacing's support a
 - **Spa's forest planted** (`tools/asset-pipeline/spa_godot/build_forest.py`): the source has bare ground behind its trackside tree cards; 236,493 spruce and beech on the open ground within 1.6 km, from scanned models with a light second model past 60 m that also casts the shadows (the full models' leaf cards in the 8192 px shadow map cost half the frame rate).
 - **Replays** place the replayed cars in world space: my car's model, a child of the live car, jittered as the car rolled on under the physics.
 - **Spa's lawns draw as the 3D grass does** (`SpaLook.LAWN_RE`, `lawn_edge`): same photo and world-space tiling, the grass's tint and average shading, no specular; the grass settles on that shading as it fades out. Before, the lawn past the grass's range (16 m on phones, 60 m on Ultra) was a lighter, washed-out band. The other circuits' lawns are unchanged (`lawn_edge` 0).
+
+## Godot: Spa's surroundings (2026-11-11)
+
+- **Real terrain for the horizon** (Copernicus GLO-30 + ESA WorldCover, `build_far.py`), not a painted backdrop: the hills are in the right places from every corner of the lap, and the data is open. The game frame was fitted to OpenStreetMap's raceway (1.9 m mean residual).
+- **Spa's painted run-off is not lawn**: `GroundDetail.paint_re` (set per circuit, "" elsewhere) keeps a material's own texture and keeps 3D grass off it; the other circuits are unchanged.
+- **Props are placed from the video**: off-track objects by the angle of their pixel column and the distance from their known size, rather than by guessed lap offsets (which swing about in hairpins).
+- **Spectator sprites from scanned people** (CC-BY) turning to face the camera: the old crowd cards faced the track and showed edge-on from a chase camera. The Nürburgring keeps its crowd (`Crowd.build` unchanged in behaviour).
+- `godot/assets_credits.md` lists every outside asset and dataset.
