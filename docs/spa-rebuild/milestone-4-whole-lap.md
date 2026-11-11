@@ -55,12 +55,37 @@ shade. The asphalt matches where the framing does (f021, f036: road ΔE 3-4).
 
 ## Performance (RX 7600 XT, 60 s AI drive from 0.5 km, the last 30 s measured)
 
-| | avg fps | 1 % low | visible / shadow primitives | draw calls |
-|---|---|---|---|---|
-| PC Ultra, Forward+, 2560 x 1440 | 79.5 | 50.7 | 17.0 M / 14.5 M | 825 + 383 |
-| phone tier (Mobile, Medium, 2400 x 1080, on this PC) | 350 | 114 | 2.2 M / 0.2 M | 145 + 14 |
+**Correction.** The M3 and first M4 figures said 2560 x 1440 but were measured at 1920 x 1043: this PC's screens are
+1920 x 1080 and the game window is capped at the screen. The test now reports what it drew and takes RENDER_SCALE (the 3D
+drawn at a multiple of the window: 1.333 is the 2560 x 1440 pixel count). Also: in the app, Ultra renders the 3D at 2x the
+window (`superSample: 2`, Graphics; the tests skip it), on these screens 3840 x 2160.
 
-Same as at M3 (79.8 / 50.3): the hills, the crowd and the props cost next to nothing.
+| | 3D drawn at | avg fps | 1 % low | GPU ms |
+|---|---|---|---|---|
+| M4 content, old forest switching (as first reported) | 1920 x 1043 | 79.5 | 50.7 | – |
+| same, at the target's pixel count | 2560 x 1391 | 48.1 | 31.1 | – |
+| blended forest, light shadow models (now) | 2560 x 1391 | 48.5 | 32.3 | 18.5 |
+| the same as the app's Ultra draws it on a 1080p screen | 3840 x 2086 | 38.5 | 27.4 | 24.1 |
+| phone tier (Mobile, Medium, on this PC) | 1920 x 1043 | 350 | 114 | – |
+
+Below the 45 fps target at 2560 x 1440: the forest is most of the frame (alpha-tested crowns of ~4,000 near trees).
+
+## The forest's level changes (user report: trees bare until passed, filling in as the car went by)
+
+The cards far away were hidden inside the near range every frame, the near models picked only every 20 m of travel:
+for a moment after each pick the trees entering the range ahead had neither, and the light model past 60 m had kept
+about 40 % of the crown's leaf cover (a floor in the card growth capped it at 4.5x whatever the limit), so it stood
+bare until the full model took over. Now (Spa: `Forest.fades`): each level change is a dithered cross-fade the GPU works
+out per frame from the tree's own distance (full / light model over 55-65 m, light model / card over 10 m past the near
+range), the layers picked every 5 m with a 6 m margin; the light models keep the crown's cover with fewer, larger cards
+(8x), drawn in the full model's frame (they were up to a fifth smaller); the shadows come from a separate 1,200-triangle
+model (the light model as caster made a 25 M primitive shadow pass).
+
+## Spectators behind the fences (user report)
+
+`build_places.py` casts a ray from the centreline to every spectator: each one stands at least 1.2 m behind the
+outermost fence, rail, wall or grille within 35 m (one short of it steps back past it; with none between him and the
+track he is left out).
 
 ## Checklist items still open
 

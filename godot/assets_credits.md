@@ -21,6 +21,8 @@ game: some licences below (CC-BY-NC, Fab Standard) allow that use only.
 | Copernicus GLO-30 DEM (tiles N50 E005, N50 E006) | [Copernicus / AWS open data](https://registry.opendata.aws/copernicus-dem/) | © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018, provided under COPERNICUS by the European Union and ESA | Copernicus DEM licence (free, attribution) | the hills around the circuit (`build_far.py`) |
 | ESA WorldCover 10 m 2021 v200 (tiles N48E003, N48E006) | [ESA WorldCover](https://esa-worldcover.org) | © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium | CC-BY 4.0 | the hills' land cover |
 | Circuit outline (highway=raceway) | [OpenStreetMap](https://www.openstreetmap.org/copyright) | © OpenStreetMap contributors | ODbL 1.0 | placing the circuit on the map (`geofit.json`) |
+| PaintedMetal001, Plastic007, Plastic011, Fabric032, Metal032, Rubber004, Wicker005, CorrugatedSteel005 | [ambientCG](https://ambientcg.com) | ambientCG (Lennart Demes) | CC0 | the props' materials (`build_props.py`), metal grain on the model's steel |
+| concrete_wall_008, painted_concrete | [Poly Haven](https://polyhaven.com/textures) | Dario Barresi, Charlotte Baglioni, Dimitrios Savva | CC0 | grain on the model's walls and buildings (`build_detail_textures.py`) |
 
 Modelled for the app (no outside source): the props in `tools/asset-pipeline/spa_godot/build_props.py` (bollards,
 feather flags, TV cranes, the balloon, podium boards, the footbridge, tents) and their printed art

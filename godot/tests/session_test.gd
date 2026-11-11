@@ -105,6 +105,11 @@ func _run() -> void:
 		for k in over:
 			Settings.presets()[Settings.data.quality][k] = over[k]
 		Settings._cached_key = ""
+	if OS.get_environment("RENDER_SCALE") != "":
+		# the 3D drawn at this multiple of the window (the target's pixel count on a smaller screen): 1.333 makes a
+		# 1920 x 1080 window cost a 2560 x 1440 one
+		get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		get_viewport().scaling_3d_scale = float(OS.get_environment("RENDER_SCALE"))
 	var gpu := {}
 	var proc := 0.0
 	var phys := 0.0
@@ -156,6 +161,10 @@ func _run() -> void:
 		for i in n_low:
 			low += sorted_dts[sorted_dts.size() - 1 - i]
 		print("avg fps %.1f, 1%% low %.1f, worst frame %.1f ms (%d frames)" % [dts.size() / total, n_low / low, sorted_dts[sorted_dts.size() - 1] * 1000.0, dts.size()])
+		# what was actually drawn: the window can be smaller than asked (capped at the screen), the 3D scaled from it
+		var vp := get_viewport()
+		var win := DisplayServer.window_get_size()
+		print("3D rendered at %d x %d (window %d x %d, 3D scale %.3f)" % [roundi(win.x * vp.scaling_3d_scale), roundi(win.y * vp.scaling_3d_scale), win.x, win.y, vp.scaling_3d_scale])
 	var vp := get_viewport().get_viewport_rid()
 	for pass_name in ["visible", "shadow"]:
 		var t := RenderingServer.VIEWPORT_RENDER_INFO_TYPE_VISIBLE if pass_name == "visible" else RenderingServer.VIEWPORT_RENDER_INFO_TYPE_SHADOW

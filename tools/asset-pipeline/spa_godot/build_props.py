@@ -2,7 +2,7 @@
 
    blender -b --factory-startup -P tools/asset-pipeline/spa_godot/build_props.py -- godot/assets/maps/spa_g/props
 
-Reads the printed art build_prop_textures.py wrote into the same folder; writes props.glb, one root node per prop at the
+Reads the printed art and the scanned CC0 materials (tex/) build_prop_textures.py wrote into the same folder; writes props.glb, one root node per prop at the
 origin, standing on z = 0 (glTF y = 0), its printed face towards -Y (glTF +Z): bollard, feather_flag, tv_crane,
 balloon, podium_board, footbridge (spans X, 34 m), marquee. SpaProps places them."""
 import math
@@ -18,7 +18,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 
 
-def mat(name, color, rough=0.6, metal=0.0, tex=None):
+def mat(name, color, rough=0.6, metal=0.0, tex=None, normal=None):
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     b = m.node_tree.nodes['Principled BSDF']
@@ -29,21 +29,62 @@ def mat(name, color, rough=0.6, metal=0.0, tex=None):
         t = m.node_tree.nodes.new('ShaderNodeTexImage')
         t.image = bpy.data.images.load(os.path.join(out, tex))
         m.node_tree.links.new(t.outputs['Color'], b.inputs['Base Color'])
+    if normal:
+        _normal(m, b, os.path.join(out, normal))
     return m
 
 
-ORANGE = mat('bollard_orange', (0.80, 0.16, 0.02), 0.45)
+def _normal(m, b, path):
+    t = m.node_tree.nodes.new('ShaderNodeTexImage')
+    t.image = bpy.data.images.load(path)
+    t.image.colorspace_settings.name = 'Non-Color'
+    nm = m.node_tree.nodes.new('ShaderNodeNormalMap')
+    m.node_tree.links.new(t.outputs['Color'], nm.inputs['Color'])
+    m.node_tree.links.new(nm.outputs['Normal'], b.inputs['Normal'])
+
+
+# material name -> metres one repeat of its scanned texture covers (faces wearing it get world-scale UVs: tile_uvs)
+TILE = {}
+
+
+def pbr(name, acg, tile):
+    """A scanned CC0 material (build_prop_textures.py copied it to tex/): colour, roughness, metalness when it has one,
+    normal map; repeated every `tile` metres."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    b = nt.nodes['Principled BSDF']
+    d = os.path.join(out, 'tex', acg)
+    c = nt.nodes.new('ShaderNodeTexImage')
+    c.image = bpy.data.images.load(d + '_color.jpg')
+    nt.links.new(c.outputs['Color'], b.inputs['Base Color'])
+    for key, sock in (('rough', 'Roughness'), ('metal', 'Metallic')):
+        if os.path.exists(f'{d}_{key}.jpg'):
+            t = nt.nodes.new('ShaderNodeTexImage')
+            t.image = bpy.data.images.load(f'{d}_{key}.jpg')
+            t.image.colorspace_settings.name = 'Non-Color'
+            nt.links.new(t.outputs['Color'], b.inputs[sock])
+        elif sock == 'Metallic':
+            b.inputs[sock].default_value = 0.0
+    _normal(m, b, d + '_normal.jpg')
+    TILE[name] = tile
+    return m
+
+
+ORANGE = pbr('bollard_plastic', 'Plastic007', 0.5)
 WHITE = mat('reflective_white', (0.82, 0.82, 0.8), 0.35)
-BLACK = mat('rubber_black', (0.025, 0.025, 0.028), 0.9)
-STEEL = mat('steel_grey', (0.42, 0.43, 0.44), 0.45, 0.8)
-YELLOW = mat('crane_yellow', (0.78, 0.5, 0.02), 0.45)
+RUBBER = pbr('rubber', 'Rubber004', 0.6)
+BLACK = pbr('black_plastic', 'Plastic011', 1.0)
+STEEL = pbr('galvanised_steel', 'Metal032', 1.5)
+YELLOW = pbr('crane_paint', 'PaintedMetal001', 2.0)
 GLASS = mat('cab_glass', (0.05, 0.07, 0.08), 0.1)
-FABRIC = mat('tent_white', (0.86, 0.86, 0.84), 0.85)
+FABRIC = pbr('tent_canvas', 'Fabric032', 1.0)
 FLAG = mat('flag_print', (1, 1, 1), 0.8, tex='flag.png')
-BALLOON = mat('balloon_envelope', (1, 1, 1), 0.55, tex='balloon.png')
+BALLOON = mat('balloon_envelope', (1, 1, 1), 0.55, tex='balloon.png', normal='balloon_normal.png')
 PODIUM = mat('podium_face', (1, 1, 1), 0.5, tex='podium.png')
 BANNER = mat('bridge_banner', (1, 1, 1), 0.6, tex='banner.png')
-WICKER = mat('basket_wicker', (0.35, 0.22, 0.1), 0.9)
+WICKER = pbr('basket_wicker', 'Wicker005', 0.5)
+CLAD = pbr('corrugated_cladding', 'CorrugatedSteel005', 2.0)
 
 
 def obj(name, bm, materials):
@@ -104,7 +145,7 @@ cyl(bm, 0, 0, 0.58, 0.66, 0.1, 0.098, 20, 1)
 cyl(bm, 0, 0, 0.66, 0.74, 0.098, 0.096, 20, 0)
 cyl(bm, 0, 0, 0.74, 0.82, 0.096, 0.094, 20, 1)
 cyl(bm, 0, 0, 0.82, 0.9, 0.094, 0.07, 20, 0)
-obj('bollard', bm, [ORANGE, WHITE, BLACK])
+obj('bollard', bm, [ORANGE, WHITE, RUBBER])
 
 # --- feather flag: 4.2 m pole, a 0.8 x 3.2 m flag curving from the pole, rounded at the top
 bm = bmesh.new()
@@ -149,7 +190,7 @@ beam(bm, p0, p0 + (p1 - p0) * 0.55, 0.62, 0)
 beam(bm, p0 + (p1 - p0) * 0.5, p1, 0.42, 0)
 box(bm, (p1.x - 0.4, -0.45, p1.z - 0.9), (p1.x + 0.4, 0.45, p1.z - 0.2), 3, 0.03)
 box(bm, (p1.x - 0.2, -0.75, p1.z - 0.8), (p1.x + 0.25, -0.35, p1.z - 0.45), 1, 0.02)
-obj('tv_crane', bm, [YELLOW, BLACK, GLASS, STEEL])
+obj('tv_crane', bm, [YELLOW, RUBBER, GLASS, STEEL])
 
 # --- hot-air balloon, tethered low as in the video: a 16 m envelope, round with a short taper, its mouth 3 m up
 bm = bmesh.new()
@@ -169,7 +210,7 @@ basket = box(bm, (-0.7, -0.7, 0.0), (0.7, 0.7, 1.1), 1, 0.05)
 for a in range(4):
     t = a * math.pi / 2 + math.pi / 4
     beam(bm, (0.6 * math.cos(t), 0.6 * math.sin(t), 1.1), (4.4 * math.cos(t), 4.4 * math.sin(t), 3.6), 0.03, 2)
-obj('balloon', bm, [BALLOON, WICKER, BLACK])
+obj('balloon', bm, [BALLOON, WICKER, RUBBER])
 
 # --- podium board: 6 x 3 m on two posts, its face 2.2 m up
 bm = bmesh.new()
@@ -190,35 +231,37 @@ for f in bm.faces:
 bm.to_mesh(o.data)
 bm.free()
 
-# --- footbridge: a 34 m steel truss over the track (X across), the deck 6.2 m up, stair towers both ends, banners
+# --- footbridge: a 34 m box girder over the track (X across) as in f063, its soffit 5.4 m up, 1.6 m deep, clad sides
+# carrying the banners, a steel handrail along the deck; stair towers clad in corrugated steel both ends
 bm = bmesh.new()
-L, z0, hgt, wid = 34.0, 6.2, 2.4, 3.0
-box(bm, (-L / 2, -wid / 2, z0 - 0.35), (L / 2, wid / 2, z0), 0, 0.03)
-for y in (-wid / 2, wid / 2):
-    beam(bm, (-L / 2, y, z0 + hgt), (L / 2, y, z0 + hgt), 0.25, 0)
-    beam(bm, (-L / 2, y, z0), (L / 2, y, z0), 0.25, 0)
-    n = 12
-    for k in range(n + 1):
-        x = -L / 2 + L * k / n
-        beam(bm, (x, y, z0), (x, y, z0 + hgt), 0.18, 0)
-        if k < n:
-            x2 = -L / 2 + L * (k + 1) / n
-            beam(bm, (x, y, z0) if k % 2 == 0 else (x, y, z0 + hgt), (x2, y, z0 + hgt) if k % 2 == 0 else (x2, y, z0), 0.12, 0)
-for x in (-L / 2 - 2.0, L / 2 + 2.0):
-    box(bm, (x - 2.0, -2.0, 0), (x + 2.0, 2.0, z0 + hgt + 0.5), 0, 0.05)
-for y in (-wid / 2 - 0.15, wid / 2 + 0.15):
-    for f in box(bm, (-L / 2 + 1.0, y - 0.03, z0 - 1.25), (L / 2 - 1.0, y + 0.03, z0 - 0.35), 1):
-        pass
-obj('footbridge', bm, [STEEL, BANNER])
+L, z0, dep, wid = 34.0, 5.4, 1.6, 3.4
+box(bm, (-L / 2, -wid / 2, z0), (L / 2, wid / 2, z0 + dep), 0, 0.04)
+# the banner panels, proud of the girder's sides
+for y in (-wid / 2 - 0.04, wid / 2 + 0.04):
+    box(bm, (-L / 2 + 1.0, y - 0.02, z0 + 0.2), (L / 2 - 1.0, y + 0.02, z0 + dep - 0.2), 1)
+# handrail: posts every 2 m, top and mid rails
+for y in (-wid / 2 + 0.05, wid / 2 - 0.05):
+    beam(bm, (-L / 2, y, z0 + dep + 1.1), (L / 2, y, z0 + dep + 1.1), 0.06, 0)
+    beam(bm, (-L / 2, y, z0 + dep + 0.55), (L / 2, y, z0 + dep + 0.55), 0.04, 0)
+    for k in range(18):
+        x = -L / 2 + L * k / 17
+        beam(bm, (x, y, z0 + dep), (x, y, z0 + dep + 1.1), 0.05, 0)
+for x in (-L / 2 - 2.2, L / 2 + 2.2):
+    box(bm, (x - 2.2, -2.2, 0), (x + 2.2, 2.2, z0 + dep + 2.6), 2, 0.05)
+    box(bm, (x - 2.35, -2.35, z0 + dep + 2.6), (x + 2.35, 2.35, z0 + dep + 2.85), 0, 0.03)
+obj('footbridge', bm, [STEEL, BANNER, CLAD])
 o = bpy.data.objects['footbridge']
 bm = bmesh.new()
 bm.from_mesh(o.data)
 uv_l = bm.loops.layers.uv.verify()
 for f in bm.faces:
     if f.material_index == 1:
+        if abs(f.normal.y) < 0.9:
+            f.material_index = 0
+            continue
         for lp in f.loops:
             u = (lp.vert.co.x + L / 2 - 1.0) / (L - 2.0)
-            lp[uv_l].uv = (u if f.normal.y < 0 else 1.0 - u, (lp.vert.co.z - (z0 - 1.25)) / 0.9)
+            lp[uv_l].uv = (u if f.normal.y < 0 else 1.0 - u, (lp.vert.co.z - (z0 + 0.2)) / (dep - 0.4))
 bm.to_mesh(o.data)
 bm.free()
 
@@ -244,6 +287,31 @@ for f in bm.faces:
     if f.material_index != 1:
         f.material_index = 0
 obj('marquee', bm, [FABRIC, STEEL])
+
+# the scanned materials at their real size: each face's UVs from its position, projected along its main axis
+def tile_uvs(o):
+    me = o.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    uv = bm.loops.layers.uv.verify()
+    for f in bm.faces:
+        mname = me.materials[f.material_index].name if f.material_index < len(me.materials) else ''
+        if mname not in TILE:
+            continue
+        k = 1.0 / TILE[mname]
+        n = f.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        for lp in f.loops:
+            p = lp.vert.co
+            lp[uv].uv = ((p.y, p.z) if ax == 0 else (p.x, p.z) if ax == 1 else (p.x, p.y))
+            lp[uv].uv = (lp[uv].uv[0] * k, lp[uv].uv[1] * k)
+    bm.to_mesh(me)
+    bm.free()
+
+
+for o in sc.objects:
+    if o.type == 'MESH':
+        tile_uvs(o)
 
 # hard surfaces flat, the cloth smooth
 for o in sc.objects:

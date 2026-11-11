@@ -29,6 +29,12 @@ ZONES = [
 GROUND_RE = ('grass', 'top2', 'sand_spa_dirt', 'gravel', 'astroturf', 'asph', 'pavement')
 # the crowd stands on these only
 CROWD_GROUND = ('grass', 'top2', 'sand_spa_dirt')
+# what keeps spectators off the track: every one stands behind all of these between him and the centreline (the user's
+# rule: fans behind the fences)
+BARRIER_RE = ('fence', 'grail', 'wall_spa', 'grille')
+# a spectator this far behind the outermost barrier at least (m), and barriers looked for this far out
+BEHIND = 1.2
+BARRIER_REACH = 35.0
 
 # [prop, where, turn (deg from the direction of travel: 180 faces the cars coming; None: faces the video's camera), frame]
 # where: [lap m, metres right of the centreline (- left)], or ['view', lap m of the video frame, degrees right of the
@@ -161,6 +167,47 @@ def zones(out):
                 tris.append((name, P[I]))
     props(out, cl, cum, np.concatenate([t for _, t in tris]))
     T = np.concatenate([t for n, t in tris if n.startswith(CROWD_GROUND)])
+    # the barriers as segments seen from above (their triangles stand upright: each one's longest edge in x, z)
+    seg = []
+    for f in ('map_track.glb', 'map_scenery.glb'):
+        for name, P, I in glb_prims(os.path.join(out, f)):
+            if name.startswith(BARRIER_RE):
+                tr = P[I]
+                e = [(tr[:, a][:, [0, 2]], tr[:, b][:, [0, 2]]) for a, b in ((0, 1), (1, 2), (2, 0))]
+                ln = np.stack([np.linalg.norm(q - p, axis=1) for p, q in e], 1)
+                k = ln.argmax(1)
+                pa = np.choose(k[:, None], [e[0][0], e[1][0], e[2][0]])
+                pb = np.choose(k[:, None], [e[0][1], e[1][1], e[2][1]])
+                tall = (tr[:, :, 1].max(1) - tr[:, :, 1].min(1)) > 0.3
+                seg.append(np.concatenate([pa, pb], 1)[tall & (ln.max(1) > 0.05)])
+    seg = np.unique(np.round(np.concatenate(seg), 2), axis=0)
+    cell = 20.0
+    grid = {}
+    for i, (ax, az, bx, bz) in enumerate(seg):
+        for gx in range(int(np.floor(min(ax, bx) / cell)), int(np.floor(max(ax, bx) / cell)) + 1):
+            for gz in range(int(np.floor(min(az, bz) / cell)), int(np.floor(max(az, bz) / cell)) + 1):
+                grid.setdefault((gx, gz), []).append(i)
+
+    def crossings(c, d):
+        # distances along the ray c + d * t (t in 0..BARRIER_REACH, x z) where it crosses a barrier
+        ids = set()
+        for t in np.arange(0, BARRIER_REACH + cell, cell / 2):
+            q = c + d * t
+            for gx in (-1, 0, 1):
+                for gz in (-1, 0, 1):
+                    ids.update(grid.get((int(np.floor(q[0] / cell)) + gx, int(np.floor(q[1] / cell)) + gz), ()))
+        if not ids:
+            return []
+        S = seg[list(ids)]
+        a, b = S[:, :2], S[:, 2:]
+        e = b - a
+        den = d[0] * e[:, 1] - d[1] * e[:, 0]
+        ok = np.abs(den) > 1e-9
+        w = a - c
+        t = np.where(ok, (w[:, 0] * e[:, 1] - w[:, 1] * e[:, 0]) / np.where(ok, den, 1), -1)
+        u = np.where(ok, (w[:, 0] * d[1] - w[:, 1] * d[0]) / np.where(ok, den, 1), -1)
+        hit = ok & (t > 2.0) & (t < BARRIER_REACH) & (u >= 0) & (u <= 1)
+        return sorted(t[hit].tolist())
     rng = np.random.default_rng(7)
     people = []
     for s0, s1, side, d0, d1, dens, _ in ZONES:
@@ -174,7 +221,15 @@ def zones(out):
                 g = 0.5 + 0.5 * np.sin(s * 0.045 + d * 0.3) * np.sin(s * 0.11 + 1.7)
                 if rng.random() > dens * 0.81 * 2.0 * g:
                     continue
-                p = cl[i] + right * side * (d + rng.uniform(-0.4, 0.4)) + f * rng.uniform(-0.4, 0.4)
+                dd = d + rng.uniform(-0.4, 0.4)
+                ray = np.array([right[0], right[2]]) * side
+                hits = crossings(np.array([cl[i][0], cl[i][2]]), ray)
+                if not hits:
+                    continue
+                # behind the outermost barrier: one short of it steps back past it, keeping its place in the band
+                if dd < hits[-1] + BEHIND:
+                    dd = hits[-1] + BEHIND + (dd - d0) * 0.5
+                p = cl[i] + right * side * dd + f * rng.uniform(-0.4, 0.4)
                 people.append((p[0], p[2], np.arctan2(cl[i][0] - p[0], cl[i][2] - p[2])))
     people = np.array(people)
     out_rows = []

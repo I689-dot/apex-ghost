@@ -4,7 +4,7 @@ each 1 m tall with its base at the origin, and each again as "<node>_lod" at a f
 hero range, Forest.hero_range).
 
     ~/.local/opt/blender-4.2.3-linux-x64/blender -b --factory-startup -P tools/asset-pipeline/spa_godot/build_trees.py -- \
-        <downloads/sketchfab dir> <out.glb> [tris per tree] [tris per tree, far model]
+        <downloads/sketchfab dir> <out.glb> [tris per tree] [tris per tree, far model] [tris per tree, shadow model]
 
 The downloads are 265k-2.3M triangles: far too many for a forest. Leaf cards are thinned, not collapsed (a collapse
 destroys a card): whole cards are kept at random and the kept ones scaled up about their centre so the crown keeps its
@@ -17,7 +17,10 @@ import numpy as np
 argv = sys.argv[sys.argv.index("--") + 1:]
 SRC, OUT = Path(argv[0]), Path(argv[1])
 BUDGET = int(argv[2]) if len(argv) > 2 else 14000
-LOD_BUDGET = int(argv[3]) if len(argv) > 3 else 1800  # "<node>_lod": past the hero range (Forest.hero_range)
+LOD_BUDGET = int(argv[3]) if len(argv) > 3 else 2600  # "<node>_lod": past the hero range (Forest.hero_range)
+# "<node>_shadow": what the near trees cast their shadows with (Forest's shadow layer): a shadow needs the crown's mass,
+# not its cards (with the far model as the caster, Ultra's shadow pass drew 25 M primitives)
+SHADOW_BUDGET = int(argv[4]) if len(argv) > 4 else 1200
 # node name -> Sketchfab uid (credits in downloads/sketchfab/credits.json)
 SPECIES = {
     # conical crowns (crown width / height 0.29-0.39 measured on the models), the shape of the video's forest-edge
@@ -29,6 +32,11 @@ SPECIES = {
 }
 LEAF_FILL = {"maple": 1.7}  # leaf cards enlarged even where none are dropped: the beech's crown is sparse, the video's dense
 CARD_GROW = 3.5  # the most a kept leaf card is enlarged (a crown thinned to 5 % keeps its density with ~4.5x)
+# the far model: its crown thinned to 1-3 % of the cards, which may grow further (capped at 3.5x it kept a sixth of the
+# crown's cover and stood bare until the full model took over), and most of its budget on foliage
+CARD_GROW_LOD = 8.0
+LEAF_SHARE = {"": 0.72, "_lod": 0.85, "_shadow": 0.85}
+FRAME = {}  # node -> (base, height) of its full model
 LEAF = ("fol", "leaf", "leav", "needle", "card", "foliage", "twig")
 
 
@@ -42,7 +50,7 @@ def tris(o):
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 done = []
-for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv in (("", BUDGET), ("_lod", LOD_BUDGET))]:
+for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv in (("", BUDGET), ("_lod", LOD_BUDGET), ("_shadow", SHADOW_BUDGET))]:
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=str(SRC / uid / "model.glb"))
     new = [o for o in bpy.data.objects if o not in before]
@@ -72,7 +80,7 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
     is_leaf = np.isin(mi, list(leaf_idx))
     leaf_tris = int(sum(len(p.vertices) - 2 for p, l in zip(me.polygons, is_leaf) if l))
     wood_tris = t0 - leaf_tris
-    leaf_budget = int(budget * 0.72)
+    leaf_budget = int(budget * LEAF_SHARE[suffix])
     wood_budget = budget - leaf_budget
     keep = min(1.0, leaf_budget / max(leaf_tris, 1))
     bm = bmesh.new()
@@ -82,7 +90,8 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
     random.seed(7)
     seen = set()
     kill = []
-    grow = 1.0 / max(keep, 0.05) ** 0.5 * LEAF_FILL.get(node, 1.0)
+    # (the far and shadow models keep 1-3 % of the cards: their floor lower, or the cap below was never reached)
+    grow = 1.0 / max(keep, 0.01 if suffix else 0.05) ** 0.5 * LEAF_FILL.get(node, 1.0)
     for f in bm.faces:
         if not is_leaf[f.index] or f.index in seen:
             continue
@@ -103,7 +112,7 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
             vs = {v for g in comp for v in g.verts}
             c = sum((v.co for v in vs), vs.__iter__().__next__().co * 0) / len(vs)
             for v in vs:
-                v.co = c + (v.co - c) * min(grow, CARD_GROW * LEAF_FILL.get(node, 1.0))
+                v.co = c + (v.co - c) * min(grow, (CARD_GROW_LOD if suffix else CARD_GROW) * LEAF_FILL.get(node, 1.0))
     bmesh.ops.delete(bm, geom=kill, context="FACES")
     bm.to_mesh(me)
     bm.free()
@@ -129,13 +138,19 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
     lo, hi = co.min(0), co.max(0)
     h = hi[2] - lo[2]
     base = np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])
+    # the lighter versions in the full model's frame: their enlarged cards stand proud of the crown, and scaled by their
+    # own height they came out up to a fifth smaller (the trees shrank where the forest blends one into the other)
+    if suffix:
+        base, h = FRAME[node]
+    else:
+        FRAME[node] = (base, h)
     co = (co - base) / h
     me.vertices.foreach_set("co", co.ravel())
     me.update()
     ob.name = node + suffix
     me.name = node + suffix
     done.append(ob)
-    log(f"{node + suffix}: {t0:,} -> {tris(ob):,} tris (leaf keep {keep:.2f}, cards x{min(grow, CARD_GROW):.2f}), {h:.1f} m tall")
+    log(f"{node + suffix}: {t0:,} -> {tris(ob):,} tris (leaf keep {keep:.2f}, cards x{min(grow, (CARD_GROW_LOD if suffix else CARD_GROW) * LEAF_FILL.get(node, 1.0)):.2f}), {h:.1f} m tall")
 
 bpy.ops.object.select_all(action="DESELECT")
 for o in done:

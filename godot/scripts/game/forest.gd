@@ -24,6 +24,7 @@ const STRIDE := 16
 class Species:
 	var mesh: ArrayMesh
 	var lod: ArrayMesh  # the lighter model past the hero range (the same mesh when the species file has no "<name>_lod")
+	var shadow: ArrayMesh  # what the shadow layer casts with: "<name>_shadow", else the lighter model
 	var height: float
 	var w_frac: float
 	var near_share: float
@@ -37,6 +38,16 @@ var species: Array = []
 ## The species models: Spa has its own (scanned spruces and a beech, tools/asset-pipeline/spa_godot/build_trees.py).
 var species_file := "res://assets/vegetation/trees.glb"
 var near_scale := 1.0
+## Blended level changes (Spa): instead of a tree switching from full model to light model to impostor card at a hard
+## distance, picked every 20 m of travel (trees ahead lost their card before their model arrived and stood bare, then
+## filled in as the car passed), each change is a dithered cross-fade the GPU works out per frame from the tree's own
+## distance, and the layers are picked with a margin for the travel between picks.
+var fades := false
+## Half the width of the full / light model blend about the hero range, and the width of the light model / card blend
+## beyond the near range (m); the margin each layer is picked with for the travel between picks.
+const HERO_BAND := 5.0
+const FAR_BAND := 10.0
+const PICK_MARGIN := 6.0
 var quality: Dictionary = {}
 var _far_nodes := {}   # cell index → MultiMeshInstance3D
 var _far_mat := ShaderMaterial.new()
@@ -62,6 +73,8 @@ static func ensure_globals() -> void:
 		# the shading the shells settle on where they end, matching the flat lawn below (SpaLook.LAWN_EDGE; 0: off)
 		RenderingServer.global_shader_parameter_add("lawn_edge", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
 		RenderingServer.global_shader_parameter_add("tree_tint", RenderingServer.GLOBAL_VAR_TYPE_VEC3, Vector3.ONE)
+		# the widths of the trees' level blends (Forest.HERO_BAND, FAR_BAND)
+		RenderingServer.global_shader_parameter_add("tree_bands", RenderingServer.GLOBAL_VAR_TYPE_VEC2, Vector2(Forest.HERO_BAND, Forest.FAR_BAND))
 		# what the multiply-blended ground passes (ground_overlay, road_wear) scale their output by. The Mobile renderer
 		# writes every pass at half value into its 10-bit buffer and decodes x2, a multiply pass included: each one
 		# halves what it covers (measured: Zandvoort's road 35/255 on Mobile, 158 on Forward+, 155 on Mobile with a gain
@@ -95,6 +108,8 @@ func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 	if track_data.get("id", "") == "spa" and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
 		species_file = "res://assets/vegetation/trees_spa.glb"
 		near_scale = SpaLook.FOREST_NEAR_SCALE
+		# FOREST_NO_FADE: hard level changes (measuring what the blends cost)
+		fades = OS.get_environment("FOREST_NO_FADE") == ""
 	var ref = track_data.get("forest", null)
 	if ref != null:
 		var base := Assets.path(ref.file).get_base_dir()
@@ -191,6 +206,12 @@ func _make_species() -> void:
 				var l := _species_from(lod_node, sp[1], sp[2], sp[3], false)
 				if l != null:
 					s.lod = l.mesh
+			s.shadow = s.lod
+			var sh_node := root.find_child(sp[0] + "_shadow", true, false) as MeshInstance3D
+			if sh_node != null and s.lod != s.mesh:
+				var sh := _species_from(sh_node, sp[1], sp[2], sp[3], false)
+				if sh != null:
+					s.shadow = sh.mesh
 			species.append(s)
 	root.free()
 	if species.size() != SPRUCES + 1:
@@ -403,7 +424,8 @@ func _build_near() -> void:
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_colors = true
-		mm.mesh = (species[k] as Species).mesh if j < species.size() else (species[k] as Species).lod
+		var sp := species[k] as Species
+		mm.mesh = sp.mesh if j < species.size() else (sp.lod if j < 2 * species.size() else sp.shadow)
 		mm.instance_count = 0
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
@@ -423,6 +445,7 @@ func set_quality(q: Dictionary) -> void:
 	for k in species.size():
 		near_r[k] = near_range(q) * (species[k] as Species).near_share
 	_far_mat.set_shader_parameter("near_r", near_r)
+	_far_mat.set_shader_parameter("near_band", FAR_BAND if fades else 0.0)
 	for c in _far_nodes:
 		var mmi: MultiMeshInstance3D = _far_nodes[c]
 		var count: int = (cells[c] as PackedFloat32Array).size() / STRIDE
@@ -439,6 +462,10 @@ func set_quality(q: Dictionary) -> void:
 		elif not own_lod and q.treeShadows:
 			mode = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		(_near[k] as MultiMeshInstance3D).cast_shadow = mode
+		# the full and the light layer blend into each other and the light one into the cards (tree_near.gdshader)
+		var tier := k / ns
+		var blend := fades and own_lod and tier < 2
+		(_near[k] as MultiMeshInstance3D).set_instance_shader_parameter("fade", Vector4(float(tier) if blend else -1.0, hero_range(q), near_range(q) * sp.near_share, 0.0))
 		if k >= 2 * ns:
 			(_near[k] as MultiMeshInstance3D).visible = bool(q.treeShadows) and own_lod
 	_last_pos = Vector3(1e9, 0, 0)
@@ -450,11 +477,12 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 		set_quality(q)
 	RenderingServer.global_shader_parameter_set("wind_time", Time.get_ticks_msec() / 1000.0)
 	if _work.is_empty():
-		if not force and cam.distance_squared_to(_last_pos) < 400.0:
+		# blended: picked every 5 m (PICK_MARGIN covers it)
+		if not force and cam.distance_squared_to(_last_pos) < (25.0 if fades else 400.0):
 			return
 		_last_pos = cam
 		_work_pos = cam
-		var near_d: float = near_range(q)
+		var near_d: float = near_range(q) + ((FAR_BAND + PICK_MARGIN) if fades else 0.0)
 		var cell: float = grid.cell
 		var ci0 := maxi(0, int(floorf((cam.x - near_d - grid.ox) / cell)))
 		var ci1 := mini(grid.nx - 1, int(floorf((cam.x + near_d - grid.ox) / cell)))
@@ -471,13 +499,20 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 			_apply_near()
 		return
 	# a couple of cells a frame
-	var budget := 2
+	var budget := 4 if fades else 2
 	var near_d2 := []
+	var blend := []
 	for k in species.size():
-		near_d2.append(pow(near_range(quality) * (species[k] as Species).near_share, 2.0))
+		var sp := species[k] as Species
+		var b: bool = fades and sp.lod != sp.mesh
+		blend.append(b)
+		near_d2.append(pow(near_range(quality) * sp.near_share + ((FAR_BAND + PICK_MARGIN) if b else 0.0), 2.0))
 	var nd: float = quality.forestNearDensity
 	var hero_d2 := pow(hero_range(quality), 2.0)
 	var shadow_d2 := hero_d2 * SHADOW_REACH * SHADOW_REACH
+	# blended: the full layer out to the hero range + the band + the margin, the light one in from as far inside
+	var full_d2 := pow(hero_range(quality) + HERO_BAND + PICK_MARGIN, 2.0)
+	var light_d2 := pow(maxf(0.0, hero_range(quality) - HERO_BAND - PICK_MARGIN), 2.0)
 	var ns := species.size()
 	while budget > 0 and not _work.is_empty():
 		var c: int = _work.pop_back()
@@ -493,7 +528,13 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 			var kind := int(data[o + 15] + 0.5)
 			if d2 <= near_d2[kind]:
 				var tree := data.slice(o, o + STRIDE)
-				_tmp[kind if d2 <= hero_d2 else kind + ns].append_array(tree)
+				if blend[kind]:
+					if d2 <= full_d2:
+						_tmp[kind].append_array(tree)
+					if d2 >= light_d2:
+						_tmp[kind + ns].append_array(tree)
+				else:
+					_tmp[kind if d2 <= hero_d2 else kind + ns].append_array(tree)
 				if d2 <= shadow_d2:
 					_tmp[kind + 2 * ns].append_array(tree)
 	if _work.is_empty():

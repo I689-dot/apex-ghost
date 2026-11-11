@@ -1304,3 +1304,7 @@ References used for each item (researched, not from memory): iRacing's support a
 - **Props are placed from the video**: off-track objects by the angle of their pixel column and the distance from their known size, rather than by guessed lap offsets (which swing about in hairpins).
 - **Spectator sprites from scanned people** (CC-BY) turning to face the camera: the old crowd cards faced the track and showed edge-on from a chase camera. The Nürburgring keeps its crowd (`Crowd.build` unchanged in behaviour).
 - `godot/assets_credits.md` lists every outside asset and dataset.
+- **Ultra renders at the window's resolution** (`superSample` 2 -> 1): with TAA on the PC (Forward+), twice the window in each direction (3840 x 2160 on a 1080p screen) added little sharpness for a third of the frame rate. Supersampling stays a separate setting on the Graphics page. (`godot/data/` is git-ignored: the change ships with the data, not in git.)
+- **Spa's forest blends its level changes** (dithered cross-fades from each tree's distance, worked out per frame; `Forest.fades`, Spa only): the hard switches, picked every 20 m, left trees bare or missing ahead of the car. Frame-rate figures are now measured at the pixel count claimed (`RENDER_SCALE` in session_test: this PC's screens are 1080p).
+- **Spectators stand behind the outermost barrier** (`build_places.py`), the user's rule.
+- **Scanned materials on the props** (ambientCG, Poly Haven) and **detail layers on the source's 256 px hard surfaces** (world-space grain multiplied onto their own textures, High / Ultra).

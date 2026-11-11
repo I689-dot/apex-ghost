@@ -8,6 +8,8 @@ uniform sampler2DArray cards : source_color, filter_linear_mipmap, repeat_disabl
 uniform vec4 card_w = vec4(12.0);   // card width (m) per species at scale 1
 uniform vec4 card_h = vec4(25.0);   // card height (m) per species at scale 1
 uniform vec4 near_r = vec4(80.0);   // inside this distance the 3D model stands there instead
+uniform float near_band = 0.0;      // > 0: the card fades in over this much beyond near_r while the model fades out
+varying float v_keep;
 varying flat float v_kind;
 varying vec3 v_tint;
 
@@ -28,11 +30,14 @@ void vertex() {
 	if (dot(d, d) < nr * nr) {
 		world = vec3(0.0, -10000.0, 0.0);
 	}
+	v_keep = near_band > 0.0 ? smoothstep(nr, nr + near_band, length(d)) : 1.0;
 	VERTEX = (VIEW_MATRIX * vec4(world, 1.0)).xyz;
 	NORMAL = (VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
 }
 
 void fragment() {
+	// fading in beyond the near range: the pixels [1 - keep, 1) of the dither, the light model keeping the rest
+	if (v_keep < 0.999 && fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715)))) < 1.0 - v_keep) discard;
 	vec4 t = texture(cards, vec3(UV, v_kind));
 	// alpha-tested: thin foliage keeps its coverage in the mips
 	vec2 ts = vec2(textureSize(cards, 0).xy);

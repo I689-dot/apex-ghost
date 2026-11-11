@@ -119,6 +119,37 @@ static func _paint(m: StandardMaterial3D) -> void:
 	m.metallic_specular = 0.15
 	m.roughness = 0.9
 
+## Detail layers on the source's hard surfaces (its textures are cut to 256 px): [material pattern, layer, metres a
+## repeat covers]. The layer (tools/asset-pipeline/spa_godot/build_detail_textures.py: scanned CC0 grain, linear mean 0.5,
+## and its normal map) is multiplied on in world space over a second UV set, so the material's own texture and its
+## paint layout stay; the material's colour is doubled to keep the average. High and Ultra only.
+const DETAIL := [
+	["^(wall_spa$|wall_spa_concrete|wall_spa_jersey|wall_spa_stone|wall_spa_barriers)", "concrete", 2.7],
+	["^(grail_spa|galvanized_spa|metal_beam|fence_spa_special)", "metal", 1.0],
+	["^(structures|box1|houses|main-gstand|raidillon-grandstand|marshal-post|box-door)", "painted", 2.0],
+]
+const DETAIL_DIR := "res://assets/textures/spa/"
+
+static func _detail(m: StandardMaterial3D, layer: String, tile: float) -> void:
+	var tex := DETAIL_DIR + "detail_%s.png" % layer
+	if not ResourceLoader.exists(tex):
+		return
+	m.detail_enabled = true
+	m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+	m.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+	m.detail_albedo = load(tex)
+	if ResourceLoader.exists(DETAIL_DIR + "detail_%s_nor.jpg" % layer):
+		m.normal_enabled = true
+		m.detail_normal = load(DETAIL_DIR + "detail_%s_nor.jpg" % layer)
+	m.uv2_triplanar = true
+	m.uv2_world_triplanar = true
+	m.uv2_scale = Vector3.ONE / tile
+	m.uv2_triplanar_sharpness = 4.0
+	# the grain's linear mean is 0.5: twice the colour under it
+	var c := m.albedo_color.srgb_to_linear()
+	m.albedo_color = Color(c.r * 2.0, c.g * 2.0, c.b * 2.0, c.a).linear_to_srgb()
+	m.albedo_color.a = c.a
+
 ## The lawns the 3D grass grows on (GrassShells: every "grass" material): drawn as the shells draw it, so the two agree
 ## where the shells end (16 m on a phone, 60 m on Ultra). Before, they were coloured apart and the flat lawn had the
 ## default material's sky reflection, which the shells have not: past the shells a lighter, washed-out band.
@@ -312,6 +343,18 @@ static func apply(track: TrackScene) -> void:
 				print("[spa look] final ", sm.resource_name, " tex ", sm.albedo_texture.resource_path if sm.albedo_texture else "-", " col ", sm.albedo_color, " vc ", sm.vertex_color_use_as_albedo, " rough ", sm.roughness, " nrm ", sm.normal_enabled, " tri ", sm.uv1_triplanar, " detail ", sm.detail_enabled, " next ", sm.next_pass != null, " shading ", sm.shading_mode)
 	# the repainted textures live on in their materials: no static reference left to outlive the scene (a leak at exit)
 	_painted.clear()
+	if Settings.data.quality == "high" or Settings.data.quality == "ultra":
+		var det_res := []
+		for d in DETAIL:
+			det_res.append([RegEx.create_from_string(d[0]), d[1], d[2]])
+		for mm in seen:
+			var sm := mm as StandardMaterial3D
+			if sm == null or sm.detail_enabled:
+				continue
+			for d in det_res:
+				if (d[0] as RegEx).search(sm.resource_name) != null:
+					_detail(sm, d[1], d[2])
+					break
 	if not off.is_empty():
 		for n in CarVisual._walk(track):
 			if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
