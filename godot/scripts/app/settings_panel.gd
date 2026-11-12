@@ -423,6 +423,7 @@ static func _driving(col: Control, changed: Callable) -> void:
 
 static func _interface(col: Control, changed: Callable) -> void:
 	var S: Dictionary = Settings.data
+	_packs(col)
 	_head(col, I18n.t("Language"))
 	col.add_child(_row("Language / Idioma", UIW.stepper(S.language, I18n.LANGUAGES, func(v):
 		S.language = v
@@ -573,3 +574,58 @@ static func _controller(col: Control, changed: Callable, app: App = null) -> voi
 		S.pad = Settings.default_settings().pad
 		S.pad.layouts = layouts
 		changed.call())])
+
+## Downloaded circuits (Packs): each circuit that comes as a download, whether it is installed, its size and version,
+## and Download / Update / Remove; the row follows a download's progress.
+static func _packs(col: Control) -> void:
+	_head(col, I18n.t("Downloaded circuits"))
+	if Packs.manifest.is_empty():
+		Packs.refresh()
+	for id in Packs.PROBES:
+		var status := UIKit.label("", 15, UIKit.SOFT)
+		var btn := UIKit.button("")
+		var rm := UIKit.button(I18n.t("Remove"))
+		var line := UIW.hbox(10)
+		line.add_child(status)
+		line.add_child(btn)
+		line.add_child(rm)
+		var p: Dictionary = (Packs.manifest.get("packs", {}) as Dictionary).get(id, {})
+		var name := str(p.get("name", "Spa-Francorchamps" if id == "spa" else id))
+		col.add_child(_row(name, line, I18n.t("A circuit too big for the app comes as a separate download; installed, it works offline.")))
+		var show := func() -> void:
+			if not is_instance_valid(status):
+				return
+			var j: Dictionary = Packs.jobs.get(id, {})
+			var installed: bool = Packs.state.has(id)
+			var mb := Packs.size_mb(id)
+			rm.visible = installed
+			btn.visible = true
+			btn.disabled = false
+			if not j.is_empty() and j.phase != "failed":
+				var pct := int(100.0 * float(j.done) / maxf(1.0, float(j.total)))
+				status.text = I18n.t("Checking {p} %", {"p": pct}) if j.phase == "checking" else I18n.t("Downloading {p} %", {"p": pct})
+				btn.text = I18n.t("Cancel")
+			elif installed:
+				status.text = I18n.t("Installed · {n} MB · version {v}", {"n": "%.0f" % (float(Packs.state[id].size) / 1e6), "v": str(Packs.state[id].version)})
+				btn.text = I18n.t("Update ({n} MB)", {"n": "%.0f" % mb})
+				btn.visible = Packs.update_available(id)
+			elif Packs.present(id):
+				status.text = I18n.t("Included in this version of the app")
+				btn.visible = false
+			else:
+				status.text = I18n.t(str(j.error)) if not j.is_empty() else (I18n.t("Not installed") if mb > 0.0 else I18n.t("Not installed: no connection"))
+				btn.text = I18n.t("Download ({n} MB)", {"n": "%.0f" % mb})
+				btn.disabled = mb <= 0.0
+		btn.pressed.connect(func():
+			if Packs.jobs.has(id) and Packs.jobs[id].phase != "failed":
+				Packs.cancel(id)
+			else:
+				Packs.download(id))
+		rm.pressed.connect(func(): Packs.remove(id))
+		var on_change := func(cid: String) -> void:
+			if cid == id:
+				show.call()
+		Packs.changed.connect(on_change)
+		status.tree_exiting.connect(func(): if Packs.changed.is_connected(on_change): Packs.changed.disconnect(on_change))
+		show.call()
+

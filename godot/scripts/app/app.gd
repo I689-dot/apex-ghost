@@ -453,6 +453,12 @@ func _process(_dt: float) -> void:
 # --------------------------------------------------------------- loading ---
 
 func start_loading(race: Dictionary, start_at) -> void:
+	# a circuit that comes as a download and is not installed (a room's host picked it): back to the lobby, where the
+	# main action downloads it (LobbyScreen); the race goes on without us
+	if not Packs.ready_for(str(race.trackId)):
+		toast(I18n.t("Download the circuit to race here."))
+		show_lobby()
+		return
 	if conn == null or room.is_empty():
 		return
 	if screen == "loading" and pending_race.get("raceId") == race.raceId:
@@ -645,6 +651,8 @@ func _autotest() -> void:
 	await shot.call("menu")
 	var err := await join(LocalRoom.create(), "Max")
 	print("join: ", err)
+	if OS.get_environment("TRACK") != "":
+		send({"t": "setConditions", "trackId": OS.get_environment("TRACK")})
 	await get_tree().create_timer(0.6).timeout
 	await shot.call("lobby_hub")
 	for step in ["circuit", "conditions", "session", "rules", "car", "drivers"]:
@@ -670,6 +678,8 @@ func _autotest() -> void:
 		if screen == "race":
 			break
 	await shot.call("loaded")
+	await get_tree().create_timer(6.0).timeout
+	await shot.call("racing")
 	if OS.get_environment("AUTODRIVE") != "":
 		# the AI drives my car through the whole session: the results screen, the career, the lobby after it
 		session.autodrive = AiDriver.new(session.track_data, session.vehicle, 0.95, 0.0)

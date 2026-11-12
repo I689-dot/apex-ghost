@@ -259,15 +259,25 @@ static func _lawn(m: StandardMaterial3D) -> void:
 ## in world space over every road layer. The source's road textures are Assetto Corsa strips (1024 x 4096) whose
 ## brightness changes along their length: the same layer showed light on one straight and dark on the next.
 const ROAD_RE := "^asph_spa_(base|base2|new|pit|pit2)$"
-const ROAD_TEX := "res://assets/textures/spa/asphalt_track_diff_4k.jpg"
-const ROAD_NORMAL := "res://assets/textures/spa/asphalt_track_nor_gl_4k.jpg"
-const ROAD_ARM := "res://assets/textures/spa/asphalt_track_arm_4k.jpg"
+## 4K on the PC, 2K on phones (the phone's pack carries only the 2K set: tools/godot/build-track-pack.py); whichever
+## is there.
+static func _road_file(map: String) -> String:
+	for res in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
+		var p := "res://assets/textures/spa/asphalt_track_%s_%s.jpg" % [map, res]
+		if ResourceLoader.exists(p):
+			return p
+	return ""
+
+## (looked up when used, not when the script loads: a pack downloaded in the session mounts after that)
 const ROAD_TILE_M := 2.0
 ## The scan's mean linear colour, measured from the file (reading it back from the GPU's compressed copy came out wrong).
 const ROAD_TEX_MEAN := Color(0.0163, 0.0128, 0.0120)
 
 static func _road_surface(m: StandardMaterial3D) -> void:
-	if not ResourceLoader.exists(ROAD_TEX):
+	var ROAD_TEX := _road_file("diff")
+	var ROAD_NORMAL := _road_file("nor_gl")
+	var ROAD_ARM := _road_file("arm")
+	if ROAD_TEX == "":
 		return
 	m.albedo_texture = load(ROAD_TEX)
 	m.uv1_triplanar = true
@@ -401,7 +411,7 @@ static func apply(track: TrackScene) -> void:
 				_kerb(m)
 			for t in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
-					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path == ROAD_TEX else texture_mean(m.albedo_texture)
+					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path.begins_with("res://assets/textures/spa/asphalt_track_diff") else texture_mean(m.albedo_texture)
 					var want: Color = t[1]
 					if OS.get_environment("SPA_DEBUG") != "":
 						print("[spa look] ", m.resource_name, " tex ", m.albedo_texture.resource_path if m.albedo_texture else "-", " ", m.albedo_texture.get_size() if m.albedo_texture else "", " mean ", mean, " albedo_color before ", m.albedo_color, " metal ", m.metallic, " rough ", m.roughness, " spec ", m.metallic_specular)

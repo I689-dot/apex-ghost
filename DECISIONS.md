@@ -1320,3 +1320,11 @@ The user asked for a completely new, more modern and more intuitive menu, taking
 - **Pad and keyboard**: every menu control is focusable now (they were `FOCUS_NONE`, so the D-pad could not reach the menus); each screen focuses its main control (hidden until the first pad or key press: `gui/common/show_focus_state_on_pointer_event`), a re-render of the same page keeps the focus (the lobby redraws on every room update), Esc / B steps back (closes the top modal, a lobby page to the overview, the career to the menu); while driving no button keeps the focus.
 - **The theme reaches the menus now**: a Window's theme does not reach controls under a CanvasLayer, so the old menus drew the engine's default buttons, sliders and scroll bars; the menu layer's root, the modals and the settings carry `UIKit.theme`. The HUD layers keep their look.
 - Shared pieces live in `UIW` (top bar, tabs, section, row, stepper, switch, card, tag, stat, hatch, weather symbols) and `MenuDecor` (the backdrop); no new fonts or images. `tests/menu_test.gd` builds every screen in both languages and checks the stepper, the switch, the default focus and the back steps; `APEX_AUTO=ui` screenshots every menu screen.
+
+## Godot: Spa as a download (2026-11-12)
+
+- **Spa comes as a Godot resource pack per platform** (PC 253 MB, phone 217 MB), downloaded once, checked (SHA-256) and mounted over `res://` (`Packs`, `scripts/game/track_packs.gd`); the base builds leave it out. Resource packs rather than a custom format: the track loads from the same paths as a bundled one, with no code path of its own.
+- **Packs carry only the track's entries** (`tools/godot/build-track-pack.py`): an exported pack also holds every script, `project.binary` and the caches, and mounted over the app those would replace its own.
+- **Resume with HTTP Range into a `.part` file** across dropped connections and app restarts; no file replaces anything until its hash matches.
+- **The phone pack has the 2K road set, the PC pack the 4K one** (`SpaLook._road_file` takes whichever is there).
+- The base URL is the project setting `apex/packs_url` (empty until R2 is set up with the user).

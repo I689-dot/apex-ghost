@@ -152,6 +152,10 @@ static func _main_action(app: App, room: Dictionary, mine: Dictionary, car: Dict
 	var is_ready: bool = mine.get("ready", false)
 	var act := UIW.action("", Callable(), true)
 	act.custom_minimum_size = Vector2(250, 0)
+	var track_id: String = str(room.conditions.trackId)
+	if not Packs.ready_for(track_id):
+		# the circuit comes as a download (Packs): the main action fetches it, its text the progress
+		return _download_action(app, act, hint, Packs.pack_of(track_id))
 	if room.phase != "lobby" or mine.get("waiting", false):
 		act.text = I18n.t("Waiting…").to_upper()
 		act.disabled = true
@@ -171,6 +175,55 @@ static func _main_action(app: App, room: Dictionary, mine: Dictionary, car: Dict
 		act.text = (I18n.t("Ready") + " ✓" if is_ready else I18n.t("Ready")).to_upper()
 		hint.text = I18n.t("Waiting for the host to start") if is_ready else ""
 		act.pressed.connect(func(): app.send({"t": "ready", "ready": not is_ready}))
+	# a newer version of the circuit's pack: said, not forced (the race runs on the installed one)
+	if hint.text == "" and Packs.pack_of(track_id) != "" and Packs.update_available(Packs.pack_of(track_id)):
+		hint.text = I18n.t("An update of this circuit is ready: Settings › Gameplay › Interface.")
+	return {"button": act, "hint": hint}
+
+## The download of a circuit's pack as the lobby's main action: Download (N MB), then the progress, the check and an
+## error to retry; the lobby is drawn again (render_lobby) once the circuit is in.
+static func _download_action(app: App, act: Button, hint: Label, id: String) -> Dictionary:
+	var show := func() -> void:
+		var j: Dictionary = Packs.jobs.get(id, {})
+		var total := maxf(1.0, float(j.get("total", 1)))
+		match str(j.get("phase", "")):
+			"connecting":
+				act.text = I18n.t("Connecting…").to_upper()
+				act.disabled = true
+			"downloading":
+				act.text = I18n.t("Downloading {p} %", {"p": int(100.0 * float(j.done) / total)}).to_upper()
+				act.disabled = true
+				hint.text = I18n.t("{a} of {b} MB. You can keep using the menus; it resumes if the connection drops.", {"a": "%.0f" % (float(j.done) / 1e6), "b": "%.0f" % (total / 1e6)})
+			"checking":
+				act.text = I18n.t("Checking {p} %", {"p": int(100.0 * float(j.done) / total)}).to_upper()
+				act.disabled = true
+			"failed":
+				act.text = I18n.t("Retry download").to_upper()
+				act.disabled = false
+				hint.text = I18n.t(str(j.error))
+			_:
+				var mb := Packs.size_mb(id)
+				if Packs.base_url() == "" or mb <= 0.0:
+					act.text = I18n.t("Circuit not installed").to_upper()
+					act.disabled = true
+					hint.text = I18n.t("This circuit is a separate download, not available right now. Connect to the internet and try again.")
+				else:
+					act.text = I18n.t("Download circuit ({n} MB)", {"n": "%.0f" % mb}).to_upper()
+					act.disabled = false
+					hint.text = I18n.t("This circuit is a separate download. Once installed it works offline.")
+	show.call()
+	act.pressed.connect(func(): Packs.download(id))
+	var on_change := func(changed_id: String) -> void:
+		if changed_id != id or not is_instance_valid(act):
+			return
+		if Packs.present(id):
+			app.render_lobby()
+			return
+		show.call()
+	Packs.changed.connect(on_change)
+	act.tree_exiting.connect(func(): if Packs.changed.is_connected(on_change): Packs.changed.disconnect(on_change))
+	if Packs.remote(id).is_empty():
+		Packs.refresh()
 	return {"button": act, "hint": hint}
 
 ## A labelled bar from 0 to 1 (the car's stats).

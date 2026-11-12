@@ -66,3 +66,11 @@ a full page for each; a car is picked automatically (the last one used).
 (on Wayland a covered, vsync'd window gets no frames and the laps crawl; real time: the
 physics does not survive a faster clock) drives laps with the AI alone and writes `data/ai_learned/<layout>.json`, a grip
 multiplier per 25 m that every bot plans with (AiDriver.learned_grip). Retrain after changing the tyres or the cars.
+
+## Track packs (downloads)
+
+Spa is a separate download (docs/spa-rebuild/milestone-5-download-pack.md):
+
+- **Build:** `python3 -I tools/godot/build-track-pack.py spa <out dir> --version <v>` writes `spa-pc-<v>.pck`, `spa-android-<v>.pck` and `packs.json`. Upload all three to the packs URL (project setting `apex/packs_url`).
+- **Test locally:** `python3 -I tools/godot/pack-server.py <out dir> 8765`, then run the app with `APEX_PACKS_URL=http://<this machine>:8765/` (a phone on the same network works too).
+- **Automated test:** `tests/pack_test.gd` (see its header).

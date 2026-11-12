@@ -13,6 +13,7 @@ config/features=PackedStringArray("4.7", "Mobile")
 
 Settings="*res://scripts/game/settings.gd"
 Account="*res://scripts/net/account.gd"
+Packs="*res://scripts/game/track_packs.gd"
 
 [display]
 window/size/viewport_width=1280
@@ -30,3 +31,7 @@ common/physics_ticks_per_second=120
 textures/vram_compression/import_etc2_astc=true
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
+
+[apex]
+
+packs_url=""
