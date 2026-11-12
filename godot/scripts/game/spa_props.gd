@@ -9,6 +9,8 @@ extends Node3D
 
 const PROPS := "assets/maps/spa_g/props/props.glb"
 const PLACES := "res://assets/maps/spa_g/props_places.json"
+## The open terraces where the video has them (build_places.py TERRACES: the hill after La Source), as steps.
+const TERRACES := "res://assets/maps/spa_g/terraces.json"
 
 ## The video's green gantry steel (as albedo_color, sRGB-encoded: multiplied onto the galvanised texture).
 const GANTRY_GREEN := Color(0.28, 0.62, 0.36)
@@ -57,7 +59,42 @@ static func build(track: TrackScene) -> SpaProps:
 					mi.material_override = m
 				out.add_child(mi)
 	out._place_props()
+	out._terraces()
 	return out
+
+func _terraces() -> void:
+	if not FileAccess.file_exists(TERRACES):
+		return
+	var d = JSON.parse_string(FileAccess.get_file_as_string(TERRACES))
+	if not (d is Dictionary):
+		return
+	var pos := PackedVector3Array()
+	var nor := PackedVector3Array()
+	var p: Array = d.positions
+	var n: Array = d.normals
+	for i in range(0, p.size(), 3):
+		pos.append(Vector3(p[i], p[i + 1], p[i + 2]))
+		nor.append(Vector3(n[i], n[i + 1], n[i + 2]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = pos
+	arrays[Mesh.ARRAY_NORMAL] = nor
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(d.indices)
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	# weathered concrete (the video's grey steps), its grain from the detail layer on High / Ultra
+	var m := StandardMaterial3D.new()
+	m.resource_name = "spa_terraces"
+	m.albedo_color = Color(0.5, 0.49, 0.46)
+	m.roughness = 0.95
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if Settings.data.quality == "high" or Settings.data.quality == "ultra":
+		SpaLook._detail(m, "concrete", 2.7)
+	mesh.surface_set_material(0, m)
+	var mi := MeshInstance3D.new()
+	mi.name = "terraces"
+	mi.mesh = mesh
+	add_child(mi)
 
 func _place_props() -> void:
 	if not ResourceLoader.exists(Assets.path(PROPS)) or not FileAccess.file_exists(PLACES):

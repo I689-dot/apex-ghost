@@ -19,13 +19,21 @@ CW, CH = 128, 256
 # [lap m from, to, side (+1 right of the direction of travel, -1 left), metres from the centreline from, to, people a
 # square metre where the groups are, frame] from the video
 ZONES = [
-    [560, 880, -1, 13, 24, 0.30, 'f008-f011: the hill after La Source (the video has grandstands there)'],
     [1640, 2000, -1, 16, 30, 0.07, 'f017-f019: Kemmel, groups up the left bank'],
     [2560, 2630, -1, 12, 22, 0.15, 'f025: Les Combes exit, left'],
     [3690, 3800, 1, 14, 26, 0.12, 'f037: Pouhon, the hill on the right'],
     [4440, 4620, -1, 10, 17, 0.20, 'f043-f044: Fagnes, along the fence on the left'],
     [4840, 4990, -1, 10, 20, 0.15, 'f047: Campus, the left bank'],
 ]
+# open terraces where the video has them packed (the model has a bare bank): [lap m from, to, side, first row's distance
+# from the centreline (m), rows, row depth, row rise, frame]
+TERRACES = [
+    [560, 880, -1, 13.0, 14, 0.8, 0.42, 'f008-f011: the hill after La Source, terraces full of spectators'],
+]
+# people a running metre of terrace row, and the share of places taken
+TERRACE_SEAT = 0.62
+TERRACE_FULL = 0.85
+
 GROUND_RE = ('grass', 'top2', 'sand_spa_dirt', 'gravel', 'astroturf', 'asph', 'pavement')
 # the crowd stands on these only
 CROWD_GROUND = ('grass', 'top2', 'sand_spa_dirt')
@@ -155,6 +163,61 @@ def props(out, cl, cum, T):
     print(f'[places] {len(rows)} props')
 
 
+def terraces(out, cl, cum, T):
+    """Stepped concrete terraces along the lap (TERRACES): treads and risers from a front wall at the first row to a back
+    wall down to the ground, every 2 m of lap; written to terraces.json (positions, normals, indices; SpaProps draws
+    them). Returns the spectators on their rows (x, y, z, yaw)."""
+    P, N, I, people = [], [], [], []
+    rng = np.random.default_rng(11)
+
+    def quad(a, b, c, d, n):
+        k = len(P)
+        P.extend([a, b, c, d])
+        N.extend([n] * 4)
+        I.extend([k, k + 1, k + 2, k, k + 2, k + 3])
+
+    for s0, s1, side, d0, rows, dep, rise, _ in TERRACES:
+        ss = np.arange(s0, s1 + 0.1, 2.0)
+        frames = [frame(cl, cum, s) for s in ss]
+        # the stand's front at the ground in front of it, half a metre up
+        g = [ground(T, *(c + r * side * d0)[[0, 2]], False) for c, f, r in frames]
+        g = np.array([v if v is not None else c[1] for v, (c, f, r) in zip(g, frames)])
+        h0 = np.convolve(g, np.ones(9) / 9, mode='same') + 0.5
+        h0[:4] = h0[4]
+        h0[-4:] = h0[-5]
+        for j in range(len(ss) - 1):
+            (ca, fa, ra), (cb, fb, rb) = frames[j], frames[j + 1]
+
+            def pt(c, r, d, h):
+                q = c + r * side * d
+                return [float(q[0]), float(h), float(q[2])]
+
+            out_n = (ra * -side).tolist()
+            # front wall from the ground up to the first tread
+            quad(pt(ca, ra, d0, h0[j] - 1.2), pt(cb, rb, d0, h0[j + 1] - 1.2), pt(cb, rb, d0, h0[j + 1]), pt(ca, ra, d0, h0[j]), out_n)
+            for k in range(rows):
+                d, hA, hB = d0 + k * dep, h0[j] + k * rise, h0[j + 1] + k * rise
+                # tread, then the riser up to the next row
+                quad(pt(ca, ra, d, hA), pt(cb, rb, d, hB), pt(cb, rb, d + dep, hB), pt(ca, ra, d + dep, hA), [0.0, 1.0, 0.0])
+                if k + 1 < rows:
+                    quad(pt(ca, ra, d + dep, hA), pt(cb, rb, d + dep, hB), pt(cb, rb, d + dep, hB + rise), pt(ca, ra, d + dep, hA + rise), out_n)
+                # spectators along the row
+                for u in np.arange(0.0, 2.0, 1.0 / TERRACE_SEAT * 0.62):
+                    if rng.random() > TERRACE_FULL:
+                        continue
+                    t = u / 2.0
+                    c = ca + (cb - ca) * t
+                    r = ra + (rb - ra) * t
+                    q = c + r * side * (d + dep * (0.35 + 0.3 * rng.random()))
+                    people.append((float(q[0]), float(hA + (hB - hA) * t), float(q[2]), float(np.arctan2(c[0] - q[0], c[2] - q[2]))))
+            # back wall from the top row down below the ground
+            dB, hA, hB = d0 + rows * dep, h0[j] + (rows - 1) * rise, h0[j + 1] + (rows - 1) * rise
+            quad(pt(ca, ra, dB, hA), pt(cb, rb, dB, hB), pt(cb, rb, dB, hB - 6.0), pt(ca, ra, dB, hA - 6.0), (ra * side).tolist())
+    json.dump({'positions': [v for p_ in P for v in p_], 'normals': [v for n_ in N for v in n_], 'indices': I}, open(os.path.join(out, 'terraces.json'), 'w'))
+    print(f'[places] terraces: {len(I) // 3} triangles, {len(people)} spectators')
+    return people
+
+
 def zones(out):
     godot = os.path.normpath(os.path.join(out, '..', '..', '..'))
     t = json.load(open(os.path.join(godot, 'data/tracks/spa.json')))
@@ -167,6 +230,7 @@ def zones(out):
                 tris.append((name, P[I]))
     props(out, cl, cum, np.concatenate([t for _, t in tris]))
     T = np.concatenate([t for n, t in tris if n.startswith(CROWD_GROUND)])
+    terrace_people = terraces(out, cl, cum, np.concatenate([t for _, t in tris]))
     # the barriers as segments seen from above (their triangles stand upright: each one's longest edge in x, z)
     seg = []
     for f in ('map_track.glb', 'map_scenery.glb'):
@@ -237,6 +301,7 @@ def zones(out):
         y = ground(T, x, z, True)
         if y is not None:
             out_rows.append((x, y, z, yaw))
+    out_rows += terrace_people
     arr = np.array(out_rows, np.float32)
     arr.tofile(os.path.join(out, 'crowd_zones.bin'))
     print(f'[places] {len(arr)} people on the banks ({len(people)} spots tried)')
