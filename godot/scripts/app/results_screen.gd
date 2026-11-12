@@ -1,8 +1,9 @@
 class_name ResultsScreen
 extends RefCounted
-## The results after a session (port of App.showResults): podium, the classification table, the career's gain, the
-## weekend's Results & Stats, a championship round's scoring, and what comes next (the race loading by itself, the
-## next round, or back to the lobby).
+## The results after a session (port of App.showResults), laid out as Le Mans Ultimate's standings: the circuit and the
+## session's chip, the podium as cards with the cars, the classification over hairline rows, the career's gain, the
+## weekend's Results & Stats, a championship round's scoring, and what comes next in the bottom bar (the race loading by
+## itself, the next round, or back to the lobby).
 
 static func _classified(r: Dictionary, race: bool) -> bool:
 	return (not r.dnf and r.totalMs != null) if race else r.bestLapMs != null
@@ -21,74 +22,138 @@ static func fmt_time(ms) -> String:
 	return "%s%d:%02d.%03d" % ["-" if neg else "", m, s, r]
 
 static func build(app: App, m: Dictionary, gain) -> Control:
+	var touch := UIKit.touch()
 	var race: bool = m.kind == "race"
 	var cars: Array = app.cars.cars
-	var col := UIW.vbox(10)
-	col.add_child(UIW.h2(I18n.t("Race results") if race else (I18n.t("Free practice results") if m.kind == "practice" else I18n.t("Qualifying results"))))
+	var col := UIW.vbox(14)
+	var title := I18n.t("Race results") if race else (I18n.t("Free practice results") if m.kind == "practice" else I18n.t("Qualifying results"))
+	# the headline: the circuit, the session as the references' white chip
+	var track := app.track_entry(str(app.pending_race.get("trackId", app.room.get("conditions", {}).get("trackId", ""))))
+	var head := UIW.hbox(16)
+	var hl := UIW.vbox(0)
+	hl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if not track.is_empty():
+		var tr := UIW.hbox(12)
+		var fl := FlagIcon.make(LobbyScreen.MAP_COUNTRY.get(LobbyScreen.circuit_of(track), "DE"), 34)
+		if fl != null:
+			fl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			tr.add_child(fl)
+		tr.add_child(UIKit.label(I18n.t(track.get("name", "")).to_upper(), 38 if not touch else 28, UIKit.TEXT, true, 700))
+		hl.add_child(tr)
+	hl.add_child(UIW.outline_label(title, 32 if not touch else 24))
+	head.add_child(hl)
+	var chip := PanelContainer.new()
+	chip.add_theme_stylebox_override("panel", UIKit.box(Color("f2f4f7"), Color(0, 0, 0, 0), 0, 4, Vector2(14, 2)))
+	chip.add_child(UIKit.label((I18n.t("Race") if race else (I18n.t("Practice") if m.kind == "practice" else I18n.t("Qualifying"))).to_upper(), 26, UIKit.CRIMSON, true, 600))
+	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(chip)
+	col.add_child(head)
 	var car_name := func(id) -> String:
 		for c in cars:
 			if c.id == id:
 				return c.name
 		return ""
 	var fastest_id = m.fastestLap.id if m.get("fastestLap") != null else null
-	# the podium
+	# the podium: the top three as cards with their cars
 	var podium := UIW.hbox(14)
 	var shown := 0
 	for r in m.rows:
 		if not _classified(r, race) or shown >= 3:
 			continue
-		var card := UIW.vbox(2)
+		var card := UIW.vbox(0)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var img := UIW.image("res://assets/ui/cars/%s.webp" % r.carId, Vector2(0, 90))
+		var top := UIW.hbox(10)
+		top.add_child(UIKit.label("P%d" % (shown + 1), 44, UIKit.ACCENT_2 if shown == 0 else UIKit.TEXT, true, 700))
+		var who := UIW.vbox(-4)
+		who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		who.alignment = BoxContainer.ALIGNMENT_CENTER
+		var nk := UIKit.label(str(r.nick).to_upper(), 22, UIKit.TEXT, true, 600)
+		nk.clip_text = true
+		who.add_child(nk)
+		var t_text: String = (fmt_time(_total(r)) if shown == 0 else "+%.3f" % (float(r.get("gapMs", 0)) / 1000.0)) if race else fmt_time(r.bestLapMs)
+		who.add_child(UIKit.label(t_text, 16, UIKit.SOFT, false, 600))
+		top.add_child(who)
+		card.add_child(top)
+		var img := UIW.image("res://assets/ui/cars/%s.webp" % r.carId, Vector2(0, 50 if touch else 96))
 		if img.texture == null:
 			for c in cars:
 				if c.id == r.carId:
 					img.texture = UIW.tex(c.thumbnail)
 		card.add_child(img)
-		card.add_child(UIKit.label("P%d" % (shown + 1), 28, UIKit.ACCENT_2 if shown == 0 else UIKit.TEXT, true, 700))
-		card.add_child(UIKit.label(r.nick, 18, UIKit.TEXT, false, 700))
-		var t_text: String = (fmt_time(_total(r)) if shown == 0 else "+%.3f" % (float(r.get("gapMs", 0)) / 1000.0)) if race else fmt_time(r.bestLapMs)
-		card.add_child(UIKit.label(t_text, 15, UIKit.MUTED))
+		var cn := UIKit.label(car_name.call(r.carId), 13, UIKit.SOFT)
+		cn.clip_text = true
+		card.add_child(cn)
 		var pp := UIW.panel(card)
+		if shown == 0:
+			pp.add_theme_stylebox_override("panel", UIKit.box(UIKit.NAVY, Color(UIKit.ACCENT_2, 0.8), 2, 8, Vector2(16, 12)))
 		pp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		pp.custom_minimum_size = Vector2(200, 0)
 		podium.add_child(pp)
 		shown += 1
 	col.add_child(podium)
-	col.add_child(UIW.muted(I18n.t("Race time includes penalties: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).") if race else I18n.t("Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).")))
 
-	# the table
+	# the classification as the references' standings: muted capitals over hairline rows, my row lit
 	var heads: Array = [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Race time"), I18n.t("Gap"), I18n.t("Best lap"), I18n.t("Laps"), I18n.t("Penalties")] if race else [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Best lap"), I18n.t("Gap"), I18n.t("Timed laps"), I18n.t("Penalties")]
-	var grid := GridContainer.new()
-	grid.columns = heads.size()
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 4)
-	for h in heads:
-		grid.add_child(UIKit.label(String(h).to_upper(), 12, UIKit.MUTED, true, 700))
+	var widths: Array = [46, 190, 250, 120, 90, 110, 60, 90] if race else [46, 200, 260, 120, 90, 100, 90]
+	var standing := UIW.vbox(0)
+	var hr := UIW.hbox(10)
+	for i in heads.size():
+		var l := UIKit.label(String(heads[i]).to_upper(), 14, UIKit.SOFT, true, 600)
+		l.custom_minimum_size = Vector2(widths[i] * (0.8 if touch else 1.0), 0)
+		if i == 2:
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hr.add_child(l)
+	standing.add_child(UIW.margins(hr, 10, 0, 10, 6))
 	for r in m.rows:
 		var cl := _classified(r, race)
 		var me: bool = r.id == app.me
-		var cell := func(text: String, color: Color = UIKit.TEXT) -> void:
-			grid.add_child(UIKit.label(text, 15, UIKit.ACCENT_2 if me and color == UIKit.TEXT else color, false, 700 if me else 500))
-		cell.call(str(r.position) if cl else "—")
-		cell.call(r.nick)
-		cell.call(car_name.call(r.carId), UIKit.MUTED)
+		var cells: Array = []
+		var colours: Array = []
+		cells.append(str(r.position) if cl else "—")
+		colours.append(UIKit.TEXT)
+		cells.append(r.nick)
+		colours.append(UIKit.TEXT)
+		cells.append(car_name.call(r.carId))
+		colours.append(UIKit.SOFT)
 		if race:
-			cell.call(I18n.t("DNF") if (r.dnf or _total(r) == null) else fmt_time(_total(r)))
+			cells.append(I18n.t("DNF") if (r.dnf or _total(r) == null) else fmt_time(_total(r)))
+			colours.append(UIKit.TEXT)
 		else:
-			cell.call(I18n.t("no time") if r.bestLapMs == null else fmt_time(r.bestLapMs), UIKit.GOOD if fastest_id == r.id else UIKit.TEXT)
-		cell.call("" if (not cl or not r.get("gapMs")) else "+%.3f" % (float(r.gapMs) / 1000.0), UIKit.MUTED)
+			cells.append(I18n.t("no time") if r.bestLapMs == null else fmt_time(r.bestLapMs))
+			colours.append(UIKit.GOOD if fastest_id == r.id else UIKit.TEXT)
+		cells.append("" if (not cl or not r.get("gapMs")) else "+%.3f" % (float(r.gapMs) / 1000.0))
+		colours.append(UIKit.SOFT)
 		if race:
-			cell.call("" if r.bestLapMs == null else fmt_time(r.bestLapMs), UIKit.GOOD if fastest_id == r.id else UIKit.TEXT)
-		cell.call("%d%s" % [r.validLaps, (" · " + I18n.t("DNF")) if r.dnf and not race else ""], UIKit.MUTED)
-		cell.call(("+%.1f s" % (float(r.penaltyMs) / 1000.0)) if r.penaltyMs > 0 else "", UIKit.MUTED)
-	col.add_child(grid)
+			cells.append("" if r.bestLapMs == null else fmt_time(r.bestLapMs))
+			colours.append(UIKit.GOOD if fastest_id == r.id else UIKit.TEXT)
+		cells.append("%d%s" % [r.validLaps, (" · " + I18n.t("DNF")) if r.dnf and not race else ""])
+		colours.append(UIKit.SOFT)
+		cells.append(("+%.1f s" % (float(r.penaltyMs) / 1000.0)) if r.penaltyMs > 0 else "")
+		colours.append(UIKit.BAD)
+		var row := UIW.hbox(10)
+		for i in cells.size():
+			var c: Color = UIKit.ACCENT_2 if me and colours[i] == UIKit.TEXT else colours[i]
+			var l := UIKit.label(String(cells[i]), 16 if i > 0 else 18, c, i == 0, 700 if (me or i == 0) else 500)
+			l.custom_minimum_size = Vector2(widths[i] * (0.8 if touch else 1.0), 0)
+			l.clip_text = true
+			if i == 2:
+				l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(l)
+		var rp := PanelContainer.new()
+		var st := UIKit.box(Color(1, 1, 1, 0.1) if me else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 2, Vector2(10, 5))
+		st.border_color = UIKit.HAIR
+		st.border_width_bottom = 1
+		rp.add_theme_stylebox_override("panel", st)
+		rp.add_child(row)
+		standing.add_child(rp)
+	col.add_child(UIW.panel(standing))
 	if fastest_id != null:
 		var who := ""
 		for r in m.rows:
 			if r.id == fastest_id:
 				who = r.nick
-		col.add_child(UIKit.label(I18n.t("Fastest lap: {nick} · {time}", {"nick": who, "time": fmt_time(m.fastestLap.ms)}), 16, UIKit.GOOD))
+		col.add_child(UIKit.label(I18n.t("Fastest lap: {nick} · {time}", {"nick": who, "time": fmt_time(m.fastestLap.ms)}), 16, UIKit.GOOD, false, 600))
+	col.add_child(UIW.muted(I18n.t("Race time includes penalties: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more).") if race else I18n.t("Ranked by best lap. Penalties are added to the lap: track limits after 3 warnings (0.5–3 s), reset (5 s), shortcut (5 s and more)."), 13))
 	if gain != null:
 		col.add_child(career_block(gain))
 
@@ -130,7 +195,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		Championship.save(null if over else champ)
 		var table := Championship.standings(champ)
 		var cb := UIW.vbox(4)
-		cb.add_child(UIW.h3(I18n.t("Championship final standings") if over else I18n.t("Championship after round {n} of {m}", {"n": champ.done, "m": champ.rounds.size()})))
+		cb.add_child(UIW.section(I18n.t("Championship final standings") if over else I18n.t("Championship after round {n} of {m}", {"n": champ.done, "m": champ.rounds.size()})))
 		for i in mini(12, table.size()):
 			var d: Dictionary = table[i]
 			var row := UIW.hbox(10)
@@ -151,10 +216,11 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 				app.teardown_connection()
 				ChampionshipUI.start_round(app, champ, my_nick), true)
 
-	# what comes next
-	var foot := UIW.hbox(10)
+	# what comes next, in the bottom bar
+	var note: Control = null
+	var actions: Array = []
 	if m.get("raceAt") != null:
-		var next := UIKit.label("", 18, UIKit.ACCENT_2)
+		var next := UIKit.label("", 20, UIKit.ACCENT_2, true, 600)
 		var tick := func():
 			if app.screen != "results" or app.conn == null:
 				return
@@ -166,14 +232,15 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		timer.timeout.connect(tick)
 		next.add_child(timer)
 		tick.call()
-		foot.add_child(next)
+		note = next
 	elif next_button != null:
-		foot.add_child(next_button)
+		actions.append(UIKit.button(I18n.t("Back to lobby"), app.show_lobby))
+		actions.append(UIW.default_focus(next_button))
+		next_button.add_theme_font_size_override("font_size", 23)
 	else:
-		foot.add_child(UIKit.button(I18n.t("Back to lobby"), app.show_lobby, true))
-	col.add_child(foot)
-	var scroll := UIW.scroll(col)
-	return UIW.margin(UIW.panel(scroll, true), 24)
+		actions.append(UIW.default_focus(UIW.action(I18n.t("Back to lobby"), app.show_lobby, true)))
+	var top := UIW.top_bar({"title": I18n.t("Results")})
+	return UIW.screen(top, UIW.scroll(col), UIW.action_bar(note, actions))
 
 static func _weekend_table(app: App, by: String) -> Control:
 	var rows: Array = app.weekend.keys().map(func(k): return [k, app.weekend[k]])
@@ -188,9 +255,10 @@ static func _weekend_table(app: App, by: String) -> Control:
 	rows.sort_custom(func(a, b): return key.call(a[1]) < key.call(b[1]))
 	var grid := GridContainer.new()
 	grid.columns = 6
-	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("h_separation", 22)
+	grid.add_theme_constant_override("v_separation", 4)
 	for h in ["#", I18n.t("Driver"), I18n.t("Practice"), I18n.t("Qualify"), I18n.t("G"), I18n.t("Race")]:
-		grid.add_child(UIKit.label(String(h).to_upper(), 12, UIKit.MUTED, true, 700))
+		grid.add_child(UIKit.label(String(h).to_upper(), 14, UIKit.SOFT, true, 600))
 	for r in rows:
 		var w: Dictionary = r[1]
 		var me: bool = r[0] == app.me
@@ -205,10 +273,10 @@ static func _weekend_table(app: App, by: String) -> Control:
 		grid.add_child(UIKit.label(("P%d" % w.qualify if w.get("qualify") else "---") + ("  " + fmt_time(w.qualifyMs) if w.get("qualifyMs") else ""), 15, c))
 		grid.add_child(UIKit.label(str(w.grid) if w.get("grid") else "", 15, c))
 		grid.add_child(UIKit.label(str(w.get("race", "")), 15, c))
-	var col := UIW.vbox(6)
-	col.add_child(UIW.h3(I18n.t("Results & stats")))
+	var col := UIW.vbox(8)
+	col.add_child(UIW.section(I18n.t("Results & stats")))
 	col.add_child(grid)
-	return col
+	return UIW.panel(col)
 
 ## What a session gave the career: the XP line by line, the level bar, the licence and its Safety Rating.
 static func career_block(g: Dictionary) -> Control:
@@ -266,7 +334,7 @@ static func career_block(g: Dictionary) -> Control:
 		ap.add_child(UIKit.label("★  %s · %s  +%d XP" % [I18n.t(a[1]), I18n.t(a[2]), a[3]], 14, UIKit.ACCENT_2, false, 700))
 		side.add_child(ap)
 	row.add_child(side)
-	var col := UIW.vbox(6)
-	col.add_child(UIW.h3(I18n.t("Career")))
+	var col := UIW.vbox(8)
+	col.add_child(UIW.section(I18n.t("Career"), "+%d XP" % g.xp))
 	col.add_child(row)
 	return UIW.panel(col)

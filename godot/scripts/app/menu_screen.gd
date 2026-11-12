@@ -1,32 +1,38 @@
 class_name MenuScreen
 extends RefCounted
-## The main menu (port of App.showMenu): mode tiles (solo, online room, championship, join), join by code / watch,
-## settings, and the driver chip with the solo career's licence.
+## The main menu (port of App.showMenu), laid out after Le Mans Ultimate's: a top bar with the sections (Play, Online,
+## Friends, Career), the driver chip and the gear; Play shows the modes as tall photo cards (solo, online room,
+## championship, join) with their facts at the bottom; Online joins by code, hosts on this device or watches a live
+## session; Friends lists them with where each one is.
+
+static var _tab := "play"
 
 static func build(app: App, error: String = "") -> Control:
 	var signed_in = Account.account()
-	var tab := ["play"]
-	var body := MarginContainer.new()
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var root := Control.new()
 	var err := UIKit.label(error, 16, UIKit.BAD)
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	# the nickname lives in a hidden field; the chip in the top bar edits it in a small dialog
+	# the nickname lives in a hidden field; the driver chip edits it in a small dialog
 	var nick := LineEdit.new()
 	nick.text = signed_in.user.nick if signed_in != null else Settings.data.get("nickname", "")
-	var nick_btn := UIKit.button("", Callable())
+	nick.visible = false
+	root.add_child(nick)
+	var nick_label := UIKit.label("", 17, UIKit.TEXT, true, 600)
 	var code := LineEdit.new()
 	code.max_length = 7
 	code.placeholder_text = I18n.t("ROOM CODE")
-	code.custom_minimum_size = Vector2(220, 0)
+	code.custom_minimum_size = Vector2(220, 52 if UIKit.touch() else 46)
+	code.add_theme_font_override("font", UIKit.font(true, 600))
+	code.add_theme_font_size_override("font_size", 26)
 	code.text_changed.connect(func(t): code.text = t.to_upper(); code.caret_column = code.text.length())
 
 	var online: bool = signed_in != null or Account.accounts_enabled() == false
 	if not online and Account.accounts_enabled() == null:
 		_probe(app, error)
 	var edit_nick := func() -> void:
-		var m := UIW.modal(app.overlay_layer, 440)
+		var m := UIW.modal(app.overlay_layer, 460)
 		var b: VBoxContainer = m.body
-		b.add_child(UIW.h2(I18n.t("Your nickname")))
+		UIW.modal_head(b, I18n.t("Your nickname"), func(): m.root.queue_free())
 		var le := LineEdit.new()
 		le.max_length = 16
 		le.placeholder_text = I18n.t("Your nickname")
@@ -37,6 +43,7 @@ static func build(app: App, error: String = "") -> Control:
 		var msg := UIKit.label("", 15, UIKit.BAD)
 		b.add_child(msg)
 		var row := UIW.hbox(10)
+		row.alignment = BoxContainer.ALIGNMENT_END
 		row.add_child(UIKit.button(I18n.t("Cancel"), func(): m.root.queue_free()))
 		var save := func():
 			var r := Validation.sanitize_nickname(le.text)
@@ -46,15 +53,14 @@ static func build(app: App, error: String = "") -> Control:
 			nick.text = r.nick
 			Settings.data.nickname = r.nick
 			Settings.save()
-			nick_btn.text = (r.nick + "  ✎").to_upper()
+			nick_label.text = r.nick.to_upper()
 			err.text = ""
 			m.root.queue_free()
 		row.add_child(UIKit.button(I18n.t("Save"), save, true))
 		le.text_submitted.connect(func(_t): save.call())
 		b.add_child(row)
 		le.grab_focus.call_deferred()
-	nick_btn.pressed.connect(edit_nick)
-	nick_btn.text = ((nick.text if nick.text != "" else I18n.t("Your nickname")) + "  ✎").to_upper()
+	nick_label.text = (nick.text if nick.text != "" else I18n.t("Your nickname")).to_upper()
 	var read_nick := func() -> String:
 		var r := Validation.sanitize_nickname(nick.text)
 		if not r.ok:
@@ -102,115 +108,108 @@ static func build(app: App, error: String = "") -> Control:
 			return await app.join(r.code, n))
 	var sign_in := func(): SocialUI.sign_in_modal(app, func(): app.show_menu())
 
+	var frame := Control.new()
+	UIKit.full(frame)
+	root.add_child(frame)
 	var render := Callable()
 	render = func():
-		# the error line and the code box are shared by the tabs: detach them before the old tab is freed
-		for shared in [err, code]:
+		# the error line, the code box and the nickname are shared by the tabs: detach them before the old tab is freed
+		for shared in [err, code, nick_label]:
 			if shared.get_parent() != null:
 				shared.get_parent().remove_child(shared)
-		for c in body.get_children():
+		for c in frame.get_children():
 			c.queue_free()
-		if tab[0] == "play":
-			var tiles := HBoxContainer.new()
-			tiles.add_theme_constant_override("separation", 14)
-			tiles.size_flags_vertical = Control.SIZE_EXPAND_FILL
-			var champ = Championship.load_saved()
-			tiles.add_child(_tile("photo_hero_spa.webp", I18n.t("OFFLINE"), I18n.t("Play solo (offline)"), I18n.t("Race the AI on any circuit. No account, no server."), solo, ""))
-			tiles.add_child(_tile("photo_hero.webp", I18n.t("ONLINE"), I18n.t("Create room"), I18n.t("Your own lobby: invite friends with the room code, add AI cars."), create if online else sign_in, "" if online else I18n.t("Sign in to play online")))
-			tiles.add_child(_tile("photo_aerial_spa.webp", I18n.t("OFFLINE"),
-				I18n.t("Championship · round {n}/{m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("Championship"),
-				I18n.t("A season against the AI on every circuit, points as in F1."), func(): ChampionshipUI.open(app, read_nick), ""))
-			tiles.add_child(_tile("photo_hero_zandvoort.webp", I18n.t("ONLINE"), I18n.t("Join friends"), I18n.t("A room code from a friend, or a live public session."),
-				(func(): tab[0] = "online"; render.call()) if online else sign_in, "" if online else I18n.t("Sign in to play online")))
-			var col := UIW.vbox(8)
-			col.add_child(tiles)
-			col.add_child(err)
-			tiles.custom_minimum_size = Vector2(0, 260)
-			body.add_child(col)
-		elif tab[0] == "online":
-			body.add_child(_online_tab(app, online, code, err, join_it, create, sign_in, host))
+		var body: Control
+		if _tab == "online":
+			body = _online_tab(app, online, code, err, join_it, create, sign_in, host)
+		elif _tab == "friends":
+			body = SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("Sign in to add friends, see where they are and join their lobbies."), sign_in)
+			# a readable column in the middle, as the references' entry list
+			var holder := HBoxContainer.new()
+			holder.alignment = BoxContainer.ALIGNMENT_CENTER
+			body.custom_minimum_size = Vector2(minf(880.0, app.get_viewport().get_visible_rect().size.x - 60.0), 0)
+			body.size_flags_vertical = Control.SIZE_EXPAND_FILL if signed_in != null else Control.SIZE_SHRINK_BEGIN
+			holder.add_child(body)
+			body = holder
 		else:
-			body.add_child(SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("Sign in to add friends, see where they are and join their lobbies."), sign_in))
+			body = _play_tab(app, online, err, solo, create, read_nick, sign_in, func(): _tab = "online"; render.call())
+		var on_tab := func(k: String):
+			if k == "career":
+				app.show_career()
+				return
+			_tab = k
+			render.call()
+		var top := UIW.top_bar({
+			"tabs": [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")], ["career", I18n.t("Career")]],
+			"tab": _tab, "on_tab": on_tab, "tabs_left": UIKit.touch(),
+			"right": _driver_chip(app, signed_in, nick_label, edit_nick, sign_in),
+		})
+		var scr := UIW.screen(top, body)
+		UIKit.full(scr)
+		frame.add_child(scr)
+		UIW.focus_first.call_deferred(body)
+	render.call()
+	UIKit.full(root)
+	return root
 
-	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 6)
-	var tab_btns := {}
-	var style_tabs := func():
-		for k in tab_btns:
-			var on: bool = tab[0] == k
-			for st in ["normal", "hover", "pressed", "focus"]:
-				if on:
-					tab_btns[k].add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT, UIKit.ACCENT, 1, UIKit.RADIUS, UIKit.btn_pad()))
-				else:
-					tab_btns[k].remove_theme_stylebox_override(st)
-	for t in [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")]]:
-		var key: String = t[0]
-		var b := UIKit.button(t[1], func(): tab[0] = key; render.call(); style_tabs.call())
-		tab_btns[key] = b
-		tabs.add_child(b)
-	style_tabs.call()
-	tabs.add_child(UIKit.button(I18n.t("Career"), app.show_career))
-	tabs.add_child(UIKit.button(I18n.t("Settings"), app.open_settings))
-
+## The driver at the top right: licence and Safety Rating, the name, rank and level (a button to the career), the
+## account's actions and the gear to the settings.
+static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Callable, sign_in: Callable) -> Array:
+	var out: Array = []
 	var career := CareerData.load_career()
 	var lic: String = career.licence
-	var chip := UIW.hbox(10)
-	var badge := UIKit.label("%s %.2f" % [lic, career.sr], 16, Color.WHITE, true, 700)
-	var badge_p := PanelContainer.new()
-	badge_p.add_theme_stylebox_override("panel", UIKit.box(Color(CareerData.LICENCE_COLOUR[lic]), Color(0, 0, 0, 0), 0, 3, Vector2(8, 3)))
-	badge_p.add_child(badge)
-	# licence, rank and level: one button to the career page
 	var lv: int = CareerData.level_of(career.xp).level
 	var rk := CareerData.rank_of(lv)
 	var prof := Button.new()
-	prof.focus_mode = Control.FOCUS_NONE
-	prof.flat = true
+	prof.focus_mode = Control.FOCUS_ALL
+	prof.tooltip_text = I18n.t("Career")
+	for st in ["normal", "disabled"]:
+		prof.add_theme_stylebox_override(st, UIKit.box(Color(0.02, 0.035, 0.08, 0.55), Color(1, 1, 1, 0.18), 1, 4))
+	prof.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.12), Color(1, 1, 1, 0.5), 1, 4))
+	prof.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.22), Color.WHITE, 1, 4))
 	var pr := UIW.hbox(8)
-	pr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	badge_p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pr.add_child(badge_p)
-	var rcol := UIW.vbox(0)
-	rcol.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var rl := UIKit.label(I18n.t(rk.name).to_upper(), 14, rk.colour, true, 700)
-	var ll := UIKit.label(I18n.t("Lv {n}", {"n": lv}), 13, UIKit.MUTED)
-	for l in [rl, ll]:
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		rcol.add_child(l)
-	pr.add_child(rcol)
-	prof.add_child(pr)
-	pr.position = Vector2(4, 4)
-	prof.custom_minimum_size = pr.get_combined_minimum_size() + Vector2(8, 8)
-	pr.resized.connect(func(): prof.custom_minimum_size = pr.get_combined_minimum_size() + Vector2(8, 8))
-	prof.pressed.connect(app.show_career)
-	chip.add_child(prof)
+	var badge := UIW.tag("%s %.2f" % [lic, career.sr], Color(CareerData.LICENCE_COLOUR[lic]))
+	pr.add_child(badge)
+	var rcol := UIW.vbox(-4)
+	if nick_label.get_parent() != null:
+		nick_label.get_parent().remove_child(nick_label)
 	if signed_in != null:
-		chip.add_child(UIKit.label(("%s · %s" % [signed_in.user.nick, signed_in.user.abbr]) if signed_in.user.get("abbr") else signed_in.user.nick, 18, UIKit.TEXT, false, 700))
-		chip.add_child(UIKit.button(I18n.t("Edit driver profile"), func(): SocialUI.profile_modal(app, func(): app.show_menu())))
-		chip.add_child(UIKit.button(I18n.t("Sign out"), func(): await Account.logout(); app.show_menu()))
+		nick_label.text = (("%s · %s" % [signed_in.user.nick, signed_in.user.abbr]) if signed_in.user.get("abbr") else str(signed_in.user.nick)).to_upper()
+	rcol.add_child(nick_label)
+	rcol.add_child(UIKit.label("%s · %s" % [I18n.t(rk.name).to_upper(), I18n.t("Lv {n}", {"n": lv})], 13, rk.colour, true, 600))
+	pr.add_child(rcol)
+	var pm := UIW.margins(pr, 8, 3, 10, 3)
+	UIW.pass_mouse(pm)
+	prof.add_child(pm)
+	prof.custom_minimum_size = pm.get_combined_minimum_size()
+	pm.resized.connect(func(): prof.custom_minimum_size = pm.get_combined_minimum_size())
+	prof.pressed.connect(app.show_career)
+	out.append(prof)
+	if signed_in != null:
+		out.append(_icon_button("✎", I18n.t("Edit driver profile"), func(): SocialUI.profile_modal(app, func(): app.show_menu())))
+		out.append(UIKit.button(I18n.t("Sign out"), func(): await Account.logout(); app.show_menu()))
 	else:
-		chip.add_child(nick_btn)
-		chip.add_child(UIKit.button(I18n.t("Sign in"), sign_in, true))
+		out.append(_icon_button("✎", I18n.t("Your nickname"), edit_nick))
+		out.append(UIKit.button(I18n.t("Sign in"), sign_in, true))
+	out.append(_icon_button("⚙", I18n.t("Settings"), app.open_settings))
+	return out
 
-	var top := UIW.hbox(18)
-	top.add_child(UIW.logo(34))
-	top.add_child(tabs)
-	top.add_child(UIW.spacer())
-	top.add_child(chip)
-	nick.visible = false
-	top.add_child(nick)
-	var root := VBoxContainer.new()
-	root.add_theme_constant_override("separation", 14)
-	root.add_child(top)
-	# the big headline is for a big screen: a phone gives the room to the mode tiles
-	if not UIKit.touch():
-		var hero := UIW.vbox(0)
-		hero.add_child(UIKit.label(I18n.t("GT3 · Nürburgring · Spa · Zandvoort"), 16, UIKit.ACCENT_2, true, 700))
-		hero.add_child(UIKit.label(I18n.t("Ready to race"), 64, UIKit.TEXT, true, 700))
-		root.add_child(hero)
-	root.add_child(body)
-	var margin := UIW.margin(root, 18 if UIKit.touch() else 26)
-	render.call()
-	return margin
+## A square icon button (the gear, the pencil).
+static func _icon_button(glyph: String, tip: String, cb: Callable) -> Button:
+	var b := UIKit.button(glyph, cb)
+	b.tooltip_text = tip
+	b.add_theme_font_override("font", UIKit.font(false, 500))
+	b.add_theme_font_size_override("font_size", 20)
+	var s := 46.0 if UIKit.touch() else 38.0
+	b.custom_minimum_size = Vector2(s, s)
+	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		var base: StyleBoxFlat = b.get_theme_stylebox(st).duplicate()
+		base.content_margin_left = 4
+		base.content_margin_right = 4
+		base.content_margin_top = 2
+		base.content_margin_bottom = 2
+		b.add_theme_stylebox_override(st, base)
+	return b
 
 static func _probe(app: App, error: String) -> void:
 	var on: bool = await Account.probe_accounts()
@@ -219,91 +218,158 @@ static func _probe(app: App, error: String) -> void:
 
 static func _busy() -> Control:
 	var c := CenterContainer.new()
-	c.add_child(UIKit.label(I18n.t("Preparing…"), 24, UIKit.MUTED, true, 600))
+	var col := UIW.vbox(10)
+	col.add_child(UIW.logo(40))
+	var l := UIKit.label(I18n.t("Preparing…").to_upper(), 22, UIKit.SOFT, true, 600)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(l)
+	c.add_child(col)
 	return c
 
 static func _gate(title: String, text: String, sign_in: Callable) -> Control:
-	var col := UIW.vbox(10)
+	var col := UIW.vbox(12)
 	col.add_child(UIW.h2(title))
 	col.add_child(UIW.muted(text))
-	col.add_child(UIKit.button(I18n.t("Sign in / create account"), sign_in, true))
-	return UIW.panel(col)
+	var b := UIKit.button(I18n.t("Sign in / create account"), sign_in, true)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	col.add_child(UIW.default_focus(b))
+	var p := UIW.panel(col)
+	p.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	return p
+
+# ------------------------------------------------------------------- play ---
+
+static func _play_tab(app: App, online: bool, err: Label, solo: Callable, create: Callable, read_nick: Callable, sign_in: Callable, to_online: Callable) -> Control:
+	var col := UIW.vbox(14 if UIKit.touch() else 18)
+	# the big headline is for a big screen: a phone gives the room to the mode cards
+	if not UIKit.touch():
+		var hero := UIW.vbox(-6)
+		hero.add_child(UIKit.label(I18n.t("GT3 · Nürburgring · Spa · Zandvoort").to_upper(), 17, UIKit.SOFT, true, 600))
+		hero.add_child(UIKit.label(I18n.t("Ready to race").to_upper(), 62, UIKit.TEXT, true, 700))
+		col.add_child(hero)
+	var circuits := {}
+	for t in app.track_index:
+		circuits[LobbyScreen.circuit_of(t)] = true
+	var champ = Championship.load_saved()
+	var cards := UIW.hbox(14 if UIKit.touch() else 18)
+	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var lock := "" if online else I18n.t("Sign in to play online")
+	var solo_card := _card("photo_hero_spa.webp", [[I18n.t("OFFLINE"), UIKit.SOFT]], I18n.t("Play solo"), I18n.t("Race the AI on any circuit. No account, no server."),
+		[[I18n.t("Circuits"), str(circuits.size())], [I18n.t("Cars"), str(CarsDb.selectable().size())]], solo, "")
+	cards.add_child(UIW.default_focus(solo_card))
+	cards.add_child(_card("photo_hero.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Create room"), I18n.t("Your own lobby: invite friends with the room code, add AI cars."),
+		[[I18n.t("Drivers"), str(Const.MAX_PLAYERS)], [I18n.t("AI cars"), "✓"]], create if online else sign_in, lock))
+	var champ_stats: Array = [[I18n.t("Round"), "%d/%d" % [champ.done + 1, champ.rounds.size()]], [I18n.t("Points"), "25 · 18 · 15"]] if champ != null else [[I18n.t("Rounds"), str(circuits.size())], [I18n.t("Points"), "25 · 18 · 15"]]
+	cards.add_child(_card("photo_aerial_spa.webp", [[I18n.t("OFFLINE"), UIKit.SOFT], [I18n.t("Season"), UIKit.ACCENT_2]],
+		I18n.t("Championship · round {n}/{m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("Championship"),
+		I18n.t("A season against the AI on every circuit, points as in F1."), champ_stats, func(): ChampionshipUI.open(app, read_nick), ""))
+	cards.add_child(_card("photo_hero_zandvoort.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Join friends"), I18n.t("A room code from a friend, or a live public session."),
+		[[I18n.t("Room code"), "5"], [I18n.t("Watch"), I18n.t("Live")]], to_online if online else sign_in, lock))
+	col.add_child(cards)
+	col.add_child(err)
+	return col
+
+## A tall mode card: the photo with a navy fade, tags, a big title, one line, its facts at the bottom and the hatched
+## corner. `lock` set: dimmed, LOCKED and why (pressing it signs in).
+static func _card(photo: String, tags: Array, title: String, sub: String, stats: Array, on: Callable, lock: String) -> Button:
+	var touch := UIKit.touch()
+	var b := UIW.card_button()
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	b.custom_minimum_size = Vector2(180, 250 if touch else 300)
+	b.get_node("clip").add_child(UIW.photo_fill("res://assets/ui/" + photo, 0.45 if lock != "" else 0.95, 0.95))
+	var col := UIW.vbox(6)
+	var tr := UIW.hbox(6)
+	for t in tags:
+		tr.add_child(UIW.tag(t[0], t[1], true, UIKit.INK if t[1] == UIKit.SOFT or t[1] == UIKit.ACCENT_2 else Color.WHITE))
+	col.add_child(tr)
+	var tl := UIKit.label(title.to_upper(), 34 if touch else 40, UIKit.TEXT, true, 700)
+	tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tl.add_theme_constant_override("line_spacing", -8)
+	col.add_child(tl)
+	if lock != "":
+		col.add_child(UIKit.label(I18n.t("Locked").to_upper(), 30 if touch else 36, Color(1, 1, 1, 0.9), true, 700))
+		col.add_child(UIKit.label(lock, 16, UIKit.ACCENT_2, false, 600))
+	col.add_child(UIW.spacer())
+	var s := UIW.muted(sub, 15 if touch else 16)
+	col.add_child(s)
+	if lock == "" and not stats.is_empty():
+		var g := GridContainer.new()
+		g.columns = 2
+		g.add_theme_constant_override("h_separation", 26)
+		for st in stats:
+			g.add_child(UIW.stat(st[0], st[1], 28 if touch else 32))
+		col.add_child(g)
+	var content: MarginContainer = b.get_node("content")
+	for side in ["left", "right"]:
+		content.add_theme_constant_override("margin_" + side, 16 if touch else 20)
+	content.add_theme_constant_override("margin_top", 16)
+	content.add_theme_constant_override("margin_bottom", 16)
+	content.add_child(col)
+	var hatch := UIW.Hatch.new(Color(1, 1, 1, 0.55) if lock == "" else Color(1, 1, 1, 0.25), Vector2(44, 44))
+	hatch.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	hatch.offset_left = -50
+	hatch.offset_top = -50
+	hatch.offset_right = -6
+	hatch.offset_bottom = -6
+	b.add_child(hatch)
+	UIW.pass_mouse(content)
+	b.pressed.connect(on)
+	return b
+
+# ----------------------------------------------------------------- online ---
 
 static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join_it: Callable, create: Callable, sign_in: Callable, host: Callable) -> Control:
-	var col := UIW.vbox(12)
+	var row := UIW.hbox(18)
+	var left := UIW.vbox(14)
+	left.custom_minimum_size = Vector2(380 if UIKit.touch() else 440, 0)
+	var join_p := UIW.vbox(10)
 	if online:
-		var p := UIW.vbox(10)
-		p.add_child(UIW.h3(I18n.t("Join with a code")))
-		var row := UIW.hbox(8)
-		row.add_child(code)
-		row.add_child(UIKit.button(I18n.t("Join"), func(): join_it.call(false), true))
-		row.add_child(UIKit.button(I18n.t("Watch"), func(): join_it.call(true)))
-		p.add_child(row)
-		p.add_child(UIKit.button(I18n.t("Create room"), create))
-		p.add_child(err)
-		col.add_child(UIW.panel(p))
-		col.add_child(_host_panel(host))
-		col.add_child(SocialUI.room_list(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)))
+		join_p.add_child(UIW.section(I18n.t("Join with a code")))
+		var r := UIW.hbox(8)
+		code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		r.add_child(code)
+		r.add_child(UIW.default_focus(UIKit.button(I18n.t("Join"), func(): join_it.call(false), true)))
+		r.add_child(UIKit.button(I18n.t("Watch"), func(): join_it.call(true)))
+		join_p.add_child(r)
+		join_p.add_child(err)
+		var cr := UIKit.button(I18n.t("Create room"), create)
+		cr.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		join_p.add_child(cr)
+		left.add_child(UIW.panel(join_p))
+		left.add_child(_host_panel(host))
 	else:
-		col.add_child(_gate(I18n.t("Online needs an account"), I18n.t("Sign in to create rooms, join friends and watch live sessions. Solo races work without one."), sign_in))
-		col.add_child(_host_panel(host))
-		var jp := UIW.vbox(8)
-		jp.add_child(UIW.h3(I18n.t("Join a race hosted on a device")))
+		left.add_child(_gate(I18n.t("Online needs an account"), I18n.t("Sign in to create rooms, join friends and watch live sessions. Solo races work without one."), sign_in))
+		join_p.add_child(UIW.section(I18n.t("Join a race hosted on a device")))
 		var jr := UIW.hbox(8)
+		code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		jr.add_child(code)
 		jr.add_child(UIKit.button(I18n.t("Join"), func(): join_it.call(false), true))
-		jp.add_child(jr)
-		col.add_child(UIW.panel(jp))
-		col.add_child(err)
-	return UIW.scroll(col)
+		join_p.add_child(jr)
+		join_p.add_child(err)
+		left.add_child(UIW.panel(join_p))
+		left.add_child(_host_panel(host))
+	row.add_child(UIW.scroll(left) if UIKit.touch() else left)
+	if online:
+		var rl := SocialUI.room_list(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c))
+		rl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rl.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		row.add_child(rl)
+	else:
+		var pic := UIW.panel(null)
+		pic.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pic.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		pic.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+		pic.add_child(UIW.photo_fill("res://assets/ui/photo_grid_spa.webp", 0.8, 0.7))
+		row.add_child(pic)
+	return row
 
 ## Races on the same Wi-Fi: hosted on this device, the friends join with its code and connect straight to it.
 static func _host_panel(host: Callable) -> Control:
-	var p := UIW.vbox(8)
-	p.add_child(UIW.h3(I18n.t("Race on the same Wi-Fi")))
+	var p := UIW.vbox(10)
+	p.add_child(UIW.section(I18n.t("Race on the same Wi-Fi")))
 	p.add_child(UIW.muted(I18n.t("Host the race on this device (a phone works): your friends join with its code and connect straight to you. No account needed.")))
-	p.add_child(UIKit.button(I18n.t("Host on this device"), host, true))
+	var b := UIKit.button(I18n.t("Host on this device"), host)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	p.add_child(b)
 	return UIW.panel(p)
-
-## A big mode tile: a photo, a kicker, a title and one line.
-static func _tile(photo: String, kicker: String, title: String, sub: String, on: Callable, lock: String) -> Control:
-	var b := Button.new()
-	b.focus_mode = Control.FOCUS_NONE
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	b.custom_minimum_size = Vector2(200, 240)
-	b.clip_contents = true
-	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
-		b.add_theme_stylebox_override(st, UIKit.box(Color(0.03, 0.03, 0.04, 0.9), Color(1, 1, 1, 0.22 if st == "hover" else 0.1), 1, 4))
-	var img := TextureRect.new()
-	img.texture = UIW.tex("res://assets/ui/" + photo)
-	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	img.modulate = Color(1, 1, 1, 0.7)
-	UIKit.full(img)
-	b.add_child(img)
-	var shade := ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.35)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UIKit.full(shade)
-	b.add_child(shade)
-	var col := VBoxContainer.new()
-	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.alignment = BoxContainer.ALIGNMENT_END
-	UIKit.full(col)
-	col.offset_left = 16
-	col.offset_right = -16
-	col.offset_bottom = -14
-	col.add_child(UIKit.label(kicker, 14, UIKit.ACCENT_2, true, 700))
-	col.add_child(UIKit.label(title.to_upper(), 29, UIKit.TEXT, true, 700))
-	var s := UIW.muted(sub, 16)
-	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(s)
-	if lock != "":
-		col.add_child(UIKit.label("🔒 " + lock, 14, UIKit.ACCENT_2))
-	for ch in col.get_children():
-		ch.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(col)
-	b.pressed.connect(on)
-	return b

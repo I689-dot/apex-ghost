@@ -51,6 +51,8 @@ func _draw() -> void:
 	for p in pts:
 		scaled.append(off + p * s)
 	scaled.append(scaled[0])
-	draw_polyline(scaled, Color(0, 0, 0, 0.5), 5.0 * maxf(0.6, s * 1.4), true)
-	draw_polyline(scaled, Color(1, 1, 1, 0.9), 2.4 * maxf(0.6, s * 1.4), true)
-	draw_circle(scaled[0], 3.6 * maxf(0.8, s * 1.2), accent)
+	# the line thickens with the size up to the menus' big circuit drawing, where it stays a bold pen line
+	var k := clampf(s * 1.4, 0.6, 2.0)
+	draw_polyline(scaled, Color(0, 0, 0, 0.5), 5.0 * k, true)
+	draw_polyline(scaled, Color(1, 1, 1, 0.9), 2.4 * k, true)
+	draw_circle(scaled[0], 3.6 * clampf(s * 1.2, 0.8, 1.8), accent)

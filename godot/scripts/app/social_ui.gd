@@ -12,17 +12,10 @@ static func fmt_lap(ms: float) -> String:
 # ----------------------------------------------------------------- sign in ---
 
 static func sign_in_modal(app: App, on_done: Callable, mode: String = "login") -> void:
-	var m := UIW.modal(app.overlay_layer, 440)
+	var m := UIW.modal(app.overlay_layer, 480)
 	var body: VBoxContainer = m.body
 	var close := func(): m.root.queue_free()
-	var head := UIW.hbox(8)
-	var tt := UIW.vbox(0)
-	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tt.add_child(UIKit.label("APEX GHOST", 13, UIKit.ACCENT_2, true, 700))
-	tt.add_child(UIW.h2(I18n.t("Your account")))
-	head.add_child(tt)
-	head.add_child(UIKit.button("×", close))
-	body.add_child(head)
+	UIW.modal_head(body, I18n.t("Your account"), close, "APEX GHOST")
 	var state := {"mode": mode}
 	var lead := UIW.muted("")
 	var nick := LineEdit.new()
@@ -32,22 +25,22 @@ static func sign_in_modal(app: App, on_done: Callable, mode: String = "login") -
 	pw.max_length = 72
 	pw.secret = true
 	pw.placeholder_text = I18n.t("Password")
-	var show := CheckBox.new()
-	show.text = I18n.t("Show password")
-	show.focus_mode = Control.FOCUS_NONE
-	show.toggled.connect(func(on): pw.secret = not on)
+	var show := UIW.row(I18n.t("Show password"), UIW.switch(false, func(on): pw.secret = not on))
 	var err := UIKit.label("", 15, UIKit.BAD)
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var submit := UIKit.button("", Callable(), true)
-	var tabs := UIW.hbox(6)
-	var set_mode := Callable()
-	set_mode = func(md: String):
+	# the tabs call set_mode through the dictionary: it is made after them
+	var ref := {}
+	var tabs := UIW.tabs([["login", I18n.t("Sign in")], ["register", I18n.t("Create account")]], mode, func(k): ref.set_mode.call(k), true)
+	tabs.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var set_mode := func(md: String):
 		state.mode = md
+		for b in tabs.get_children():
+			b.set_active(b.get_meta("key") == md)
 		lead.text = I18n.t("Welcome back. Sign in to play online with your friends.") if md == "login" else I18n.t("Just a nickname and a password. Your laps and results are kept, and friends can find you.")
 		submit.text = (I18n.t("Sign in") if md == "login" else I18n.t("Create account")).to_upper()
 		err.text = ""
-	tabs.add_child(UIKit.button(I18n.t("Sign in"), func(): set_mode.call("login")))
-	tabs.add_child(UIKit.button(I18n.t("Create account"), func(): set_mode.call("register")))
+	ref.set_mode = set_mode
 	body.add_child(tabs)
 	body.add_child(lead)
 	body.add_child(UIW.field(I18n.t("Nickname"), nick))
@@ -70,6 +63,7 @@ static func sign_in_modal(app: App, on_done: Callable, mode: String = "login") -
 			err.text = I18n.t(str(r.error))
 	submit.pressed.connect(go)
 	pw.text_submitted.connect(func(_t): go.call())
+	submit.custom_minimum_size = Vector2(0, 48)
 	body.add_child(submit)
 	body.add_child(UIW.muted(I18n.t("Online play needs an account. Solo races work without one."), 13))
 	set_mode.call(mode)
@@ -124,7 +118,7 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 		if all.is_empty():
 			list.add_child(UIW.muted(I18n.t("No friends yet: add them by their nickname.")))
 		for f in all:
-			list.add_child(_friend_row(app, f, join, watch, refresh, err))
+			list.add_child(UIW.row_line(_friend_row(app, f, join, watch, refresh, err)))
 	var add := func():
 		err.text = ""
 		var r: Dictionary = await Account.add_friend(input.text)
@@ -137,7 +131,7 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 	var row := UIW.hbox(8)
 	row.add_child(input)
 	row.add_child(UIKit.button(I18n.t("Add"), add))
-	card.add_child(UIW.h3(I18n.t("Friends")))
+	card.add_child(UIW.section(I18n.t("Friends")))
 	card.add_child(UIW.scroll(list))
 	card.add_child(row)
 	card.add_child(err)
@@ -217,9 +211,9 @@ static func room_list(app: App, join: Callable, watch: Callable) -> Control:
 			if r.phase == "lobby" and r.drivers < r.maxPlayers:
 				row.add_child(UIKit.button(I18n.t("Join"), func(): join.call(r.code)))
 			row.add_child(UIKit.button(I18n.t("Watch"), func(): watch.call(r.code)))
-			list.add_child(row)
+			list.add_child(UIW.row_line(row))
 	var col := UIW.vbox(8)
-	col.add_child(UIW.h3(I18n.t("Live sessions")))
+	col.add_child(UIW.section(I18n.t("Live sessions")))
 	col.add_child(list)
 	var timer := Timer.new()
 	timer.wait_time = 15.0
@@ -232,15 +226,10 @@ static func room_list(app: App, join: Callable, watch: Callable) -> Control:
 # ----------------------------------------------------------------- records ---
 
 static func records_modal(app: App) -> void:
-	var m := UIW.modal(app.overlay_layer, 900)
+	var m := UIW.modal(app.overlay_layer, 960)
 	var body: VBoxContainer = m.body
 	var close := func(): m.root.queue_free()
-	var head := UIW.hbox(8)
-	var tt := UIW.h2(I18n.t("Records"))
-	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(tt)
-	head.add_child(UIKit.button("×", close))
-	body.add_child(head)
+	UIW.modal_head(body, I18n.t("Records"), close)
 	var tracks: Array = app.track_index
 	var cars: Array = app.cars.cars
 	var state := {"track": tracks[0].id, "car": "", "scope": "global", "wet": false}
@@ -271,7 +260,7 @@ static func records_modal(app: App) -> void:
 		grid.columns = 6
 		grid.add_theme_constant_override("h_separation", 14)
 		for h in [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Lap"), I18n.t("Gap"), I18n.t("Laps")]:
-			grid.add_child(UIKit.label(String(h).to_upper(), 12, UIKit.MUTED, true, 700))
+			grid.add_child(UIKit.label(String(h).to_upper(), 14, UIKit.SOFT, true, 600))
 		for r in rows:
 			var col := UIKit.ACCENT_2 if r.get("me", false) else UIKit.TEXT
 			grid.add_child(UIKit.label(str(r.position), 15, col))
@@ -304,7 +293,7 @@ static func records_modal(app: App) -> void:
 		var s: Dictionary = await Account.stats()
 		if not is_instance_valid(career) or s.is_empty():
 			return
-		career.add_child(UIW.h3(s.nick))
+		career.add_child(UIW.section(s.nick))
 		var tiles := UIW.hbox(18)
 		for t in [[I18n.t("Races"), s.races], [I18n.t("Wins"), s.wins], [I18n.t("Podiums"), s.podiums], [I18n.t("Qualifyings"), s.qualifyings], [I18n.t("Poles"), s.poles], [I18n.t("Timed laps"), s.laps]]:
 			var c := UIW.vbox(0)
@@ -324,17 +313,10 @@ static func records_modal(app: App) -> void:
 
 static func profile_modal(app: App, on_done: Callable) -> void:
 	var me: Dictionary = Account.account().user
-	var m := UIW.modal(app.overlay_layer, 440)
+	var m := UIW.modal(app.overlay_layer, 480)
 	var body: VBoxContainer = m.body
 	var close := func(): m.root.queue_free(); on_done.call()
-	var head := UIW.hbox(8)
-	var tt := UIW.vbox(0)
-	tt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tt.add_child(UIKit.label(me.nick, 13, UIKit.ACCENT_2, true, 700))
-	tt.add_child(UIW.h2(I18n.t("Driver profile")))
-	head.add_child(tt)
-	head.add_child(UIKit.button("×", close))
-	body.add_child(head)
+	UIW.modal_head(body, I18n.t("Driver profile"), close, str(me.nick))
 	body.add_child(UIW.muted(I18n.t("How you appear on the timing screens: your flag, your number and your three-letter code.")))
 	var opts: Array = [["", I18n.t("Not set")]]
 	for c in COUNTRIES.split(" "):

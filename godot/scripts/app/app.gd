@@ -21,6 +21,7 @@ var gamepad: GamepadInput = null
 var weekend := {}
 
 var backdrop: TextureRect
+var decor: MenuDecor
 var bg: CanvasLayer
 var ui_layer: CanvasLayer
 var ui: Control
@@ -42,6 +43,8 @@ var _brief_clock: Label = null
 var touch: TouchControls = null
 var perf: PerfOverlay = null
 var graphics: Graphics = null
+## The screen the UI shows (screen + page): a new one fades in, a re-render of the same one keeps the pad's focus.
+var _ui_key := ""
 
 func _ready() -> void:
 	# a phone's CPU: the vehicle model runs at 60 Hz (the lap time holds within 0.3 % of 120 Hz)
@@ -86,8 +89,16 @@ func _build_layers() -> void:
 	UIKit.full(backdrop)
 	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	backdrop.modulate = Color(1, 1, 1, 0.55)
+	backdrop.modulate = Color(1, 1, 1, 0.8)
 	bg.add_child(backdrop)
+	# the photo drifts slowly behind the menus (one looping tween, no per-frame script)
+	backdrop.resized.connect(func(): backdrop.pivot_offset = backdrop.size * 0.5)
+	var drift := backdrop.create_tween().set_loops()
+	drift.tween_property(backdrop, "scale", Vector2(1.07, 1.07), 26.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	drift.tween_property(backdrop, "scale", Vector2.ONE, 26.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	decor = MenuDecor.new()
+	UIKit.full(decor)
+	bg.add_child(decor)
 	hud_layer = CanvasLayer.new()
 	hud_layer.layer = 5
 	add_child(hud_layer)
@@ -99,6 +110,8 @@ func _build_layers() -> void:
 	add_child(ui_layer)
 	ui = Control.new()
 	UIKit.full(ui)
+	# the menus' theme on their layer's root (the window's theme stops at the CanvasLayer)
+	ui.theme = UIKit.theme
 	ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_layer.add_child(ui)
 	overlay_layer = CanvasLayer.new()
@@ -141,10 +154,44 @@ func toast(text: String, ms: float = 2500.0) -> void:
 	get_tree().create_timer(ms / 1000.0).timeout.connect(func(): if is_instance_valid(p): p.queue_free())
 
 func set_ui(c: Control) -> void:
+	var key := "%s/%s/%s/%s" % [screen, LobbyScreen._page, MenuScreen._tab, CareerScreen._tab]
+	# a re-render of the same page (the lobby redraws on every room update) puts the pad's focus back where it was
+	var keep := PackedInt32Array()
+	var hidden := true
+	var old: Control = ui.get_child(ui.get_child_count() - 1) if ui.get_child_count() > 0 else null
+	var f := get_viewport().gui_get_focus_owner()
+	if key == _ui_key and old != null and f != null and old.is_ancestor_of(f):
+		hidden = not f.has_focus(true)
+		var n: Node = f
+		while n != old:
+			keep.insert(0, n.get_index())
+			n = n.get_parent()
 	for ch in ui.get_children():
 		ch.queue_free()
 	UIKit.full(c)
 	ui.add_child(c)
+	if key != _ui_key:
+		c.modulate.a = 0.0
+		c.create_tween().tween_property(c, "modulate:a", 1.0, 0.18)
+	_ui_key = key
+	_restore_focus.call_deferred(c, keep, hidden)
+
+func _restore_focus(root: Control, path: PackedInt32Array, hidden: bool) -> void:
+	if not is_instance_valid(root) or not root.is_inside_tree() or screen == "race":
+		return
+	for c in overlay_layer.get_children():
+		if c.has_meta("modal"):
+			return  # a modal keeps the focus
+	var n: Node = root
+	for i in path:
+		if i >= n.get_child_count():
+			n = null
+			break
+		n = n.get_child(i)
+	if n != null and n != root and n is Control and (n as Control).focus_mode != Control.FOCUS_NONE and (n as Control).is_visible_in_tree():
+		(n as Control).grab_focus(hidden)
+	elif get_viewport().gui_get_focus_owner() == null or not root.is_ancestor_of(get_viewport().gui_get_focus_owner()):
+		UIW.focus_first(root)
 
 func set_backdrop(name: String, track_id: String = "") -> void:
 	# the 3D world is drawn first: the backdrop layer must not cover it during a race
@@ -383,6 +430,11 @@ func _apply_ui_scale() -> void:
 
 func _process(_dt: float) -> void:
 	_apply_ui_scale()
+	# while driving no button keeps the focus: Space and Enter are driving keys, not presses of the last clicked button
+	if screen == "race" and pause_ui == null and replay_ui == null:
+		var f := get_viewport().gui_get_focus_owner()
+		if f is BaseButton:
+			f.release_focus()
 	# the performance overlay follows the setting (Settings → General)
 	if Settings.data.showPerf and perf == null:
 		perf = PerfOverlay.new()
@@ -412,9 +464,9 @@ func start_loading(race: Dictionary, start_at) -> void:
 	_drop_session()
 	var bar := ProgressBar.new()
 	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(520, 10)
+	bar.custom_minimum_size = Vector2(520, 4)
 	bar.max_value = 1.0
-	var label := UIKit.label(I18n.t("Preparing…"), 18, UIKit.MUTED)
+	var label := UIKit.label(I18n.t("Preparing…"), 17, UIKit.SOFT)
 	var w0 := Weather.weather_at(race.weather, 0.0)
 	var weather_txt := I18n.t(Weather.LABEL[race.weather.kind])
 	if race.weather.get("change") != null:
@@ -425,8 +477,8 @@ func start_loading(race: Dictionary, start_at) -> void:
 	var col := UIW.vbox(14)
 	col.set_anchors_preset(Control.PRESET_CENTER)
 	col.add_child(UIW.logo(40))
-	col.add_child(UIW.h2(title))
-	col.add_child(UIKit.label(info, 20, UIKit.MUTED))
+	col.add_child(UIKit.label(title.to_upper(), 40, UIKit.TEXT, true, 700))
+	col.add_child(UIKit.label(info, 20, UIKit.SOFT))
 	col.add_child(bar)
 	col.add_child(label)
 	var root := Control.new()
@@ -512,12 +564,15 @@ func set_pause(open: bool) -> void:
 		pause_ui = null
 	if not open:
 		return
-	var m := UIW.modal(overlay_layer, 420)
+	var m := UIW.modal(overlay_layer, 440)
 	pause_ui = m.root
 	var b: VBoxContainer = m.body
-	b.add_child(UIW.h2(I18n.t("Paused")))
+	UIW.modal_head(b, I18n.t("Paused"), func(): if session != null: session.toggle_pause(false))
+	# the session's own Esc closes the pause menu: App.go_back leaves it alone
+	pause_ui.remove_meta("modal")
+	pause_ui.remove_meta("close")
 	b.add_child(UIW.muted(I18n.t("The race keeps running.")))
-	b.add_child(UIKit.button(I18n.t("Resume"), func(): if session != null: session.toggle_pause(false), true))
+	b.add_child(UIW.default_focus(UIKit.button(I18n.t("Resume"), func(): if session != null: session.toggle_pause(false), true)))
 	if session != null and session.replay.size() >= 40:
 		b.add_child(UIKit.button(I18n.t("Replay"), func():
 			session.toggle_pause(false)
@@ -549,7 +604,8 @@ func open_settings() -> void:
 			session.apply_settings()
 		audio.set_levels(Settings.data.audio)
 		graphics.apply_quality())
-	overlay_layer.add_child(panel)
+	# back on the screen under it, the pad's focus returns there
+	panel.tree_exited.connect(func(): if is_instance_valid(ui) and is_inside_tree() and screen != "race": UIW.focus_first(ui))
 
 # --------------------------------------------------------------- results ---
 
@@ -670,44 +726,129 @@ func _shots_only() -> void:
 		get_viewport().get_texture().get_image().save_png("%s/intro_%d.png" % [OS.get_environment("SHOT_DIR"), int(t)])
 	get_tree().quit()
 
-## Dev: APEX_AUTO=ui screenshots the menu's modals and the settings tabs.
+## Dev: APEX_AUTO=ui screenshots the menus: the menu's tabs and modals, the career's pages, every settings page, the
+## lobby's pages and the briefing of a solo room, and a results screen from made-up rows (nothing is saved).
 func _ui_shots() -> void:
 	var dir := OS.get_environment("SHOT_DIR")
 	var shot := func(n: String):
 		await get_tree().create_timer(0.7).timeout
 		get_viewport().get_texture().get_image().save_png("%s/ui_%s.png" % [dir, n])
+	var clear := func():
+		for c in overlay_layer.get_children():
+			if c != toasts and c != perf:
+				c.queue_free()
 	await get_tree().create_timer(1.5).timeout
 	await shot.call("menu")
-	show_career()
-	await shot.call("career")
+	# the pad's D-pad: the focus ring moves to the next card
+	var pad := InputEventAction.new()
+	pad.action = "ui_right"
+	pad.pressed = true
+	Input.parse_input_event(pad)
+	await shot.call("menu_pad_focus")
+	for t in ["online", "friends"]:
+		MenuScreen._tab = t
+		show_menu()
+		await shot.call("menu_" + t)
+	MenuScreen._tab = "play"
+	for t in ["profile", "achievements", "ranks"]:
+		CareerScreen._tab = t
+		show_career()
+		await shot.call("career_" + t)
+	CareerScreen._tab = "profile"
 	show_menu()
 	SocialUI.sign_in_modal(self, func(): pass)
 	await shot.call("signin")
-	for c in overlay_layer.get_children():
-		if c != toasts and c != perf:
-			c.queue_free()
+	clear.call()
 	ChampionshipUI.open(self, func(): return "Max")
 	await shot.call("champ")
-	for c in overlay_layer.get_children():
-		if c != toasts and c != perf:
-			c.queue_free()
+	clear.call()
 	SocialUI.records_modal(self)
 	await shot.call("records")
-	for c in overlay_layer.get_children():
-		if c != toasts and c != perf:
-			c.queue_free()
+	clear.call()
 	for tab in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller"]:
 		SettingsPanel._tab = tab
 		var panel := SettingsPanel.build(self, func(): pass)
 		await shot.call("settings_" + tab)
 		panel.queue_free()
+	# a solo room: every lobby page, then the briefing's pages
+	await join(LocalRoom.create(), "Max")
+	await get_tree().create_timer(0.6).timeout
+	for step in ["hub", "circuit", "car", "session", "conditions", "rules", "drivers"]:
+		LobbyScreen._page = step
+		render_lobby()
+		await shot.call("lobby_" + step)
+	LobbyScreen._page = "hub"
+	render_lobby()
+	send({"t": "addBot"})
+	send({"t": "addBot"})
+	send({"t": "ready", "ready": true})
+	send({"t": "start"})
+	await get_tree().create_timer(0.8).timeout
+	for t in ["setup", "advanced", "saved"]:
+		LobbyScreen._brief_tab = t
+		render_briefing()
+		await shot.call("briefing_" + t)
+	LobbyScreen._brief_tab = "setup"
+	# the results, from made-up rows, with the room closed so no championship is scored
+	var ids: Array = CarsDb.selectable().map(func(c): return c.id)
+	var nicks := ["Max", "Harry Ashdown", "Sem van Doorn", "Lucas Moreau", "Jonas Keller", "Marco Rossi"]
+	var rows: Array = []
+	for i in nicks.size():
+		rows.append({"id": me if i == 0 else "bot%d" % i, "nick": nicks[i], "carId": ids[(i * 3) % ids.size()], "position": i + 1, "totalMs": 612345.0 + i * 1834.0,
+			"penaltyMs": 5000.0 if i == 3 else 0.0, "gapMs": i * 1834.0, "bestLapMs": 118234.0 + i * 211.0, "validLaps": 5, "dnf": i == 5})
+	var gain := {"lines": [["Race finished", 120], ["Position", 150], ["Clean laps", 40]], "xp": 310, "xpBefore": 0, "srBefore": 2.5, "srAfter": 2.62,
+		"levelBefore": 1, "levelAfter": 1, "licenceBefore": "R", "licenceAfter": "R", "rankBefore": "Rookie", "rankAfter": "Rookie", "ratingBefore": 1350, "ratingAfter": 1372,
+		"achievements": [CareerData.ACHIEVEMENTS[0]]}
+	pending_race = {"trackId": "spa"}
+	teardown_connection()
+	weekend.clear()
+	screen = "results"
+	set_backdrop("pole", "spa")
+	set_ui(ResultsScreen.build(self, {"kind": "race", "rows": rows, "fastestLap": {"id": me, "ms": 118234.0}, "raceId": 1}, gain))
+	await shot.call("results")
 	get_tree().quit()
+
+## Esc and the pad's B (GamepadInput sends Esc) step back in the menus: the top modal closes, a lobby page returns to
+## its overview, the career to the menu. The race keeps Esc for its pause menu.
+func _unhandled_input(e: InputEvent) -> void:
+	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_ESCAPE and screen != "race" and screen != "loading":
+		if go_back():
+			get_viewport().set_input_as_handled()
+
+## One step back; false when there is nowhere to go from here.
+func go_back() -> bool:
+	var top: Node = null
+	for c in overlay_layer.get_children():
+		if c.has_meta("modal") and not c.is_queued_for_deletion():
+			top = c
+	if top != null:
+		if top.has_meta("close"):
+			(top.get_meta("close") as Callable).call()
+		else:
+			top.queue_free()
+		return true
+	match screen:
+		"career":
+			show_menu()
+			return true
+		"lobby":
+			if LobbyScreen.back_page():
+				render_lobby()
+				return true
+		"menu":
+			if MenuScreen._tab != "play":
+				MenuScreen._tab = "play"
+				show_menu()
+				return true
+	return false
 
 ## The phone's back button, and the app going to the background.
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_WM_GO_BACK_REQUEST:
-			if screen == "race" and session != null:
+			if screen != "race" and overlay_layer.get_children().any(func(c): return c.has_meta("modal")):
+				go_back()
+			elif screen == "race" and session != null:
 				session.toggle_pause()
 			elif screen == "menu":
 				get_tree().quit()

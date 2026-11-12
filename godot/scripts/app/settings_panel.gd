@@ -1,8 +1,10 @@
 class_name SettingsPanel
 extends RefCounted
-## Settings (port of ui/settingsPanel.ts, reorganised after iRacing's options): one page at a time (Graphics, Display,
-## View, Driving, Interface, Audio, Controls / Touch, Controller), each in titled sections. Rows are described as data;
-## every change is saved and `on_change` called after it.
+## Settings (port of ui/settingsPanel.ts, reorganised after iRacing's options and laid out as Le Mans Ultimate's):
+## four top tabs (Graphics, Gameplay, Audio, Controls) with their pages as sub-tabs (Quality, Display, View; Driving,
+## Interface; Keyboard / Touch, Controller), each page in big titled sections of hairline rows with ‹ value › steppers,
+## switches and sliders, and the help for the row under the pointer or the pad on the right. Every change is saved and
+## `on_change` called after it.
 
 const ACTION_LABEL := {
 	"throttle": "Throttle", "brake": "Brake / reverse", "steerLeft": "Steer left", "steerRight": "Steer right", "handbrake": "Handbrake",
@@ -37,48 +39,99 @@ const PRESET_NOTE := {
 static var _tab := "graphics"
 ## Old page names (a player's last page) and their new ones.
 const RENAMED := {"general": "interface", "camera": "view", "sound": "audio"}
+## The pages under the four top tabs (Le Mans Ultimate's Gameplay / Controls / Graphics / Sound with sub-tabs).
+const GROUPS := [["graphics", "Graphics", ["graphics", "display", "view"]], ["gameplay", "Gameplay", ["driving", "interface"]], ["audio", "Audio", ["audio"]], ["controls", "Controls", ["controls", "controller"]]]
+## The help column: the row under the pointer or the pad's focus explains itself there (a phone shows the help in the rows).
+static var _help_title: Label = null
+static var _help_text: Label = null
+static var _inline_hints := true
 
 static func _pct(v: float) -> String:
 	return "%d %%" % roundi(v * 100.0)
 
+static func _group_of(page: String) -> Array:
+	for g in GROUPS:
+		if (g[2] as Array).has(page):
+			return g
+	return GROUPS[0]
+
+## The settings, over whatever is on screen (menu, lobby or the pause menu): a page of its own with the top bar, the
+## rows in the middle and the help on the right. Closes with Done, ‹, Esc or the pad's B.
 static func build(app: App, on_change: Callable) -> Control:
-	var m := UIW.modal(app.overlay_layer, 760, UIKit.touch())
-	var root: Control = m.root
-	var body: VBoxContainer = m.body
+	var touch := UIKit.touch()
+	var vp := app.get_viewport().get_visible_rect().size
+	var wide := not touch and vp.x >= 1180.0
+	_inline_hints = not wide
+	var root := Control.new()
+	UIKit.full(root)
+	root.theme = UIKit.theme
+	root.set_meta("modal", true)
+	var dim := ColorRect.new()
+	dim.color = Color(0.012, 0.02, 0.05, 0.97)
+	UIKit.full(dim)
+	root.add_child(dim)
+	var decor := MenuDecor.new()
+	UIKit.full(decor)
+	root.add_child(decor)
+	var close := func():
+		_help_title = null
+		_help_text = null
+		root.queue_free()
+	root.set_meta("close", close)
 	var changed := func():
 		Settings.save()
 		on_change.call()
-	var head := UIW.hbox(8)
-	var title := UIW.h2(I18n.t("Settings"))
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(title)
-	head.add_child(UIKit.button(I18n.t("Close"), func(): root.queue_free(), true))
-	body.add_child(head)
-	# one scrolling row of tabs on a phone, so the settings themselves get the height
-	var tabs_row: Container = HBoxContainer.new() if UIKit.touch() else HFlowContainer.new()
-	tabs_row.add_theme_constant_override("separation" if UIKit.touch() else "h_separation", 6)
-	if UIKit.touch():
-		var tabs_scroll := ScrollContainer.new()
-		tabs_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		tabs_scroll.add_child(tabs_row)
-		body.add_child(tabs_scroll)
-	else:
-		body.add_child(tabs_row)
-	var holder := MarginContainer.new()
-	holder.custom_minimum_size = Vector2(0, 120 if UIKit.touch() else 380)
-	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_child(holder)
 	var is_touch := DisplayServer.is_touchscreen_available()
-	var tabs := [
-		["graphics", I18n.t("Graphics")], ["display", I18n.t("Display")], ["view", I18n.t("View")], ["driving", I18n.t("Driving")],
-		["interface", I18n.t("Interface")], ["audio", I18n.t("Audio")], ["controls", I18n.t("Touch") if is_touch else I18n.t("Controls")], ["controller", I18n.t("Controller")],
-	]
+	var page_label := {
+		"graphics": I18n.t("Quality"), "display": I18n.t("Display"), "view": I18n.t("View"), "driving": I18n.t("Driving"), "interface": I18n.t("Interface"),
+		"audio": I18n.t("Audio"), "controls": I18n.t("Touch") if is_touch else I18n.t("Keyboard"), "controller": I18n.t("Controller"),
+	}
+	var holder := MarginContainer.new()
+	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var sub_row := CenterContainer.new()
+	sub_row.custom_minimum_size = Vector2(0, 42 if touch else 46)
+	var help_col := UIW.vbox(10)
+	help_col.custom_minimum_size = Vector2(300, 0)
+	help_col.visible = wide
+	_help_title = UIKit.label("", 26, UIKit.DIM, true, 600)
+	_help_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_help_text = UIKit.label("", 15, UIKit.SOFT)
+	_help_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help_col.add_child(_help_title)
+	var help_box := PanelContainer.new()
+	help_box.add_theme_stylebox_override("panel", UIKit.box(Color(1, 1, 1, 0.05), Color(1, 1, 1, 0.16), 1, 2, Vector2(14, 12)))
+	help_box.add_child(_help_text)
+	help_col.add_child(help_box)
+	var devices := UIW.vbox(2)
+	help_col.add_child(UIW.spacer())
+	help_col.add_child(devices)
+	# the bar is made after the page switcher: the switcher finds its tab row through this dictionary
+	var bar := {}
 	var show := Callable()
 	show = func(key: String):
 		_tab = key
+		var grp := _group_of(key)
+		for b in (bar.tabs.get_children() if bar.has("tabs") and bar.tabs != null else []):
+			b.set_active(b.get_meta("key") == grp[0])
+		for c in sub_row.get_children():
+			c.queue_free()
+		if (grp[2] as Array).size() > 1:
+			sub_row.add_child(UIW.tabs((grp[2] as Array).map(func(k): return [k, page_label[k]]), key, func(k): show.call(k), true))
 		for c in holder.get_children():
 			c.queue_free()
-		var col := UIW.vbox(8)
+		_help_title.text = String(page_label[key]).to_upper()
+		_help_text.text = I18n.t("Point at a setting, or move to it with the pad, to see what it does.")
+		for c in devices.get_children():
+			c.queue_free()
+		if key == "controls" or key == "controller":
+			devices.add_child(UIKit.label(I18n.t("Detected devices").to_upper(), 22, UIKit.DIM, true, 600))
+			var pads := Input.get_connected_joypads()
+			if pads.is_empty():
+				devices.add_child(UIKit.label(I18n.t("No controller connected"), 14, UIKit.SOFT))
+			for d in pads:
+				devices.add_child(UIKit.label(Input.get_joy_name(d), 14, UIKit.SOFT))
+		var col := UIW.vbox(0)
 		match key:
 			"graphics":
 				_graphics(col, changed, show)
@@ -99,59 +152,145 @@ static func build(app: App, on_change: Callable) -> Control:
 					_controls(col, changed, show)
 			"controller":
 				_controller(col, changed, app)
-		holder.add_child(UIW.scroll(col))
-		for i in tabs_row.get_child_count():
-			var b := tabs_row.get_child(i) as Button
-			var on: bool = tabs[i][0] == key
-			for st in ["normal", "hover", "pressed"]:
-				b.add_theme_stylebox_override(st, UIKit.box(UIKit.ACCENT if on else Color(1, 1, 1, 0.06), UIKit.LINE, 1, 3, UIKit.btn_pad()))
-	for t in tabs:
-		var key: String = t[0]
-		var b := UIKit.button(t[1], func(): show.call(key))
-		tabs_row.add_child(b)
+		col.add_child(UIW.spacer(false))
+		var sc := UIW.scroll(UIW.margins(col, 0, 0, 14, 12))
+		holder.add_child(sc)
+	var on_group := func(g: String):
+		for grp in GROUPS:
+			if grp[0] == g:
+				show.call(grp[2][0])
+				UIW.focus_first.call_deferred(holder)
+	var top := UIW.top_bar({
+		"title": I18n.t("Settings"), "back": close,
+		"tabs": GROUPS.map(func(g): return [g[0], I18n.t(g[1])]), "tab": "", "on_tab": on_group, "tabs_left": touch,
+	})
+	# the tab row is the bar's own: found once to light the current group
+	bar.tabs = _find_tabs(top)
+	var body := UIW.hbox(36)
+	var mid := UIW.vbox(0)
+	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mid.size_flags_stretch_ratio = 2.6
+	mid.add_child(holder)
+	body.add_child(mid)
+	help_col.size_flags_stretch_ratio = 1.0
+	help_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(help_col)
+	var col := UIW.vbox(0)
+	col.add_child(top)
+	col.add_child(sub_row)
+	var done := UIW.action(I18n.t("Done"), close, true)
+	var scr := UIW.screen(col, body, UIW.action_bar(null, [done]))
+	UIKit.full(scr)
+	root.add_child(scr)
 	var start: String = RENAMED.get(_tab, _tab)
-	show.call(start if tabs.any(func(t): return t[0] == start) else "graphics")
+	var ok := false
+	for g in GROUPS:
+		if (g[2] as Array).has(start):
+			ok = true
+	show.call(start if ok else "graphics")
+	app.overlay_layer.add_child(root)
+	root.modulate.a = 0.0
+	root.create_tween().tween_property(root, "modulate:a", 1.0, 0.15)
+	UIW.focus_first.call_deferred(holder)
 	return root
+
+static func _find_tabs(n: Node) -> HBoxContainer:
+	for c in n.get_children():
+		if c is HBoxContainer and c.get_child_count() > 0 and c.get_child(0) is UIW.TabButton:
+			return c
+		var r := _find_tabs(c)
+		if r != null:
+			return r
+	return null
 
 # --------------------------------------------------------------- row kinds ---
 
+## A row: the label on the left, the control on the right, a hairline under it; the pointer or the focus lights it and
+## puts its help in the help column (or under the label on a phone).
 static func _row(label: String, ctrl: Control, hint: String = "") -> Control:
+	var touch := UIKit.touch()
+	var p := PanelContainer.new()
+	var normal := UIKit.box(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, Vector2(10, 6 if touch else 4))
+	normal.border_color = UIKit.HAIR
+	normal.border_width_bottom = 1
+	var lit: StyleBoxFlat = normal.duplicate()
+	lit.bg_color = UIKit.ROW_HI
+	p.add_theme_stylebox_override("panel", normal)
+	p.custom_minimum_size = Vector2(0, 50 if touch else 40)
 	var r := UIW.hbox(12)
-	var left := UIW.vbox(1)
+	var left := UIW.vbox(0)
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left.add_child(UIKit.label(label, 17, UIKit.TEXT, false, 600))
-	if hint != "":
+	left.alignment = BoxContainer.ALIGNMENT_CENTER
+	left.add_child(UIKit.label(label, 17 if touch else 16, UIKit.TEXT, false, 600))
+	if hint != "" and _inline_hints:
 		left.add_child(UIW.muted(hint, 13))
 	r.add_child(left)
 	ctrl.size_flags_horizontal = Control.SIZE_SHRINK_END
+	ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(ctrl)
-	return r
+	p.add_child(r)
+	var on := func():
+		p.add_theme_stylebox_override("panel", lit)
+		if _help_title != null and is_instance_valid(_help_title):
+			_help_title.text = label.to_upper()
+			_help_text.text = hint if hint != "" else I18n.t("Point at a setting, or move to it with the pad, to see what it does.")
+	var off := func():
+		if not p.is_inside_tree():
+			return
+		var f := p.get_viewport().gui_get_focus_owner()
+		var focused := f != null and p.is_ancestor_of(f)
+		if not focused and not p.get_global_rect().has_point(p.get_global_mouse_position()):
+			p.add_theme_stylebox_override("panel", normal)
+	p.mouse_entered.connect(on)
+	p.mouse_exited.connect(off)
+	for c in _focusables(ctrl):
+		c.focus_entered.connect(on)
+		c.focus_exited.connect(off)
+	return p
+
+static func _focusables(c: Control) -> Array:
+	var out: Array = []
+	if c.focus_mode != Control.FOCUS_NONE:
+		out.append(c)
+	for ch in c.get_children():
+		if ch is Control:
+			out.append_array(_focusables(ch))
+	return out
 
 static func _toggle(col: Control, label: String, hint: String, d: Dictionary, key: String, changed: Callable) -> void:
-	var cb := CheckButton.new()
-	cb.focus_mode = Control.FOCUS_NONE
-	cb.button_pressed = d[key]
-	cb.toggled.connect(func(v): d[key] = v; changed.call())
-	col.add_child(_row(label, cb, hint))
+	var sw := UIW.switch(d[key], func(v): d[key] = v; changed.call())
+	col.add_child(_row(label, sw, hint))
 
 static func _range(col: Control, label: String, hint: String, d: Dictionary, key: String, lo: float, hi: float, step: float, fmt: Callable, changed: Callable) -> void:
-	var out := UIKit.label(fmt.call(d[key]), 15, UIKit.MUTED)
-	out.custom_minimum_size = Vector2(70, 0)
+	var out := UIKit.label(fmt.call(d[key]), 16, UIKit.TEXT, false, 600)
+	out.custom_minimum_size = Vector2(76, 0)
 	out.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	var s := UIW.slider(d[key], lo, hi, step, func(v): d[key] = v; out.text = fmt.call(v); changed.call())
-	s.custom_minimum_size = Vector2(220, 28)
-	var box := UIW.hbox(8)
+	s.custom_minimum_size = Vector2(240, 30)
+	var box := UIW.hbox(10)
 	box.add_child(s)
 	box.add_child(out)
 	col.add_child(_row(label, box, hint))
 
 static func _select(col: Control, label: String, hint: String, d: Dictionary, key: String, options: Array, changed: Callable, cast: Callable = Callable()) -> void:
 	var cur = d[key]
-	var o := UIW.select(str(cur) if not cast.is_valid() else str(cur), options, func(v): d[key] = cast.call(v) if cast.is_valid() else v; changed.call())
+	var o := UIW.stepper(str(cur), options, func(v): d[key] = cast.call(v) if cast.is_valid() else v; changed.call())
 	col.add_child(_row(label, o, hint))
 
+## A section's heading (a gap above all but the first).
 static func _head(col: Control, text: String) -> void:
-	col.add_child(UIW.h3(text))
+	if col.get_child_count() > 0:
+		var gap := Control.new()
+		gap.custom_minimum_size = Vector2(0, 22)
+		col.add_child(gap)
+	col.add_child(UIW.section(text))
+
+## Buttons under a section, on the left.
+static func _buttons(col: Control, buttons: Array) -> void:
+	var row := UIW.hbox(8)
+	for b in buttons:
+		row.add_child(b)
+	col.add_child(UIW.margins(row, 0, 10, 0, 4))
 
 # ------------------------------------------------------------------- tabs ---
 
@@ -161,7 +300,7 @@ static func _levels() -> Array:
 ## A graphics override row: "Preset" follows the preset; any other level takes that preset's values for the group.
 static func _override(col: Control, label: String, hint: String, key: String, options: Array, cast: Callable, changed: Callable) -> void:
 	var g: Dictionary = Settings.data.graphics
-	col.add_child(_row(label, UIW.select(str(g.get(key, "")), options, func(v):
+	col.add_child(_row(label, UIW.stepper(str(g.get(key, "")), options, func(v):
 		if v == "":
 			g.erase(key)
 		else:
@@ -183,19 +322,16 @@ static func _graphics(col: Control, changed: Callable, show: Callable) -> void:
 		S.qualityAuto = false
 		changed.call()
 		show.call("graphics"))
-	col.add_child(note)
+	col.add_child(UIW.margins(note, 10, 8, 10, 0))
 	refresh.call()
-	var buttons := UIW.hbox(8)
-	buttons.add_child(UIKit.button(I18n.t("Back to the preset"), func():
+	_buttons(col, [UIKit.button(I18n.t("Back to the preset"), func():
 		S.graphics = {}
 		changed.call()
-		show.call("graphics")))
-	buttons.add_child(UIKit.button(I18n.t("Detect for this device"), func():
+		show.call("graphics")), UIKit.button(I18n.t("Detect for this device"), func():
 		S.quality = Settings.detect_quality()
 		S.graphics = {}
 		changed.call()
-		show.call("graphics")))
-	col.add_child(buttons)
+		show.call("graphics"))])
 	for sec in SECTIONS:
 		_head(col, I18n.t(sec[0]))
 		for grp in sec[1]:
@@ -257,12 +393,12 @@ static func _view(col: Control, changed: Callable) -> void:
 	var cm := func(v): return "%d cm" % int(v)
 	_range(col, I18n.t("Screen width"), I18n.t("The picture's visible width"), sc, "widthCm", 20, 200, 1, cm, func(): changed.call(); upd.call())
 	_range(col, I18n.t("Eyes to screen"), "", sc, "distanceCm", 30, 200, 1, cm, func(): changed.call(); upd.call())
-	col.add_child(result)
+	col.add_child(UIW.margins(result, 10, 8, 10, 0))
 	upd.call()
-	col.add_child(UIKit.button(I18n.t("Use this field of view"), func():
+	_buttons(col, [UIKit.button(I18n.t("Use this field of view"), func():
 		S.fov = clampf(roundf(calc.call()), 25.0, 95.0)
 		changed.call()
-		result.text = I18n.t("Field of view set to {v}°.", {"v": "%d" % int(S.fov)})))
+		result.text = I18n.t("Field of view set to {v}°.", {"v": "%d" % int(S.fov)}))])
 	_head(col, I18n.t("Seat"))
 	_range(col, I18n.t("Seat height"), I18n.t("Raise the cockpit camera to see more road"), S, "seatHeight", -0.1, 0.2, 0.01, func(v): return "%s%d cm" % ["+" if v >= 0 else "", roundi(v * 100)], changed)
 	_range(col, I18n.t("Seat position"), I18n.t("Forward / back"), S, "seatForward", -0.25, 0.25, 0.01, func(v): return "%s%d cm" % ["+" if v >= 0 else "", roundi(v * 100)], changed)
@@ -288,7 +424,7 @@ static func _driving(col: Control, changed: Callable) -> void:
 static func _interface(col: Control, changed: Callable) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Language"))
-	col.add_child(_row("Language / Idioma", UIW.select(S.language, I18n.LANGUAGES, func(v):
+	col.add_child(_row("Language / Idioma", UIW.stepper(S.language, I18n.LANGUAGES, func(v):
 		S.language = v
 		I18n.set_lang(v)
 		changed.call())))
@@ -335,7 +471,7 @@ static func _key_name(code: String) -> String:
 static func _controls(col: Control, changed: Callable, show: Callable) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Controls"))
-	col.add_child(UIW.muted(I18n.t("Click a key, then press the new one. Two keys per action.")))
+	col.add_child(UIW.margins(UIW.muted(I18n.t("Click a key, then press the new one. Two keys per action.")), 10, 8, 10, 6))
 	for a in ACTION_LABEL:
 		var keys := UIW.hbox(6)
 		var codes: Array = S.bindings[a]
@@ -344,14 +480,14 @@ static func _controls(col: Control, changed: Callable, show: Callable) -> void:
 		if codes.size() < 2:
 			keys.add_child(_key_button(a, codes.size(), "+", S, changed, show))
 		col.add_child(_row(I18n.t(ACTION_LABEL[a]), keys))
-	col.add_child(UIKit.button(I18n.t("Reset keys"), func():
+	_buttons(col, [UIKit.button(I18n.t("Reset keys"), func():
 		S.bindings = Settings.DEFAULT_BINDINGS.duplicate(true)
 		changed.call()
-		show.call("controls")))
+		show.call("controls"))])
 
 static func _key_button(action: String, idx: int, text: String, S: Dictionary, changed: Callable, show: Callable) -> Button:
 	var b := UIKit.button(text)
-	b.custom_minimum_size = Vector2(70, 0)
+	b.custom_minimum_size = Vector2(78, 0)
 	b.pressed.connect(func():
 		b.text = "…"
 		var listener := KeyCapture.new()
@@ -383,7 +519,7 @@ class KeyCapture:
 static func _touch(col: Control) -> void:
 	_head(col, I18n.t("Touch"))
 	var steer: Dictionary = {"steer": TouchPrefs.get_pref("steer")}
-	col.add_child(_row(I18n.t("Steering"), UIW.select(steer.steer, [["buttons", I18n.t("Arrow buttons")], ["slider", I18n.t("Slider")], ["tilt", I18n.t("Tilt the phone")]], func(v): TouchPrefs.set_pref("steer", v))))
+	col.add_child(_row(I18n.t("Steering"), UIW.stepper(steer.steer, [["buttons", I18n.t("Arrow buttons")], ["slider", I18n.t("Slider")], ["tilt", I18n.t("Tilt the phone")]], func(v): TouchPrefs.set_pref("steer", v))))
 	var tr := {"v": TouchPrefs.get_pref("tiltRange")}
 	var out := UIKit.label("%d°" % int(tr.v), 15, UIKit.MUTED)
 	var s := UIW.slider(tr.v, 10, 50, 1, func(v): TouchPrefs.set_pref("tiltRange", v); out.text = "%d°" % int(v))
@@ -391,26 +527,22 @@ static func _touch(col: Control) -> void:
 	r.add_child(s)
 	r.add_child(out)
 	col.add_child(_row(I18n.t("Tilt range"), r, I18n.t("Tilt angle that gives full steering")))
-	var inv := CheckButton.new()
-	inv.button_pressed = TouchPrefs.get_pref("tiltInvert")
-	inv.toggled.connect(func(v): TouchPrefs.set_pref("tiltInvert", v))
+	var inv := UIW.switch(TouchPrefs.get_pref("tiltInvert"), func(v): TouchPrefs.set_pref("tiltInvert", v))
 	col.add_child(_row(I18n.t("Invert tilt"), inv, I18n.t("Swap the tilt direction")))
 	var sz := UIW.slider(TouchPrefs.get_pref("size"), 0.8, 1.3, 0.05, func(v): TouchPrefs.set_pref("size", v))
 	col.add_child(_row(I18n.t("Pedal size"), sz))
 	var op := UIW.slider(TouchPrefs.get_pref("opacity"), 0.25, 1.0, 0.05, func(v): TouchPrefs.set_pref("opacity", v))
 	col.add_child(_row(I18n.t("Controls opacity"), op))
-	var hp := CheckButton.new()
-	hp.button_pressed = TouchPrefs.get_pref("haptics")
-	hp.toggled.connect(func(v): TouchPrefs.set_pref("haptics", v))
+	var hp := UIW.switch(TouchPrefs.get_pref("haptics"), func(v): TouchPrefs.set_pref("haptics", v))
 	col.add_child(_row(I18n.t("Vibration"), hp, I18n.t("Short vibration on gear shifts and button presses")))
 
 static func _controller(col: Control, changed: Callable, app: App = null) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Controller"))
 	if app != null and app.gamepad != null:
-		col.add_child(PadSetup.new(app.gamepad))
+		col.add_child(UIW.margins(PadSetup.new(app.gamepad), 10, 8, 10, 4))
 	_head(col, I18n.t("Steering wheel"))
-	col.add_child(UIW.muted(I18n.t("Logitech, Thrustmaster, Fanatec, Moza, Simucube and Simagic wheels are recognised. Set the wheel to 900° in its own software and the same here: each car then turns as its real lock allows."), 13))
+	col.add_child(UIW.margins(UIW.muted(I18n.t("Logitech, Thrustmaster, Fanatec, Moza, Simucube and Simagic wheels are recognised. Set the wheel to 900° in its own software and the same here: each car then turns as its real lock allows."), 13), 10, 8, 10, 6))
 	_select(col, I18n.t("Device"), "", S.wheel, "mode", [["auto", I18n.t("Recognise wheels automatically")], ["wheel", I18n.t("Always a steering wheel")], ["pad", I18n.t("Always a gamepad")]], changed)
 	_range(col, I18n.t("Wheel rotation"), I18n.t("Lock to lock, as set on the wheel base: the car's own lock is used within it"), S.wheel, "rotationDeg", 180, 1080, 10, func(v): return "%d°" % int(v), changed)
 	_range(col, I18n.t("Brake pedal curve"), I18n.t("1 = linear; higher = more travel near the locking point (load-cell pedals: about 1)"), S.wheel, "brakeCurve", 0.6, 2.4, 0.1, func(v): return "%.1f" % v, changed)
@@ -436,8 +568,8 @@ static func _controller(col: Control, changed: Callable, app: App = null) -> voi
 	_range(col, I18n.t("Throttle ramp"), I18n.t("Time from nothing to full throttle: longer, a tap gives part throttle"), k, "throttleRamp", 0.05, 1.5, 0.05, func(v): return "%.2f s" % v, changed)
 	_range(col, I18n.t("Brake ramp"), I18n.t("Time from nothing to full brake"), k, "brakeRamp", 0.05, 1.5, 0.05, func(v): return "%.2f s" % v, changed)
 	_range(col, I18n.t("Steering speed"), "", k, "steerSpeed", 0.5, 1.6, 0.05, _pct, changed)
-	col.add_child(UIKit.button(I18n.t("Reset the controller settings"), func():
+	_buttons(col, [UIKit.button(I18n.t("Reset the controller settings"), func():
 		var layouts = S.pad.layouts
 		S.pad = Settings.default_settings().pad
 		S.pad.layouts = layouts
-		changed.call()))
+		changed.call())])
