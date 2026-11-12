@@ -4,7 +4,7 @@
 
 Reads the printed art and the scanned CC0 materials (tex/) build_prop_textures.py wrote into the same folder; writes props.glb, one root node per prop at the
 origin, standing on z = 0 (glTF y = 0), its printed face towards -Y (glTF +Z): bollard, feather_flag, tv_crane,
-balloon, podium_board, footbridge (spans X, 34 m), marquee. SpaProps places them."""
+balloon, podium_board, footbridge (spans X, 34 m), marquee, container_green / _orange / _white. SpaProps places them."""
 import math
 import os
 import sys
@@ -312,6 +312,37 @@ def tile_uvs(o):
 for o in sc.objects:
     if o.type == 'MESH':
         tile_uvs(o)
+
+# --- hospitality containers (f001-f003, the hill left of the main straight): 20 ft boxes, corrugated sides, door end;
+# one per paint the video shows
+def tinted(name, rgb):
+    m = pbr(name, 'CorrugatedSteel005', 2.0)
+    nt = m.node_tree
+    b = nt.nodes['Principled BSDF']
+    mix = nt.nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    mix.blend_type = 'MULTIPLY'
+    mix.inputs['Factor'].default_value = 1.0
+    col = [l for l in nt.links if l.to_socket == b.inputs['Base Color']][0].from_socket
+    nt.links.new(col, mix.inputs['A'])
+    mix.inputs['B'].default_value = (*rgb, 1.0)
+    nt.links.new(mix.outputs['Result'], b.inputs['Base Color'])
+    # the glTF export bakes no node maths: the tint goes in the base colour factor too (the exporter keeps the texture
+    # and the factor)
+    b.inputs['Base Color'].default_value = (*rgb, 1.0)
+    return m
+
+
+for cname, rgb in (('container_green', (0.25, 0.7, 0.2)), ('container_orange', (0.95, 0.35, 0.05)), ('container_white', (1.0, 1.0, 1.0))):
+    bm = bmesh.new()
+    box(bm, (-3.03, -1.22, 0.0), (3.03, 1.22, 2.59), 0, 0.03)
+    # corner castings and door bars
+    for x in (-3.0, 3.0):
+        for y in (-1.19, 1.19):
+            box(bm, (x - 0.09, y - 0.09, 0.0), (x + 0.09, y + 0.09, 2.59), 1, 0.01)
+    for y in (-0.6, -0.2, 0.2, 0.6):
+        beam(bm, (3.06, y, 0.1), (3.06, y, 2.5), 0.05, 1)
+    obj(cname, bm, [tinted(cname + '_paint', rgb), STEEL])
 
 # hard surfaces flat, the cloth smooth
 for o in sc.objects:

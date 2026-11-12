@@ -74,6 +74,16 @@ PROPS = [
     ['tv_crane', ['view', 4936, 17.8, 65], None, 'f048: Campus, right of the gantry'],
     ['tv_crane', ['view', 6442, 19.6, 150], None, 'f062: towards the chicane, right'],
     ['footbridge', [6574, 0], 180, 'f063: over the track before the chicane (overhead in the frame)'],
+    # f001-f003: containers and marquees up the hill left of the main straight (the angles from f002, 54 m; the model's
+    # hill is lower than the real one, so they stand further up it than their size in the frame says)
+    ['container_green', ['view', 54, -17.0, 175], 100, 'f002: green container on the hill'],
+    ['container_orange', ['view', 54, -14.6, 180], 95, 'f002: orange container'],
+    ['container_white', ['view', 54, -12.4, 186], 90, 'f002: white container'],
+    ['container_green', ['view', 54, -10.8, 192], 92, 'f002: second green container'],
+    ['container_white', ['view', 54, -9.6, 198], 88, 'f002: white container, further'],
+    ['marquee', ['view', 54, -8.2, 205], 180, 'f002: marquees beyond the containers'],
+    ['marquee', ['view', 54, -7.2, 212], 180, 'f002: marquees'],
+    ['marquee', ['view', 165, -12.0, 90], 180, 'f003: marquees on the hill'],
 ] + [['bollard', [s, 5.8], 180, 'f007-f009: on the pit exit line'] for s in range(470, 730, 12)] \
   + [['feather_flag', [s, 16.5], 270, 'f008: on the right, behind the green pit-exit wall'] for s in range(480, 720, 8)] \
   + [['marquee', [s, 42 + 6 * (k % 2)], 180, 'f043: Fagnes, tents on the right'] for k, s in enumerate(range(4500, 4560, 7))] \

@@ -1,4 +1,4 @@
-# Spa rebuild, milestone 4: the whole lap (in progress)
+# Spa rebuild, milestone 4: the whole lap
 
 The approved test-slice look (M3) runs over the whole 7 km: one set of materials, so the colours were already lap-wide. M4
 adds what the source model lacks around the lap, and the M3 grass fix. Compared with the reference video at 16 spots
@@ -107,7 +107,26 @@ Compared at full resolution with the video at Kemmel, Speakers' Corner, Pouhon a
   out before it can shimmer; the colour fitted to the haze of f055.
 - Spa's full tree models out to 30 m (blended): Ultra at 2560 x 1440, 67 fps average, 40 at the 1 % low.
 
-## Checklist items still open
+## Added after the realism pass
+
+- **Terraces on the hill after La Source** (560-880 m): 14 rows of concrete steps behind the barriers, 3,839 spectators
+  on them (`build_places.py` TERRACES); the loose bank crowd there dropped.
+- **Advertising boards** where the video has them: Laune, Classic 21 and Circuit de Spa at Raidillon, TotalEnergies
+  behind the right-hand rail there, Fanatec at Les Combes and Bruxelles (274 panels, `BOARDS`; art drawn in
+  `build_prop_textures.py`).
+- **Kerbs** in the video's red and yellow (the source's pale pink and cream texels repainted), matte, with concrete grain.
+- **Hospitality containers and marquees** on the hill left of the main straight (green, orange, white 20 ft boxes).
+  The model's hill there is lower than the real one, so from the matched camera they stand behind the stand and trees.
+- **Menus** redesigned after the UI references (DECISIONS.md, "Godot: menu redesign").
+
+## Left as it is
+
+- The pit building: in the game it already matches the video (dark glass, red fins); the M1 "plain grey" note was the
+  raw model before materials.
+- Crowd sprites are flat cards facing the camera: close up in the cockpit at the La Source terraces they read as cards.
+- The phone tier was not measured on a phone.
+
+## Checklist items open at the first M4 check-in (since done, above)
 
 - The grandstands on the hill after La Source (f008-f011; the model has a bare bank there): the crowd stands on the bank.
 - Banner art on the Raidillon boards and the Armco banners (blank in the model).
