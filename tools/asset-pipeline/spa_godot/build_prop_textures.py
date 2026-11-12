@@ -102,3 +102,41 @@ if acg:
                 im.save(os.path.join(td, f'{k}_{dst}.jpg'), quality=90)
     print('[prop textures] scanned materials:', ', '.join(PBR))
 print('[prop textures] balloon, podium, flag, banner')
+
+# advertising boards along the track (build_places.py BOARDS), one 2048 x 256 row each (an 8 m run of 1 m tall boards):
+# 0 TotalEnergies banner, 1 Laune, 2 Classic 21, 3 Circuit de Spa, 4 Fanatec
+rows = []
+img = Image.new('RGB', (2048, 256), (246, 246, 246))
+d = ImageDraw.Draw(img)
+for k in range(2):
+    centred(d, (k * 1024, 0, (k + 1) * 1024, 256), 'TotalEnergies', font(150), (30, 60, 150) if k == 0 else (215, 45, 40))
+rows.append(img)
+img = Image.new('RGB', (2048, 256), (200, 30, 40))
+d = ImageDraw.Draw(img)
+for k in range(4):
+    x0 = k * 512
+    d.rectangle([x0 + 30, 50, x0 + 110, 206], fill=(245, 245, 245))
+    d.rectangle([x0 + 54, 74, x0 + 86, 182], fill=(200, 30, 40))
+    centred(d, (x0 + 130, 0, x0 + 490, 256), 'laune', font(130), (245, 245, 245))
+rows.append(img)
+img = Image.new('RGB', (2048, 256), (88, 40, 150))
+d = ImageDraw.Draw(img)
+for k in range(4):
+    centred(d, (k * 512, 0, (k + 1) * 512, 256), 'CLASSIC 21', font(92), (245, 245, 245))
+rows.append(img)
+img = Image.new('RGB', (2048, 256), (244, 244, 244))
+d = ImageDraw.Draw(img)
+for k in range(2):
+    centred(d, (k * 1024, 0, (k + 1) * 1024, 256), 'CIRCUIT DE SPA', font(120), (35, 35, 40))
+    d.rectangle([k * 1024 + 60, 200, k * 1024 + 964, 214], fill=(215, 30, 40))
+rows.append(img)
+img = Image.new('RGB', (2048, 256), (14, 14, 16))
+d = ImageDraw.Draw(img)
+for k in range(4):
+    centred(d, (k * 512, 0, (k + 1) * 512, 256), 'FANATEC', font(110), (238, 238, 238))
+rows.append(img)
+atlas = Image.new('RGB', (2048, 256 * len(rows)))
+for k, r in enumerate(rows):
+    atlas.paste(r, (0, k * 256))
+atlas.save(os.path.join(out, 'boards.png'))
+print('[prop textures] boards:', len(rows), 'rows')

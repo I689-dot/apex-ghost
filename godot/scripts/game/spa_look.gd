@@ -127,6 +127,8 @@ static func _paint(m: StandardMaterial3D) -> void:
 const DETAIL := [
 	["^(wall_spa$|wall_spa_concrete|wall_spa_jersey|wall_spa_stone|wall_spa_barriers)", "concrete", 2.7],
 	["^(grail_spa|galvanized_spa|metal_beam|fence_spa_special)", "metal", 1.0],
+	# the kerbs: painted concrete
+	["^(curb_spa|lines_spa$)", "concrete", 1.6],
 	["^(structures|box1|houses|main-gstand|raidillon-grandstand|marshal-post|box-door)", "painted", 2.0],
 ]
 const DETAIL_DIR := "res://assets/textures/spa/"
@@ -167,6 +169,64 @@ static func _catch_fence(m: StandardMaterial3D) -> void:
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	m.metallic = 0.6
 	m.roughness = 0.5
+
+## The kerbs' paint (the source's 96 x 256 kerb textures came out pale pink and cream): red and yellow texels brought to
+## the video's (measured lit at Les Combes and Raidillon: red 0.59-0.79 / 0.13-0.15 / 0.12-0.13, yellow 0.66-0.75 /
+## 0.58-0.65 / 0.08-0.11 linear) as albedos, each texel's brightness kept as grain; white left alone.
+const KERB_RE := "^(curb_spa|lines_spa$)"
+const KERB_RED := Color(0.5, 0.085, 0.07)
+const KERB_YELLOW := Color(0.5, 0.42, 0.05)
+
+static func _kerb(m: StandardMaterial3D) -> void:
+	var t := m.albedo_texture
+	if t == null:
+		return
+	var img := t.get_image()
+	if img == null:
+		return
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.clear_mipmaps()
+	img.convert(Image.FORMAT_RGBA8)
+	# each paint's texels and their mean brightness first, so the grain keeps its average
+	var groups := {"red": [], "yellow": []}
+	var sums := {"red": 0.0, "yellow": 0.0}
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			var key := ""
+			# (faded paint: a pale pink is still red, a cream still yellow; white and grey stay)
+			if c.r > c.g * 1.12 and c.r > c.b * 1.1 and c.r - c.g > 0.06:
+				key = "red"
+			elif (c.r + c.g) * 0.5 > c.b * 1.2 and absf(c.r - c.g) < 0.12 and (c.r + c.g) * 0.5 - c.b > 0.08:
+				key = "yellow"
+			if key != "":
+				var l := c.srgb_to_linear()
+				var lum := l.r * 0.2126 + l.g * 0.7152 + l.b * 0.0722
+				groups[key].append([x, y, lum])
+				sums[key] += lum
+	var changed := false
+	for key in groups:
+		var g: Array = groups[key]
+		if g.is_empty():
+			continue
+		changed = true
+		var mean: float = sums[key] / g.size()
+		var want: Color = KERB_RED if key == "red" else KERB_YELLOW
+		for p in g:
+			var k: float = clampf(p[2] / mean, 0.7, 1.3)
+			var c := Color(want.r * k, want.g * k, want.b * k).linear_to_srgb()
+			c.a = img.get_pixel(p[0], p[1]).a
+			img.set_pixel(p[0], p[1], c)
+	# matte paint: the source's kerbs were glossy and a flat kerb seen low against the sky came out pale pink and cream
+	m.roughness = 0.85
+	m.metallic = 0.0
+	m.metallic_specular = 0.25
+	if changed:
+		img.generate_mipmaps()
+		m.albedo_texture = ImageTexture.create_from_image(img)
+		m.albedo_color = Color(1, 1, 1, m.albedo_color.a)
 
 ## The lawns the 3D grass grows on (GrassShells: every "grass" material): drawn as the shells draw it, so the two agree
 ## where the shells end (16 m on a phone, 60 m on Ultra). Before, they were coloured apart and the flat lawn had the
@@ -337,6 +397,8 @@ static func apply(track: TrackScene) -> void:
 				_paint(m)
 			if m.resource_name == "fence_spa":
 				_catch_fence(m)
+			if RegEx.create_from_string(KERB_RE).search(m.resource_name) != null:
+				_kerb(m)
 			for t in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
 					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path == ROAD_TEX else texture_mean(m.albedo_texture)

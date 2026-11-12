@@ -11,6 +11,9 @@ const PROPS := "assets/maps/spa_g/props/props.glb"
 const PLACES := "res://assets/maps/spa_g/props_places.json"
 ## The open terraces where the video has them (build_places.py TERRACES: the hill after La Source), as steps.
 const TERRACES := "res://assets/maps/spa_g/terraces.json"
+## Advertising boards where the video has them (build_places.py BOARDS) and their art (build_prop_textures.py).
+const BOARDS := "res://assets/maps/spa_g/boards.json"
+const BOARD_ART := "res://assets/maps/spa_g/props/boards.png"
 
 ## The video's green gantry steel (as albedo_color, sRGB-encoded: multiplied onto the galvanised texture).
 const GANTRY_GREEN := Color(0.28, 0.62, 0.36)
@@ -60,7 +63,45 @@ static func build(track: TrackScene) -> SpaProps:
 				out.add_child(mi)
 	out._place_props()
 	out._terraces()
+	out._boards()
 	return out
+
+func _boards() -> void:
+	if not FileAccess.file_exists(BOARDS) or not ResourceLoader.exists(BOARD_ART):
+		return
+	var d = JSON.parse_string(FileAccess.get_file_as_string(BOARDS))
+	if not (d is Dictionary) or (d.indices as Array).is_empty():
+		return
+	var pos := PackedVector3Array()
+	var nor := PackedVector3Array()
+	var uv := PackedVector2Array()
+	var p: Array = d.positions
+	var n: Array = d.normals
+	var u: Array = d.uvs
+	for i in p.size() / 3:
+		pos.append(Vector3(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]))
+		nor.append(Vector3(n[i * 3], n[i * 3 + 1], n[i * 3 + 2]))
+		uv.append(Vector2(u[i * 2], u[i * 2 + 1]))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = pos
+	arrays[Mesh.ARRAY_NORMAL] = nor
+	arrays[Mesh.ARRAY_TEX_UV] = uv
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array(d.indices)
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var m := StandardMaterial3D.new()
+	m.resource_name = "spa_boards"
+	m.albedo_texture = load(BOARD_ART)
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.roughness = 0.6
+	# printed vinyl seen from the track; the back is the same print (a board's back is rarely seen)
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mesh.surface_set_material(0, m)
+	var mi := MeshInstance3D.new()
+	mi.name = "boards"
+	mi.mesh = mesh
+	add_child(mi)
 
 func _terraces() -> void:
 	if not FileAccess.file_exists(TERRACES):

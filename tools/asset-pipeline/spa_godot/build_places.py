@@ -30,6 +30,17 @@ ZONES = [
 TERRACES = [
     [560, 880, -1, 13.0, 14, 0.8, 0.42, 'f008-f011: the hill after La Source, terraces full of spectators'],
 ]
+# advertising boards where the video has them (the model's are blank or missing): [lap m from, to, side, metres from the
+# centreline, height of the bottom edge, height (m), art row (build_prop_textures.py boards.png), frame]
+BOARDS = [
+    [1150, 1235, -1, 11.5, 0.4, 1.0, 1, 'T3 Raidillon: Laune boards on the left wall'],
+    [1235, 1290, -1, 11.5, 0.4, 1.0, 2, 'T3 Raidillon: Classic 21'],
+    [1160, 1290, -1, 15.0, 2.4, 1.4, 3, 'T3 Raidillon: Circuit de Spa boards higher on the bank'],
+    [1180, 1330, 1, 12.0, 1.6, 1.3, 0, 'T3-T4: TotalEnergies boards behind the right-hand rail'],
+    [2360, 2420, -1, 18.0, 0.8, 1.6, 4, 'f022: Fanatec boards braking for Les Combes'],
+    [2950, 3020, -1, 16.0, 0.8, 1.6, 4, 'f029: Fanatec boards at Bruxelles'],
+]
+
 # people a running metre of terrace row, and the share of places taken
 TERRACE_SEAT = 0.62
 TERRACE_FULL = 0.85
@@ -218,6 +229,33 @@ def terraces(out, cl, cum, T):
     return people
 
 
+def boards(out, cl, cum):
+    """BOARDS as strips of quads every 2 m, standing on the centreline's side, facing it: boards.json (positions, normals,
+    uvs, indices; SpaProps draws them with boards.png, u along the run every 8 m, v the art row)."""
+    P, N, U, I = [], [], [], []
+    rows = 5
+    for s0, s1, side, dist, z0, hgt, row, _ in BOARDS:
+        ss = np.arange(s0, s1 + 0.1, 2.0)
+        for a, b in zip(ss[:-1], ss[1:]):
+            (ca, fa, ra), (cb, fb, rb) = frame(cl, cum, a), frame(cl, cum, b)
+            pa, pb = ca + ra * side * dist, cb + rb * side * dist
+            n = (-(ra + rb) / 2 * side).tolist()
+            ua, ub = (a - s0) / 8.0, (b - s0) / 8.0
+            v0, v1 = (row + 1) / rows, row / rows
+            k = len(P)
+            P.extend([[pa[0], pa[1] + z0, pa[2]], [pb[0], pb[1] + z0, pb[2]], [pb[0], pb[1] + z0 + hgt, pb[2]], [pa[0], pa[1] + z0 + hgt, pa[2]]])
+            N.extend([n] * 4)
+            # read left to right from the track (u along the lap reads mirrored on the right-hand side's... both checked
+            # in the game: the right-hand runs need u reversed)
+            if side > 0:
+                ua, ub = -ua, -ub
+            U.extend([[ua, v0], [ub, v0], [ub, v1], [ua, v1]])
+            I.extend([k, k + 1, k + 2, k, k + 2, k + 3])
+    flat = lambda a: [float(v) for p_ in a for v in p_]
+    json.dump({'positions': flat(P), 'normals': flat(N), 'uvs': flat(U), 'indices': I}, open(os.path.join(out, 'boards.json'), 'w'))
+    print(f'[places] boards: {len(I) // 6} panels')
+
+
 def zones(out):
     godot = os.path.normpath(os.path.join(out, '..', '..', '..'))
     t = json.load(open(os.path.join(godot, 'data/tracks/spa.json')))
@@ -231,6 +269,7 @@ def zones(out):
     props(out, cl, cum, np.concatenate([t for _, t in tris]))
     T = np.concatenate([t for n, t in tris if n.startswith(CROWD_GROUND)])
     terrace_people = terraces(out, cl, cum, np.concatenate([t for _, t in tris]))
+    boards(out, cl, cum)
     # the barriers as segments seen from above (their triangles stand upright: each one's longest edge in x, z)
     seg = []
     for f in ('map_track.glb', 'map_scenery.glb'):
