@@ -46,8 +46,9 @@ func _run() -> void:
 	var cars := CarsDb.selectable()
 	conn.send_json({"t": "selectCar", "carId": OS.get_environment("CAR_ID") if OS.get_environment("CAR_ID") != "" else cars[0].id})
 	if OS.get_environment("NO_BOTS") == "":
-		conn.send_json({"t": "addBot"})
-		conn.send_json({"t": "addBot"})
+		# BOTS=<n>: a fuller grid (default 2)
+		for i in int(OS.get_environment("BOTS")) if OS.get_environment("BOTS") != "" else 2:
+			conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "ready", "ready": true})
 	await get_tree().create_timer(0.3).timeout
 	var cond := {"t": "setConditions", "weather": OS.get_environment("WEATHER") if OS.get_environment("WEATHER") != "" else "clear", "time": OS.get_environment("TIME") if OS.get_environment("TIME") != "" else "midday", "changes": "off"}
@@ -126,6 +127,10 @@ func _run() -> void:
 			for k in rids:
 				if rids[k].is_valid():
 					gpu[k] = gpu.get(k, 0.0) + RenderingServer.viewport_get_measured_render_time_gpu(rids[k])
+		if OS.get_environment("COCKPIT_DEBUG") != "" and session.cockpit != null and int(elapsed * 2.0) != int((elapsed - get_process_delta_time()) * 2.0):
+			var cam: Camera3D = session.cockpit.camera
+			var car: Node3D = session.my_visual
+			print("[cockpit] eye in car ", car.global_transform.affine_inverse() * cam.global_position, " current ", cam.current, " car up ", car.global_transform.basis.y)
 		if OS.get_environment("SHOT_ONCE") != "" and elapsed >= float(OS.get_environment("SHOT_ONCE")):
 			get_viewport().get_texture().get_image().save_png("%s/%s.png" % [shot_dir, OS.get_environment("SHOT_NAME") if OS.get_environment("SHOT_NAME") != "" else "shot"])
 			get_tree().quit()

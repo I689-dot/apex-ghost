@@ -79,8 +79,8 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 			continue
 		var root: Node3D = src.instantiate()
 		_cockpit_pass = local and i == 0
-		if _cockpit_pass and InteriorLook.BAKED_WHEELS.has(entry.id):
-			_cut_out_wheel(root, InteriorLook.BAKED_WHEELS[entry.id])
+		if _cockpit_pass and InteriorLook.BAKED_WHEELS.has(model_id(entry)):
+			_cut_out_wheel(root, InteriorLook.BAKED_WHEELS[model_id(entry)])
 		_prepare_materials(root, cache)
 		_cockpit_pass = false
 		var rig := _rig(root)
@@ -278,8 +278,9 @@ func _setup_material(sm: StandardMaterial3D) -> void:
 		sm.roughness = 0.85
 		sm.metallic = 0.0
 	_apply_look(sm)
+	InteriorLook.apply_generic(model_id(entry), sm)
 	if _cockpit_pass:
-		InteriorLook.apply(entry.id, sm)
+		InteriorLook.apply(model_id(entry), sm)
 	if local and sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and _is_glass(nm):
 		_glass_mats.append([sm, sm.albedo_color])
 	if not local:
@@ -588,3 +589,9 @@ func dispose() -> void:
 	for sp in _smoke:
 		sp.queue_free()
 	queue_free()
+
+## The id of the model a car entry draws: its own, or the one it shares (the safety car is the Vantage GT3: "model").
+## Per-model fixes (InteriorLook, DashDisplay.OVERLAYS) are keyed by it.
+static func model_id(e: Dictionary) -> String:
+	return str(e.get("model", e.get("id", "")))
+

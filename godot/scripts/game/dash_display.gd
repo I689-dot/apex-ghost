@@ -88,7 +88,9 @@ func _init(root: Node3D) -> void:
 				if m == null:
 					m = mi.mesh.surface_get_material(s)
 				if m != null and overlay_re.search(m.resource_name) != null:
-					mi.visible = false
+					# the overlay's surface only: a model that merges its parts into one mesh (the Porsche's whole body)
+					# vanished when the mesh was hidden
+					mi.set_surface_override_material(s, _hidden_mat())
 	_add_overlays(root)
 
 ## A lit quad over a screen the model has as plain glass (OVERLAYS), in the cockpit model so it is only seen from inside.
@@ -99,7 +101,7 @@ func _add_overlays(root: Node3D) -> void:
 	var cockpit := car.cockpit_root()
 	if cockpit == null:
 		return
-	for o in OVERLAYS.get(car.entry.id, []):
+	for o in OVERLAYS.get(CarVisual.model_id(car.entry), []):
 		var sc := _make_screen(o.kind, o.view)
 		screens.append(sc)
 		var n: Vector3 = (o.normal as Vector3).normalized()
@@ -397,3 +399,15 @@ class DashScreen:
 			draw_circle(Vector2(cx, cy), 17.0, Color("0b0e12"))
 			_text(knobs[i][1], Vector2(cx, cy), 18, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 			_text(knobs[i][0], Vector2(cx, cy + 32), 12, grey, HORIZONTAL_ALIGNMENT_CENTER, false)
+
+static var _hidden: StandardMaterial3D
+## A material that draws nothing (a surface hidden within a mesh that stays).
+static func _hidden_mat() -> StandardMaterial3D:
+	if _hidden == null:
+		_hidden = StandardMaterial3D.new()
+		_hidden.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_hidden.albedo_color = Color(0, 0, 0, 0)
+		_hidden.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_hidden.no_depth_test = false
+	return _hidden
+

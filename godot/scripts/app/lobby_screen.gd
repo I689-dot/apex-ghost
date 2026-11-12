@@ -895,11 +895,10 @@ static func _player_row(app: App, p: Dictionary, all_cars: Array, can_remove: bo
 	var car_name := I18n.t("choosing…")
 	var thumb := ""
 	if p.carId != null:
-		car_name = p.carId
-		for c in all_cars:
-			if c.id == p.carId:
-				car_name = c.name
-				thumb = c.thumbnail
+		# a car the app no longer has shows as the one it is drawn as (CarsDb.FALLBACK)
+		var shown := CarsDb.resolve(str(p.carId))
+		car_name = shown.get("name", str(p.carId))
+		thumb = shown.get("thumbnail", "")
 	elif p.waiting:
 		car_name = I18n.t("next race")
 	if thumb != "":

@@ -299,6 +299,13 @@ func load_session(progress: Callable) -> void:
 	for c in cars_file.cars:
 		entries[c.id] = c
 	var racers: Array = race.grid.map(func(id): return {"id": id, "player": _player(id)})
+	# a car the app no longer has (a web player's pick in a shared room): the closest one it has (CarsDb.FALLBACK)
+	for r in racers:
+		var pl = r.player
+		if pl != null and pl.carId != null and not entries.has(pl.carId):
+			var alt := CarsDb.resolve(str(pl.carId))
+			if not alt.is_empty():
+				entries[pl.carId] = alt
 	var my_car_id = null
 	if spectator:
 		for r in racers:
@@ -870,7 +877,7 @@ func update_timing() -> void:
 		return
 	timing.update_list(standings, me, func(id: String) -> Dictionary:
 		var p = _player(id)
-		var car := CarsDb.by_id(p.carId) if p != null and p.carId != null else {}
+		var car := CarsDb.resolve(p.carId) if p != null and p.carId != null else {}
 		return {"nick": names.get(id, "?"), "car": car.get("name", ""), "colour": car.get("color", "#888888"), "bot": p != null and p.get("bot", false)})
 
 static func fmt_lap(ms: float) -> String:
@@ -2356,6 +2363,7 @@ func _load_safety_car() -> void:
 	var visual := CarVisual.new(entry, model, false)
 	visual.visible = false
 	add_child(visual)
+	var look := SafetyCarLook.dress(visual, entry)
 	var body = null
 	if contact:
 		var r := Remote.new()
@@ -2363,7 +2371,7 @@ func _load_safety_car() -> void:
 		r.visual = visual
 		body = _make_proxy(r)
 		body.collision_layer = 0 # solid only on track (move_kinematics)
-	sc = {"visual": visual, "body": body, "s": 0.0, "speed": 0.0, "vel": Vector3.ZERO, "visible": false, "solid": false}
+	sc = {"visual": visual, "body": body, "look": look, "s": 0.0, "speed": 0.0, "vel": Vector3.ZERO, "visible": false, "solid": false}
 
 ## The safety car: drawn where race control's deterministic path puts it (every client agrees).
 func update_safety_car(server_now: float, dt: float) -> void:
@@ -2372,6 +2380,8 @@ func update_safety_car(server_now: float, dt: float) -> void:
 	var d = rc.sc
 	var on: bool = d != null and server_now >= d.t0 and (d.inAt == null or server_now < d.inAt)
 	sc.visible = on
+	if sc.get("look") != null:
+		(sc.look as SafetyCarLook).active = on
 	sc.visual.visible = true
 	if not on or d == null:
 		# waiting at the end of the pit lane, as at a real race, lights off

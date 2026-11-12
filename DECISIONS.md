@@ -1328,3 +1328,13 @@ The user asked for a completely new, more modern and more intuitive menu, taking
 - **Resume with HTTP Range into a `.part` file** across dropped connections and app restarts; no file replaces anything until its hash matches.
 - **The phone pack has the 2K road set, the PC pack the 4K one** (`SpaLook._road_file` takes whichever is there).
 - The base URL is the project setting `apex/packs_url` (empty until R2 is set up with the user).
+
+## Godot: the new car line-up (2026-11-12)
+
+- **Nine new cars on the old ids** (`tools/godot/build-cars.py`): each keeps the replaced car's specs, engine sound and bot setup; only the models change. The other 16 cars are gone from the app; an id the server still lists draws as the closest remaining car (`CarsDb.FALLBACK`, e.g. a Huracán as the R8).
+- **Liveries from the zips**: the Audi, Porsche and NASA AMG ship theirs as separate textures the models never referenced (applied in `car_prep.py`, flipped where stored DirectX-style); the placeholder "00" door boards are dropped where the livery has its own number.
+- **Full detail near, as the user asked**: cockpit and your own car from outside are the source models unsimplified (302k-2.56M triangles), other cars near you ~400k, far ~80k; Godot's own generated mesh LODs are off for the car files (they turned curves into facets).
+- **Same-material pieces merged** per named part (`join`, keepNamed): about half the draw calls (a 12-car grid at Ultra 1440p: 47 -> 52 fps average).
+- **Cockpit eyes count as tuned**: the auto-lift ray-tested whole meshes, and these models keep the windscreen in the body mesh, so it always lifted the eye 14 cm into the roof.
+- **The safety car is the Vantage GT3** (its model fields, its own id and role), green paint by brightness over the Vantage livery and an amber roof light bar that flashes while deployed (`SafetyCarLook`).
+- `tools/godot/sync-assets.sh` refuses to run unless FORCE_SYNC=1: its mirror would delete the Godot-only Spa and car files.

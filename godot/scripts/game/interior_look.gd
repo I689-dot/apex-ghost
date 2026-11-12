@@ -30,6 +30,39 @@ const BAKED_WHEELS := {
 	},
 }
 
+## Fixes for every car, by material name (Assetto Corsa's naming, the 2026-11 line-up): its interior maps are shading
+## (ambient occlusion over a carbon / plastic detail the original shader adds): exported as the base colour they drew
+## white and black blotches (the Audi's "camouflage" cabin, the McLaren's white one). Kept as the shading of a dark trim.
+## A car's own LOOKS entry for the material comes first.
+const GENERIC := [
+	["(?i)^INT_(Carbon|Occlusion)", {"tint": 0.15, "metallic": 0.0, "roughness": 0.6}],
+	["(?i)^INT_ELECTRONICS", {"tint": 0.35, "metallic": 0.0, "roughness": 0.55}],
+]
+static var _generic_re: Array = []
+
+## The generic fix for a material of any of the car's models (also seen through the windows from outside).
+static func apply_generic(car_id: String, sm: StandardMaterial3D) -> void:
+	if not enabled or (LOOKS.get(car_id, {}) as Dictionary).has(sm.resource_name):
+		return
+	if _generic_re.is_empty():
+		for g in GENERIC:
+			_generic_re.append([RegEx.create_from_string(g[0]), g[1]])
+	for g in _generic_re:
+		if (g[0] as RegEx).search(sm.resource_name) != null:
+			_fix(sm, g[1])
+			return
+
+static func _fix(sm: StandardMaterial3D, fix: Dictionary) -> void:
+	if fix.has("tint"):
+		var f: float = fix.tint
+		sm.albedo_color = Color(sm.albedo_color.r * f, sm.albedo_color.g * f, sm.albedo_color.b * f, sm.albedo_color.a)
+	if fix.has("metallic"):
+		sm.metallic_texture = null
+		sm.metallic = fix.metallic
+	if fix.has("roughness"):
+		sm.roughness_texture = null
+		sm.roughness = fix.roughness
+
 ## Applies the car's fix for this material of its cockpit model, if it has one.
 static func apply(car_id: String, sm: StandardMaterial3D) -> void:
 	if not enabled:
