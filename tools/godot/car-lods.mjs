@@ -119,6 +119,9 @@ async function buildOne(name, { tris, maxError, interior, tiny, color, dataSize,
   const t = await simplifyTo(doc, tris, maxError, seams);
   if (tiny) await doc.transform(normals({ overwrite: false }));
   await sizeTextures(doc, color, dataSize);
+  // Godot imports a node whose name ends in "_wheel" as a VehicleWheel3D (an import hint), not as a mesh: the steering
+  // wheel goes by "steering_rim", the name CarVisual turns (as tools/godot/unpack-glb.mjs does for the web game's cars)
+  for (const n of doc.getRoot().listNodes()) if (n.getName() === 'steering_wheel') n.setName('steering_rim');
   await doc.transform(prune());
   const file = path.join(outDir, name);
   await io.write(file, doc);

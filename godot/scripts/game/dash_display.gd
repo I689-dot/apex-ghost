@@ -16,6 +16,13 @@ const OVERLAYS := {
 	"vantage_gt3_evo_heart_of_racing": [
 		{"kind": "aston", "pos": Vector3(0.385, 0.777, 0.174), "normal": Vector3(0.0, 0.14, -0.99), "size": Vector2(0.128, 0.077), "view": Vector2i(640, 384)},
 	],
+	# Ferrari 296 GT3 (a Sketchfab export: its screens are faces of the dash mesh, no display material): the Bosch dash
+	# in the middle and the two side screens (probed with tests/cockpit_probe.gd from the race's eye)
+	"ferrari_296_gt3_verstappen": [
+		{"kind": "dash", "pos": Vector3(0.332, 0.737, 0.788), "normal": Vector3(0.0, 0.171, -0.985), "size": Vector2(0.15, 0.097), "view": Vector2i(640, 414)},
+		{"kind": "wheel", "pos": Vector3(0.558, 0.777, 0.751), "normal": Vector3(-0.328, 0.263, -0.907), "size": Vector2(0.09, 0.056), "view": Vector2i(384, 240)},
+		{"kind": "wheel", "pos": Vector3(0.099, 0.776, 0.758), "normal": Vector3(0.333, 0.253, -0.909), "size": Vector2(0.09, 0.056), "view": Vector2i(384, 240)},
+	],
 }
 
 var screens: Array = []  # {view: SubViewport, ctl: Screen, kind}

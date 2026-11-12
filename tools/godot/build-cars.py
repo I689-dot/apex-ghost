@@ -35,7 +35,10 @@ CARS = {
     'bmw_m4_gt3_vecarz': {'dir': 'bmw-m4-gt3', 'model': 'inner/bmw_m4_gt3__www.vecarz.com.glb', 'prep': {'rename': True}},
     # a Sketchfab export (anonymous objects and materials): its wheel parts named by material
     'ferrari_296_gt3_verstappen': {'dir': 'ferrari-296-gt3-wwwvecarzcom', 'model': 'source/ferrari_296_gt3.glb', 'prep': {'rename': True,
-        'name_by_material': {'mat_75': 'Tyre', 'mat_235': 'Rim', 'mat_36': 'Rim_hub', 'mat_232': 'Caliper'}, 'align': '^Tyre_'},
+        'name_by_material': {'mat_75': 'Tyre', 'mat_235': 'Rim', 'mat_36': 'Rim_hub', 'mat_232': 'Caliper', 'mat_225': 'Steering_wheel'},
+        'align': '^Tyre_', 'hasInterior': True,
+        # (the eye search landed 0.44 m out, beside the seat: behind the wheel the model has at 0.33 m)
+        'eye': [0.332, 0.86, -0.03]},
         'name': 'Ferrari 296 GT3'},
     'ford_mustang_gt3': {'dir': 'ford-mustang-gt3-2024', 'model': 'inner/ford_mustang_gt3_2024__www.vecarz.com.glb', 'prep': {'rename': True}},
     # (the eye search put the eye 0.50 m out, behind the cage's padding: in line with the steering wheel instead)
@@ -107,7 +110,8 @@ def install(cid, c, meta, out, png, entries):
         # the converter's eye search, or a hand-set one ("eye"), counts as tuned: CockpitCamera's auto-lift casts rays at the
         # whole mesh, and these models keep the windscreen in the body's mesh, so it always lifted the eye 14 cm into the roof
         'cockpitCamera': {**meta['cockpitCamera'], **({'position': c['eye']} if 'eye' in c else {}), 'tuned': True},
-        'look': None, 'hasInterior': meta['hasInterior'], 'lights': meta['lights'], 'genericWheels': meta['genericWheels'],
+        # (a model with anonymous materials has a cabin the name-based detection cannot see: "hasInterior" set by hand)
+        'look': None, 'hasInterior': c.get('hasInterior', meta['hasInterior']), 'lights': meta['lights'], 'genericWheels': meta['genericWheels'],
         'source': 'godot-m6',
     })
     if 'name' in c:

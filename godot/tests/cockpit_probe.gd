@@ -25,6 +25,10 @@ func _run() -> void:
 	cam.current = true
 	var p: Array = entry.cockpitCamera.position
 	cam.global_position = Vector3(p[0], p[1], p[2])
+	# EYE_OFFSET="x,y,z": the race's eye (CockpitCamera adds EYE_FORWARD 0.2 and EYE_UP 0.02)
+	if OS.get_environment("EYE_OFFSET") != "":
+		var o := OS.get_environment("EYE_OFFSET").split(",")
+		cam.global_position += Vector3(float(o[0]), float(o[1]), float(o[2]))
 	cam.global_transform.basis = Basis.from_euler(Vector3(deg_to_rad(float(view[1])), deg_to_rad(180.0 + float(view[0])), 0), EULER_ORDER_YXZ)
 	for _k in 3:
 		await get_tree().process_frame
