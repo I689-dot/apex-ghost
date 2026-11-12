@@ -87,6 +87,26 @@ model (the light model as caster made a 25 M primitive shadow pass).
 outermost fence, rail, wall or grille within 35 m (one short of it steps back past it; with none between him and the
 track he is left out).
 
+## Realism pass (user report: grass, hills, trees and fences less real than the video; the terrain without texture)
+
+Compared at full resolution with the video at Kemmel, Speakers' Corner, Pouhon and Blanchimont:
+
+- **Trees lit as crowns** (`tree_near.gdshader`): the leaf cards' normals bend out from the trunk's axis, the inner and
+  lower leaves are darker, the sun shines through (backlight); both faces of a card take the crown's normal. Before, each
+  card was lit as a flat sheet and the forest read as dark cut-outs. The forest tint turned greener (red equal to green
+  read beige on the sunlit side). The far cards are lit as a crown seen from the side, not as a sheet facing the sky.
+- **The broadleaf** is a PlantCatalog oak (10.5 m, full crown; scanned in autumn, its leaves recoloured to summer in
+  `build_trees.py`) in place of the small beech, which scaled to the video's 20-25 m trackside trees stood as a bare
+  trunk. Opaque "twig" materials are the oak's branch wood (they had been thinned as leaf cards and fell apart).
+- **Catch fences** redrawn at 4x with solid wires and alpha-hashed (`SpaLook._catch_fence`): the source drew the mesh as
+  an 11 % alpha fill, and the alpha cut at 45 % left only the posts.
+- **Banks keep the source's own textures** (`SpaLook.OWN_RE`): the rock cuttings (grass-side1B) and rough banks
+  (sbancamento_B 8K, grass-side3 4K) had been swapped for the mown lawn photo with 3D grass on top since the web port.
+- **Green walls** at Paul Frere and from Blanchimont to the chicane (`SpaProps.REPAINT`, measured from f049-f063).
+- **The hills' forest as crowns** (`far_terrain.gdshader`): a dome per ~5 m cell lit by the sun, gaps in shade, faded
+  out before it can shimmer; the colour fitted to the haze of f055.
+- Spa's full tree models out to 30 m (blended): Ultra at 2560 x 1440, 67 fps average, 40 at the 1 % low.
+
 ## Checklist items still open
 
 - The grandstands on the hill after La Source (f008-f011; the model has a bare bank there): the crowd stands on the bank.

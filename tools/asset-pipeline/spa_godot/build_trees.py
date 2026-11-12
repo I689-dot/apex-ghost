@@ -28,16 +28,75 @@ SPECIES = {
     "spruce_0": "8bbf8b718c58458dbc8d78d6c6694be6",  # PlantCatalog, Realistic HD Norway spruce (13/43), w/h 0.36
     "spruce_1": "03dfd6ca5d624753bbf2ef9f78371db3",  # PlantCatalog, Norway spruce (28/43), w/h 0.39
     "spruce_2": "dcc2eae5908d44e39eecc1e90bc54f0c",  # PlantCatalog, Norway spruce (10/43), w/h 0.29
-    "maple": "0983d8933531491f9be71c669e8a907b",     # evolveduk, Beech tree (6.6k tris; the 2.3M-tri Fagus sylvatica scan is for hero trees)
+    # the broadleaf slot: a full-crowned PlantCatalog oak (10.5 m, 203k tris) in place of the small beech (3.8 m, 6.6k
+    # tris, sparse: scaled to the video's 20-25 m trackside trees it stood as a bare trunk); scanned in autumn colours,
+    # its leaves recoloured to summer (RECOLOUR)
+    "maple": "b7ed18f291c3445a8b805da379e3de4f",     # PlantCatalog, Realistic HD Northern red oak (37/138)
 }
-LEAF_FILL = {"maple": 1.7}  # leaf cards enlarged even where none are dropped: the beech's crown is sparse, the video's dense
+LEAF_FILL = {}  # leaf cards enlarged even where none are dropped (the old beech needed 1.7: its crown was sparse)
 CARD_GROW = 3.5  # the most a kept leaf card is enlarged (a crown thinned to 5 % keeps its density with ~4.5x)
 # the far model: its crown thinned to 1-3 % of the cards, which may grow further (capped at 3.5x it kept a sixth of the
 # crown's cover and stood bare until the full model took over), and most of its budget on foliage
 CARD_GROW_LOD = 8.0
 LEAF_SHARE = {"": 0.72, "_lod": 0.85, "_shadow": 0.85}
 FRAME = {}  # node -> (base, height) of its full model
+# leaf textures brought to a summer green: node -> the green (linear, at the leaves' mean brightness) and how much of the
+# original hue variation stays
+RECOLOUR = {"maple": ((0.30, 0.42, 0.10), 0.25)}
 LEAF = ("fol", "leaf", "leav", "needle", "card", "foliage", "twig")
+
+
+def is_leaf_mat(m):
+    """Foliage cards: a leaf-like name, and for "twig" a see-through material too (the oak's twigs are its branch wood,
+    opaque: thinned and scaled as cards they fell apart into floating pieces)."""
+    n = m.name.lower()
+    if not any(k in n for k in LEAF):
+        return False
+    if "twig" in n and not any(k in n for k in LEAF if k != "twig"):
+        return see_through(m)
+    return True
+
+
+def see_through(m):
+    """Does the material cut or blend by alpha? (the glTF importer links the texture's alpha to the BSDF's Alpha for
+    MASK / BLEND materials; blend_method no longer tells in Blender 4.2)"""
+    if not m.use_nodes:
+        return False
+    for nd in m.node_tree.nodes:
+        if nd.type == "BSDF_PRINCIPLED":
+            a = nd.inputs.get("Alpha")
+            return a is not None and (a.is_linked or a.default_value < 0.999)
+    return False
+
+
+def recolour(ob, green, keep):
+    """The leaf textures' colour replaced by `green` at each texel's own brightness (the veins, light and shade stay),
+    with `keep` of the original colour's deviation from grey mixed back for variety. Once per source image."""
+    seen = set()
+    for m in ob.data.materials:
+        if not m or not is_leaf_mat(m) or not m.use_nodes:
+            continue
+        for nd in m.node_tree.nodes:
+            if nd.type != "TEX_IMAGE" or nd.image is None or nd.image.name in seen:
+                continue
+            if not any(l.to_socket.name == "Base Color" for l in nd.outputs["Color"].links):
+                continue
+            img = nd.image
+            seen.add(img.name)
+            px = np.empty(len(img.pixels), dtype=np.float32)
+            img.pixels.foreach_get(px)
+            px = px.reshape(-1, 4)
+            rgb = px[:, :3]
+            lum = rgb @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+            solid = px[:, 3] > 0.2
+            mean = float(lum[solid].mean()) if solid.any() else 0.3
+            g = np.array(green, np.float32)
+            g = g / (g @ np.array([0.2126, 0.7152, 0.0722], np.float32))
+            dev = rgb - lum[:, None]
+            rgb[:] = np.clip(lum[:, None] * g[None, :] + dev * keep, 0.0, 1.0)
+            img.pixels.foreach_set(px.ravel())
+            img.pack()
+            log(f"  recoloured {img.name} (mean brightness {mean:.2f})")
 
 
 def log(*a):
@@ -70,9 +129,11 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
     bpy.context.view_layer.objects.active = meshes[0]
     bpy.ops.object.join()
     ob = bpy.context.view_layer.objects.active
+    if node in RECOLOUR:
+        recolour(ob, *RECOLOUR[node])
     t0 = tris(ob)
     # split leaf and wood by material name
-    leaf_idx = {i for i, m in enumerate(ob.data.materials) if m and any(k in m.name.lower() for k in LEAF)}
+    leaf_idx = {i for i, m in enumerate(ob.data.materials) if m and is_leaf_mat(m)}
     me = ob.data
     nf = len(me.polygons)
     mi = np.empty(nf, dtype=np.int64)
@@ -80,7 +141,8 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
     is_leaf = np.isin(mi, list(leaf_idx))
     leaf_tris = int(sum(len(p.vertices) - 2 for p, l in zip(me.polygons, is_leaf) if l))
     wood_tris = t0 - leaf_tris
-    leaf_budget = int(budget * LEAF_SHARE[suffix])
+    # a broadleaf's branches carry its shape (the spruces' needles hide theirs): more of the budget to the wood
+    leaf_budget = int(budget * LEAF_SHARE[suffix] * (0.8 if node == "maple" else 1.0))
     wood_budget = budget - leaf_budget
     keep = min(1.0, leaf_budget / max(leaf_tris, 1))
     bm = bmesh.new()
@@ -127,7 +189,8 @@ for (node, uid), (suffix, budget) in [(sp, lv) for sp in SPECIES.items() for lv 
                 wv.update(p.vertices)
         vg.add(list(wv), 1.0, "REPLACE")
         mod = ob.modifiers.new("dec", "DECIMATE")
-        mod.ratio = max(0.02, wood_budget / wood_tris)
+        mod.ratio = max(0.004 if suffix else 0.02, wood_budget / wood_tris)
+        log(f"  wood {wood_tris:,} tris, budget {wood_budget:,}, ratio {mod.ratio:.3f}")
         mod.vertex_group = "wood"
         bpy.context.view_layer.objects.active = ob
         bpy.ops.object.modifier_apply(modifier="dec")

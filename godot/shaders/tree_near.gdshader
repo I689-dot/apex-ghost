@@ -20,6 +20,11 @@ uniform vec2 uv_offset = vec2(0.0);
 uniform float bend = 0.0004;
 uniform float flutter = 0.05;
 uniform bool leaf = true;
+// foliage lit as a crown, not as flat cards: the normals bent out from the trunk's axis (0: the cards' own), the inner
+// and lower leaves darker (light that never got in)
+uniform float crown_normals = 0.75;
+uniform float crown_ao = 0.45;
+varying float v_ao;
 
 float dither(vec2 p) {
 	return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
@@ -27,6 +32,15 @@ float dither(vec2 p) {
 
 void vertex() {
 	vec2 root = MODEL_MATRIX[3].xz;
+	// the models stand 1 m tall at the origin (Forest scales them): a crown's normal points out from its axis and up
+	v_ao = 1.0;
+	if (leaf) {
+		vec3 cn = normalize(vec3(VERTEX.x, 0.18 + max(VERTEX.y - 0.45, 0.0) * 0.7, VERTEX.z) + vec3(1e-4, 0.0, 0.0));
+		NORMAL = normalize(mix(NORMAL, cn, crown_normals));
+		// out towards the crown's edge (a cone narrowing to the top) and up
+		float edge = clamp(length(VERTEX.xz) / max(0.06, 0.36 * (1.0 - VERTEX.y) + 0.04), 0.0, 1.0);
+		v_ao = mix(1.0 - crown_ao, 1.0, edge * 0.7 + clamp(VERTEX.y, 0.0, 1.0) * 0.3);
+	}
 	v_keep = vec2(0.0, 1.0);
 	if (fade.x >= 0.0) {
 		float d = distance(root, CAMERA_POSITION_WORLD.xz);
@@ -67,7 +81,18 @@ void fragment() {
 		float a = t.a * (1.0 + lod * 0.1);
 		if (a < 0.5) discard;
 	}
-	ALBEDO = t.rgb * tint * COLOR.rgb * tree_tint;
+	ALBEDO = t.rgb * tint * COLOR.rgb * tree_tint * v_ao;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
+	if (leaf) {
+		// both faces of a card take the crown's normal (a two-sided face is flipped on its back), and the sun shines
+		// through the leaves
+		if (!FRONT_FACING) {
+			NORMAL = -NORMAL;
+		}
+		// (a stronger sheen and translucency turned the sunlit side of the spruces beige-grey)
+		BACKLIGHT = ALBEDO * 0.3;
+		SPECULAR = 0.02;
+		ROUGHNESS = 0.95;
+	}
 }

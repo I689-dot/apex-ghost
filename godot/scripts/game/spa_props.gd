@@ -28,6 +28,10 @@ const COPIES := [
 const REPAINT := [
 	# f007-f009: the pit-exit wall is green (white in the model); measured lit (0.012, 0.08, 0.05)
 	["^wall_spa_concrete$", 440.0, 770.0, 1, 4.0, 14.0, Color(0.015, 0.1, 0.06)],
+	# f049-f050 (Paul Frere, right) and f058-f063 (Blanchimont to the chicane, left): bright green walls; measured lit
+	# (0.05-0.1, 0.32-0.44, 0.02-0.06)
+	["^wall_spa(_concrete|_jersey)?$", 5000.0, 5200.0, 1, 3.0, 25.0, Color(0.06, 0.3, 0.03)],
+	["^wall_spa(_concrete|_jersey)?$", 5900.0, 6600.0, -1, 3.0, 25.0, Color(0.06, 0.3, 0.03)],
 ]
 
 static func build(track: TrackScene) -> SpaProps:

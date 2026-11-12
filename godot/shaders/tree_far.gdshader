@@ -45,8 +45,12 @@ void fragment() {
 	vec2 dy = dFdy(UV * ts);
 	float lod = clamp(0.5 * log2(max(dot(dx, dx), dot(dy, dy))), 0.0, 3.0);
 	if (t.a * (1.0 + lod * 0.12) < 0.45) discard;
-	ALBEDO = t.rgb * v_tint * tree_tint;
+	// lit as a crown seen from the side, not as a sheet facing the sky (which caught the whole sky and sun and came out
+	// pale): the normal leans to the viewer, the lower crown is in its own shade
+	float lift = clamp(UV.y, 0.0, 1.0);
+	ALBEDO = t.rgb * v_tint * tree_tint * mix(1.0, 0.6, lift * lift);
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
-	NORMAL = (VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
+	NORMAL = normalize(vec3(0.0, 0.55, 0.0) + vec3(0.0, 0.0, 1.0));
+	BACKLIGHT = ALBEDO * 0.4;
 }

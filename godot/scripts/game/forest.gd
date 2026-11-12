@@ -43,6 +43,8 @@ var near_scale := 1.0
 ## filled in as the car passed), each change is a dithered cross-fade the GPU works out per frame from the tree's own
 ## distance, and the layers are picked with a margin for the travel between picks.
 var fades := false
+## How far trees are drawn as their full models unless the quality says (forestHero); a circuit can set its own.
+var hero_m := 60.0
 ## Half the width of the full / light model blend about the hero range, and the width of the light model / card blend
 ## beyond the near range (m); the margin each layer is picked with for the travel between picks.
 const HERO_BAND := 5.0
@@ -108,6 +110,7 @@ func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 	if track_data.get("id", "") == "spa" and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
 		species_file = "res://assets/vegetation/trees_spa.glb"
 		near_scale = SpaLook.FOREST_NEAR_SCALE
+		hero_m = SpaLook.FOREST_HERO
 		# FOREST_NO_FADE: hard level changes (measuring what the blends cost)
 		fades = OS.get_environment("FOREST_NO_FADE") == ""
 	var ref = track_data.get("forest", null)
@@ -193,7 +196,8 @@ func _make_species() -> void:
 	var specs: Array = []
 	for k in SPRUCES:
 		specs.append(["spruce_%d" % k, SPRUCE_H, Color.WHITE if own else SPRUCE_TINT, NEAR_SHARE[k]])
-	specs.append(["maple", BEECH_H, Color.WHITE if own else MAPLE_TINT, NEAR_SHARE[3]])
+	# a circuit's own broadleaf (Spa's oak: its far model holds up) stands as a model further out than the old maple
+	specs.append(["maple", BEECH_H, Color.WHITE if own else MAPLE_TINT, 0.5 if own else NEAR_SHARE[3]])
 	for sp in specs:
 		var node := root.find_child(sp[0], true, false) as MeshInstance3D
 		if node == null:
@@ -563,8 +567,8 @@ func near_range(q: Dictionary) -> float:
 ## the quality's "forestHero", else 60 m.
 const SHADOW_REACH := 1.5
 
-static func hero_range(q: Dictionary) -> float:
-	return float(q.get("forestHero", 60.0))
+func hero_range(q: Dictionary) -> float:
+	return float(q.get("forestHero", hero_m))
 
 ## Total trees drawn as models (near).
 func drawn() -> int:

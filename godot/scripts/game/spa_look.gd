@@ -39,7 +39,8 @@ const TINT := [
 	["^top2", [2.05, 1.78, 1.53]],
 	["@lawn", [1.98, 1.78, 1.47]],
 	# the forest (scanned spruces, beech) and the source's distant tree cards: the video's spruce is a dark green
-	["@forest", [0.32, 0.3, 0.17]],
+	# (red nearly equal to green read olive-beige on the sunlit side of the crowns once they were lit as crowns)
+	["@forest", [0.27, 0.31, 0.16]],
 	["^(trees_|bushes)", [0.57, 0.54, 0.38]],
 ]
 
@@ -150,10 +151,32 @@ static func _detail(m: StandardMaterial3D, layer: String, tile: float) -> void:
 	m.albedo_color = Color(c.r * 2.0, c.g * 2.0, c.b * 2.0, c.a).linear_to_srgb()
 	m.albedo_color.a = c.a
 
+## The catch fence (the source's "fence_spa"): its 64 x 256 texture drew the wire mesh as an 11 % alpha fill and the
+## cables at 23 %; cut at 45 % only the posts were left (the video shows a grey veil of wires). Redrawn at 4x with solid
+## wires (tools/asset-pipeline/spa_godot/build_detail_textures.py) and alpha-hashed: a thin wire keeps its coverage
+## far off as a dither TAA smooths, where an alpha cut drops it.
+const CATCH_FENCE := "res://assets/textures/spa/catch_fence.png"
+
+static func _catch_fence(m: StandardMaterial3D) -> void:
+	if not ResourceLoader.exists(CATCH_FENCE):
+		return
+	m.albedo_texture = load(CATCH_FENCE)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
+	m.alpha_hash_scale = 1.0
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.metallic = 0.6
+	m.roughness = 0.5
+
 ## The lawns the 3D grass grows on (GrassShells: every "grass" material): drawn as the shells draw it, so the two agree
 ## where the shells end (16 m on a phone, 60 m on Ultra). Before, they were coloured apart and the flat lawn had the
 ## default material's sky reflection, which the shells have not: past the shells a lighter, washed-out band.
-const LAWN_RE := "^grass_spa"
+const LAWN_RE := "^grass_spa(_ext|_bank)?$"
+## Ground that keeps its own texture and grows no 3D grass (GroundDetail.paint_re): the painted run-off, and the side
+## banks: the source's rock cuttings (grass-side1B: layered rock and scrub) and rough banks (sbancamento_B, 8K: meadow
+## grass and earth; grass-side3, 4K). The shared ground code put the mown lawn photo on them (a port of the web game,
+## where they read as bare patches) and the 3D lawn on top: the cuttings and banks came out uniform mown grass.
+const OWN_RE := "^(astroturf_spa|curb_spa_b|grass_spa_side)"
 ## The shells' shading the flat lawn takes (grass_shells.gdshader: dark roots 0.62 to light tips 1.3; 0.84 to 0.88 on
 ## average over the blade texture seen from above); the shells settle on it as they fade out.
 const LAWN_EDGE := 0.85
@@ -312,6 +335,8 @@ static func apply(track: TrackScene) -> void:
 				_lawn(m)
 			if RegEx.create_from_string(PAINT_RE).search(m.resource_name) != null:
 				_paint(m)
+			if m.resource_name == "fence_spa":
+				_catch_fence(m)
 			for t in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
 					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path == ROAD_TEX else texture_mean(m.albedo_texture)
@@ -379,6 +404,10 @@ static func _hidden() -> StandardMaterial3D:
 ## Spa's forest stands up to the track all round (build_forest.py plants it every 6.5 m): the models' range is cut so
 ## Ultra draws about as many as at the Nordschleife (10,500 trees within 220 m: 36 fps on the RX 7600 XT at 1440p).
 const FOREST_NEAR_SCALE := 0.6
+## Spa's full tree models out to 30 m (60 elsewhere): the far models keep the crowns' cover (build_trees.py) and the
+## change is a blend (Forest.fades), so it is hard to see; the full layer reaches the range + Forest.HERO_BAND +
+## PICK_MARGIN. Ultra at 2560 x 1440 (60 s drive from 0.5 km): 30 m 67 fps average / 40 at the 1 % low, 40 m 59 / 35
+const FOREST_HERO := 30.0
 
 ## The source's trackside trees (crossed cards, planted as models by Forest): its cards stand 2-18 m (5-95 %) and the
 ## near ones are nearly all one spruce texture, where the video shows 20-30 m spruce with beech and birch in front. Trees

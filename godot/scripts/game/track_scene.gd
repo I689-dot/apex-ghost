@@ -90,7 +90,7 @@ func load_scene() -> TrackScene:
 		ch.radius = c.radius
 		chunks.append(ch)
 	_pull_ground_pieces()
-	GroundDetail.paint_re = SpaLook.PAINT_RE if data.get("id", "") == "spa" else ""
+	GroundDetail.paint_re = SpaLook.OWN_RE if data.get("id", "") == "spa" else ""
 	_prepare_materials()
 	Forest.ensure_globals()
 	RenderingServer.global_shader_parameter_set("lawn_tint", SpaLook.global_tint("@lawn") if data.get("id", "") == "spa" else Vector3.ONE)
