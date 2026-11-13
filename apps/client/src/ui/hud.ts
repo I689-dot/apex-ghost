@@ -5,6 +5,7 @@ import type { CompoundId } from '../physics/tyres';
 import { CarStatus } from './carStatus';
 import { RaceOverlays, type RelativeRow } from './overlays';
 import { DamagePanel } from './damagePanel';
+import { Dial } from './dial';
 import { CircuitMap, type MapCar } from './circuitMap';
 import { flagImg } from './social';
 import type { DamageState } from '../physics/damage';
@@ -60,6 +61,10 @@ export interface HudState {
   fuelText: string;
   /** Less than two laps of fuel left. */
   fuelLow: boolean;
+  /** The fuel for the dial's bar: share of the tank, litres, laps left (null without the fuel rule). */
+  fuel: { frac: number; litres: number; laps: number } | null;
+  /** The headlights are on. */
+  headlights: boolean;
   /** Pedals after their filters (0…1) and the steering (−1 right … +1 left of full lock), for the inputs overlay. */
   throttle: number;
   brake: number;
@@ -76,9 +81,6 @@ interface MapDot {
 /** Minimal cockpit-friendly HUD. Only writes to the DOM when values change. */
 export class Hud {
   readonly el: HTMLElement;
-  private speed: LazyText;
-  private unit: LazyText;
-  private gear: LazyText;
   private lap: LazyText;
   private pos: LazyText;
   private cur: LazyText;
@@ -90,10 +92,8 @@ export class Hud {
   private pitBanner: LazyText;
   private flag: LazyText;
   private flagKind = '';
-  private fuel: LazyText;
   private draft: HTMLElement = h('div.hud-draft', { text: t('SLIPSTREAM') });
-  private rpmFill: HTMLElement;
-  private rpmLeds: HTMLElement[] = [];
+  private dial = new Dial();
   private wrong: HTMLElement;
   private status = new CarStatus();
   private overlays = new RaceOverlays();
@@ -108,19 +108,8 @@ export class Hud {
   private boardKey = '';
   private map: HTMLCanvasElement;
   private mapCtx: CanvasRenderingContext2D;
-  private lastRpmPct = -1;
 
   constructor() {
-    this.speed = new LazyText(h('span.hud-speed', { text: '0' }));
-    this.unit = new LazyText(h('span.hud-unit', { text: settings.units === 'mph' ? 'MPH' : 'KM/H' }));
-    this.gear = new LazyText(h('div.hud-gear', { text: 'N' }));
-    this.rpmFill = h('div.hud-rpm-fill');
-    const leds = h('div.hud-leds');
-    for (let i = 0; i < 10; i++) {
-      const l = h('i');
-      this.rpmLeds.push(l);
-      leds.append(l);
-    }
     this.lap = new LazyText(h('div.hud-big', { text: t('OUT') }));
     this.pos = new LazyText(h('div.hud-big', { text: '1/1' }));
     this.cur = new LazyText(h('span'));
@@ -131,7 +120,6 @@ export class Hud {
     this.fin = new LazyText(h('div.hud-finish'));
     this.pitBanner = new LazyText(h('div.hud-pit'));
     this.flag = new LazyText(h('div.hud-flag'));
-    this.fuel = new LazyText(h('div.hud-fuel'));
     this.wrong = h('div.hud-wrong', { text: t('WRONG WAY') });
     this.resetEl = h('div.hud-reset', { text: t('Press R to reset to the track') });
     this.board = h('div.hud-board');
@@ -154,23 +142,21 @@ export class Hud {
         h('div.hud-times', {}, this.lapTag, this.cur.el, h('label', { text: t('BEST') }), this.best.el, h('label', { text: t('LAST') }), this.last.el),
         this.delta.el,
         this.overlays.deltaBar,
-        this.overlays.relative,
+        // the minimap under the lap times (the corner by the dial is the driver's)
+        h('div.hud-br', {}, this.map, this.circuitMap.el),
       ),
       h(
         'div.hud-bc',
         {},
-        leds,
-        h('div.hud-rpm', {}, this.rpmFill),
-        h('div.hud-speedo', {}, this.gear.el, h('div.hud-sp', {}, this.speed.el, this.unit.el)),
-        this.fuel.el,
+        this.dial.el,
         this.overlays.inputs,
       ),
-      h('div.hud-br', {}, this.map, this.circuitMap.el),
       this.overlays.spotL,
       this.overlays.spotR,
       this.overlays.mirrorDelta,
       this.damagePanel.el,
-      h('div.hud-bl', {}, this.status.el),
+      // bottom left, as in the sims: who is just ahead and behind, over the tyres
+      h('div.hud-bl', {}, this.overlays.relative, this.status.el),
       this.wrong,
       this.msg.el,
       this.fin.el,
@@ -179,6 +165,8 @@ export class Hud {
       this.draft,
       this.resetEl,
     );
+    this.fit();
+    window.addEventListener('resize', () => this.fit());
   }
 
   private trackPath: Path2D | null = null;
@@ -289,18 +277,39 @@ export class Hud {
     g.stroke();
   }
 
+  /**
+   * Scales the HUD to the window: full size from 1600 × 900 up, smaller below (a laptop's 1366 × 768 or 1280 × 600),
+   * and the damage report a little more, so that it stays between the timing tower and the tyre widget.
+   */
+  fit(): void {
+    const w = window.innerWidth;
+    const hgt = window.innerHeight;
+    const k = Math.max(0.58, Math.min(1, Math.min(w / 1600, hgt / 900)));
+    const sc = Number(settings.hud.scale) || 1;
+    // the report is ~330 px high from 26 % of the height; the tyre widget under it ~200 px plus its margin
+    const room = hgt * (1 - 0.26) - (200 * k * sc + 30 * k);
+    const dmg = Math.max(0.5, Math.min(1, room / (330 * k * sc)));
+    this.el.style.setProperty('--ui-fit', k.toFixed(3));
+    this.el.style.setProperty('--dmg-fit', dmg.toFixed(3));
+  }
+
   update(s: HudState): void {
     const v = settings.units === 'mph' ? s.speedMs * 2.23694 : s.speedMs * 3.6;
-    this.speed.set(String(Math.round(Math.abs(v))));
-    this.gear.set(s.gear < 0 ? 'R' : s.gear === 0 ? 'N' : String(s.gear));
-    this.gear.el.classList.toggle('manual', s.manual);
-    const pct = Math.round(Math.min(1, s.rpm / s.limiter) * 100);
-    if (pct !== this.lastRpmPct) {
-      this.lastRpmPct = pct;
-      this.rpmFill.style.transform = `scaleX(${pct / 100})`;
-      const lit = Math.max(0, Math.min(10, Math.round(((s.rpm / s.redline - 0.75) / 0.25) * 10)));
-      this.rpmLeds.forEach((l, i) => (l.className = i < lit ? (i < 4 ? 'g' : i < 8 ? 'r' : 'b') : ''));
-    }
+    this.dial.update({
+      speed: v,
+      unit: settings.units === 'mph' ? 'MPH' : 'KM/H',
+      gear: s.gear,
+      manual: s.manual,
+      rpm: s.rpm,
+      redline: s.redline,
+      limiter: s.limiter,
+      abs: s.abs,
+      tc: s.tc,
+      headlights: s.headlights,
+      engine: s.damageZones[4] ?? 0,
+      fuel: s.fuel,
+      fuelLow: s.fuelLow,
+    });
     this.lap.set(s.lapLabel);
     const tagKey = `${s.lapPenaltyMs}|${s.lapInvalid ? 1 : 0}`;
     if (tagKey !== this.lastPenalty) {
@@ -339,8 +348,6 @@ export class Hud {
       this.flagKind = s.flag;
       this.flag.el.className = `hud-flag${s.flag ? ` ${s.flag}` : ''}`;
     }
-    this.fuel.set(s.fuelText);
-    this.fuel.el.classList.toggle('low', s.fuelLow);
     // the inputs widget shows the gear and speed: the old speedometer only without it
     this.el.classList.toggle('inputs-on', settings.overlays.inputs);
     // the player's HUD (Settings → General): size, opacity, the parts shown
@@ -349,6 +356,7 @@ export class Hud {
     if (key !== this.hudKey) {
       this.hudKey = key;
       this.el.style.setProperty('--hud-scale', String(hs.scale));
+      this.fit();
       this.el.style.setProperty('--hud-opacity', String(hs.opacity));
       this.el.classList.toggle('no-timing', !hs.timing);
       this.el.classList.toggle('no-lapinfo', !hs.lapInfo);

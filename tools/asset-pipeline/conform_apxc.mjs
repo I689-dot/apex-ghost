@@ -1,14 +1,30 @@
 /**
  * Applies kerb_conform.mjs (subdivide, then conformKerbs) to a finished collision file (.apxc): kerbs added after the pipeline's conform pass (or
  * files built before it) get the same treatment. Writes the file in place (gzip kept).
- *   node tools/asset-pipeline/conform_apxc.mjs apps/client/public/assets/maps/spa/collision.apxc
+ *   node tools/asset-pipeline/conform_apxc.mjs [--track=godot/data/tracks/spa.json --stray=3200:3320[,...]] <file.apxc>...
+ * --stray: lap stretches (m) where stacked road pieces over the road are removed (dropCoveredRoad).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { conformKerbs, kerbSkirts, subdivide } from './kerb_conform.mjs';
+
+const opts = Object.fromEntries(process.argv.filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
+const files = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+/** Circles along the given stretches of the lap's centreline. */
+function strayZones() {
+  if (!opts.track || !opts.stray) return [];
+  const td = JSON.parse(readFileSync(opts.track, 'utf8'));
+  const zones = [];
+  for (const range of opts.stray.split(',')) {
+    const [s0, s1] = range.split(':').map(Number);
+    for (let i = 0; i < td.cumS.length; i++)
+      if (td.cumS[i] >= s0 && td.cumS[i] <= s1) zones.push({ x: td.centerline[i * 3], z: td.centerline[i * 3 + 2], r: 12 });
+  }
+  return zones;
+}
+import { conformKerbs, dropCoveredRoad, kerbSkirts, lowerRoadSpikes, lowerStrayRoad, subdivide } from './kerb_conform.mjs';
 
 const SURFACES = ['asphalt', 'curb', 'grass', 'gravel', 'sand', 'wall'];
-for (const file of process.argv.slice(2)) {
+for (const file of files) {
   const raw = readFileSync(file);
   const gz = raw[0] === 0x1f && raw[1] === 0x8b;
   const buf = gz ? gunzipSync(raw) : raw;
@@ -27,6 +43,8 @@ for (const file of process.argv.slice(2)) {
     o += ni * 4;
     parts.push({ si, pos, idx });
   }
+  const zones = strayZones();
+  if (zones.length) console.log(`${file}: ${dropCoveredRoad(parts.filter((p) => SURFACES[p.si] === 'asphalt'), zones)} stray road triangles over the road removed, ${lowerStrayRoad(parts.filter((p) => SURFACES[p.si] === 'asphalt'), zones)} vertices lowered onto the road under them, ${lowerRoadSpikes(parts.filter((p) => SURFACES[p.si] === 'asphalt'), zones)} spikes brought down to the road around them`);
   for (const p of parts) if (SURFACES[p.si] === 'curb') Object.assign(p, subdivide(p.pos, p.idx));
   const of = (s) => parts.filter((p) => SURFACES[p.si] === s);
   const k = conformKerbs(of('asphalt'), of('curb'), [...of('grass'), ...of('gravel'), ...of('sand')]);

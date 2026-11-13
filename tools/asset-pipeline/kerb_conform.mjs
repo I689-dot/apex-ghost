@@ -253,3 +253,203 @@ export function kerbSkirts(asphaltParts, kerbParts, groundParts, width = 0.45) {
   }
   return { pos: new Float32Array(pos), idx: new Int32Array(idx) };
 }
+
+/**
+ * Stray road pieces lying over the road.
+ *
+ * A source model can carry a piece of asphalt a few cm to ~40 cm above the road under it (a patch from another layer,
+ * tilted at its edges). The wheel rays take the top surface, so the car meets a block with a step on each side: at Spa
+ * before turn 9 one 4 m long block stood 20-35 cm over the road, and a second raised the left half 14-16 cm.
+ *
+ * dropCoveredRoad() removes, inside the given zones only (circles {x, z, r}: the pipeline never touches the rest of a
+ * lap, where stacked layers are pit-lane decks or bridges), every asphalt triangle that lies LOW..HIGH metres above
+ * other asphalt at every one of its sample points: the road under it is whole, so it is not needed. Triangles are
+ * judged one by one and a dropped one no longer counts as road, so of two stacked layers the upper goes, never both.
+ * Edits the parts' idx in place; returns how many triangles were dropped.
+ */
+export function dropCoveredRoad(asphaltParts, zones, LOW = 0.04, HIGH = 0.45) {
+  const inZone = (x, z) => zones.some((q) => Math.hypot(x - q.x, z - q.z) < q.r);
+  const tris = [];
+  for (const p of asphaltParts)
+    for (let t = 0; t < p.idx.length; t += 3) {
+      const g = [0, 1, 2].flatMap((k) => [p.pos[p.idx[t + k] * 3], p.pos[p.idx[t + k] * 3 + 1], p.pos[p.idx[t + k] * 3 + 2]]);
+      tris.push({ p, t, g, drop: false });
+    }
+  const grid = new Map();
+  tris.forEach((tr, n) => {
+    const [ax, , az, bx, , bz, cx, , cz] = tr.g;
+    for (let gx = Math.floor(Math.min(ax, bx, cx) / CELL); gx <= Math.floor(Math.max(ax, bx, cx) / CELL); gx++)
+      for (let gz = Math.floor(Math.min(az, bz, cz) / CELL); gz <= Math.floor(Math.max(az, bz, cz) / CELL); gz++) {
+        const k = `${gx},${gz}`;
+        let l = grid.get(k);
+        if (!l) grid.set(k, (l = []));
+        l.push(n);
+      }
+  });
+  const at = (g, x, z) => {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = g;
+    const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (Math.abs(d) < 1e-12) return null;
+    const u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+    const v = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+    if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) return null;
+    return u * ay + v * by + (1 - u - v) * cy;
+  };
+  let dropped = 0;
+  // the highest first: a stack of three loses its top, then its middle if that is still above the bottom
+  const order = tris.map((_, n) => n).sort((a, b) => Math.max(tris[b].g[1], tris[b].g[4], tris[b].g[7]) - Math.max(tris[a].g[1], tris[a].g[4], tris[a].g[7]));
+  for (const n of order) {
+    const g = tris[n].g;
+    const mx = (g[0] + g[3] + g[6]) / 3;
+    const mz = (g[2] + g[5] + g[8]) / 3;
+    if (!inZone(mx, mz)) continue;
+    const pts = [[mx, mz]];
+    for (let k = 0; k < 3; k++) {
+      pts.push([(mx + g[k * 3]) / 2, (mz + g[k * 3 + 2]) / 2]);
+      pts.push([(g[k * 3] + g[((k + 1) % 3) * 3]) / 2, (g[k * 3 + 2] + g[((k + 1) % 3) * 3 + 2]) / 2]);
+    }
+    let covered = 0;
+    for (const [x, z] of pts) {
+      const own = at(g, x, z);
+      if (own === null) continue;
+      let low = -Infinity;
+      for (const m of grid.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? []) {
+        if (m === n || tris[m].drop) continue;
+        const h = at(tris[m].g, x, z);
+        if (h !== null && own - h > LOW && own - h < HIGH) low = Math.max(low, h);
+      }
+      if (low === -Infinity) {
+        covered = -1;
+        break;
+      }
+      covered++;
+    }
+    if (covered > 0) {
+      tris[n].drop = true;
+      dropped++;
+    }
+  }
+  for (const p of asphaltParts) {
+    const keep = [];
+    for (const tr of tris) if (tr.p === p && !tr.drop) keep.push(p.idx[tr.t], p.idx[tr.t + 1], p.idx[tr.t + 2]);
+    p.idx = p.idx instanceof Uint32Array ? new Uint32Array(keep) : new Int32Array(keep);
+  }
+  return dropped;
+}
+
+/**
+ * Lowers the vertices of stray road pieces onto the road under them (zones as in dropCoveredRoad). A piece that
+ * reaches beyond the road under it cannot be dropped without leaving a hole, but its corners can be brought down to the
+ * surface below, which flattens it: every vertex with asphalt LOW..HIGH metres under it takes that surface's height.
+ * Returns how many vertices moved.
+ */
+export function lowerStrayRoad(asphaltParts, zones, LOW = 0.04, HIGH = 0.5) {
+  const inZone = (x, z) => zones.some((q) => Math.hypot(x - q.x, z - q.z) < q.r);
+  const tris = [];
+  for (const p of asphaltParts)
+    for (let t = 0; t < p.idx.length; t += 3) {
+      const g = [0, 1, 2].flatMap((k) => [p.pos[p.idx[t + k] * 3], p.pos[p.idx[t + k] * 3 + 1], p.pos[p.idx[t + k] * 3 + 2]]);
+      tris.push({ p, t, g });
+    }
+  const grid = new Map();
+  tris.forEach((tr, n) => {
+    const [ax, , az, bx, , bz, cx, , cz] = tr.g;
+    for (let gx = Math.floor(Math.min(ax, bx, cx) / CELL); gx <= Math.floor(Math.max(ax, bx, cx) / CELL); gx++)
+      for (let gz = Math.floor(Math.min(az, bz, cz) / CELL); gz <= Math.floor(Math.max(az, bz, cz) / CELL); gz++) {
+        const k = `${gx},${gz}`;
+        let l = grid.get(k);
+        if (!l) grid.set(k, (l = []));
+        l.push(n);
+      }
+  });
+  const at = (g, x, z) => {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = g;
+    const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (Math.abs(d) < 1e-12) return null;
+    const u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+    const v = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+    if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) return null;
+    return u * ay + v * by + (1 - u - v) * cy;
+  };
+  const moves = new Map();
+  for (const tr of tris)
+    for (let k = 0; k < 3; k++) {
+      const x = tr.g[k * 3];
+      const y = tr.g[k * 3 + 1];
+      const z = tr.g[k * 3 + 2];
+      if (!inZone(x, z)) continue;
+      let low = -Infinity;
+      for (const m of grid.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? []) {
+        const h = at(tris[m].g, x, z);
+        if (h !== null && y - h > LOW && y - h < HIGH) low = Math.max(low, h);
+      }
+      if (low > -Infinity) moves.set(`${tris.indexOf(tr) >= 0 ? '' : ''}${tr.p.si}:${tr.p.idx[tr.t + k]}:${tr.p.pos.buffer.byteLength}`, { p: tr.p, vi: tr.p.idx[tr.t + k], y: low + 0.004 });
+    }
+  for (const { p, vi, y } of moves.values()) p.pos[vi * 3 + 1] = y;
+  return moves.size;
+}
+
+/**
+ * Spikes in the road (zones as in dropCoveredRoad): a vertex that stands more than SPIKE metres above the median of the
+ * road around it (ring points 1.5 and 3 m away, on other triangles) comes down to that median. The corner of a stray
+ * piece with no road under it, only kerb or grass, is such a spike. Returns how many vertices moved.
+ */
+export function lowerRoadSpikes(asphaltParts, zones, SPIKE = 0.12) {
+  const inZone = (x, z) => zones.some((q) => Math.hypot(x - q.x, z - q.z) < q.r);
+  const tris = [];
+  for (const p of asphaltParts)
+    for (let t = 0; t < p.idx.length; t += 3) {
+      const g = [0, 1, 2].flatMap((k) => [p.pos[p.idx[t + k] * 3], p.pos[p.idx[t + k] * 3 + 1], p.pos[p.idx[t + k] * 3 + 2]]);
+      tris.push({ p, t, g, v: [p.idx[t], p.idx[t + 1], p.idx[t + 2]] });
+    }
+  const grid = new Map();
+  tris.forEach((tr, n) => {
+    const [ax, , az, bx, , bz, cx, , cz] = tr.g;
+    for (let gx = Math.floor(Math.min(ax, bx, cx) / CELL); gx <= Math.floor(Math.max(ax, bx, cx) / CELL); gx++)
+      for (let gz = Math.floor(Math.min(az, bz, cz) / CELL); gz <= Math.floor(Math.max(az, bz, cz) / CELL); gz++) {
+        const k = `${gx},${gz}`;
+        let l = grid.get(k);
+        if (!l) grid.set(k, (l = []));
+        l.push(n);
+      }
+  });
+  const at = (g, x, z) => {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = g;
+    const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (Math.abs(d) < 1e-12) return null;
+    const u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+    const v = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+    if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) return null;
+    return u * ay + v * by + (1 - u - v) * cy;
+  };
+  const moves = new Map();
+  tris.forEach((tr, n) => {
+    for (let k = 0; k < 3; k++) {
+      const x = tr.g[k * 3];
+      const y = tr.g[k * 3 + 1];
+      const z = tr.g[k * 3 + 2];
+      if (!inZone(x, z)) continue;
+      const ring = [];
+      for (const r of [1.5, 3]) {
+        for (let a = 0; a < 8; a++) {
+          const px = x + r * Math.cos((a * Math.PI) / 4);
+          const pz = z + r * Math.sin((a * Math.PI) / 4);
+          let top = -Infinity;
+          for (const m of grid.get(`${Math.floor(px / CELL)},${Math.floor(pz / CELL)}`) ?? []) {
+            if (tris[m].p === tr.p && tris[m].v.includes(tr.v[k])) continue;
+            const h = at(tris[m].g, px, pz);
+            // the road at about this level (not a bridge over or a road under)
+            if (h !== null && Math.abs(h - y) < 0.6) top = Math.max(top, h);
+          }
+          if (top > -Infinity) ring.push(top);
+        }
+      }
+      if (ring.length < 6) continue;
+      ring.sort((a, b) => a - b);
+      const med = ring[ring.length >> 1];
+      if (y - med > SPIKE) moves.set(`${tr.v[k]}:${tr.p.pos.length}:${tr.p.si}`, { p: tr.p, vi: tr.v[k], y: med });
+    }
+  });
+  for (const { p, vi, y } of moves.values()) p.pos[vi * 3 + 1] = y;
+  return moves.size;
+}

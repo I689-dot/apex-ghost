@@ -435,7 +435,8 @@ export class RaceSession {
       this.hud.setDriver(p.id, p.country ?? null, p.num ?? null);
       if (p.num) this.numbers.set(p.id, p.num);
     }
-    this.contact = !!this.race.rules?.contact && !spectator;
+    // cars never collide with each other (every car is a ghost to the others), whatever the room's rule says
+    this.contact = false;
   }
 
   /* ------------------------------------------------------------ loading --- */
@@ -1980,7 +1981,13 @@ export class RaceSession {
   }
 
   /** Race control's flag for me (the light panel on the HUD) and the fuel readout. */
-  private raceControlHud(serverNow: number): { flag: string; flagText: string; fuelText: string; fuelLow: boolean } {
+  private raceControlHud(serverNow: number): {
+    flag: string;
+    flagText: string;
+    fuelText: string;
+    fuelLow: boolean;
+    fuel: { frac: number; litres: number; laps: number } | null;
+  } {
     const rc = this.rc;
     const me = this.standings.find((s) => s.id === this.me);
     let flag = '';
@@ -2022,6 +2029,7 @@ export class RaceSession {
       flagText,
       fuelText: fuel === null ? '' : t('FUEL {l} L · {laps} LAPS', { l: fuel.toFixed(1), laps: laps.toFixed(1) }),
       fuelLow: fuel !== null && laps < 2,
+      fuel: fuel === null ? null : { frac: fuel / FUEL.tankL, litres: fuel, laps },
     };
   }
 
@@ -3222,6 +3230,8 @@ export class RaceSession {
             : '',
       fuelText: '',
       fuelLow: false,
+      fuel: null,
+      headlights: this.headlightsOn,
     });
     this.mapTimer -= dt;
     if (this.mapTimer <= 0 && r) {
@@ -3298,6 +3308,7 @@ export class RaceSession {
       tyreTemps: v.wheels.map((w) => w.temp),
       damageZones: this.damage.zones,
       ...rcHud,
+      headlights: this.headlightsOn,
       throttle: v.pedals.throttle,
       brake: v.pedals.brake,
       steer: v.steerAngle / v.maxSteer,

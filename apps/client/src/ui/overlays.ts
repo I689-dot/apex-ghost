@@ -42,9 +42,9 @@ export class RaceOverlays {
   private last = { delta: 99, mdelta: '' };
   /**
    * The inputs as iRacing's widget draws them: a trace of the last seconds of throttle (green) and brake (red),
-   * the two pedals as bars, the gear on yellow, the speed, the wheel turning.
+   * the two pedals as bars and the wheel turning.
    */
-  private inCanvas = h('canvas.ov-in-canvas', { width: 540, height: 112 });
+  private inCanvas = h('canvas.ov-in-canvas', { width: 400, height: 112 });
   private inG = this.inCanvas.getContext('2d') as CanvasRenderingContext2D;
   private trace = new Float32Array(150 * 2);
   private traceAt = 0;
@@ -71,7 +71,7 @@ export class RaceOverlays {
         this.trace[this.traceAt * 2 + 1] = brake;
         this.traceAt = (this.traceAt + 1) % 150;
       }
-      this.drawInputs(throttle, brake, steer, gear, speed, unit);
+      this.drawInputs(throttle, brake, steer);
     }
     this.deltaBar.hidden = !o.deltaBar || deltaMs === null;
     if (o.deltaBar && deltaMs !== null) {
@@ -92,9 +92,9 @@ export class RaceOverlays {
     }
   }
 
-  private drawInputs(throttle: number, brake: number, steer: number, gear: number, speed: number, unit: string): void {
+  private drawInputs(throttle: number, brake: number, steer: number): void {
     const g = this.inG;
-    const W = 540;
+    const W = 400;
     const H = 112;
     g.clearRect(0, 0, W, H);
     g.fillStyle = 'rgba(14, 16, 20, 0.82)';
@@ -139,24 +139,7 @@ export class RaceOverlays {
     };
     bar(tx + tw + 14, brake, '#ff453a');
     bar(tx + tw + 38, throttle, '#30d158');
-    // the gear on yellow
-    const gx = tx + tw + 70;
-    g.fillStyle = '#ffd60a';
-    g.beginPath();
-    g.roundRect(gx, ty + 6, 46, th - 12, 6);
-    g.fill();
-    g.fillStyle = '#111';
-    g.font = 'bold 56px "Barlow Condensed", sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(gear < 0 ? 'R' : gear === 0 ? 'N' : String(gear), gx + 23, ty + th / 2 + 2);
-    // the speed
-    g.fillStyle = '#fff';
-    g.font = 'bold 40px "Barlow Condensed", sans-serif';
-    g.fillText(String(Math.round(Math.abs(speed))), gx + 100, ty + th / 2 - 8);
-    g.fillStyle = 'rgba(255,255,255,0.6)';
-    g.font = '20px "Barlow Condensed", sans-serif';
-    g.fillText(unit, gx + 100, ty + th / 2 + 22);
+    // (the gear and the speed are on the dial, ui/dial.ts)
     // the wheel, turned as far as a real one would be (±1 ≈ 270°)
     const cx = W - 52;
     const cy = H / 2;
