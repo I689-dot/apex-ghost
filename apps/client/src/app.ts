@@ -984,6 +984,7 @@ export class App {
 
     // --- the steps
     const ruleItems: [keyof RaceRules, string, string][] = [
+      ['contact', t('Car contact'), t('Cars collide and take damage (off: ghost cars that pass through each other)')],
       ['pitWindow', t('Mandatory pit stop'), t('Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint')],
       ['fuel', t('Fuel and refuelling'), t('Engines burn fuel, you choose your fuel load, stops can refuel (endurance)')],
       ['raceControl', t('Race control'), t('Yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties')],
@@ -1230,6 +1231,7 @@ export class App {
   private rulesPanel(room: RoomSnapshot, edit: boolean): HTMLElement {
     const rules = room.rules ?? { contact: false, pitWindow: false, fuel: false, raceControl: false };
     const items: [keyof RaceRules, string, string][] = [
+      ['contact', t('Car contact'), t('Cars collide and take damage (off: ghost cars that pass through each other)')],
       ['pitWindow', t('Mandatory pit stop'), t('Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint')],
       ['fuel', t('Fuel and refuelling'), t('Engines burn fuel, you choose your fuel load, stops can refuel (endurance)')],
       ['raceControl', t('Race control'), t('Yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties')],

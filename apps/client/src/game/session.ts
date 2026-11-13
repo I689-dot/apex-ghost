@@ -435,8 +435,7 @@ export class RaceSession {
       this.hud.setDriver(p.id, p.country ?? null, p.num ?? null);
       if (p.num) this.numbers.set(p.id, p.num);
     }
-    // cars never collide with each other (every car is a ghost to the others), whatever the room's rule says
-    this.contact = false;
+    this.contact = !!this.race.rules?.contact && !spectator;
   }
 
   /* ------------------------------------------------------------ loading --- */
@@ -1576,8 +1575,46 @@ export class RaceSession {
    * velocity plus a pull onto the pose: PROXY_TAU_S), the safety car's box onto its path. Velocities, not
    * positions: the solver then shares a hit by the masses.
    */
+  /** The pit lane, its boxes and the front of the garages: within this distance (m) of the lane's line. */
+  private static readonly PIT_AREA_M = 16;
+  private pitSegs: number[][] | null = null;
+  private myContactOn = true;
+
+  /** (x, z) is in the pit area: there cars are ghosts to each other, whatever the room's contact rule says. */
+  private inPitArea(x: number, z: number): boolean {
+    if (!this.pitSegs) {
+      const pts = this.trackData.pitLane?.points ?? [];
+      this.pitSegs = [];
+      for (let i = 0; i + 1 < pts.length; i++) this.pitSegs.push([pts[i][0], pts[i][2], pts[i + 1][0], pts[i + 1][2]]);
+    }
+    const r2 = RaceSession.PIT_AREA_M * RaceSession.PIT_AREA_M;
+    for (const [ax, az, bx, bz] of this.pitSegs) {
+      const dx = bx - ax;
+      const dz = bz - az;
+      const len2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2));
+      const ex = ax + dx * t - x;
+      const ez = az + dz * t - z;
+      if (ex * ex + ez * ez < r2) return true;
+    }
+    return false;
+  }
+
   private moveKinematics(): void {
     const ahead = -this.acc; // this step's time relative to the frame (s)
+    // contact off in the pit area for every car with a body of its own (mine, the bots'); other players' proxies below
+    const mp = this.vehicle.body.translation();
+    const solidMe = !this.inPitArea(mp.x, mp.z);
+    if (solidMe !== this.myContactOn) {
+      this.myContactOn = solidMe;
+      this.vehicle.setContact(solidMe);
+    }
+    for (const r of this.remotes.values()) {
+      const bv = r.bot?.vehicle;
+      if (!bv) continue;
+      const bp = bv.body.translation();
+      bv.setContact(!this.inPitArea(bp.x, bp.z));
+    }
     const move = (body: RAPIER.RigidBody, o: THREE.Object3D, vel: THREE.Vector3) => {
       body.setNextKinematicTranslation({ x: o.position.x + vel.x * ahead, y: o.position.y + vel.y * ahead, z: o.position.z + vel.z * ahead });
       body.setNextKinematicRotation(o.quaternion);
@@ -1594,7 +1631,8 @@ export class RaceSession {
       const ex = tx - p.x;
       const ey = ty - p.y;
       const ez = tz - p.z;
-      const hidden = !o.visible || !r.buffer.hasData;
+      // a car in the pit area is a ghost (the same rule as mine), so it never stands solid in the lane or a box
+      const hidden = !o.visible || !r.buffer.hasData || this.inPitArea(o.position.x, o.position.z);
       if (hidden || ex * ex + ey * ey + ez * ez > PROXY_SNAP_M * PROXY_SNAP_M) {
         body.setTranslation({ x: tx, y: ty, z: tz }, true);
         if (!r.ghosted) c.setEnabled(false);
