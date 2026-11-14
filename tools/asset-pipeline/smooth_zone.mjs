@@ -190,7 +190,10 @@ const box = (arr, half) =>
     }
     return acc.map((v) => v / n);
   });
-const smooth = box(box(rows.map((r) => [r.q[0] + r.f.y, r.q[1], r.q[2]]), 2), 2);
+// --filter=N: the box's half width in metres (2: a 5 m box, it takes out the 5 m slices; 5: an 11 m box, the longer
+// waves too, a real road's vertical curves being hundreds of metres in radius)
+const HALF = Number(opts.filter ?? 2);
+const smooth = box(box(rows.map((r) => [r.q[0] + r.f.y, r.q[1], r.q[2]]), HALF), HALF);
 
 
 if (opts.debug) {
