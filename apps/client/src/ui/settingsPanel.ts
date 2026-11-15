@@ -43,9 +43,38 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     onChange();
   };
 
+  // a choice as Le Mans Ultimate's options show it: the value between ‹ › arrows that step through the options
   const select = <T extends string>(value: T, options: [T, string][], set: (v: T) => void) => {
-    const s = h('select', { onchange: () => set(s.value as T) }, ...options.map(([v, l]) => h('option', { value: v, text: l, selected: v === value })));
-    return s;
+    let i = Math.max(
+      0,
+      options.findIndex(([v]) => v === value),
+    );
+    const label = h('span.stp-value', { text: options[i]?.[1] ?? '' });
+    const go = (d: number) => {
+      i = (i + d + options.length) % options.length;
+      label.textContent = options[i][1];
+      set(options[i][0]);
+    };
+    const el = h(
+      'div.stepper',
+      {
+        tabindex: 0,
+        role: 'spinbutton',
+        'aria-valuetext': options[i]?.[1] ?? '',
+        onkeydown: (e: Event) => {
+          const k = (e as KeyboardEvent).key;
+          if (k === 'ArrowLeft' || k === 'ArrowRight') {
+            e.preventDefault();
+            go(k === 'ArrowLeft' ? -1 : 1);
+            el.setAttribute('aria-valuetext', options[i][1]);
+          }
+        },
+      },
+      h('button.stp-arrow', { type: 'button', html: ICONS.left, 'aria-label': t('Previous'), onclick: () => go(-1) }),
+      label,
+      h('button.stp-arrow', { type: 'button', html: ICONS.right, 'aria-label': t('Next'), onclick: () => go(1) }),
+    );
+    return el;
   };
   const toggle = (value: boolean, set: (v: boolean) => void) => {
     const i = h('input', { type: 'checkbox', checked: value, onchange: () => set(i.checked) });
@@ -1061,11 +1090,12 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     h(
       'header.sp-head',
       {},
-      h('button.ghost.sp-back', { type: 'button', html: `${ICONS.left} ${t('Back')}`, onclick: close }),
-      h('div.sp-title', {}, h('span.sp-kicker', { text: 'APEX GHOST' }), h('h2', { text: t('Settings') })),
+      h('button.sp-back', { type: 'button', html: ICONS.left, title: t('Back'), 'aria-label': t('Back'), onclick: close }),
+      h('h2.sp-title', { text: t('Settings') }),
+      h('nav.sp-tabs', {}, tabBar),
       h('span.sp-hint', { text: t('Changes are saved as you make them') }),
     ),
-    h('div.sp-layout', {}, h('nav.sp-rail', {}, tabBar), h('div.sp-content', {}, body)),
+    h('div.sp-layout', {}, h('div.sp-content', {}, body)),
   );
   show(current);
   return panel;

@@ -86,8 +86,16 @@ export function profilePage(o: { cars: CarEntry[]; tracks: TrackChoice[]; onChan
   );
 
   // --- the numbers
-  const tile = (label: string, value: string, sub = '') =>
-    h('div.pf-tile', {}, h('b', { text: value }), h('span', { text: label }), sub ? h('small', { text: sub }) : null);
+  // a number, its label, and (out of the starts) a thin bar, as Le Mans Ultimate's career stats
+  const tile = (label: string, value: string, sub = '', frac: number | null = null) =>
+    h(
+      'div.pf-tile',
+      {},
+      h('b', { text: value }),
+      h('span', { text: label }),
+      sub ? h('small', { text: sub }) : null,
+      frac !== null ? h('i.pf-tile-bar', {}, h('i', { style: `width:${Math.max(0, Math.min(1, frac)) * 100}%` })) : null,
+    );
   const raced = hist.filter((r) => r.kind === 'race');
   const avgFinish = raced.filter((r) => r.position > 0);
   const stats = h(
@@ -98,8 +106,8 @@ export function profilePage(o: { cars: CarEntry[]; tracks: TrackChoice[]; onChan
       'div.pf-tiles',
       {},
       tile(t('Starts'), String(career.races)),
-      tile(t('Wins'), String(career.wins), pct(career.wins, career.races)),
-      tile(t('Podiums'), String(career.podiums), pct(career.podiums, career.races)),
+      tile(t('Wins'), String(career.wins), `${career.wins}/${career.races}`, career.races ? career.wins / career.races : 0),
+      tile(t('Podiums'), String(career.podiums), `${career.podiums}/${career.races}`, career.races ? career.podiums / career.races : 0),
       tile(t('Poles'), String(career.poles)),
       tile(t('Sessions'), String(career.sessions)),
       tile(t('Distance'), `${Math.round(career.km).toLocaleString()} km`),

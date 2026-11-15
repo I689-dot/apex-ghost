@@ -1162,4 +1162,13 @@ const ES: Record<string, string> = {
   'That is not a picture.': 'Eso no es una imagen.',
   'That picture could not be read.': 'No se pudo leer esa imagen.',
   'Changes are saved as you make them': 'Los cambios se guardan al momento',
+  Start: 'Empezar',
+  Locked: 'Bloqueado',
+  Previous: 'Anterior',
+  Next: 'Siguiente',
+  Tip: 'Consejo',
+  'Race · {min} min': 'Carrera · {min} min',
+  'Free practice · {min} min': 'Libres · {min} min',
+  'Qualifying · {min} min': 'Clasificación · {min} min',
+  'Grand Prix': 'Gran Premio',
 };

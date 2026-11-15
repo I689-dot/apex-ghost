@@ -200,6 +200,82 @@ export function primeRacingLine(track: TrackData, line: RacingLine): void {
   if (lineCache?.track !== track) lineCache = { track, line };
 }
 
+/** Another car, as the traffic logic sees it: position, speed (m/s) and heading (unit x / z). */
+export interface TrafficCar {
+  x: number;
+  y: number;
+  z: number;
+  speed: number;
+  fx: number;
+  fz: number;
+}
+
+/** What the cars around a bot leave it: a speed cap, the room either side, the car to pass, one alongside. */
+export interface TrafficView {
+  cap: number;
+  roomL: number;
+  roomR: number;
+  block: { along: number; lat: number } | null;
+  beside: boolean;
+}
+
+/** Lateral offset of a pass (m). */
+export const PASS_OFFSET = 3.6;
+
+/**
+ * Traffic for a bot (the racecraft of the sims' AI and the racing rules: Sony's GT Sophy, the "attacker / defender"
+ * space rules):
+ *  - a car ahead in its path: never closer than it can stop behind (its speed, the gap past 8.5 m, 8 m/s² of
+ *    braking), looked for as far as its own stopping distance;
+ *  - a car alongside (any overlap of the two bodies): that side is a wall a car's width away (2.3 m between
+ *    centres), and moving away from one that is too close, at most 0.8 m;
+ *  - a faster car coming up behind, already on one side: it keeps that side (no closing the door);
+ *  - a slower car ahead it may pass (`block`), and whether one is beside it (to hold its side while passing).
+ * `passing`: the bot is pulled out to pass (its path is narrower).
+ */
+export function trafficView(me: TrafficCar, passing: boolean, others: TrafficCar[]): TrafficView {
+  const { fx, fz } = me;
+  let cap = Infinity;
+  let block: { along: number; lat: number } | null = null;
+  let beside = false;
+  let roomL = Infinity;
+  let roomR = Infinity;
+  const range = Math.max(40, (me.speed * me.speed) / 16 + 15);
+  for (const o of others) {
+    // not the same piece of road: a car on the other leg of a hairpin (driving the other way) or on a bridge /
+    // underpass looked like a car ahead, and the bots braked for nothing; a stopped car is avoided whichever way
+    if (Math.abs(o.y - me.y) > 2.5 || (o.speed > 5 && o.fx * fx + o.fz * fz < 0.3)) continue;
+    const dx = o.x - me.x;
+    const dz = o.z - me.z;
+    const along = dx * fx + dz * fz;
+    const lat = dx * fz - dz * fx; // + = left of the bot
+    if (Math.abs(along) < 5.2 && Math.abs(lat) < 4.2) {
+      const room = Math.max(-0.8, Math.abs(lat) - 2.3);
+      if (lat > 0) roomL = Math.min(roomL, room);
+      else roomR = Math.min(roomR, room);
+    } else if (along <= -5.2 && along > -14 && o.speed > me.speed + 1.5 && Math.abs(lat) > 1.1 && Math.abs(lat) < 4.2) {
+      const room = Math.max(0, Math.abs(lat) - 2.3);
+      if (lat > 0) roomL = Math.min(roomL, room);
+      else roomR = Math.min(roomR, room);
+    }
+    // alongside on the side we moved to: hold that side until it is behind us; and while pulled out to pass, the
+    // car being passed is still ahead of us a lane over (it left the "in our path" check once we moved out, and the
+    // pass was given up a second later, still behind it: the bots never got past a slower car)
+    if (along > -6 && along <= 3 && Math.abs(lat) < 3.4) beside = true;
+    if (passing && along > 0 && along < 30 && Math.abs(lat) < 6.5) beside = true;
+    if (along <= 0 || along > range || Math.abs(lat) > 2.6) continue;
+    if (Math.abs(lat) < (passing ? 2.05 : 2.3)) {
+      // 8 m/s² and 8.5 m: a GT3 ahead brakes at up to 15 m/s², and at 10 / 7.5 the bots still ran into the back
+      // of one that braked earlier and harder than they expected (tools/sim/traffic.ts)
+      const c = along > 8.5 ? Math.sqrt(o.speed * o.speed + 2 * 8 * (along - 8.5)) : Math.max(0, o.speed - (8.5 - along) * 1.5);
+      cap = Math.min(cap, c);
+    }
+    if (along <= 3 || along > 40 || (o.speed > me.speed - 1.5 && along > 14)) continue; // as fast as us and not close: just follow
+    if (!block || along < block.along) block = { along, lat };
+  }
+  return { cap, roomL, roomR, block, beside };
+}
+
 /** Racing AI: pure-pursuit steering along the racing line (plus its own small offset) and a speed profile. */
 export class AiDriver {
   readonly controls: Controls = { throttle: 0, brake: 0, steer: 0, handbrake: 0, digital: false };
@@ -270,10 +346,35 @@ export class AiDriver {
 
   private lastS = 0;
 
-  /** Room to pass: no corner or braking zone in the next 150 m (pulling out mid-corner in the wet spun bots). */
+  private passHold = 0;
+
+  /**
+   * The traffic around it (trafficView): the room either side, and passing: a slower car ahead makes it pull out
+   * on the side away from it (where there is room, not into a corner) and keep that side until the car is behind.
+   * No overtaking under a caution.
+   */
+  applyTraffic(view: TrafficView, caution: boolean, dt: number): void {
+    this.roomL = view.roomL;
+    this.roomR = view.roomR;
+    const found = caution ? null : view.block;
+    if (found && (this.passTarget !== 0 || this.canPass())) {
+      if (this.passTarget === 0) this.passTarget = found.lat > 0.3 ? -PASS_OFFSET : found.lat < -0.3 ? PASS_OFFSET : this.roomySide() * PASS_OFFSET;
+      this.passHold = 1;
+    } else if (view.beside && this.passTarget !== 0) this.passHold = 1;
+    else if ((this.passHold -= dt) <= 0) this.passTarget = 0;
+  }
+
+  /**
+   * Room to pass: no corner or braking zone close ahead. Real passes are made down a straight in the slipstream and
+   * finished on the brakes (alongside by the braking point, then braking later than the car being passed), so on a
+   * dry track only the next 1.4 s of road must be free of a big slow-down (a fixed 150 m kept the bots stuck behind a
+   * slower car for whole races: no straight at Zandvoort is clear for 150 m before its corner and there is no pass
+   * without a corner); in the wet, 150 m as before (pulling out mid-corner in the wet spun bots).
+   */
   canPass(): boolean {
     const v = this.vehicle.telemetry.speed;
-    for (let d = 0; d <= 150; d += 10) if (this.profile[indexAt(this.track, this.lastS + d)] < Math.max(v, 20) * 0.92) return false;
+    const horizon = this.profileGrip < 0.92 ? 150 : Math.max(50, Math.min(150, v * 1.4));
+    for (let d = 0; d <= horizon; d += 10) if (this.profile[indexAt(this.track, this.lastS + d)] < Math.max(v, 20) * 0.92) return false;
     return true;
   }
 

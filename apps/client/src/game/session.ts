@@ -75,6 +75,7 @@ import { PitMenu } from '../ui/pitMenu';
 import { TimingScreen } from '../ui/timingScreen';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../physics/tyres';
 import { RacingLineFx } from './racingLineFx';
+import { trafficView, type TrafficCar } from './ai';
 import { RearMirror } from './mirror';
 import { GrassMask } from './grassMask';
 import { TrackLimits, beyondLimitsNow } from './trackLimits';
@@ -108,8 +109,6 @@ import { rumble } from '../input/gamepad';
 const FIXED_DT = 1 / PHYSICS_HZ;
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
 const MAX_FRAME_DT = 0.1;
-/** How far a bot moves over to pass a slower car (m). */
-const PASS_OFFSET = 3.6;
 /** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). 2.5 s kept the last of 11
  * bots waiting 27 s, which looked like bots that would not start. */
 const BOT_RELEASE_MS = 1000;
@@ -189,7 +188,6 @@ interface LocalBot {
   limits: TrackLimits;
   hint: number;
   /** Seconds left before a pass manoeuvre is given up (traffic cleared). */
-  passHold: number;
   /** Its own pit-lane monitor (enter / exit for the lap logic), the lap it makes its mandatory stop on, and the
    * service in progress (ends at, performance.now() ms; 0 = none) with its timeline (pitCrew.stopTimeline). */
   pit: PitLaneMonitor | null;
@@ -876,7 +874,6 @@ export class RaceSession {
         resetFlagSamples: 0,
         limits: new TrackLimits(),
         hint: -1,
-        passHold: 0,
         pit,
         // spread over the window so they don't all stop on the same lap
         stopLap: win.open + (r.slot % (win.close - win.open + 1)),
@@ -2235,65 +2232,24 @@ export class RaceSession {
     const v = b.vehicle;
     const p = v.body.translation();
     const q = v.body.rotation();
-    const fx = 2 * (q.x * q.z + q.y * q.w);
-    const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
-    const mySpeed = v.telemetry.speed;
-    let cap = Infinity;
-    let block: { along: number; lat: number } | null = null;
-    let beside = false;
-    // the room beside the bot (AiDriver.roomL/R), found again every step
-    let roomL = Infinity;
-    let roomR = Infinity;
-    // how far ahead it looks: its stopping distance at a firm 10 m/s² and some (40 m was too short from 250 km/h:
-    // a car braking earlier than the bot's plan was hit from behind)
-    const range = Math.max(40, (mySpeed * mySpeed) / 20 + 15);
-    const check = (ox: number, oy: number, oz: number, speed: number, ofx: number, ofz: number) => {
-      // not the same piece of road: a car on the other leg of a hairpin (driving the other way) or on a bridge /
-      // underpass looked like a car ahead, and the bots braked for nothing; a stopped car is avoided whichever way
-      if (Math.abs(oy - p.y) > 2.5 || (speed > 5 && ofx * fx + ofz * fz < 0.3)) return;
-      const dx = ox - p.x;
-      const dz = oz - p.z;
-      const along = dx * fx + dz * fz;
-      const lat = dx * fz - dz * fx; // + = left of the bot
-      // side by side (any overlap of the two cars, ~4.6 m long): that side is a wall a car's width away (2.3 m
-      // between centres: 2 m of car and a little air). Moving away from a car that is too close, at most 0.8 m.
-      if (Math.abs(along) < 5.2 && Math.abs(lat) < 4.2) {
-        const room = Math.max(-0.8, Math.abs(lat) - 2.3);
-        if (lat > 0) roomL = Math.min(roomL, room);
-        else roomR = Math.min(roomR, room);
-      }
-      // a faster car coming up behind, already on one side: leave it that side (no closing the door on it)
-      else if (along <= -5.2 && along > -14 && speed > mySpeed + 1.5 && Math.abs(lat) > 1.1 && Math.abs(lat) < 4.2) {
-        const room = Math.max(0, Math.abs(lat) - 2.3);
-        if (lat > 0) roomL = Math.min(roomL, room);
-        else roomR = Math.min(roomR, room);
-      }
-      // alongside on the side we moved to: hold that side until it is behind us
-      if (along > -6 && along <= 3 && Math.abs(lat) < 3.4) beside = true;
-      if (along <= 0 || along > range || Math.abs(lat) > 2.6) return;
-      // in our path (a little narrower once we are pulling out past it): never closer than it can stop behind
-      // (its speed, the gap past 7.5 m and 10 m/s² of braking), and backing off when inside that gap
-      if (Math.abs(lat) < (b.ai.passTarget !== 0 ? 2.05 : 2.3)) {
-        const c = along > 7.5 ? Math.sqrt(speed * speed + 2 * 10 * (along - 7.5)) : Math.max(0, speed - (7.5 - along) * 1.5);
-        cap = Math.min(cap, c);
-      }
-      if (along <= 3 || along > 40 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
-      if (!block || along < block.along) block = { along, lat };
-    };
     const fwd = (qx: number, qy: number, qz: number, qw: number): [number, number] => [2 * (qx * qz + qy * qw), 1 - 2 * (qx * qx + qy * qy)];
+    const [fx, fz] = fwd(q.x, q.y, q.z, q.w);
+    const others: TrafficCar[] = [];
     for (const o of this.remotes.values()) {
       if (o === r) continue;
       const op = o.bot ? o.bot.vehicle.body.translation() : o.visual.object.position;
       const oq = o.bot ? o.bot.vehicle.body.rotation() : o.visual.object.quaternion;
       const [ofx, ofz] = fwd(oq.x, oq.y, oq.z, oq.w);
-      check(op.x, op.y, op.z, o.vel.length(), ofx, ofz);
+      others.push({ x: op.x, y: op.y, z: op.z, speed: o.vel.length(), fx: ofx, fz: ofz });
     }
     if (!this.spectator) {
       const me = this.vehicle.body.translation();
       const mq = this.vehicle.body.rotation();
       const [mfx, mfz] = fwd(mq.x, mq.y, mq.z, mq.w);
-      check(me.x, me.y, me.z, this.vehicle.telemetry.speed, mfx, mfz);
+      others.push({ x: me.x, y: me.y, z: me.z, speed: this.vehicle.telemetry.speed, fx: mfx, fz: mfz });
     }
+    const view = trafficView({ x: p.x, y: p.y, z: p.z, fx, fz, speed: v.telemetry.speed }, b.ai.passTarget !== 0, others);
+    let cap = view.cap;
     // the safety car: queue behind it, seen from far enough to stop behind it (the 40 m of a car ahead were too
     // short from 250 km/h to its 150, and the bots ran into it)
     const sc = this.sc;
@@ -2303,17 +2259,9 @@ export class RaceSession {
       const gap = prog !== undefined ? wrapDelta(prog, sc.s, this.trackData.length) : -1;
       if (gap > 0 && gap < 220) cap = Math.min(cap, Math.sqrt(sc.speed ** 2 + 2 * 7 * Math.max(0, gap - 18)));
     }
-    b.ai.roomL = roomL;
-    b.ai.roomR = roomR;
     // no overtaking under a caution (FCY, safety car, a yellow flag here): follow instead
     const caution = this.rc.course !== 'green' || this.inYellow(this.localTracker?.players.get(r.id)?.progressS ?? -1e9);
-    const found = caution ? null : (block as { along: number; lat: number } | null);
-    if (found && (b.ai.passTarget !== 0 || b.ai.canPass())) {
-      // pass on the side away from it (it is left of us → go right), else keep the side already chosen
-      if (b.ai.passTarget === 0) b.ai.passTarget = found.lat > 0.3 ? -PASS_OFFSET : found.lat < -0.3 ? PASS_OFFSET : b.ai.roomySide() * PASS_OFFSET;
-      b.passHold = 1;
-    } else if (beside && b.ai.passTarget !== 0) b.passHold = 1;
-    else if ((b.passHold -= FIXED_DT) <= 0) b.ai.passTarget = 0;
+    b.ai.applyTraffic(view, caution, FIXED_DT);
     return cap;
   }
 

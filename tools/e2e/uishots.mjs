@@ -28,11 +28,15 @@ for (const [w, hgt] of sizes) {
     if (over) console.log(`${name} ${w}x${hgt}: horizontal overflow`);
   };
   await shot('home');
-  for (const tab of ['Garage', 'Profile', 'Online', 'Friends']) {
+  for (const tab of ['Garage', 'Profile', 'Online', 'Friends', 'Records']) {
     await page.click(`.mm-tabs button:has-text("${tab}")`);
     await page.waitForTimeout(900);
     await shot(tab.toLowerCase());
   }
+  await page.click('.mm-gear');
+  await page.waitForTimeout(900);
+  await shot('settings');
+  await page.keyboard.press('Escape');
   await page.click('.mm-tabs button:has-text("Play")');
   await page.click('.mm-tile.solo');
   await page.waitForSelector('.garage-modal', { timeout: 10000 });

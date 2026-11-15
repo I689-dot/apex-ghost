@@ -55,7 +55,7 @@ import { getLang, t } from './i18n';
 import { IS_APP } from './mobile/platform';
 import { mobileAppLink } from './mobile/installScreen';
 import * as acc from './net/account';
-import { flagImg, friendsPanel, recordsModal, signInModal } from './ui/social';
+import { flagImg, friendsPanel, recordsPage, signInModal } from './ui/social';
 import { profilePage, recentPlayersPanel } from './ui/profile';
 import { avatarEl } from './ui/avatar';
 import { cinematicReel, trackReel } from './ui/reel';
@@ -412,12 +412,13 @@ export class App {
       h(
         `button.mm-tile.${cls}`,
         { onclick: onclick ?? (() => signIn()), style: `--photo: ${cssUrl(photo)}`, 'aria-disabled': onclick ? null : 'true' },
-        h('span.mm-tile-kicker', { text: kicker }),
+        h('span.mm-tile-chips', {}, h('span.mm-tile-kicker', { text: kicker }), h('span.mm-tile-class', { text: 'GT3' })),
         h('span.mm-tile-title', { text: title }),
         h('span.mm-tile-sub', { text: sub }),
+        h('span.mm-tile-go', { html: `${onclick ? t('Start') : t('Locked')} ${ICONS.right}` }),
         extra ?? null,
       );
-    let tab: 'play' | 'garage' | 'profile' | 'online' | 'friends' = this.menuTab;
+    let tab: 'play' | 'garage' | 'profile' | 'online' | 'friends' | 'records' = this.menuTab;
     const body = h('div.mm-body');
     const tabs = h('nav.mm-tabs');
     const renderTab = () => {
@@ -443,6 +444,10 @@ export class App {
               })
             : h('p.muted', { text: t('Loading…') }),
         );
+        return;
+      }
+      if (tab === 'records') {
+        body.replaceChildren(recordsPage(this.trackIndex, this.cars?.cars ?? [], this.trackIndex.find((x) => x.default)?.id ?? ''));
         return;
       }
       if (tab === 'profile') {
@@ -601,11 +606,7 @@ export class App {
       tabBtn('online', t('Online')),
       tabBtn('friends', t('Friends')),
       tabBtn('profile', t('Profile')),
-      h('button', {
-        text: t('Records'),
-        onclick: () => document.body.append(recordsModal(this.trackIndex, this.cars?.cars ?? [], this.trackIndex.find((x) => x.default)?.id ?? '')),
-      }),
-      h('button', { text: t('Settings'), onclick: () => this.openSettings() }),
+      tabBtn('records', t('Records')),
     );
     // the driver: account chip (signed in) or the nickname for offline play and a sign-in button
     // the solo career on the driver chip: licence and Safety Rating, level (iRacing's licence badge, the games' level)
@@ -689,7 +690,14 @@ export class App {
       h(
         'div.menu.mm',
         {},
-        h('header.mm-top', {}, h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })), tabs, profile),
+        h(
+          'header.mm-top',
+          {},
+          h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
+          tabs,
+          profile,
+          h('button.mm-gear', { type: 'button', html: ICONS.gear, title: t('Settings'), 'aria-label': t('Settings'), onclick: () => this.openSettings() }),
+        ),
         h('div.mm-hero', {}, h('span.mm-kicker', { text: t('GT3 · Nürburgring · Spa · Zandvoort') }), h('h1', { text: t('Ready to race') })),
         body,
         h(
@@ -771,7 +779,7 @@ export class App {
   }
 
   /** The main menu's open tab (kept when the menu is drawn again). */
-  private menuTab: 'play' | 'garage' | 'profile' | 'online' | 'friends' = 'play';
+  private menuTab: 'play' | 'garage' | 'profile' | 'online' | 'friends' | 'records' = 'play';
   /** The garage's car, brand filter and search, kept across redraws (menu and lobby). */
   private garageState = { shown: null as string | null, brand: '', query: '' };
 
@@ -2133,12 +2141,16 @@ export class App {
       t('Tip: all four wheels off the track and the lap does not count.'),
       t('Tip: follow another car closely to use its slipstream.'),
       t('Tip: Settings → Quality changes how the world looks.'),
-    ];
+    ].map((s) => {
+      const x = s.replace(/^[^:]{2,12}:\s*/, '');
+      return x.charAt(0).toUpperCase() + x.slice(1);
+    });
     let tipAt = Math.floor(Math.random() * tips.length);
-    const tip = h('div.load-tip.in', { text: tips[tipAt] });
+    const tipText = h('span', { text: tips[tipAt] });
+    const tip = h('div.load-tip.in', {}, h('span.ld-tip-kicker', { text: t('Tip') }), tipText);
     const tipTimer = setInterval(() => {
       tipAt = (tipAt + 1) % tips.length;
-      tip.textContent = tips[tipAt];
+      tipText.textContent = tips[tipAt];
       // restart the fade-in
       tip.classList.remove('in');
       void tip.offsetWidth;
@@ -2147,21 +2159,52 @@ export class App {
     const weatherTxt = race.weather.change
       ? t('{weather} → {later} later', { weather: t(WEATHER_LABEL[race.weather.kind]), later: t(WEATHER_LABEL[race.weather.change.to]) })
       : t(WEATHER_LABEL[race.weather.kind]);
+    // the loading screen, as the F1 games lay theirs out: the circuit full screen (the photo reel, no captions), a
+    // "Loading" pill in the top left, the brand top right, and at the bottom left a tip over the circuit's name in
+    // big letters and the layout | session under it, the circuit's outline bottom right, a hairline of progress
+    const trackEntry = this.trackIndex.find((tr) => tr.id === race.trackId);
+    const full = trackEntry ? (CIRCUIT_NAME[circuitOf(trackEntry)] ?? t(trackEntry.name)) : 'Nürburgring';
+    // the place in big letters ("Circuit de Spa-Francorchamps" → SPA-FRANCORCHAMPS), the layout under it
+    const circuit = full.replace(/^Circuit (de |of )?/i, '');
+    const layoutName = trackEntry ? t(trackEntry.name) : '';
+    const layout = !layoutName || layoutName === full ? t('Grand Prix') : layoutName.replace(/^Nürburgring\s*/, '') || layoutName;
+    const sessionTxt =
+      race.kind === 'race'
+        ? race.raceMs
+          ? t('Race · {min} min', { min: Math.round(race.raceMs / 60000) })
+          : t('Race · {n} laps', { n: race.laps })
+        : race.kind === 'practice'
+          ? t('Free practice · {min} min', { min: Math.round(race.sessionMs / 60000) })
+          : t('Qualifying · {min} min', { min: Math.round(race.sessionMs / 60000) });
+    const outline = trackOutline(race.trackId, () => {
+      const svg = trackOutline(race.trackId, () => {});
+      if (svg) mapEl.innerHTML = svg;
+    });
+    const mapEl = h('div.ld-map', { html: outline ?? '' });
     const loadingEl = h(
-      'div.loading',
+      'div.loading.ld',
       {},
+      h('div.ld-shade'),
       h(
-        'div.load-card',
+        'div.ld-top',
         {},
-        h('div.logo.small.load-logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
-        h('h2', {
-          text: t('{track} · {min}-minute qualifying', {
-            track: t(this.trackIndex.find((tr) => tr.id === race.trackId)?.name ?? 'Nürburgring GP'),
-            min: Math.round(race.sessionMs / 60000),
-          }),
-        }),
+        h('div.ld-pill', {}, h('span.ld-spin'), h('b', { text: t('Loading') }), label),
         h(
-          'div.race-facts',
+          'div.ld-brand',
+          {},
+          h('div.logo.small', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
+          h('span.ld-slashes', {}, h('i'), h('i'), h('i')),
+        ),
+      ),
+      h(
+        'div.ld-bottom',
+        {},
+        tip,
+        h('i.ld-rule'),
+        h('h1.ld-title', { text: circuit }),
+        h('div.ld-sub', {}, h('b', { text: layout }), h('span', { text: sessionTxt })),
+        h(
+          'div.ld-facts',
           {},
           fact(t('Grid'), t('P{slot} of {n}', { slot, n: race.grid.length })),
           fact(t('Weather'), weatherTxt),
@@ -2169,22 +2212,14 @@ export class App {
           fact(t('Track'), w0.wetness > 0.3 ? t('Wet') : w0.wetness > 0.05 ? t('Damp') : t('Dry')),
           fact(t('Air / track'), `${Math.round(temp0.airC)} / ${Math.round(temp0.trackC)} °C`),
         ),
-        h('div.bar', {}, bar),
-        h('div.load-steps', {}, ...ticks),
-        label,
-        tip,
       ),
+      mapEl,
+      h('div.ld-bar', {}, bar),
     );
-    // the TV intro plays while the world loads: the circuit, your car, the grid
-    const trackEntry = this.trackIndex.find((tr) => tr.id === race.trackId);
+    // the TV intro plays while the world loads: the circuit, your car, the grid (no captions: the screen says it)
     const myCar = this.cars.cars.find((c) => c.id === this.room?.players.find((p) => p.id === this.me)?.carId);
     const reel = cinematicReel(
-      trackReel(
-        trackEntry?.map,
-        t(trackEntry?.name ?? ''),
-        myCar ? { url: heroUrl(myCar), name: myCar.name } : null,
-        race.kind === 'race' ? t('RACE') : t('QUALIFYING'),
-      ),
+      trackReel(trackEntry?.map, '', myCar ? { url: heroUrl(myCar), name: myCar.name } : null, '').map((s) => ({ ...s, kicker: undefined, title: undefined })),
       { loop: true, shotMs: 4600 },
     );
     loadingEl.prepend(reel.el);

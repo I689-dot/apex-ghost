@@ -170,17 +170,19 @@ await page.evaluate(() => {
 });
 
 // wait for the green light, then watch
-await page.waitForFunction(
-  () => {
-    const s = window.__apex.session;
-    return s.startAt !== null && s.conn.serverNow() > s.startAt;
-  },
-  null,
-  { timeout: 420_000, polling: 250 },
-).catch(async (e) => {
-  await shot('no-start');
-  throw e;
-});
+await page
+  .waitForFunction(
+    () => {
+      const s = window.__apex.session;
+      return s.startAt !== null && s.conn.serverNow() > s.startAt;
+    },
+    null,
+    { timeout: 420_000, polling: 250 },
+  )
+  .catch(async (e) => {
+    await shot('no-start');
+    throw e;
+  });
 if (DRIVE) await page.keyboard.down('KeyW');
 for (const [ms, name] of [
   [1500, '01-green'],

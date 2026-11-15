@@ -259,8 +259,7 @@ export function fmtLap(ms: number): string {
  * Records: the best lap of every driver on a layout (everyone or friends; any car or one; dry or wet), and your
  * career (sessions, wins, podiums, poles, laps, your best lap everywhere).
  */
-export function recordsModal(tracks: TrackChoice[], cars: CarEntry[], startTrack: string): HTMLElement {
-  const close = () => modal.remove();
+export function recordsPage(tracks: TrackChoice[], cars: CarEntry[], startTrack: string): HTMLElement {
   const carName = (id: string) => cars.find((c) => c.id === id)?.name ?? id;
   const trackName = (id: string) => tracks.find((x) => x.id === id)?.name ?? id;
   const state = {
@@ -374,16 +373,15 @@ export function recordsModal(tracks: TrackChoice[], cars: CarEntry[], startTrack
       career.replaceChildren(h('p.form-error', { text: t((e as Error).message) }));
     }
   };
-  const card = h(
-    'div.modal-card.records',
+  // a page of the main menu (its own tab), not a pop-up
+  const page = h(
+    'div.records-page',
     {},
-    h('header', {}, h('h2', { text: t('Records') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: close })),
-    h('div.records-grid', {}, h('section', {}, h('h3', { text: t('Lap records') }), filters, body), h('section', {}, career)),
+    h('div.records-grid', {}, h('section.rec-panel', {}, h('h3', { text: t('Lap records') }), filters, body), h('section.rec-panel', {}, career)),
   );
-  const modal: HTMLElement = h('div.modal', { onclick: (e: Event) => e.target === modal && close() }, card);
   void load();
   void loadCareer();
-  return modal;
+  return page;
 }
 
 /** Countries for the driver profile (ISO 3166 alpha-2): the motorsport nations first, then the rest A-Z by code. */
