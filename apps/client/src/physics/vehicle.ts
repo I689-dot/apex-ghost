@@ -436,6 +436,15 @@ export class Vehicle {
   setup: VehicleSetup = NEUTRAL_SETUP;
   /** Air temperature (°C), for the tyres and brakes. */
   ambientC = 20;
+  /**
+   * Engine coolant and oil (°C), for the dash (LMU's and ACC's water / oil readouts). A racing engine's water sits at
+   * ~80-95 °C (the thermostat holds it up, the radiator's airflow keeps it down): hotter under load and standing still
+   * (no air through the radiator: a car idling in the pits creeps towards 100 °C), a little hotter on a hot day; the
+   * oil follows the water ~10 °C above it and more slowly (it has more mass and its own cooler). Cars leave the pits
+   * warmed up.
+   */
+  waterC = 78;
+  oilC = 86;
   /** Track surface temperature (°C): tyres in contact take heat from it or give heat to it. */
   trackC = 25;
   /** Air density (kg/m³): drag, downforce and engine power follow it (setAir). */
@@ -975,6 +984,14 @@ export class Vehicle {
     }
     tel.rpm = dt2.rpm;
     tel.gear = dt2.gear;
+    if (!this.frozen) {
+      const load = Math.min(1.2, (Math.max(0, dt2.engineTorque) * dt2.rpm * RPM_TO_RADS) / Math.max(1, s.powerKw * 1000));
+      const airflow = Math.min(1, speed / 45);
+      const waterTarget = 80 + 12 * load + 14 * (1 - airflow) + 0.45 * (this.ambientC - 20);
+      const oilTarget = waterTarget + 6 + 10 * load;
+      this.waterC += (waterTarget - this.waterC) * Math.min(1, dt / 30);
+      this.oilC += (oilTarget - this.oilC) * Math.min(1, dt / 70);
+    }
     const front = s.drivetrain === 'AWD' ? s.frontTorqueSplit : s.drivetrain === 'FWD' ? 1 : 0;
     this.splitAxle(0, 1, axleTorque * front);
     this.splitAxle(2, 3, axleTorque * (1 - front));

@@ -8,6 +8,7 @@ import { DamagePanel } from './damagePanel';
 import { Dial } from './dial';
 import { CircuitMap, type MapCar } from './circuitMap';
 import { flagImg } from './social';
+import { TyreWidget } from './tyreWidget';
 import type { DamageState } from '../physics/damage';
 import { LazyText, fmtDelta, fmtTime, h } from './dom';
 import { t } from '../i18n';
@@ -49,6 +50,9 @@ export interface HudState {
   tyreWear: number[];
   /** FL, FR, RL, RR brake disc °C */
   brakeTemps: number[];
+  /** Engine coolant and oil (°C). */
+  waterC: number;
+  oilC: number;
   /** Slipstream strength 0..1 */
   slipstream: number;
   resetHint: boolean;
@@ -96,6 +100,7 @@ export class Hud {
   private dial = new Dial();
   private wrong: HTMLElement;
   private status = new CarStatus();
+  private tyres = new TyreWidget();
   private overlays = new RaceOverlays();
   private damagePanel = new DamagePanel();
   private hudKey = '';
@@ -145,13 +150,14 @@ export class Hud {
         // the minimap under the lap times (the corner by the dial is the driver's)
         h('div.hud-br', {}, this.map, this.circuitMap.el),
       ),
-      h('div.hud-bc', {}, this.dial.el, this.overlays.inputs),
+      // bottom right, together as Le Mans Ultimate's: the inputs, the tyres and engine temperatures, the dial
+      h('div.hud-bc', {}, this.overlays.inputs, this.tyres.el, this.dial.el),
       this.overlays.spotL,
       this.overlays.spotR,
       this.overlays.mirrorDelta,
       this.damagePanel.el,
       // bottom left, as in the sims: who is just ahead and behind, over the tyres
-      h('div.hud-bl', {}, this.overlays.relative, this.status.el),
+      h('div.hud-bl', {}, this.overlays.relative),
       this.wrong,
       this.msg.el,
       this.fin.el,
@@ -304,6 +310,9 @@ export class Hud {
       engine: s.damageZones[4] ?? 0,
       fuel: s.fuel,
       fuelLow: s.fuelLow,
+      throttle: s.throttle,
+      brake: s.brake,
+      tyreLife: 1 - Math.max(...s.tyreWear),
     });
     this.lap.set(s.lapLabel);
     const tagKey = `${s.lapPenaltyMs}|${s.lapInvalid ? 1 : 0}`;
@@ -332,7 +341,7 @@ export class Hud {
       this.delta.el.className = `hud-delta ${d <= 0 ? 'good' : 'bad'}${s.lapPenaltyMs > 0 || s.lapInvalid ? ' void' : ''}`;
     }
     this.wrong.classList.toggle('show', s.wrongWay);
-    this.status.update(s.tyreTemps, s.damageZones, s.abs, s.tc, s.compound, s.tyreWear, s.brakeTemps);
+    this.tyres.update(s.tyreTemps, s.tyreWear, s.brakeTemps, s.compound, s.damageZones, s.waterC, s.oilC);
     this.draft.classList.toggle('show', s.slipstream > 0.25);
     this.msg.set(s.message);
     this.fin.set(s.sessionText);

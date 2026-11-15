@@ -1171,4 +1171,8 @@ const ES: Record<string, string> = {
   'Free practice · {min} min': 'Libres · {min} min',
   'Qualifying · {min} min': 'Clasificación · {min} min',
   'Grand Prix': 'Gran Premio',
+  tread: 'banda',
+  laps: 'vueltas',
+  'Water temperature': 'Temperatura del agua',
+  'Oil temperature': 'Temperatura del aceite',
 };

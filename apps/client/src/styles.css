@@ -8212,3 +8212,234 @@ select,
     right: 18px;
   }
 }
+/* the friends panel grows with its list (it was capped at 46 % of the screen while the list ran out under it);
+ * the menu page scrolls when there are many */
+.mm-friends .menu-card.friends {
+  max-height: none;
+  height: auto;
+  overflow: visible;
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * Bottom-right cluster (ui/hud.ts), as Le Mans Ultimate's: the pedal trace, the tyre panel (ui/tyreWidget.ts) and
+ * the dial side by side; on the dial, the throttle (green) and brake (red) arcs inside the rev ring, and under it the
+ * fuel and tread bars.
+ * ---------------------------------------------------------------------------------------------------------------- */
+.hud-bc {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 10px;
+}
+.tyre-widget {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 132px;
+  padding: 8px 10px 10px;
+  border-radius: 8px;
+  background: rgba(8, 11, 20, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-family: var(--display);
+}
+.tw-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.tw-chassis {
+  fill: rgba(255, 255, 255, 0.05);
+  stroke-width: 1.2;
+}
+.tw-axle {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1.4;
+  fill: none;
+}
+.tw-wing {
+  fill: none;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+.tw-tyre {
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 1;
+  transition: fill 0.4s;
+}
+.tw-tread {
+  fill: rgba(255, 255, 255, 0.55);
+}
+.tw-temp {
+  font-size: 9px;
+  font-weight: 700;
+  fill: #fff;
+  font-family: var(--display);
+}
+.tw-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #fff;
+}
+.tw-row b.hot {
+  color: #ff453a;
+}
+.tw-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.tw-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hud.no-tyres .tyre-widget {
+  display: none;
+}
+/* pedal arcs inside the rev ring */
+.dial-in {
+  fill: none;
+  stroke-width: 5;
+}
+.dial-in-track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+.dial-thr {
+  stroke: #30d158;
+  filter: drop-shadow(0 0 3px rgba(48, 209, 88, 0.6));
+}
+.dial-brk {
+  stroke: #ff3b5c;
+  filter: drop-shadow(0 0 3px rgba(255, 59, 92, 0.6));
+}
+/* the fuel and tread bars across the dial's foot */
+.dial {
+  margin-bottom: 44px;
+}
+.dial-bars {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: calc(100% - 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.db-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 8px 2px 2px;
+  background: rgba(8, 11, 20, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+.db-row[hidden] {
+  display: none;
+}
+.db-tag {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+.db-tag i {
+  position: absolute;
+  inset: 0;
+  transform-origin: left;
+  transform: scaleX(var(--f, 1));
+  transition: transform 0.4s;
+}
+.db-row.fuel .db-tag i {
+  background: #e3405a;
+}
+.db-row.tyre .db-tag i {
+  background: #2f7de1;
+}
+.db-tag svg,
+.db-tag b {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.db-tag b {
+  width: auto;
+  height: auto;
+  font-weight: 700;
+}
+.db-val {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.db-row.low {
+  animation: dial-low 0.8s ease-in-out infinite alternate;
+}
+/* the home page centred on the screen and using its height: title, the five cards tall, the strip under them */
+.mm[data-tab='play'] .mm-hero,
+.mm[data-tab='play'] .mm-tiles,
+.mm[data-tab='play'] .mm-strip {
+  width: min(1560px, 100%);
+  max-width: none;
+  margin-inline: auto;
+}
+.mm[data-tab='play'] .mm-hero {
+  padding-left: clamp(16px, 4vw, 56px);
+  padding-right: clamp(16px, 4vw, 56px);
+  box-sizing: border-box;
+}
+.mm[data-tab='play'] .mm-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.mm[data-tab='play'] .mm-tile {
+  min-height: clamp(300px, 50vh, 600px);
+  padding: 24px 24px 22px;
+}
+.mm[data-tab='play'] .mm-tile-title {
+  font-size: clamp(1.9rem, 2.8vw, 3rem);
+}
+.mm[data-tab='play'] .mm-tile-sub {
+  font-size: 0.95rem;
+}
+.mm[data-tab='play'] .mm-card {
+  min-height: 96px;
+}
+.mm[data-tab='play'] .mm-car img {
+  width: 190px;
+  height: 80px;
+}
+.mm[data-tab='play'] .mm-hero {
+  width: min(1560px, calc(100% - 2 * clamp(16px, 4vw, 56px)));
+  padding-left: 0;
+  padding-right: 0;
+}
+.mm[data-tab='play'] .mm-tile-title {
+  font-size: clamp(1.8rem, 2.5vw, 2.7rem);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
