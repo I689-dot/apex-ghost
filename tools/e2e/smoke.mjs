@@ -79,8 +79,13 @@ page.on('request', (r) => {
 page.on('websocket', (ws) => {
   if (/\/api\//.test(ws.url())) apiRequests++;
 });
-if (args.includes('--solo')) await page.click('button.solo');
-else await page.click('button:has-text("Create room")');
+if (args.includes('--solo')) {
+  await page.click('button.solo');
+  await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
+} else {
+  await page.click('button:has-text("Create room")');
+  await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
+}
 await page.waitForSelector('.lobby', { timeout: 30_000 });
 await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(2500);
@@ -101,7 +106,7 @@ if (TRACK || WEATHER) {
   console.log(`  forecast: ${f}`);
 }
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 await page.waitForTimeout(1500);
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');

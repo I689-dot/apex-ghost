@@ -45,6 +45,7 @@ await page.addInitScript(() => {
 });
 await page.goto(URL);
 await page.click('button:has-text("Play solo")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps', { timeout: 60_000 });
 await page.waitForTimeout(800);
 const cond = (k, v) => page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), [k, v]);
@@ -55,7 +56,7 @@ await page.waitForTimeout(300);
 await cond('time', 'midday');
 await page.waitForTimeout(300);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot').catch(() => {});
   await page.waitForTimeout(150);

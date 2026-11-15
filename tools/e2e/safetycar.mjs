@@ -50,7 +50,7 @@ await page.evaluate(() => {
   window.__app.conn.sendJson({ t: 'setRaceLaps', laps: 3 });
 });
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');
   await page.waitForTimeout(200);

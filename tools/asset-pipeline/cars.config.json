@@ -241,6 +241,7 @@
   },
   "cars": {
     "2015_mclaren_650s_gt3": {
+      "exclude": "removed at the user's request (2026-11-15)",
       "name": "McLaren 650S GT3",
       "manufacturer": "McLaren",
       "year": 2015,
@@ -274,6 +275,7 @@
       }
     },
     "2015_mercedes_amg_gt3_marin_kitagawa": {
+      "exclude": "fictional anime livery, not a car that raced",
       "name": "Mercedes-AMG GT3 \"Marin\"",
       "manufacturer": "Mercedes-AMG",
       "year": 2015,
@@ -338,6 +340,7 @@
       }
     },
     "2022_mercedes_amg_project_one": {
+      "exclude": "not a GT3 car (road hypercar)",
       "name": "Mercedes-AMG ONE",
       "manufacturer": "Mercedes-AMG",
       "year": 2022,
@@ -456,6 +459,7 @@
       }
     },
     "bmw_m4_touring_nh_24h": {
+      "exclude": "not a GT3 car (Nurburgring 24h SP-X class)",
       "name": "BMW M3 Touring 24h",
       "manufacturer": "BMW",
       "year": 2024,
@@ -484,6 +488,7 @@
       }
     },
     "ferrari_296_challenge_2024": {
+      "exclude": "not a GT3 car (one-make Challenge car)",
       "name": "Ferrari 296 Challenge",
       "manufacturer": "Ferrari",
       "year": 2024,
@@ -680,6 +685,7 @@
       }
     },
     "porsche_911_gt3_r_rennsport": {
+      "exclude": "not a racing GT3 (track-only special edition, never raced)",
       "name": "Porsche 911 GT3 R Rennsport",
       "manufacturer": "Porsche",
       "year": 2023,

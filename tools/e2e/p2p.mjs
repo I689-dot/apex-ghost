@@ -50,7 +50,7 @@ if (ok && args.includes('--race')) {
     [guest, 1],
   ]) {
     await p.click('.lb-step >> nth=4');
-    await p.click(`.car-card >> nth=${i}`);
+    await p.dblclick(`.gr-row >> nth=${i}`);
     await p.click('.lobby-actions button:has-text("Ready")');
     await p.waitForTimeout(500);
   }

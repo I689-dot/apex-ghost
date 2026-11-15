@@ -5,15 +5,16 @@ import { carLimits, racingLineFor, speedProfile } from './ai';
 
 export type RacingLineMode = 'off' | 'corners' | 'full';
 
-const WIDTH = 1.1;
+/** Ribbon width (m): the painted look of the F1 / ACC lines, about half a lane-marking wide at its core. */
+const WIDTH = 0.9;
 const LIFT = 0.03;
-/** Chevron spacing along the line (m). */
-const CHEVRON_M = 2.4;
 /** The dynamic colours are judged from the car's speed this far ahead (m); beyond it the static colours show. */
 const LOOKAHEAD_M = 320;
 
 /**
- * Racing-line assist after the F1 games' dynamic line: a ribbon of soft chevrons pointing the way, coloured from
+ * Racing-line assist after the F1 games' dynamic line (and ACC's / Gran Turismo's): one clean ribbon on the road,
+ * a bright core with soft edges and a thin dark rim so it reads on light and dark asphalt alike (the old repeating
+ * chevrons looked like arrows painted on the track and flickered in the distance), coloured from
  * what *your* car needs now. Ahead of the car the colour comes from the deceleration needed to get from your current
  * speed down to the line's target speed there (green: keep going, amber: lift / light braking, red: brake hard now),
  * so a braking zone turns red only when you arrive too fast, and stays green when you are already slow enough.
@@ -92,7 +93,7 @@ export class RacingLineFx {
         uLength: { value: this.length },
         // the car's mechanical braking (m/s²); aero adds more at speed, so the colours stay on the safe side
         uBrake: { value: limits.muBrake * 9.81 },
-        uOpacity: { value: 0.82 },
+        uOpacity: { value: 0.9 },
       },
       vertexShader: /* glsl */ `
         attribute float aTarget;
@@ -119,9 +120,9 @@ export class RacingLineFx {
         varying float vTarget;
         varying float vPlan;
         varying float vDepth;
-        const vec3 GO = vec3(0.10, 0.85, 0.30);
-        const vec3 LIFT = vec3(1.0, 0.72, 0.05);
-        const vec3 BRAKE = vec3(1.0, 0.10, 0.12);
+        const vec3 GO = vec3(0.16, 0.92, 0.45);
+        const vec3 LIFT = vec3(1.0, 0.76, 0.12);
+        const vec3 BRAKE = vec3(1.0, 0.18, 0.16);
         void main() {
           // distance ahead of the car along the line (wraps at the line)
           float ahead = mod(vUv.y - uCarS + uLength, uLength);
@@ -135,19 +136,21 @@ export class RacingLineFx {
             k = mix(dyn, vPlan, smoothstep(${(LOOKAHEAD_M * 0.7).toFixed(1)}, ${LOOKAHEAD_M.toFixed(1)}, ahead));
           }
           vec3 col = k < 1.0 ? mix(GO, LIFT, k) : mix(LIFT, BRAKE, k - 1.0);
-          // chevrons pointing along the line: a V across the ribbon, repeated every ${CHEVRON_M} m
+          // across the ribbon: 0 in the middle, 1 at the edge; antialiased with the pixel footprint
           float x = abs(vUv.x - 0.5) * 2.0;
-          float p = fract((vUv.y + x * 0.9) / ${CHEVRON_M.toFixed(1)});
-          float w = fwidth(p) * 1.5 + 0.02;
-          float band = smoothstep(0.0, w, p) * (1.0 - smoothstep(0.34 - w, 0.34, p));
-          // soft edges across the ribbon
-          float edge = 1.0 - smoothstep(0.78, 1.0, x);
-          // a faint body between the chevrons keeps the line readable far away, where the chevrons blur
-          float far = smoothstep(60.0, 160.0, vDepth);
-          float a = mix(band * 0.95 + 0.12, 0.55, far) * edge;
+          float px = fwidth(x) * 1.2;
+          // the core (a flat bright band) and its rim (a dark hairline that separates it from the asphalt)
+          float core = 1.0 - smoothstep(0.62 - px, 0.62 + px, x);
+          float rim = (1.0 - smoothstep(0.86 - px, 0.86 + px, x)) - core;
+          // a soft sheen down the middle, as a painted line catches the light
+          float sheen = 1.0 + 0.25 * (1.0 - smoothstep(0.0, 0.35, x));
+          vec3 rgb = mix(col * 0.18, col * sheen, core / max(core + rim, 1e-4));
+          float a = core * 0.86 + rim * 0.55;
+          // brake zones read a touch stronger; the go sections stay quiet (less to look at on the straights)
+          a *= mix(0.72, 1.0, clamp(k, 0.0, 1.0));
           // not under the car's nose, and fading into the distance
-          a *= smoothstep(2.5, 9.0, ahead < uLength - 30.0 ? ahead : 99.0) * (1.0 - smoothstep(260.0, 420.0, vDepth));
-          gl_FragColor = vec4(col * 1.15, a * uOpacity);
+          a *= smoothstep(2.5, 10.0, ahead < uLength - 30.0 ? ahead : 99.0) * (1.0 - smoothstep(240.0, 400.0, vDepth));
+          gl_FragColor = vec4(rgb, a * uOpacity);
           #include <colorspace_fragment>
         }`,
       transparent: true,

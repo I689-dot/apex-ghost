@@ -60,6 +60,7 @@ await page.addInitScript(
 );
 await page.goto(`${URL}/?app=${APP ? 1 : 0}`);
 await page.click('button:has-text("Create room")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps');
 await page.waitForTimeout(800);
 if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', TRACK]);
@@ -69,7 +70,7 @@ await page.waitForTimeout(600);
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', TIME]);
 await page.waitForTimeout(600);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=16');
+await page.dblclick('.gr-row >> nth=16');
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(400);
 await page.click('button:has-text("Start race")');

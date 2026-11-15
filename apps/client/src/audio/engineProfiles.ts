@@ -223,7 +223,6 @@ const PROFILES: Record<string, Omit<EngineProfile, 'redline'>> = {
 };
 
 function profileKey(id: string): keyof typeof PROFILES {
-  if (id.includes('project_one')) return 'f1V6';
   if (id.includes('porsche')) return 'boxer6';
   if (id.includes('mclaren')) return 'mclarenV8';
   if (id.includes('lamborghini') || id.includes('audi')) return 'v10';

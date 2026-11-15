@@ -159,6 +159,17 @@ export const CHASSIS = {
    */
   diffPreload: 110,
   diffCoast: 0.55,
+  /**
+   * Rear-axle ABS: a racing ABS (Bosch M5 in every GT3) does not brake the rears at the tyre's peak slip as it does
+   * the fronts: it holds them lower, and lower still as the car turns, so the rear keeps the side grip that holds the
+   * car straight on the brakes (the stability half of its tuning). Target slip × kappaPeak, and the share removed at
+   * the tyre's peak slip angle.
+   */
+  absRear: 0.7,
+  absRearTurn: 0.45,
+  /** GT3 rear slicks are wider than the fronts (e.g. 325/705 against 300/680 R18): more rubber on the road, more grip
+   * per newton of load at the rear (×). It is what makes the cars stable at the limit, as the real ones are. */
+  rearGrip: 1.05,
 };
 
 /**
@@ -978,7 +989,8 @@ export class Vehicle {
       // whenever slip passed 13 %, so the wheels cycled through the peak and braked ~1.6 g where the tyres held 2+.
       // Released fast in proportion to the overshoot, reapplied more slowly (a modern Bosch M5 does both in ms).
       if (this.assists.abs && bt > 0 && w.contact && Math.abs(vF) > 3) {
-        const target = this.tire.p.kappaPeak * 0.95;
+        const turn = Math.min(1, Math.abs(w.slipAngle) / this.tire.p.alphaPeak);
+        const target = this.tire.p.kappaPeak * (w.front ? 0.95 : CHASSIS.absRear * (1 - CHASSIS.absRearTurn * turn));
         const over = (-w.slipRatio - target) / target;
         if (over > 0) w.abs = Math.max(0.1, w.abs - dt * (12 + 80 * over));
         else w.abs = Math.min(1, w.abs + dt * (4 - 6 * over));
@@ -1064,6 +1076,7 @@ export class Vehicle {
         wearGrip(w.wear) *
         pressureGrip(w.pressure) *
         camberGrip *
+        (w.front ? 1 : CHASSIS.rearGrip) *
         (1 - 0.06 * w.flatSpot);
       const fz = w.fz;
       const R = w.radius;

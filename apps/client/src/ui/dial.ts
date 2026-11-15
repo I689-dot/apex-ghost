@@ -64,8 +64,7 @@ export class Dial {
     this.fuelBar.append(this.fuelFill, this.fuelText);
     this.lampLights.innerHTML =
       '<svg viewBox="0 0 24 24"><path d="M11 5C6.5 5 3 8 3 12s3.5 7 8 7c1.2 0 2-.4 2-1.2V6.2C13 5.4 12.200 5 11 5z"/><path d="M16.500 7l4.500-1.500M16.500 12H21M16.500 17l4.500 1.500"/></svg>';
-    this.lampEngine.innerHTML =
-      '<svg viewBox="0 0 24 24"><path d="M3 10h3l1-2h3V6h4v2h2l2 2h3v6h-3l-2 2H9l-2-2H3z"/></svg>';
+    this.lampEngine.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 10h3l1-2h3V6h4v2h2l2 2h3v6h-3l-2 2H9l-2-2H3z"/></svg>';
     this.el.append(
       ring,
       h('div.dial-face', {}, h('div.dial-lamps', {}, this.lampLights, this.lampTc, this.lampAbs, this.lampEngine), this.gear, this.speed, this.unit),

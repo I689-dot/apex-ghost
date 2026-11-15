@@ -60,6 +60,7 @@ console.log('  friends: request sent, accepted, A shown online in the menu');
 // A opens a room; B sees it on the friends list and joins from there
 await a.click('.mm-tabs button[data-tab="play"]');
 await a.click('button:has-text("Create room")');
+await a.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await a.waitForSelector('.lb-steps', { timeout: 30_000 });
 const code = await a.evaluate(() => window.__app.conn.code);
 await b.bringToFront();
@@ -85,7 +86,7 @@ if (LAP) {
     [b, 1],
   ]) {
     await p.click('.lb-step >> nth=4');
-    await p.click(`.car-card >> nth=${n}`);
+    await p.dblclick(`.gr-row >> nth=${n}`);
     await p.click('.lobby-actions button:has-text("Ready")');
   }
   await a.waitForTimeout(600);

@@ -36,6 +36,7 @@ import {
   planWeather,
   temperatures,
   weatherAt,
+  DEFAULT_BOT_LEVEL,
   type CarEntry,
   type Temperatures,
   type CarState,
@@ -854,9 +855,9 @@ export class RaceSession {
       if (this.race.rules?.fuel) vehicle.setFuel(this.race.kind === 'race' ? Math.min(FUEL.tankL, this.raceLaps * perLap * 1.05 + 2) : 40);
       const pit = this.trackData.pitLane ? new PitLaneMonitor(this.trackData) : null;
       const win = pitWindowLaps(this.raceLaps);
-      // skill and racing line differ per bot so they spread out (deterministic per slot)
-      // the player's AI difficulty (Settings → Driving) scales every bot's pace
-      const skill = (0.88 + ((r.slot * 37) % 10) / 100) * settings.ai.difficulty;
+      // the host's bot level (race rules) sets the pace; each bot a little under it so they spread out over a lap
+      // instead of driving nose to tail (deterministic per slot: 96.5–100 % of the level)
+      const skill = ((this.race.rules?.botLevel ?? DEFAULT_BOT_LEVEL) / 100) * (0.965 + ((r.slot * 37) % 10) / 280);
       const lane = (((r.slot * 7) % 5) - 2) * 0.45;
       const t = vehicle.body.translation();
       const q = vehicle.body.rotation();
@@ -2240,6 +2241,12 @@ export class RaceSession {
     let cap = Infinity;
     let block: { along: number; lat: number } | null = null;
     let beside = false;
+    // the room beside the bot (AiDriver.roomL/R), found again every step
+    let roomL = Infinity;
+    let roomR = Infinity;
+    // how far ahead it looks: its stopping distance at a firm 10 m/s² and some (40 m was too short from 250 km/h:
+    // a car braking earlier than the bot's plan was hit from behind)
+    const range = Math.max(40, (mySpeed * mySpeed) / 20 + 15);
     const check = (ox: number, oy: number, oz: number, speed: number, ofx: number, ofz: number) => {
       // not the same piece of road: a car on the other leg of a hairpin (driving the other way) or on a bridge /
       // underpass looked like a car ahead, and the bots braked for nothing; a stopped car is avoided whichever way
@@ -2248,12 +2255,29 @@ export class RaceSession {
       const dz = oz - p.z;
       const along = dx * fx + dz * fz;
       const lat = dx * fz - dz * fx; // + = left of the bot
+      // side by side (any overlap of the two cars, ~4.6 m long): that side is a wall a car's width away (2.3 m
+      // between centres: 2 m of car and a little air). Moving away from a car that is too close, at most 0.8 m.
+      if (Math.abs(along) < 5.2 && Math.abs(lat) < 4.2) {
+        const room = Math.max(-0.8, Math.abs(lat) - 2.3);
+        if (lat > 0) roomL = Math.min(roomL, room);
+        else roomR = Math.min(roomR, room);
+      }
+      // a faster car coming up behind, already on one side: leave it that side (no closing the door on it)
+      else if (along <= -5.2 && along > -14 && speed > mySpeed + 1.5 && Math.abs(lat) > 1.1 && Math.abs(lat) < 4.2) {
+        const room = Math.max(0, Math.abs(lat) - 2.3);
+        if (lat > 0) roomL = Math.min(roomL, room);
+        else roomR = Math.min(roomR, room);
+      }
       // alongside on the side we moved to: hold that side until it is behind us
       if (along > -6 && along <= 3 && Math.abs(lat) < 3.4) beside = true;
-      if (along <= 0 || along > 40 || Math.abs(lat) > 2.6) return;
-      // in our path (narrower once we are pulling out): keep about 10 m, back off if closer
-      if (Math.abs(lat) < (b.ai.passTarget !== 0 ? 1.6 : 2.2)) cap = Math.min(cap, Math.max(0, speed + (along - 10) * 0.7));
-      if (along <= 3 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
+      if (along <= 0 || along > range || Math.abs(lat) > 2.6) return;
+      // in our path (a little narrower once we are pulling out past it): never closer than it can stop behind
+      // (its speed, the gap past 7.5 m and 10 m/s² of braking), and backing off when inside that gap
+      if (Math.abs(lat) < (b.ai.passTarget !== 0 ? 2.05 : 2.3)) {
+        const c = along > 7.5 ? Math.sqrt(speed * speed + 2 * 10 * (along - 7.5)) : Math.max(0, speed - (7.5 - along) * 1.5);
+        cap = Math.min(cap, c);
+      }
+      if (along <= 3 || along > 40 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
       if (!block || along < block.along) block = { along, lat };
     };
     const fwd = (qx: number, qy: number, qz: number, qw: number): [number, number] => [2 * (qx * qz + qy * qw), 1 - 2 * (qx * qx + qy * qy)];
@@ -2279,6 +2303,8 @@ export class RaceSession {
       const gap = prog !== undefined ? wrapDelta(prog, sc.s, this.trackData.length) : -1;
       if (gap > 0 && gap < 220) cap = Math.min(cap, Math.sqrt(sc.speed ** 2 + 2 * 7 * Math.max(0, gap - 18)));
     }
+    b.ai.roomL = roomL;
+    b.ai.roomR = roomR;
     // no overtaking under a caution (FCY, safety car, a yellow flag here): follow instead
     const caution = this.rc.course !== 'green' || this.inYellow(this.localTracker?.players.get(r.id)?.progressS ?? -1e9);
     const found = caution ? null : (block as { along: number; lat: number } | null);

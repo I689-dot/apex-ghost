@@ -45,9 +45,38 @@ export interface RaceRules {
   pitWindow: boolean;
   fuel: boolean;
   raceControl: boolean;
+  /** The AI drivers' level (% of the pace the car can do, as the sims' AI strength: BOT_LEVELS); absent: the default. */
+  botLevel?: number;
 }
 
+/** The on/off rules (botLevel is a number). */
+export type RuleSwitch = 'contact' | 'pitWindow' | 'fuel' | 'raceControl';
+
 export const DEFAULT_RULES: RaceRules = { contact: false, pitWindow: false, fuel: false, raceControl: false };
+
+/**
+ * Bot levels, named as Le Mans Ultimate names its AI strength bands (75–105 %): the share of the car's grip the bots
+ * plan their corners and braking with. Above ~106 % the cars cannot hold the speeds the plan asks for (tools/sim/ailap.ts:
+ * at 112 % they hit the walls), so that is the top.
+ */
+export const BOT_LEVELS: { pct: number; name: string }[] = [
+  { pct: 82, name: 'Rookie' },
+  { pct: 88, name: 'Amateur' },
+  { pct: 93, name: 'Club' },
+  { pct: 97, name: 'Pro' },
+  { pct: 101, name: 'Elite' },
+  { pct: 105, name: 'Alien' },
+];
+export const BOT_LEVEL_MIN = 80;
+export const BOT_LEVEL_MAX = 106;
+export const DEFAULT_BOT_LEVEL = 93;
+
+/** The level's name (the band at or below it). */
+export function botLevelName(pct: number): string {
+  let name = BOT_LEVELS[0].name;
+  for (const l of BOT_LEVELS) if (pct >= l.pct) name = l.name;
+  return name;
+}
 
 /** What the host sets up before the session (all clients compute the same forecast from it). */
 export interface Conditions {
@@ -160,6 +189,8 @@ export type ClientMsg =
   /** `account`: the signed-in player's token (accounts.ts): their laps and results go to their records. */
   | { t: 'hello'; v: number; nick: string; session: string | null; spectate?: boolean; account?: string; country?: string; num?: number }
   | { t: 'selectCar'; carId: string | null }
+  /** A line in the room's chat (lobby, briefing, between sessions). */
+  | { t: 'chat'; text: string }
   | { t: 'ready'; ready: boolean }
   | { t: 'start' }
   | { t: 'briefed' }
@@ -193,6 +224,8 @@ export const MAX_BUMP_IMPULSE = 42_000;
 /* ------------------------------------------------------ server → client --- */
 
 export type ServerMsg =
+  /** A chat line from a driver in the room (`from`: their id). */
+  | { t: 'chat'; from: string; nick: string; text: string; at: number }
   | {
       t: 'welcome';
       you: string;
@@ -247,6 +280,22 @@ const str = (v: unknown, max = 64): v is string => typeof v === 'string' && v.le
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** Strict validation of untrusted client JSON. Returns null for anything malformed. */
+/** Longest chat line (characters). */
+export const CHAT_MAX = 200;
+
+/** A chat line as it may be shown: no control or invisible characters, no line breaks, trimmed, CHAT_MAX at most. */
+export function cleanChat(s: string): string {
+  return (
+    s
+      .normalize('NFKC')
+      // eslint-disable-next-line no-control-regex -- removing control characters is the point
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, CHAT_MAX)
+  );
+}
+
 export function parseClientMsg(raw: string): ClientMsg | null {
   if (raw.length > 2048) return null;
   let v: unknown;
@@ -296,6 +345,11 @@ export function parseClientMsg(raw: string): ClientMsg | null {
       return num(v.minutes) && Number.isInteger(v.minutes) && v.minutes >= 1 && v.minutes <= 60 ? { t: 'setSession', minutes: v.minutes } : null;
     case 'setPublic':
       return typeof v.isPublic === 'boolean' ? { t: 'setPublic', isPublic: v.isPublic } : null;
+    case 'chat': {
+      if (typeof v.text !== 'string') return null;
+      const text = cleanChat(v.text);
+      return text ? { t: 'chat', text } : null;
+    }
     case 'setRaceMinutes':
       return num(v.minutes) && (RACE_MINUTE_CHOICES as readonly number[]).includes(v.minutes) ? { t: 'setRaceMinutes', minutes: v.minutes } : null;
     case 'setPractice':
@@ -317,11 +371,16 @@ export function parseClientMsg(raw: string): ClientMsg | null {
     case 'setRules': {
       if (!isRecord(v.rules)) return null;
       const out: Partial<RaceRules> = {};
-      for (const k of Object.keys(DEFAULT_RULES) as (keyof RaceRules)[]) {
+      for (const k of Object.keys(DEFAULT_RULES) as RuleSwitch[]) {
         const x = v.rules[k];
         if (x === undefined) continue;
         if (typeof x !== 'boolean') return null;
         out[k] = x;
+      }
+      const lv = v.rules.botLevel;
+      if (lv !== undefined) {
+        if (typeof lv !== 'number' || !Number.isInteger(lv) || lv < BOT_LEVEL_MIN || lv > BOT_LEVEL_MAX) return null;
+        out.botLevel = lv;
       }
       return { t: 'setRules', rules: out };
     }

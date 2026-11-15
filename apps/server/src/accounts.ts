@@ -152,6 +152,7 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       ['num', 'integer'],
       ['abbr', 'text'],
       ['colour', 'text'],
+      ['avatar', 'text'],
     ])
       if (!cols.has(c)) this.sql.exec(`alter table users add column ${c} ${type}`);
   }
@@ -228,13 +229,16 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     const num = pick(body.num, (x) => typeof x === 'number' && Number.isInteger(x) && x >= 1 && x <= 999);
     const abbr = pick(body.abbr, (x) => typeof x === 'string' && PROFILE_RE.abbr.test(x));
     const colour = pick(body.colour, (x) => typeof x === 'string' && PROFILE_RE.colour.test(x));
-    if ([country, num, abbr, colour].some((v) => v === undefined)) throw new HttpError(400, 'Check the profile fields.');
+    // the avatar only when sent (older clients do not send it: it is kept)
+    const avatar = 'avatar' in body ? pick(body.avatar, (x) => typeof x === 'string' && PROFILE_RE.avatar.test(x)) : (u.avatar ?? null);
+    if ([country, num, abbr, colour, avatar].some((v) => v === undefined)) throw new HttpError(400, 'Check the profile fields.');
     this.sql.exec(
-      'update users set country = ?, num = ?, abbr = ?, colour = ? where id = ?',
+      'update users set country = ?, num = ?, abbr = ?, colour = ?, avatar = ? where id = ?',
       country as SqlStorageValue,
       num as SqlStorageValue,
       abbr as SqlStorageValue,
       colour as SqlStorageValue,
+      avatar as SqlStorageValue,
       u.id,
     );
     return this.userOf(token) as AccountUser;
@@ -245,7 +249,7 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     if (!token || !/^[0-9a-f]{48}$/.test(token)) return null;
     return (
       this.rows<AccountUser>(
-        'select u.id as id, u.nick as nick, u.country as country, u.num as num, u.abbr as abbr, u.colour as colour from tokens t join users u on u.id = t.user_id where t.token = ?',
+        'select u.id as id, u.nick as nick, u.country as country, u.num as num, u.abbr as abbr, u.colour as colour, u.avatar as avatar from tokens t join users u on u.id = t.user_id where t.token = ?',
         token,
       )[0] ?? null
     );
@@ -359,8 +363,16 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
   /** Friends and requests (presence filled in by the Worker, from the DirectoryDO). */
   private friends(token: string | null): FriendEntry[] {
     const me = this.requireUser(token);
-    const rows = this.rows<{ id: string; nick: string; mine: string | null; theirs: string | null; last_seen: number | null }>(
-      `select u.id as id, u.nick as nick, a.status as mine, b.status as theirs, u.last_seen as last_seen
+    const rows = this.rows<{
+      id: string;
+      nick: string;
+      mine: string | null;
+      theirs: string | null;
+      last_seen: number | null;
+      avatar: string | null;
+      colour: string | null;
+    }>(
+      `select u.id as id, u.nick as nick, a.status as mine, b.status as theirs, u.last_seen as last_seen, u.avatar as avatar, u.colour as colour
        from users u
        left join friends a on a.user_id = ?1 and a.friend_id = u.id
        left join friends b on b.user_id = u.id and b.friend_id = ?1
@@ -374,6 +386,8 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       status: r.mine === 'accepted' && r.theirs === 'accepted' ? 'friend' : r.theirs === 'pending' ? 'incoming' : 'outgoing',
       presence: null,
       lastSeen: r.last_seen ?? null,
+      avatar: r.avatar ?? null,
+      colour: r.colour ?? null,
     }));
   }
 

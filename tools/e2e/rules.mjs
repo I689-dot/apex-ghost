@@ -63,7 +63,7 @@ await page.waitForTimeout(500);
 await shot('1-lobby');
 console.log('  rules:', (await page.evaluate(() => JSON.stringify(window.__app.room.rules))) ?? '?');
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');
   await page.waitForTimeout(250);

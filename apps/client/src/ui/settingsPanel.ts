@@ -36,7 +36,7 @@ function arrowName(code: string): string {
   return keyName(code);
 }
 
-/** Settings modal. `onChange` is called after every change (already saved). */
+/** Settings, a full-screen page. `onChange` is called after every change (already saved). */
 export function settingsPanel(onClose: () => void, onChange: () => void): HTMLElement {
   const changed = () => {
     saveSettings(settings);
@@ -827,21 +827,6 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
       t('The cockpit view turns into corners with the steering'),
     ),
   );
-  assists.append(
-    h('h3', { text: t('AI drivers') }),
-    row(
-      t('AI difficulty'),
-      num(
-        () => settings.ai.difficulty,
-        (v) => (settings.ai.difficulty = v),
-        0.8,
-        1.06,
-        0.01,
-        pct,
-      ),
-      t('Their pace in the races you play solo or host (from the next session)'),
-    ),
-  );
   sound.append(
     h('h3', { text: t('Mix') }),
     row(
@@ -1053,16 +1038,34 @@ export function settingsPanel(onClose: () => void, onChange: () => void): HTMLEl
     }),
   );
 
+  // a full-screen page, as the sims' options (ACC, Le Mans Ultimate, F1): the categories down the left, the
+  // category's settings on the right; Back or Esc returns to where it was opened from
+  const close = () => {
+    document.removeEventListener('keydown', esc, true);
+    // this page itself (after "Reset controller settings" redrew it, the caller's reference is the old one)
+    panel.remove();
+    onClose();
+  };
+  const esc = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || !panel.isConnected) return;
+    // a key being bound (Controls) takes the Esc itself
+    if (document.activeElement?.closest('.binding.listening')) return;
+    e.stopPropagation();
+    e.preventDefault();
+    close();
+  };
+  document.addEventListener('keydown', esc, true);
   const panel: HTMLElement = h(
-    'div.modal',
-    { onclick: (e: Event) => e.target === panel && onClose() },
+    'div.settings-page.settings',
+    { role: 'dialog', 'aria-label': t('Settings') },
     h(
-      'div.modal-card.settings',
+      'header.sp-head',
       {},
-      h('header', {}, h('h2', { text: t('Settings') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: onClose })),
-      tabBar,
-      body,
+      h('button.ghost.sp-back', { type: 'button', html: `${ICONS.left} ${t('Back')}`, onclick: close }),
+      h('div.sp-title', {}, h('span.sp-kicker', { text: 'APEX GHOST' }), h('h2', { text: t('Settings') })),
+      h('span.sp-hint', { text: t('Changes are saved as you make them') }),
     ),
+    h('div.sp-layout', {}, h('nav.sp-rail', {}, tabBar), h('div.sp-content', {}, body)),
   );
   show(current);
   return panel;

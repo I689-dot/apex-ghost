@@ -10,7 +10,7 @@ import {
   type ServerMsg,
 } from '@apex/shared';
 import { SERVER_URL } from '../config';
-import { getSession, setSession } from '../settings';
+import { getSession, setSession, settings } from '../settings';
 import { LocalSocket, isLocalCode } from './localRoom';
 import { P2pSocket, isKnownP2p } from './p2p';
 import { account } from './account';
@@ -144,8 +144,9 @@ export class Connection {
         spectate: this.spectate,
         ...(token ? { account: token } : {}),
         // the driver profile for the timing screens (offline too: it is the player's own)
-        ...(account()?.user.country ? { country: account()?.user.country ?? undefined } : {}),
-        ...(account()?.user.num ? { num: account()?.user.num ?? undefined } : {}),
+        // the account's profile, or the one kept in this browser (Profile page) for solo and LAN races
+        ...((account()?.user.country ?? settings.profile.country) ? { country: (account()?.user.country ?? settings.profile.country) || undefined } : {}),
+        ...((account()?.user.num ?? settings.profile.num) ? { num: (account()?.user.num ?? settings.profile.num) || undefined } : {}),
       });
     };
     ws.onmessage = (e) => {

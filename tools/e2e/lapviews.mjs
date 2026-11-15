@@ -42,11 +42,12 @@ await page.addInitScript((q) => {
 }, QUALITY);
 await page.goto(URL);
 await page.click('button:has-text("Create room")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps');
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', 'midday']);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(400);
 await page.click('button:has-text("Start race")');

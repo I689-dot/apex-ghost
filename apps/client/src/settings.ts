@@ -148,6 +148,20 @@ export interface Settings {
   brightness: number;
   /** The AI drivers' pace (× their skill), on the races you host or play solo. */
   ai: { difficulty: number };
+  /** Your car, chosen in the garage before a session (it is picked for you in every lobby; null: not chosen yet). */
+  garageCar: string | null;
+  /** The driver profile kept in this browser for solo and LAN races (a signed-in account keeps its own on the server). */
+  profile: {
+    num: number | null;
+    abbr: string;
+    country: string;
+    colour: string;
+    /** Helmet design and second colour (ui/avatar.ts), a photo of your own instead (data URL, this browser only). */
+    avatar: string;
+    photo: string | null;
+    /** The profile card's background: a circuit photo, or none. */
+    banner: 'spa' | 'zandvoort' | 'nurburgring' | 'none';
+  };
   bindings: KeyBindings;
   /**
    * Game controller: stick dead zone (0…0.25), steering curve exponent (1 = linear, higher = finer near centre),
@@ -216,6 +230,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lookToApex: 1,
   brightness: 1,
   ai: { difficulty: 1 },
+  garageCar: null,
+  profile: { num: null, abbr: '', country: '', colour: '#e10600', avatar: 'h1:#ffffff', photo: null, banner: 'spa' },
   carSetup: {
     tyre: 'medium',
     wing: 'medium',
@@ -277,6 +293,7 @@ export function loadSettings(): Settings {
     merged.pad = { ...DEFAULT_SETTINGS.pad, ...(s.pad ?? {}) };
     merged.wheel = { ...DEFAULT_SETTINGS.wheel, ...(s.wheel ?? {}) };
     merged.carSetup = { ...DEFAULT_SETTINGS.carSetup, ...(s.carSetup ?? {}) };
+    merged.profile = { ...DEFAULT_SETTINGS.profile, ...(s.profile ?? {}) };
     merged.graphics = { ...(s.graphics ?? {}) };
     merged.overlays = { ...DEFAULT_SETTINGS.overlays, ...(s.overlays ?? {}) };
     merged.keyboard = { ...DEFAULT_SETTINGS.keyboard, ...(s.keyboard ?? {}) };

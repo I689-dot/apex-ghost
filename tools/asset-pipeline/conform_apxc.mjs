@@ -44,7 +44,19 @@ for (const file of files) {
     parts.push({ si, pos, idx });
   }
   const zones = strayZones();
-  if (zones.length) console.log(`${file}: ${dropCoveredRoad(parts.filter((p) => SURFACES[p.si] === 'asphalt'), zones)} stray road triangles over the road removed, ${lowerStrayRoad(parts.filter((p) => SURFACES[p.si] === 'asphalt'), zones)} vertices lowered onto the road under them, ${lowerRoadSpikes(parts.filter((p) => SURFACES[p.si] === 'asphalt'), zones)} spikes brought down to the road around them`);
+  if (zones.length)
+    console.log(
+      `${file}: ${dropCoveredRoad(
+        parts.filter((p) => SURFACES[p.si] === 'asphalt'),
+        zones,
+      )} stray road triangles over the road removed, ${lowerStrayRoad(
+        parts.filter((p) => SURFACES[p.si] === 'asphalt'),
+        zones,
+      )} vertices lowered onto the road under them, ${lowerRoadSpikes(
+        parts.filter((p) => SURFACES[p.si] === 'asphalt'),
+        zones,
+      )} spikes brought down to the road around them`,
+    );
   for (const p of parts) if (SURFACES[p.si] === 'curb') Object.assign(p, subdivide(p.pos, p.idx));
   const of = (s) => parts.filter((p) => SURFACES[p.si] === s);
   const k = conformKerbs(of('asphalt'), of('curb'), [...of('grass'), ...of('gravel'), ...of('sand')]);
@@ -62,5 +74,7 @@ for (const file of files) {
   }
   const out = Buffer.concat(chunks);
   writeFileSync(file, gz ? gzipSync(out, { level: 9 }) : out);
-  console.log(`${file}: ${k.moved} kerb vertices moved (up to ${(k.maxMove * 100).toFixed(1)} cm), ${k.ground} ground vertices followed, ${k.lifted} raised to meet a kerb`);
+  console.log(
+    `${file}: ${k.moved} kerb vertices moved (up to ${(k.maxMove * 100).toFixed(1)} cm), ${k.ground} ground vertices followed, ${k.lifted} raised to meet a kerb`,
+  );
 }

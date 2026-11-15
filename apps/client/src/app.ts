@@ -10,7 +10,13 @@ import {
   PRACTICE_MINUTE_CHOICES,
   PIT_WINDOW,
   pitWindowLaps,
-  type RaceRules,
+  BOT_LEVELS,
+  CHAT_MAX,
+  BOT_LEVEL_MAX,
+  BOT_LEVEL_MIN,
+  DEFAULT_BOT_LEVEL,
+  botLevelName,
+  type RuleSwitch,
   TIME_LABEL,
   WEATHER_KINDS,
   planWeather,
@@ -23,7 +29,6 @@ import {
   normalizeRoomCode,
   sanitizeNickname,
   weatherAt,
-  type CarEntry,
   type CarsFile,
   type RaceSetup,
   type RoomSnapshot,
@@ -31,11 +36,12 @@ import {
   type ServerMsg,
 } from '@apex/shared';
 import { Connection, RoomError, createRoom, listPublicRooms } from './net/connection';
-import { createLocalRoom, isHostedCode, isLocalCode } from './net/localRoom';
-import { steeringLockDeg } from './physics/steeringLock';
+import { LOCAL_CODE, createLocalRoom, isHostedCode, isLocalCode } from './net/localRoom';
 import { hostRace, isP2pCode, stopHosting } from './net/p2p';
 import { LICENCE_COLOUR, LICENCE_NAME, addSession, levelOf, loadCareer, type CareerGain } from './career';
 import { careerBlock } from './ui/careerBlock';
+import { addHistory, addRecentPlayers, loadHistory } from './history';
+import { garageModal, garagePicker } from './ui/garage';
 // coins (kept for later, off in the game for now): import { buyCar, carPrice, claimDaily, initGarage, ownsCar } from './career';
 import { loadChampionship, newChampionship, saveChampionship, scoreRace, standings, type Championship } from './championship';
 import { Graphics } from './game/graphics';
@@ -49,7 +55,9 @@ import { getLang, t } from './i18n';
 import { IS_APP } from './mobile/platform';
 import { mobileAppLink } from './mobile/installScreen';
 import * as acc from './net/account';
-import { flagImg, friendsPanel, profileModal, recordsModal, signInModal } from './ui/social';
+import { flagImg, friendsPanel, recordsModal, signInModal } from './ui/social';
+import { profilePage, recentPlayersPanel } from './ui/profile';
+import { avatarEl } from './ui/avatar';
 import { cinematicReel, trackReel } from './ui/reel';
 import { ICONS } from './ui/icons';
 import { trackOutline } from './ui/trackMap';
@@ -57,7 +65,6 @@ import { trackOutline } from './ui/trackMap';
 type Screen = 'menu' | 'lobby' | 'briefing' | 'watch' | 'loading' | 'race' | 'results';
 type LobbyStep = 'circuit' | 'conditions' | 'session' | 'rules' | 'car';
 
-const hp = (kw: number) => Math.round(kw * 1.341);
 /** Maps with their own menu photos (photo_<shot>_<map>.webp, tools/e2e/photos.mjs) and their countries. */
 const MAP_PHOTOS = new Set(['zandvoort', 'spa']);
 const MAP_COUNTRY: Record<string, string> = { zandvoort: 'NL', spa: 'BE' };
@@ -125,6 +132,13 @@ export class App {
       })
       .catch((e: Error) => this.fatal(e.message));
     window.addEventListener('beforeunload', () => this.conn?.close());
+    // the menus' scale for the screen (styles.css: --menu-fit): a laptop shows the desktop layout, smaller
+    const fit = () => {
+      const k = Math.max(0.7, Math.min(1, Math.min(window.innerWidth / 1500, window.innerHeight / 860)));
+      document.documentElement.style.setProperty('--menu-fit', k.toFixed(3));
+    };
+    fit();
+    window.addEventListener('resize', fit);
     void loadTrackIndex().then((t) => {
       this.trackIndex = t;
       if (this.screen === 'lobby') this.renderLobby();
@@ -219,6 +233,17 @@ export class App {
     const code = h('input.code-input', { type: 'text', maxlength: 7, placeholder: t('ROOM CODE'), autocomplete: 'off', spellcheck: 'false' });
     const err = h('div.form-error', { text: error });
     const busy = (b: boolean) => document.querySelector('.mm')?.classList.toggle('busy', b);
+    // choose the car before the session (Assetto Corsa EVO and Le Mans Ultimate: car, then the race): the garage
+    // opens on the car you had, one click to go on with it; false when backed out
+    const pickCar = async (cta: string): Promise<boolean> => {
+      const list = (this.cars?.cars ?? []).filter((c) => c.role !== 'safety');
+      if (!list.length) return true;
+      const id = await garageModal(list, settings.garageCar && list.some((c) => c.id === settings.garageCar) ? settings.garageCar : null, cta);
+      if (!id) return false;
+      settings.garageCar = id;
+      saveSettings(settings);
+      return true;
+    };
     const readNick = (): string | null => {
       const r = sanitizeNickname(nick.value);
       if (!r.ok) {
@@ -233,6 +258,7 @@ export class App {
     const create = async () => {
       const n = readNick();
       if (!n) return;
+      if (!(await pickCar(t('Create room')))) return;
       busy(true);
       err.textContent = '';
       try {
@@ -247,6 +273,7 @@ export class App {
     const host = async () => {
       const n = readNick();
       if (!n) return;
+      if (!(await pickCar(t('Host on this device')))) return;
       busy(true);
       err.textContent = '';
       try {
@@ -270,6 +297,7 @@ export class App {
     const solo = async () => {
       const n = readNick();
       if (!n) return;
+      if (!(await pickCar(t('Race with this car')))) return;
       busy(true);
       err.textContent = '';
       try {
@@ -289,6 +317,7 @@ export class App {
         code.focus();
         return;
       }
+      if (!(await pickCar(t('Join the room')))) return;
       busy(true);
       err.textContent = '';
       try {
@@ -328,7 +357,40 @@ export class App {
       code.value = c;
       await joinIt();
     };
+    // quick match (the consoles' "quick race"): the fullest public lobby with a free place, else a new public room
+    // that others find in the list
+    const quick = async () => {
+      const n = readNick();
+      if (!n) return;
+      if (!(await pickCar(t('Find a race')))) return;
+      busy(true);
+      err.textContent = '';
+      try {
+        const rooms = await listPublicRooms().catch(() => [] as RoomSummary[]);
+        const open = rooms.filter((r) => r.phase === 'lobby' && r.drivers < r.maxPlayers).sort((a, b) => b.humans - a.humans || b.drivers - a.drivers);
+        if (open.length) {
+          toast(t("Joining {host}'s room", { host: open[0].host }));
+          await this.join(open[0].code, n);
+        } else {
+          await this.join(await createRoom(), n);
+          this.conn?.sendJson({ t: 'setPublic', isPublic: true });
+          toast(t('No open lobby right now: your room is public, others can join it.'), 5000);
+        }
+      } catch (e) {
+        err.textContent = t((e as Error).message);
+      } finally {
+        busy(false);
+      }
+    };
     code.addEventListener('input', () => (code.value = code.value.toUpperCase()));
+    // an invite link (?join=CODE from a lobby's "Invite link"): the code filled in on the online tab
+    const invited = normalizeRoomCode(new URLSearchParams(location.search).get('join') ?? '');
+    if (invited) {
+      history.replaceState(null, '', location.pathname);
+      code.value = invited;
+      this.menuTab = 'online';
+      setTimeout(() => toast(t('Invited to room {code}: press Join.', { code: invited }), 6000), 400);
+    }
     code.addEventListener('keydown', (e) => e.key === 'Enter' && void joinIt());
     // online play is for signed-in drivers (the server refuses the others: no account, no server use); the local
     // dev server has no accounts, so dev builds may play online without one
@@ -355,11 +417,49 @@ export class App {
         h('span.mm-tile-sub', { text: sub }),
         extra ?? null,
       );
-    let tab: 'play' | 'online' | 'friends' = 'play';
+    let tab: 'play' | 'garage' | 'profile' | 'online' | 'friends' = this.menuTab;
     const body = h('div.mm-body');
     const tabs = h('nav.mm-tabs');
     const renderTab = () => {
+      this.menuTab = tab;
       for (const b of tabs.querySelectorAll('button')) b.classList.toggle('on', b.getAttribute('data-tab') === tab);
+      document.querySelector('.mm')?.setAttribute('data-tab', tab);
+      if (tab === 'garage') {
+        const list = (this.cars?.cars ?? []).filter((c) => c.role !== 'safety');
+        body.replaceChildren(
+          list.length
+            ? garagePicker(list, {
+                current: settings.garageCar,
+                kicker: t('Garage'),
+                title: t('Your car'),
+                cta: t('Select car'),
+                state: this.garageState,
+                onPick: (id) => {
+                  settings.garageCar = id;
+                  saveSettings(settings);
+                  toast(t('{car} is your car: it is picked for you in every lobby.', { car: list.find((c) => c.id === id)?.name ?? id }), 3500);
+                  renderTab();
+                },
+              })
+            : h('p.muted', { text: t('Loading…') }),
+        );
+        return;
+      }
+      if (tab === 'profile') {
+        body.replaceChildren(
+          profilePage({
+            cars: this.cars?.cars ?? [],
+            tracks: this.trackIndex,
+            onChanged: () => this.showMenu(),
+            signIn,
+            openGarage: () => {
+              tab = 'garage';
+              renderTab();
+            },
+          }),
+        );
+        return;
+      }
       if (tab === 'play')
         body.replaceChildren(
           h(
@@ -373,6 +473,15 @@ export class App {
               t('Play solo (offline)'),
               t('Race the AI on any circuit. No account, no server.'),
               () => void solo(),
+            ),
+            tile(
+              'quick',
+              'photo_grid_spa.webp',
+              t('ONLINE'),
+              t('Quick match'),
+              t('Straight into an open public lobby, or open one for others.'),
+              online ? () => void quick() : null,
+              online ? null : locked(t('Sign in to play online')),
             ),
             tile(
               'online',
@@ -407,6 +516,16 @@ export class App {
                 : null,
               online ? null : locked(t('Sign in to play online')),
             ),
+          ),
+          this.homeStrip(
+            () => {
+              tab = 'garage';
+              renderTab();
+            },
+            () => {
+              tab = 'profile';
+              renderTab();
+            },
           ),
           err,
         );
@@ -448,10 +567,15 @@ export class App {
       else
         body.replaceChildren(
           signedIn
-            ? friendsPanel(
-                () => this.trackIndex,
-                (c) => void joinCode(c),
-                (c) => void watchIt(c),
+            ? h(
+                'div.mm-friends',
+                {},
+                friendsPanel(
+                  () => this.trackIndex,
+                  (c) => void joinCode(c),
+                  (c) => void watchIt(c),
+                ),
+                recentPlayersPanel(this.trackIndex),
               )
             : h(
                 'div.mm-panel.mm-gate',
@@ -473,8 +597,10 @@ export class App {
       });
     tabs.append(
       tabBtn('play', t('Play')),
+      tabBtn('garage', t('Garage')),
       tabBtn('online', t('Online')),
       tabBtn('friends', t('Friends')),
+      tabBtn('profile', t('Profile')),
       h('button', {
         text: t('Records'),
         onclick: () => document.body.append(recordsModal(this.trackIndex, this.cars?.cars ?? [], this.trackIndex.find((x) => x.default)?.id ?? '')),
@@ -482,7 +608,6 @@ export class App {
       h('button', { text: t('Settings'), onclick: () => this.openSettings() }),
     );
     // the driver: account chip (signed in) or the nickname for offline play and a sign-in button
-    const initials = (signedIn?.user.nick ?? settings.nickname ?? '?').slice(0, 2).toUpperCase() || '?';
     // the solo career on the driver chip: licence and Safety Rating, level (iRacing's licence badge, the games' level)
     // coins (off for now): the daily bonus, once a day (the games' login reward), and the coins on the chip
     // const daily = claimDaily();
@@ -499,19 +624,38 @@ export class App {
       ? h(
           'div.mm-profile',
           {},
-          h('button.mm-avatar', {
-            text: signedIn.user.num ? String(signedIn.user.num) : initials,
-            title: t('Driver profile'),
-            style: signedIn.user.colour ? `background:${signedIn.user.colour}` : '',
-            onclick: () => document.body.append(profileModal(() => this.showMenu())),
-          }),
+          h(
+            'button.mm-avatar.has-av',
+            {
+              title: t('Driver profile'),
+              'aria-label': t('Driver profile'),
+              onclick: () => {
+                tab = 'profile';
+                renderTab();
+              },
+            },
+            avatarEl(
+              {
+                avatar: signedIn.user.avatar ?? settings.profile.avatar,
+                colour: signedIn.user.colour ?? settings.profile.colour,
+                photo: settings.profile.photo,
+              },
+              40,
+            ),
+          ),
           careerBadge,
           // coinsBadge,
           h(
             'div.mm-who',
             {},
             h('b.mm-name', {}, flagImg(signedIn.user.country, 18), signedIn.user.abbr ? `${signedIn.user.nick} · ${signedIn.user.abbr}` : signedIn.user.nick),
-            h('button.mm-status.on.linkish', { text: t('Edit driver profile'), onclick: () => document.body.append(profileModal(() => this.showMenu())) }),
+            h('button.mm-status.on.linkish', {
+              text: t('Edit driver profile'),
+              onclick: () => {
+                tab = 'profile';
+                renderTab();
+              },
+            }),
           ),
           h('button.mm-profile-btn.ghost', {
             text: t('Sign out'),
@@ -524,7 +668,18 @@ export class App {
       : h(
           'div.mm-profile',
           {},
-          h('span.mm-avatar.off', { text: initials }),
+          h(
+            'button.mm-avatar.off.has-av',
+            {
+              title: t('Driver profile'),
+              'aria-label': t('Driver profile'),
+              onclick: () => {
+                tab = 'profile';
+                renderTab();
+              },
+            },
+            avatarEl({ avatar: settings.profile.avatar, colour: settings.profile.colour, photo: settings.profile.photo }, 40),
+          ),
           careerBadge,
           // coinsBadge,
           h('label.mm-who', { title: t('Your nickname for solo races') }, nick, h('span.mm-status', { text: t('Offline · solo only') })),
@@ -559,6 +714,66 @@ export class App {
     renderTab();
     if (!nick.value) nick.focus();
   }
+
+  /**
+   * Under the mode tiles, as the F1 and Gran Turismo home screens: your car (to change in the garage), your last
+   * session and where your career stands.
+   */
+  private homeStrip(openGarage: () => void, openProfile: () => void): HTMLElement {
+    const cars = this.cars?.cars ?? [];
+    const car = cars.find((c) => c.id === settings.garageCar && c.role !== 'safety') ?? null;
+    const last = loadHistory()[0] ?? null;
+    const career = loadCareer();
+    const lv = levelOf(career.xp);
+    const trackName = (id: string) => t(this.trackIndex.find((x) => x.id === id)?.name ?? id);
+    const kind = (k: string) => (k === 'race' ? t('Race') : k === 'qualifying' ? t('Qualifying') : t('Practice'));
+    return h(
+      'div.mm-strip',
+      {},
+      h(
+        'button.mm-card.mm-car',
+        { type: 'button', onclick: openGarage },
+        car ? h('img', { src: heroUrl(car), alt: '', draggable: 'false', onerror: (e: Event) => ((e.target as HTMLImageElement).src = car.thumbnail) }) : null,
+        h(
+          'span.mm-card-text',
+          {},
+          h('small', { text: t('Your car') }),
+          h('b', { text: car ? car.name : t('Choose your car') }),
+          h('em', { text: car ? t('Change in the garage') : t('Open the garage') }),
+        ),
+      ),
+      h(
+        'button.mm-card',
+        { type: 'button', onclick: openProfile },
+        h(
+          'span.mm-card-text',
+          {},
+          h('small', { text: t('Last session') }),
+          last
+            ? h('b', { text: `${last.position > 0 ? `P${last.position}` : last.kind === 'race' ? 'DNF' : '—'} · ${trackName(last.trackId)}` })
+            : h('b', { text: t('No sessions yet') }),
+          h('em', { text: last ? `${kind(last.kind)}${last.bestLapMs ? ` · ${t('best')} ${fmtTime(last.bestLapMs)}` : ''}` : t('Your results show here') }),
+        ),
+      ),
+      h(
+        'button.mm-card',
+        { type: 'button', onclick: openProfile },
+        h(
+          'span.mm-card-text',
+          {},
+          h('small', { text: t('Driver') }),
+          h('b', { text: `${t('Level {n}', { n: lv.level })} · ${career.licence} ${career.sr.toFixed(2)}` }),
+          h('span.mm-xp', {}, h('i', { style: `width:${((lv.into / lv.need) * 100).toFixed(1)}%` })),
+          h('em', { text: t('{w} wins · {p} podiums · {r} starts', { w: career.wins, p: career.podiums, r: career.races }) }),
+        ),
+      ),
+    );
+  }
+
+  /** The main menu's open tab (kept when the menu is drawn again). */
+  private menuTab: 'play' | 'garage' | 'profile' | 'online' | 'friends' = 'play';
+  /** The garage's car, brand filter and search, kept across redraws (menu and lobby). */
+  private garageState = { shown: null as string | null, brand: '', query: '' };
 
   /** Watching (spectator connection): no car, no lobby controls. */
   private spectating = false;
@@ -601,6 +816,58 @@ export class App {
     clearTimeout(this.fillTimer);
     this.session?.dispose();
     this.session = null;
+    this.chatBox = null;
+  }
+
+  /**
+   * The room's chat (the lobby's sidebar, as the online racers' lobbies have it): made once a connection and moved
+   * into each new drawing of the lobby, so a line being typed survives the lobby redrawing as players come and go.
+   */
+  private chatBox: { el: HTMLElement; list: HTMLElement; input: HTMLInputElement } | null = null;
+  private chat(): HTMLElement {
+    if (this.chatBox) return this.chatBox.el;
+    const list = h('div.chat-list', { 'aria-live': 'polite' }, h('p.chat-hint', { text: t('Say hello to the room.') }));
+    const input = h('input.chat-input', {
+      type: 'text',
+      maxlength: CHAT_MAX,
+      placeholder: t('Message the room'),
+      spellcheck: 'true',
+      'aria-label': t('Message the room'),
+    });
+    const send = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      this.conn?.sendJson({ t: 'chat', text });
+      input.value = '';
+    };
+    // typing must not reach the game's keys (the lobby has none, but Esc / Enter elsewhere)
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') send();
+    });
+    const el = h(
+      'section.lobby-chat',
+      {},
+      h('h3', { html: `${ICONS.chat} ${t('Chat')}` }),
+      list,
+      h('div.chat-row', {}, input, h('button.chat-send', { type: 'button', html: ICONS.send, title: t('Send'), 'aria-label': t('Send'), onclick: send })),
+    );
+    this.chatBox = { el, list, input };
+    return el;
+  }
+
+  private onChat(m: Extract<ServerMsg, { t: 'chat' }>): void {
+    const box = this.chatBox;
+    const mine = m.from === this.me;
+    if (box) {
+      box.list.querySelector('.chat-hint')?.remove();
+      const time = new Date(m.at).toLocaleTimeString(getLang(), { hour: '2-digit', minute: '2-digit' });
+      box.list.append(h(`p.chat-line${mine ? '.me' : ''}`, {}, h('b', { text: m.nick }), h('span', { text: m.text }), h('small', { text: time })));
+      while (box.list.childElementCount > 80) box.list.firstElementChild?.remove();
+      box.list.scrollTop = box.list.scrollHeight;
+    }
+    // not looking at the lobby (in a race, the results): the line as a toast
+    if (!mine && this.screen !== 'lobby') toast(`${m.nick}: ${m.text}`, 5000);
   }
 
   /* ------------------------------------------------------------- messages --- */
@@ -620,11 +887,15 @@ export class App {
       case 'room':
         this.room = m.room;
         this.autoFill();
+        this.autoCar();
         if (m.room.phase === 'briefing' && (this.screen === 'lobby' || this.screen === 'briefing')) this.renderBriefing();
         else if (this.screen === 'briefing') this.showLobby();
         else if (this.screen === 'lobby') this.renderLobby();
         else if (this.screen === 'watch') this.renderWatch();
         this.session?.updateRoom(m.room);
+        break;
+      case 'chat':
+        this.onChat(m);
         break;
       case 'carLock':
         if (!m.ok && m.carId) {
@@ -661,6 +932,19 @@ export class App {
    * online games fill a lobby that is taking too long, up to 7 of them or the free cars. A player joining later still
    * can (a bot gives its place up only if the host removes it).
    */
+  /** The garage car, picked for you on arriving in a lobby (once a room: changing it there is yours to do). */
+  private autoCarFor = '';
+  private autoCar(): void {
+    const r = this.room;
+    const mine = r?.players.find((p) => p.id === this.me);
+    const car = settings.garageCar;
+    if (!r || !mine || mine.carId || this.spectating || !car || this.autoCarFor === r.code) return;
+    if (r.phase !== 'lobby' && !mine.waiting) return;
+    if (!(this.cars?.cars ?? []).some((c) => c.id === car && c.role !== 'safety')) return;
+    this.autoCarFor = r.code;
+    this.conn?.sendJson({ t: 'selectCar', carId: car });
+  }
+
   private autoFill(): void {
     const r = this.room;
     const online = !!this.conn && !isLocalCode(r?.code ?? this.conn.code);
@@ -983,7 +1267,7 @@ export class App {
     const field = (label: string, ctrl: HTMLElement) => h('div.lb-field', {}, h('h4', { text: label }), ctrl);
 
     // --- the steps
-    const ruleItems: [keyof RaceRules, string, string][] = [
+    const ruleItems: [RuleSwitch, string, string][] = [
       ['contact', t('Car contact'), t('Cars collide and take damage (off: ghost cars that pass through each other)')],
       ['pitWindow', t('Mandatory pit stop'), t('Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint')],
       ['fuel', t('Fuel and refuelling'), t('Engines burn fuel, you choose your fuel load, stops can refuel (endurance)')],
@@ -994,7 +1278,11 @@ export class App {
       ['circuit', t('Circuit'), t(track?.name ?? '')],
       ['conditions', t('Conditions'), `${t(WEATHER_LABEL[plan.kind])} · ${formatHour(plan.startHour)}`],
       ['session', t('Session'), raceLabel(raceKey)],
-      ['rules', t('Rules'), rulesOn ? t('{n} of {max} on', { n: rulesOn, max: ruleItems.length }) : t('Ghost cars')],
+      [
+        'rules',
+        t('Rules'),
+        `${t('Bots')} ${t(botLevelName(rules.botLevel ?? DEFAULT_BOT_LEVEL))} · ${rulesOn ? t('{n} of {max} on', { n: rulesOn, max: ruleItems.length }) : t('Ghost cars')}`,
+      ],
       ['car', t('Car'), carName ?? t('Pick a car')],
     ];
     const at = steps.findIndex(([k]) => k === step);
@@ -1198,9 +1486,14 @@ export class App {
       );
     } else if (step === 'rules') {
       pane = h(
-        'div.lb-toggles',
+        'div.lb-rules',
         {},
-        ...ruleItems.map(([k, label, help]) => toggle(rules[k], label, help, edit ? (v) => this.conn?.sendJson({ t: 'setRules', rules: { [k]: v } }) : null)),
+        this.botLevelPicker(room, edit),
+        h(
+          'div.lb-toggles',
+          {},
+          ...ruleItems.map(([k, label, help]) => toggle(rules[k], label, help, edit ? (v) => this.conn?.sendJson({ t: 'setRules', rules: { [k]: v } }) : null)),
+        ),
       );
     } else pane = carPane;
 
@@ -1227,10 +1520,59 @@ export class App {
     return [nav, h(`div.lb-pane.lb-pane-${step}`, {}, pane), foot];
   }
 
+  /**
+   * Bot level, as the sims set their AI (Le Mans Ultimate's strength bands, ACC's AI strength): a named band to tap,
+   * and a fine slider in per cent of the pace the car can do.
+   */
+  private botLevelPicker(room: RoomSnapshot, edit: boolean): HTMLElement {
+    const lv = room.rules?.botLevel ?? DEFAULT_BOT_LEVEL;
+    const set = (v: number) => this.conn?.sendJson({ t: 'setRules', rules: { botLevel: Math.round(Math.max(BOT_LEVEL_MIN, Math.min(BOT_LEVEL_MAX, v))) } });
+    const value = h('b.bl-value', { text: `${lv}%` });
+    const name = h('span.bl-name', { text: t(botLevelName(lv)) });
+    const slider = h('input.bl-slider', {
+      type: 'range',
+      min: BOT_LEVEL_MIN,
+      max: BOT_LEVEL_MAX,
+      step: 1,
+      value: lv,
+      disabled: !edit,
+      'aria-label': t('Bot level'),
+      oninput: (e: Event) => {
+        const v = Number((e.target as HTMLInputElement).value);
+        value.textContent = `${v}%`;
+        name.textContent = t(botLevelName(v));
+      },
+      onchange: (e: Event) => set(Number((e.target as HTMLInputElement).value)),
+    });
+    return h(
+      'div.bot-level',
+      {},
+      h(
+        'div.bl-head',
+        {},
+        h('div', {}, h('h4', { text: t('Bot level') }), h('small.muted', { text: t('How fast the AI drivers are: a share of what the car can do') })),
+        h('div.bl-readout', {}, name, value),
+      ),
+      h(
+        'div.bl-bands',
+        {},
+        ...BOT_LEVELS.map((b) =>
+          h(
+            `button.bl-band${botLevelName(lv) === b.name ? '.on' : ''}`,
+            { type: 'button', disabled: !edit, onclick: () => set(b.pct) },
+            h('b', { text: t(b.name) }),
+            h('small', { text: `${b.pct}%` }),
+          ),
+        ),
+      ),
+      slider,
+    );
+  }
+
   /** The host's rules (switches for the host in the lobby, a summary for everyone else). */
   private rulesPanel(room: RoomSnapshot, edit: boolean): HTMLElement {
     const rules = room.rules ?? { contact: false, pitWindow: false, fuel: false, raceControl: false };
-    const items: [keyof RaceRules, string, string][] = [
+    const items: [RuleSwitch, string, string][] = [
       ['contact', t('Car contact'), t('Cars collide and take damage (off: ghost cars that pass through each other)')],
       ['pitWindow', t('Mandatory pit stop'), t('Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint')],
       ['fuel', t('Fuel and refuelling'), t('Engines burn fuel, you choose your fuel load, stops can refuel (endurance)')],
@@ -1238,7 +1580,8 @@ export class App {
     ];
     if (!edit) {
       const on = items.filter(([k]) => rules[k]).map(([, label]) => label);
-      return h('b', { text: on.length ? on.join(' · ') : t('Ghost cars, no fuel, no race control') });
+      const lv = rules.botLevel ?? DEFAULT_BOT_LEVEL;
+      return h('b', { text: `${t('Bots')}: ${t(botLevelName(lv))} ${lv}% · ${on.length ? on.join(' · ') : t('Ghost cars, no fuel, no race control')}` });
     }
     return h(
       'div.rules',
@@ -1446,7 +1789,6 @@ export class App {
     this.setWaitReel(this.screen === 'lobby' && mine?.waiting ? room.conditions.trackId : null);
     // the safety car is race control's, nobody's to drive
     const cars = (this.cars?.cars ?? []).filter((c) => c.role !== 'safety');
-    const browsing = cars.find((c) => c.id === (this.browsing ?? mine?.carId)) ?? cars.find((c) => c.id === mine?.carId) ?? null;
     const isHost = !!mine?.host;
     // the room shows everyone's starting tyres: tell it ours (saved from last time)
     if (mine && (room.phase === 'lobby' || room.phase === 'briefing') && mine.tyre !== settings.carSetup.tyre && this.tyreSentFor !== room.code) {
@@ -1455,7 +1797,6 @@ export class App {
     }
     const connected = room.players.filter((p) => p.connected);
     const allReady = connected.length > 0 && connected.every((p) => p.carId && p.ready);
-    const nameOf = (id: string) => room.players.find((p) => p.id === id)?.nick ?? '?';
 
     const copy = () => {
       void navigator.clipboard?.writeText(room.code).then(
@@ -1486,111 +1827,28 @@ export class App {
         ),
       ),
     );
-    const grid = h(
-      'div.car-grid',
-      {},
-      ...cars.map((c) => {
-        const owner = room.carLocks[c.id];
-        const takenBy = owner && owner !== this.me ? nameOf(owner) : null;
-        const sel = mine?.carId === c.id;
-        // coins (off for now, kept for later): the garage's version of the card, prices and buying
-        // // the garage (career.ts): a car not bought yet shows its price; picking it offers to buy it
-        // const owned = ownsCar(c.id);
-        // const price = carPrice(c);
-        // return h(
-        //   `button.car-card${sel ? '.selected' : ''}${takenBy ? '.taken' : ''}${browsing?.id === c.id ? '.browsing' : ''}${owned ? '' : '.locked'}`,
-        //   {
-        //     disabled: !!takenBy || room.phase !== 'lobby',
-        //     title: takenBy ? t('Taken by {name}', { name: takenBy }) : owned ? c.name : t('{car}: {n} coins', { car: c.name, n: price.toLocaleString() }),
-        //     onmouseenter: () => this.previewSoon(c),
-        //     onmouseleave: () => this.previewSoon(browsing),
-        //     onclick: () => {
-        //       this.browsing = c.id;
-        //       if (!ownsCar(c.id)) {
-        //         const have = loadCareer().coins;
-        //         if (have < price) {
-        //           toast(
-        //             t('{car} costs {n} coins: you have {have}. Race to earn more.', { car: c.name, n: price.toLocaleString(), have: have.toLocaleString() }),
-        //             4500,
-        //           );
-        //           this.renderLobby();
-        //           return;
-        //         }
-        //         if (!confirm(t('Buy the {car} for {n} coins? (you have {have})', { car: c.name, n: price.toLocaleString(), have: have.toLocaleString() })))
-        //           return;
-        //         buyCar(c);
-        //         toast(t('{car} is yours!', { car: c.name }), 3500);
-        //       }
-        //       this.conn?.sendJson({ t: 'selectCar', carId: c.id });
-        //     },
-        //   },
-        //   h('img', { src: c.thumbnail, alt: '', loading: 'lazy', draggable: 'false' }),
-        //   h('span.cname', { text: c.name }),
-        //   h('span.cat', { text: c.category }),
-        //   takenBy ? h('span.owner', { text: takenBy }) : null,
-        //   owned ? null : h('span.price', { html: `${ICONS.coin}${price.toLocaleString()}` }),
-        // );
-        return h(
-          `button.car-card${sel ? '.selected' : ''}${takenBy ? '.taken' : ''}${browsing?.id === c.id ? '.browsing' : ''}`,
-          {
-            disabled: !!takenBy || room.phase !== 'lobby',
-            title: takenBy ? t('Taken by {name}', { name: takenBy }) : c.name,
-            onmouseenter: () => this.previewSoon(c),
-            onmouseleave: () => this.previewSoon(browsing),
-            onclick: () => {
-              this.browsing = c.id;
-              this.conn?.sendJson({ t: 'selectCar', carId: c.id });
-            },
-          },
-          h('img', { src: c.thumbnail, alt: '', loading: 'lazy', draggable: 'false' }),
-          h('span.cname', { text: c.name }),
-          h('span.cat', { text: c.category }),
-          takenBy ? h('span.owner', { text: takenBy }) : null,
-        );
-      }),
-    );
-    const spec = browsing
-      ? h(
-          'div.spec',
-          {},
-          h('img.hero-car', {
-            src: heroUrl(browsing),
-            alt: '',
-            draggable: 'false',
-            onerror: (e: Event) => ((e.target as HTMLImageElement).src = browsing.thumbnail),
-          }),
-          h('h2', { text: browsing.name }),
-          h('div.spec-sub', { text: `${browsing.manufacturer}${browsing.year ? ` · ${browsing.year}` : ''} · ${browsing.category}` }),
-          h(
-            'dl',
-            {},
-            h('dt', { text: t('Power') }),
-            h('dd', { text: t('{n} hp', { n: hp(browsing.specs.powerKw) }) }),
-            h('dt', { text: t('Weight (with driver)') }),
-            h('dd', { text: `${browsing.specs.massKg} kg` }),
-            h('dt', { text: t('Drivetrain') }),
-            h('dd', { text: browsing.specs.drivetrain }),
-            h('dt', { text: t('Top speed') }),
-            h('dd', { text: `${browsing.specs.topSpeedKmh} km/h` }),
-            h('dt', { text: t('Gears') }),
-            h('dd', { text: String(browsing.specs.gears.length) }),
-            h('dt', { text: t('Steering lock') }),
-            h('dd', { text: `${steeringLockDeg(browsing.id)}°` }),
-            h('dt', { text: t('Power-to-weight') }),
-            h('dd', { text: `${(browsing.specs.massKg / hp(browsing.specs.powerKw)).toFixed(2)} kg/hp` }),
-            ...(browsing.info
-              ? [
-                  h('dt', { text: t('Engine') }),
-                  h('dd', { text: t(browsing.info.engine) }),
-                  h('dt', { text: t('Gearbox') }),
-                  h('dd', { text: t(browsing.info.gearbox) }),
-                  h('dt', { text: t('Team') }),
-                  h('dd', { text: t(browsing.info.team) }),
-                ]
-              : []),
-          ),
-        )
-      : h('div.spec', {}, h('h2', { text: t('Pick a car') }));
+    // the garage, in the lobby's car step: any car (several drivers may race the same one), its numbers against
+    // the field, the others on each car named on it
+    const others: Record<string, string[]> = {};
+    for (const p of room.players) if (p.carId && p.id !== this.me) (others[p.carId] ??= []).push(p.nick);
+    const carPicker = garagePicker(cars, {
+      current: mine?.carId ?? null,
+      kicker: t('Car'),
+      title: mine?.carId ? t('Your car') : t('Pick a car'),
+      cta: t('Select car'),
+      others,
+      state: this.garageState,
+      disabled: room.phase !== 'lobby' && !mine?.waiting,
+      onBrowse: (c) => {
+        this.browsing = c.id;
+      },
+      onPick: (id) => {
+        this.browsing = id;
+        settings.garageCar = id;
+        saveSettings(settings);
+        this.conn?.sendJson({ t: 'selectCar', carId: id });
+      },
+    });
     const readyBtn = h(`button${mine?.ready ? '.on' : ''}`, {
       text: t('Ready'),
       disabled: !mine?.carId || room.phase !== 'lobby' || mine.waiting,
@@ -1622,6 +1880,17 @@ export class App {
                 h('label', { text: t('ROOM CODE') }),
                 h('div.code', { text: room.code }),
                 h('button.ghost', { text: t('Copy'), onclick: copy }),
+                h('button.ghost.invite', {
+                  html: `${ICONS.link} ${t('Invite link')}`,
+                  title: t('A link that opens the game with this room code filled in'),
+                  onclick: () => {
+                    const url = `${location.origin}${location.pathname}?join=${room.code}`;
+                    void navigator.clipboard?.writeText(url).then(
+                      () => toast(t('Invite link copied: send it to your friends')),
+                      () => toast(url, 8000),
+                    );
+                  },
+                }),
               ),
         h('h3', { text: t('Drivers {n}/{max}', { n: room.players.length, max: MAX_PLAYERS }) }),
         players,
@@ -1633,6 +1902,7 @@ export class App {
               onclick: () => this.conn?.sendJson({ t: 'addBot' }),
             })
           : null,
+        this.conn && room.code !== LOCAL_CODE ? this.chat() : null,
         h('div.lobby-actions', {}, readyBtn, startBtn),
         h(
           'div.lobby-foot',
@@ -1645,16 +1915,19 @@ export class App {
         'main.lobby-main.lb',
         {},
         banner,
-        ...this.lobbySetup(room, isHost, h('div.lb-car', {}, spec, grid), mine?.carId ? (cars.find((c) => c.id === mine.carId)?.name ?? null) : null),
+        ...this.lobbySetup(room, isHost, h('div.lb-car', {}, carPicker), mine?.carId ? (cars.find((c) => c.id === mine.carId)?.name ?? null) : null),
       ),
     );
-    // keep scroll position of the car grid across re-renders
-    const oldGrid = this.lobbyEl?.querySelector('.car-grid');
+    // keep scroll position of the car list across re-renders
+    const oldGrid = this.lobbyEl?.querySelector('.gr-list');
     const scroll = oldGrid ? oldGrid.scrollTop : 0;
+    const typing = document.activeElement === this.chatBox?.input;
     this.setUi(el);
     this.lobbyEl = el;
-    const ng = el.querySelector('.car-grid');
-    if (ng) ng.scrollTop = scroll;
+    if (typing) this.chatBox?.input.focus();
+    if (this.chatBox) this.chatBox.list.scrollTop = this.chatBox.list.scrollHeight;
+    const ng = el.querySelector('.gr-list');
+    if (ng && oldGrid) requestAnimationFrame(() => (ng.scrollTop = scroll));
   }
 
   private roomsTimer = 0;
@@ -1809,17 +2082,6 @@ export class App {
     );
     this.setUi(el);
     this.lobbyEl = null;
-  }
-
-  private hoverTimer = 0;
-  /** Hover previews load full-detail models, so wait until the pointer rests on a card. */
-  private previewSoon(entry: CarEntry | null): void {
-    clearTimeout(this.hoverTimer);
-    // studio renders swap instantly (no 3D model to load)
-    this.hoverTimer = window.setTimeout(() => {
-      const img = this.lobbyEl?.querySelector<HTMLImageElement>('img.hero-car');
-      if (img && entry) img.src = heroUrl(entry);
-    }, 60);
   }
 
   private leave(): void {
@@ -2072,8 +2334,31 @@ export class App {
         position: ok && mine ? mine.position : 0,
         field: m.rows.length,
         start: (this.session?.race.grid.indexOf(this.me) ?? -1) + 1,
-        difficulty: settings.ai.difficulty,
+        difficulty: (this.session?.race.rules?.botLevel ?? DEFAULT_BOT_LEVEL) / 93,
       });
+    }
+    // the profile's history (every session, solo or online) and the people raced against (to add them as friends)
+    if (!this.spectating) {
+      const mine = m.rows.find((r) => r.id === this.me);
+      const trackId = this.session?.race.trackId ?? this.pendingRace?.trackId ?? '';
+      if (mine && trackId) {
+        addHistory({
+          at: Date.now(),
+          kind: m.kind === 'race' ? 'race' : m.kind === 'practice' ? 'practice' : 'qualifying',
+          trackId,
+          carId: mine.carId,
+          position: m.kind === 'race' && (mine.dnf || mine.totalMs === null) ? 0 : mine.position,
+          field: m.rows.length,
+          bestLapMs: mine.bestLapMs,
+          online: !!this.conn && !isLocalCode(this.conn.code),
+        });
+        const humans = (this.room?.players ?? []).filter((p) => !p.bot && p.id !== this.me);
+        if (humans.length)
+          addRecentPlayers(
+            humans.map((p) => ({ nick: p.nick, country: p.country ?? null })),
+            trackId,
+          );
+      }
     }
     this.session?.dispose();
     this.session = null;
@@ -2428,6 +2713,18 @@ export class App {
   private async startChampionshipRound(c: Championship, nick: string): Promise<void> {
     const trackId = c.rounds[c.done];
     if (!trackId) return;
+    // the car for this round first, as for every session
+    const list = (this.cars?.cars ?? []).filter((x) => x.role !== 'safety');
+    if (list.length) {
+      const id = await garageModal(
+        list,
+        settings.garageCar && list.some((x) => x.id === settings.garageCar) ? settings.garageCar : null,
+        t('Race with this car'),
+      );
+      if (!id) return;
+      settings.garageCar = id;
+      saveSettings(settings);
+    }
     await this.join(await createLocalRoom(), nick);
     const send = (m: Parameters<Connection['sendJson']>[0]) => this.conn?.sendJson(m);
     send({ t: 'setConditions', trackId });

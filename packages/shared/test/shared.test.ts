@@ -613,3 +613,23 @@ describe('temperature', () => {
     expect(zv.airDensity).toBeLessThan(1.25);
   });
 });
+
+describe('lobby chat and bot level messages', () => {
+  it('cleans chat lines: no control characters or line breaks, trimmed, capped', () => {
+    expect(parseClientMsg(JSON.stringify({ t: 'chat', text: '  hi\n\tthere\u0007 ' }))).toEqual({ t: 'chat', text: 'hi there' });
+    expect(parseClientMsg(JSON.stringify({ t: 'chat', text: '   ' }))).toBeNull();
+    expect(parseClientMsg(JSON.stringify({ t: 'chat', text: 42 }))).toBeNull();
+    const long = parseClientMsg(JSON.stringify({ t: 'chat', text: 'x'.repeat(500) }));
+    expect(long && long.t === 'chat' ? long.text.length : 0).toBe(200);
+  });
+
+  it('accepts a bot level only as a whole per cent within the range', () => {
+    expect(parseClientMsg(JSON.stringify({ t: 'setRules', rules: { botLevel: 97 } }))).toEqual({ t: 'setRules', rules: { botLevel: 97 } });
+    expect(parseClientMsg(JSON.stringify({ t: 'setRules', rules: { botLevel: 120 } }))).toBeNull();
+    expect(parseClientMsg(JSON.stringify({ t: 'setRules', rules: { botLevel: 95.5 } }))).toBeNull();
+    expect(parseClientMsg(JSON.stringify({ t: 'setRules', rules: { contact: true, botLevel: 80 } }))).toEqual({
+      t: 'setRules',
+      rules: { contact: true, botLevel: 80 },
+    });
+  });
+});

@@ -145,12 +145,7 @@ export class Hud {
         // the minimap under the lap times (the corner by the dial is the driver's)
         h('div.hud-br', {}, this.map, this.circuitMap.el),
       ),
-      h(
-        'div.hud-bc',
-        {},
-        this.dial.el,
-        this.overlays.inputs,
-      ),
+      h('div.hud-bc', {}, this.dial.el, this.overlays.inputs),
       this.overlays.spotL,
       this.overlays.spotR,
       this.overlays.mirrorDelta,

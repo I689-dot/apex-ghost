@@ -42,7 +42,7 @@ if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setC
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', TIME]);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < 3; i++) {
   await page.click('button.add-bot');
   await page.waitForTimeout(250);

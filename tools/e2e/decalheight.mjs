@@ -25,7 +25,7 @@ await page.click('button.solo');
 await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', TRACK]);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(300);
 await page.click('button:has-text("Start race")');

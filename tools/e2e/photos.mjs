@@ -49,6 +49,7 @@ await page.addInitScript(() => {
 await page.goto(URL);
 await page.waitForSelector('.menu', { timeout: 30_000 });
 await page.click('button:has-text("Create room")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', TRACK]);
@@ -58,14 +59,14 @@ await page.waitForTimeout(400);
 {
   // the car cards exist once the car step is open
   await page.click('.lb-step >> nth=4');
-  await page.waitForSelector('.car-card');
-  const names = await page.evaluate(() => [...document.querySelectorAll('.car-card')].map((c) => c.textContent ?? ''));
+  await page.waitForSelector('.gr-row');
+  const names = await page.evaluate(() => [...document.querySelectorAll('.gr-row')].map((c) => c.textContent ?? ''));
   const i = Math.max(
     0,
     names.findIndex((n) => n.toLowerCase().includes(CAR.toLowerCase())),
   );
   console.log(`car: ${names[i]?.trim().slice(0, 40)}`);
-  await page.click(`.car-card >> nth=${i}`);
+  await page.dblclick(`.gr-row >> nth=${i}`);
 }
 await page.waitForTimeout(600);
 for (let i = 0; i < 7; i++) {

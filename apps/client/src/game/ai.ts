@@ -228,6 +228,15 @@ export class AiDriver {
   private laneNow = 0;
   private roomy = 1;
   /**
+   * Room beside it (m it may move its path left / right of where it is now), set each step by the traffic logic
+   * (session.followCap): a car alongside is a wall a car's width away, and a faster car coming up on one side is
+   * left its side (the racing rule: no moving across into a car that is already there, no squeezing it off).
+   */
+  roomL = Infinity;
+  roomR = Infinity;
+  /** How far the room beside it pushed it off its line (m): it lifts a little for the tighter line. */
+  private squeeze = 0;
+  /**
    * Pit stop asked for by the session: stop in the box, or straight through (a drive-through). The bot brakes for
    * the entry, follows the lane's centre line at the limiter, stops at `pitBox` (a lane point) until pitServed(),
    * and merges back onto its racing line after the exit.
@@ -408,7 +417,21 @@ export class AiDriver {
     const laneStep = 0.04 * Math.max(speed, 5) * dt;
     this.laneNow += clamp(laneTarget - this.laneNow, -laneStep, laneStep);
     const lane = this.laneNow;
-    const extra = clamp(lineOff + lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2) - lineOff;
+    let want = clamp(lineOff + lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2);
+    if (this.roomL < Infinity || this.roomR < Infinity) {
+      // where the car is across the road now (+ = left of the centreline), and the room the cars beside leave
+      const iN = (i + 1) % n;
+      let ix = cl[iN * 3] - cl[i * 3];
+      let iz = cl[iN * 3 + 2] - cl[i * 3 + 2];
+      const il = Math.hypot(ix, iz) || 1;
+      ix /= il;
+      iz /= il;
+      const myOff = (p.x - cl[i * 3]) * iz - (p.z - cl[i * 3 + 2]) * ix;
+      const held = clamp(want, myOff - this.roomR, myOff + this.roomL);
+      this.squeeze = Math.abs(held - want);
+      want = clamp(held, -t.widthR[j] + 0.9, t.widthL[j] - 0.9);
+    } else this.squeeze = 0;
+    const extra = want - lineOff;
     this.roomy = t.widthL[j] - lineOff > t.widthR[j] + lineOff ? 1 : -1;
     let px = L.x[j] + (L.x[j2] - L.x[j]) * f + tz * extra;
     let pz = L.z[j] + (L.z[j2] - L.z[j]) * f - tx * extra;
@@ -460,6 +483,9 @@ export class AiDriver {
     let vt = this.profile[indexAt(t, s + 2 + speed * 0.12)];
     // in a car's dirty air (less downforce: Vehicle.wake) corners must be taken slower; straights keep the tow
     if (vt < this.limits.vMax * 0.9) vt *= 1 - 0.35 * (1 - v.wake.downforce);
+    // squeezed off its line by a car alongside: a tighter or wider line than the plan, so a little slower (a
+    // driver side by side lifts rather than turning into the other car)
+    if (this.squeeze > 0.3 && vt < this.limits.vMax * 0.95) vt *= 1 - Math.min(0.1, 0.04 * this.squeeze);
     vt = Math.min(vt, speedCap);
     if (pit) vt = Math.min(vt, pit.v);
     this.lastS = s;

@@ -44,7 +44,7 @@ await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (WEATHER) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', WEATHER]);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');
   await page.waitForTimeout(300);

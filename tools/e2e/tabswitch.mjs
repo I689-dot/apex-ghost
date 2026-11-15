@@ -40,10 +40,11 @@ const mk = async (nick) => {
 };
 const host = await mk('Hosty');
 await host.click('button:has-text("Create room")');
+await host.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await host.waitForSelector('.lb-steps');
 await host.check('.switch-row input');
 await host.click('.lb-step >> nth=4');
-await host.click('.car-card >> nth=0');
+await host.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < 2; i++) {
   await host.click('button.add-bot');
   await host.waitForTimeout(250);

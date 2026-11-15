@@ -119,7 +119,7 @@ export async function refreshProfile(): Promise<void> {
 }
 
 /** Saves the driver profile (country, number, three-letter code, helmet colour; null clears a field). */
-export async function saveProfile(p: Pick<AccountUser, 'country' | 'num' | 'abbr' | 'colour'>): Promise<void> {
+export async function saveProfile(p: Pick<AccountUser, 'country' | 'num' | 'abbr' | 'colour' | 'avatar'>): Promise<void> {
   const { user } = await api<{ user: AccountUser }>('account/profile', p);
   if (current) save({ ...current, user });
 }
