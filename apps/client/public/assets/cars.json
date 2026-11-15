@@ -1201,7 +1201,7 @@
   },
   {
    "id": "ferrari_296_gt3_verstappen",
-   "name": "Ferrari 296 GT3 (Verstappen.com Racing)",
+   "name": "Ferrari 296 GT3",
    "manufacturer": "Ferrari",
    "year": 2024,
    "category": "GT3",
@@ -1372,7 +1372,7 @@
    "info": {
     "engine": "3.0 L twin-turbo 120° V6",
     "gearbox": "6-speed sequential",
-    "team": "Verstappen.com Racing (GT World Challenge Europe)"
+    "team": "Verstappen Racing (GT World Challenge Europe)"
    },
    "role": null
   },

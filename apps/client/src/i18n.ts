@@ -867,7 +867,7 @@ const ES: Record<string, string> = {
   '5.5 L flat-plane V8, naturally aspirated (LT6.R)': 'V8 de cigüeñal plano de 5,5 L, atmosférico (LT6.R)',
   'AWA #13 (IMSA GTD Pro, WEC LMGT3): Orlando livery': 'AWA #13 (IMSA GTD Pro, WEC LMGT3): decoración Orlando',
   '3.0 L twin-turbo 120° V6': 'V6 a 120° biturbo de 3,0 L',
-  'Verstappen.com Racing (GT World Challenge Europe)': 'Verstappen.com Racing (GT World Challenge Europe)',
+  'Verstappen Racing (GT World Challenge Europe)': 'Verstappen Racing (GT World Challenge Europe)',
   '5.4 L V8, naturally aspirated (Coyote)': 'V8 de 5,4 L, atmosférico (Coyote)',
   '6-speed Xtrac transaxle': 'Transeje Xtrac de 6 marchas',
   'Ford Performance (IMSA GTD Pro, WEC LMGT3, GT World Challenge)': 'Ford Performance (IMSA GTD Pro, WEC LMGT3, GT World Challenge)',
