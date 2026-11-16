@@ -126,6 +126,24 @@ func shift_at(i: int) -> float:
 			return sh[k]
 	return 0.0
 
+## The garage fronts along the boxes: [points, away directions] per run of boxes, where measure_boxes found the wall
+## (a box's outer edge GARAGE_GAP in front of it); away points from the lane into the garages. Empty before then.
+func garage_front() -> Array:
+	var sh = _geo.boxShift
+	if sh == null:
+		return []
+	var pts: Array = lane.points
+	var line := PackedVector3Array()
+	var dirs := PackedVector3Array()
+	var bx := boxes()
+	for k in bx.size():
+		var front: float = float(sh[k]) + HALF + GARAGE_GAP
+		for i in range(bx[k][0], bx[k][1] + 1):
+			var aw := away_at(i)
+			line.append(Vector3(pts[i][0] + aw.x * front, pts[i][1], pts[i][2] + aw.y * front))
+			dirs.append(Vector3(aw.x, 0.0, aw.y))
+	return [[line, dirs]] if line.size() > 1 else []
+
 ## Unit vector (x, z) across the lane at point i, away from the circuit.
 func away_at(i: int) -> Vector2:
 	return _geo.away[clampi(i, 0, _geo.away.size() - 1)]

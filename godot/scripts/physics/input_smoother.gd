@@ -23,7 +23,7 @@ func update(_dt: float, kb: KeyboardInput, _speed_ms: float, reverse: bool) -> C
 	var left := kb.held("steerLeft")
 	var right := kb.held("steerRight")
 	out.steer = 0.0 if left == right else (1.0 if left else -1.0)
-	for src in [InputState.touch, InputState.pad]:
+	for src in [InputState.touch, InputState.pad, InputState.rig]:
 		if not src.active:
 			continue
 		var thr := clampf(src.throttle, 0.0, 1.0)
@@ -33,14 +33,15 @@ func update(_dt: float, kb: KeyboardInput, _speed_ms: float, reverse: bool) -> C
 		out.handbrake = maxf(out.handbrake, clampf(src.handbrake, 0.0, 1.0))
 		# a wheel: its angle (a fraction of half its rotation) scaled to the car's lock (soft lock), 1:1
 		var st: float = src.steer
-		if src == InputState.pad and InputState.pad.wheel:
+		if (src == InputState.pad and InputState.pad.wheel) or src == InputState.rig:
 			st = src.steer * float(s.wheel.rotationDeg) / InputState.wheel.carLockDeg
 		if out.steer == 0.0:
 			out.steer = clampf(st, -1.0, 1.0)
 	# a wheel drives the steering directly, as a real one: no keyboard or pad filters
-	out.digital = not (InputState.pad.active and InputState.pad.wheel and not left and not right)
+	var wheel_on: bool = (InputState.pad.active and InputState.pad.wheel) or InputState.rig.active
+	out.digital = not (wheel_on and not left and not right)
 	# a key held for steering wins; otherwise a connected controller makes the filters proportional
-	out.analog = InputState.pad.active and not left and not right and not (InputState.touch.active and InputState.touch.steer != 0.0)
+	out.analog = (InputState.pad.active or InputState.rig.active) and not left and not right and not (InputState.touch.active and InputState.touch.steer != 0.0)
 	return out
 
 func reset() -> void:

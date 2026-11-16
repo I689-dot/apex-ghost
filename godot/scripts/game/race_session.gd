@@ -98,6 +98,9 @@ var me: String
 var cars_file: Dictionary
 var spectator := false
 var contact := false
+var side_screens: SideScreens
+## The H-pattern lever's last gear (DeviceBindings), -99 none.
+var _h_gear := -99
 
 var track: TrackScene
 var track_data: Dictionary
@@ -505,6 +508,11 @@ func hud_node() -> Hud:
 	return hud
 
 func start() -> void:
+	# triple screens: the monitors beside the game's carry the view on (Display → Side screens)
+	if OS.get_environment("SIDE_SCREENS") != "":
+		Settings.data.display.sideScreens = OS.get_environment("SIDE_SCREENS")
+	side_screens = SideScreens.new()
+	add_child(side_screens)
 	conn.send_json({"t": "loaded", "raceId": race.raceId})
 	running = true
 	if cinematic != null:
@@ -1011,6 +1019,7 @@ func _physics_inner(dt: float) -> void:
 	step_bots(race_t)
 	Prof.e("bots")
 	if contact:
+		pit_lane_contact()
 		move_kinematics(dt)
 		after_contacts()
 	if step_count % RESCUE_STEPS == 0:
@@ -1132,7 +1141,7 @@ func move_kinematics(_dt: float) -> void:
 		var tgt := o.global_position
 		var p := body.global_position
 		var e := tgt - p
-		var hidden := not o.visible or not r.buffer.has_data()
+		var hidden := not o.visible or not r.buffer.has_data() or remote_in_pit(r.id)
 		if hidden or e.length_squared() > PROXY_SNAP_M * PROXY_SNAP_M:
 			body.global_position = tgt
 			if not r.ghosted:
@@ -1162,6 +1171,51 @@ func move_kinematics(_dt: float) -> void:
 		else:
 			sc.body.linear_velocity = sc.vel + (sc.visual.global_position - sc.body.global_position) / PROXY_TAU_S
 			sc.body.global_transform.basis = sc.visual.global_transform.basis
+
+## No car contact in the pit lane (the user, 2026-11-16): a car simulated here that is in the pit lane passes
+## through the others, and they through it; it is solid again once out of the lane and clear of every car (it never
+## turns solid inside another).
+func pit_lane_contact() -> void:
+	for sv in simulated():
+		var id: String = sv[0]
+		var v: Vehicle = sv[1]
+		var in_lane := false
+		if id == me:
+			in_lane = pit != null and pit.in_lane
+		else:
+			for r: Remote in remotes.values():
+				if r.id == id and r.bot != null:
+					in_lane = r.bot.ai.in_pit_lane or (r.bot.pit != null and r.bot.pit.in_lane)
+		var want := not in_lane
+		if want == v.contact_on():
+			continue
+		if want:
+			var p := v.global_position
+			if not cars_clear_of_except(p.x, p.z, 5.5, v):
+				continue
+		v.set_contact(want)
+
+## A remote driver is in the pit lane (from the standings): their proxy body is not solid there.
+func remote_in_pit(id: String) -> bool:
+	var o = _standing(id)
+	return o != null and bool(o.get("inPit", false))
+
+## No car (simulated here, or another driver's) within r (m) of (x, z), apart from `skip`.
+func cars_clear_of_except(x: float, z: float, r: float, skip: Node3D) -> bool:
+	for sv in simulated():
+		var v: Node3D = sv[1]
+		if v == skip:
+			continue
+		var p: Vector3 = v.global_position
+		if (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z) < r * r:
+			return false
+	for rr: Remote in remotes.values():
+		if rr.bot != null or rr.visual == null or not rr.visual.visible:
+			continue
+		var q: Vector3 = rr.visual.global_position
+		if (q.x - x) * (q.x - x) + (q.z - z) * (q.z - z) < r * r:
+			return false
+	return true
 
 ## No car simulated here within r (m) of (x, z).
 func clear_of_mine(x: float, z: float, r: float) -> bool:
@@ -2067,6 +2121,14 @@ func handle_keys(server_now: float) -> void:
 		chat_open = true
 		chat.open()
 		return
+	# an H-pattern shifter: the gear its lever is in (the gearbox is manual while one is bound)
+	var hg: int = InputState.rig.gear
+	if hg != -99 and not spectator:
+		vehicle.drivetrain.manual = true
+		if hg != _h_gear:
+			_h_gear = hg
+			# a 7th position on a six-speed car is 6th
+			vehicle.drivetrain.set_gear(clampi(hg, -1, (vehicle.specs.gears as Array).size()))
 	if kb.tapped("shiftUp"):
 		vehicle.shift(1)
 	if kb.tapped("shiftDown"):
@@ -2702,11 +2764,42 @@ func _road_height(x: float, z: float, top: float):
 			best = y
 	return best
 
+## No driving into the garages (the user, 2026-11-16): an unseen wall just behind the garage fronts along the boxes,
+## on its own layer, which every car meets (a bot in the pit lane has its other walls off, to get through the narrow
+## entry and exit).
+func _build_garage_wall(monitor: PitLaneMonitor) -> void:
+	var body := StaticBody3D.new()
+	body.name = "garage-wall"
+	body.collision_layer = VehicleConsts.LAYER_GARAGE
+	body.collision_mask = 0
+	body.set_meta("surface", "wall")
+	for run: Array in monitor.garage_front():
+		var line: PackedVector3Array = run[0]
+		var dirs: PackedVector3Array = run[1]
+		for i in line.size() - 1:
+			var a := line[i]
+			var b := line[i + 1]
+			var d := Vector3(b.x - a.x, 0.0, b.z - a.z)
+			var l := d.length()
+			if l < 0.05:
+				continue
+			var away := (dirs[i] + dirs[i + 1]).normalized()
+			var cs := CollisionShape3D.new()
+			var box := BoxShape3D.new()
+			# long along the front, 3 m tall, 0.3 m thick, its lane-side face on the front line
+			box.size = Vector3(0.3, 3.0, l + 0.1)
+			cs.shape = box
+			var mid := (a + b) * 0.5
+			cs.transform = Transform3D(Basis.looking_at(d / l, Vector3.UP), mid + away * 0.15 + Vector3(0, 1.4, 0))
+			body.add_child(cs)
+	add_child(body)
+
 ## Pit lane: markings, the crews at their garages, the smoothed surface where the map's own is rough.
 func _build_pit_lane(entries: Dictionary) -> void:
 	var lane: Dictionary = track_data.pitLane
 	pit = PitLaneMonitor.new(track_data)
 	pit.measure_boxes(wall_probe)
+	_build_garage_wall(pit)
 	# painted on the *visible* road: the collision under painted layers is flattened a few cm lower, so markings placed
 	# on it disappeared under the asphalt. Copy once only the road triangles within ~40 m of the pit lane into one small
 	# set (ray casts against the whole road took seconds on a phone)
@@ -2805,9 +2898,13 @@ func _build_pit_lane(entries: Dictionary) -> void:
 		_crew_centre.append(centre)
 		_crew_pool.append({"car": null, "u": 0.0, "events": null})
 		crew_boxes.append({"centre": centre, "along": Vector3(q1[0] - q0[0], 0, q1[2] - q0[2]).normalized(), "away": Vector3(away.x, 0, away.y), "colour": e.color})
-	if not crew_boxes.is_empty() and ResourceLoader.exists("res://scripts/game/pit_crew.gd"):
+	if SHOW_PIT_CREWS and not crew_boxes.is_empty() and ResourceLoader.exists("res://scripts/game/pit_crew.gd"):
 		crews = PitCrews.new(crew_boxes)
 		add_child(crews)
+
+## The mechanics at the garages and their work at a stop (PitCrews): off (the user, 2026-11-16: no people in the boxes);
+## the stops' timing and service are the same without them.
+const SHOW_PIT_CREWS := false
 
 ## Pit lane: limiter, pit-in/out for the lap logic, the service box.
 func update_pit(server_now: float) -> void:

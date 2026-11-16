@@ -202,6 +202,9 @@ func _update_mass() -> void:
 	inertia = _base_inertia * (m / mass_kg)
 
 ## Cars collide with each other (the contact rule) or pass through (ghosts).
+func contact_on() -> bool:
+	return _contact_on
+
 func set_contact(on: bool) -> void:
 	_contact_on = on
 	_apply_groups()
@@ -212,7 +215,7 @@ func set_walls(on: bool) -> void:
 	_apply_groups()
 
 func _apply_groups() -> void:
-	var m := C.LAYER_TRACK
+	var m := C.LAYER_TRACK | C.LAYER_GARAGE
 	if _walls_on:
 		m |= C.LAYER_WALL
 	if _contact_on:

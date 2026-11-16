@@ -8,5 +8,9 @@ extends RefCounted
 static var touch := {"active": false, "throttle": 0.0, "brake": 0.0, "steer": 0.0, "handbrake": 0.0}
 ## Game controller (GamepadInput): analog triggers and stick, same meaning and filters as touch.
 static var pad := {"active": false, "throttle": 0.0, "brake": 0.0, "steer": 0.0, "handbrake": 0.0, "wheel": false}
+## Wheels, pedals, shifters and handbrakes bound in Settings → Wheel & devices (DeviceBindings): a wheel's steering
+## (-1..+1 of half its rotation, + = left), pedals 0..1, the H-pattern gear held (-1 R, 0 neutral, 1..7; -99 when no
+## shifter is bound).
+static var rig := {"active": false, "throttle": 0.0, "brake": 0.0, "steer": 0.0, "handbrake": 0.0, "clutch": 0.0, "gear": -99}
 ## The car being driven's steering lock (degrees lock to lock), for a wheel's soft lock.
 static var wheel := {"carLockDeg": 600.0}

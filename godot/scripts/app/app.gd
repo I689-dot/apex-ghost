@@ -17,6 +17,7 @@ var pending_race: Dictionary = {}
 var pending_start_at = null
 var audio: GameAudio = null
 var gamepad: GamepadInput = null
+var devices: DeviceBindings
 ## The weekend so far, per driver (practice / qualifying / grid / race) for the results tables.
 var weekend := {}
 
@@ -64,6 +65,9 @@ func _ready() -> void:
 	gamepad.driving = func(): return screen == "race" and pause_ui == null and session != null
 	gamepad.spectating = func(): return spectating
 	add_child(gamepad)
+	# wheels, pedal sets, shifters and handbrakes, each bound in the settings
+	devices = DeviceBindings.new()
+	add_child(devices)
 	gamepad.connected_changed.connect(func(on, name): toast(I18n.t("Controller connected: {name}", {"name": name}) if on else I18n.t("Controller disconnected")))
 	Account.changed.connect(func(_a): if screen == "menu": show_menu())
 	show_menu()

@@ -12,6 +12,9 @@ const LAYER_TRACK := 1
 const LAYER_CAR := 2
 const LAYER_WALL := 4
 const LAYER_PROXY := 8
+## The garage fronts along the pit boxes (RaceSession._build_garage_wall): solid for every car, also for a bot in the
+## pit lane, whose other walls are off.
+const LAYER_GARAGE := 16
 ## Wheel rays only see the track and its walls.
 const RAY_MASK := LAYER_TRACK | LAYER_WALL
 

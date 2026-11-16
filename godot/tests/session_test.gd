@@ -170,6 +170,10 @@ func _run() -> void:
 			print("[cockpit] eye in car ", car.global_transform.affine_inverse() * cam.global_position, " current ", cam.current, " car up ", car.global_transform.basis.y)
 		if OS.get_environment("SHOT_ONCE") != "" and elapsed >= float(OS.get_environment("SHOT_ONCE")):
 			get_viewport().get_texture().get_image().save_png("%s/%s.png" % [shot_dir, OS.get_environment("SHOT_NAME") if OS.get_environment("SHOT_NAME") != "" else "shot"])
+			# the side screens' views too (triple screens)
+			if session.side_screens != null:
+				for e in session.side_screens.windows():
+					(e[0] as Window).get_texture().get_image().save_png("%s/%s_%s.png" % [shot_dir, OS.get_environment("SHOT_NAME") if OS.get_environment("SHOT_NAME") != "" else "shot", "left" if e[2] < 0 else "right"])
 			get_tree().quit()
 			return
 		if shot_dir != "" and elapsed >= next_shot and OS.get_environment("SHOT_ONCE") == "":

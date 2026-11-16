@@ -40,6 +40,9 @@ func _run() -> void:
 		conn.send_json({"t": "addBot"})
 	conn.send_json({"t": "setSession", "minutes": 1})
 	conn.send_json({"t": "setRaceLaps", "laps": laps})
+	# RULES='{"pitWindow": true, "contact": true}': the room's rules (a mandatory stop, car contact...)
+	if OS.get_environment("RULES") != "":
+		conn.send_json({"t": "setRules", "rules": JSON.parse_string(OS.get_environment("RULES"))})
 	conn.send_json({"t": "ready", "ready": true})
 	await get_tree().create_timer(0.3).timeout
 	conn.send_json({"t": "setConditions", "trackId": _env("TRACK", "spa"), "weather": "clear", "time": "midday", "changes": "off"})
@@ -76,6 +79,9 @@ func _run() -> void:
 		if session.cinematic != null:
 			session.cinematic.skip()
 		session.autodrive = AiDriver.new(session.track_data, session.vehicle, 0.95, 0.0)
+		var gw := session.get_node_or_null("garage-wall")
+		if kind == "race":
+			check(gw != null and gw.get_child_count() > 20, "the garage fronts are solid (%d wall pieces)" % (gw.get_child_count() if gw != null else 0))
 		var n_results := _results().size()
 		var frames := 0
 		var t0 := Time.get_ticks_msec()
@@ -112,14 +118,15 @@ func _run() -> void:
 	var finished := rows.filter(func(r): return r.get("totalMs") != null)
 	print("race classification:")
 	for r in rows:
-		print("  P%s %-22s %-34s total %s  best %s  valid laps %s%s" % [r.get("position"), str(r.get("nick", r.get("id"))).substr(0, 22), str(r.get("carId")), r.get("totalMs"), r.get("bestLapMs"), r.get("validLaps"), "  DNF" if r.get("dnf", false) else ""])
+		print("  P%s %-22s %-34s total %s  best %s  valid laps %s  penalty %s%s" % [r.get("position"), str(r.get("nick", r.get("id"))).substr(0, 22), str(r.get("carId")), r.get("totalMs"), r.get("bestLapMs"), r.get("validLaps"), r.get("penaltyMs"), "  DNF" if r.get("dnf", false) else ""])
 	check(finished.size() >= rows.size() - 1, "the race: all but at most one car finished (%d of %d)" % [finished.size(), rows.size()])
 	var positions: Array = rows.map(func(r): return int(r.get("position", 0)))
 	var ordered := true
 	for i in positions.size():
 		ordered = ordered and positions[i] == i + 1
 	check(ordered, "the race: positions 1..%d in order" % rows.size())
-	var totals: Array = finished.map(func(r): return float(r.totalMs))
+	# the classification counts time penalties (race control's, for incidents with car contact on)
+	var totals: Array = finished.map(func(r): return float(r.totalMs) + float(r.get("penaltyMs", 0) if r.get("penaltyMs") != null else 0))
 	var by_time := true
 	for i in range(1, totals.size()):
 		by_time = by_time and totals[i] >= totals[i - 1]

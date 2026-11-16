@@ -73,7 +73,7 @@ static func default_settings() -> Dictionary:
 		# the window and the picture (Display page): windowed / borderless / fullscreen, vsync, a frame-rate cap (0: none),
 		# the monitor it opens on (-1: where the desktop puts it; APEX_SCREEN overrides),
 		# the upscaler used under a resolution scale below 100 %, and contrast / saturation over the game's own grade
-		"display": {"windowMode": "windowed", "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0, "screen": -1},
+		"display": {"windowMode": "windowed", "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0, "screen": -1, "sideScreens": "off", "sideAngle": 0},
 		# the field-of-view calculator: the screen's visible width and the eyes' distance from it (cm)
 		"screen": {"widthCm": 60.0, "distanceCm": 70.0},
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,
@@ -89,6 +89,8 @@ static func default_settings() -> Dictionary:
 		# your car's paint (CarPaint, the car page of the lobby): colours, finish, design, race number, rims, calipers
 		"livery": {"base": "#c8102e", "accent": "#f2f2f2", "finish": "gloss", "design": "stripes", "number": 7, "showNumber": true, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"},
 		"wheel": {"mode": "auto", "rotationDeg": 900, "brakeCurve": 1.0},
+		# wheels, pedals, shifters, handbrakes (DeviceBindings): function -> {dev, nth, kind, index, min, max, deadzone}
+		"devices": {},
 		"pad": {
 			"deadzone": 0.06, "steerCurve": 1.7, "steerSpeed": 1.0, "speedSens": 0.5, "brakeCurve": 1.4, "throttleDeadzone": 0.04,
 			"throttleSaturation": 0.96, "throttleCurve": 1.1, "brakeDeadzone": 0.04, "brakeSaturation": 0.96, "steerSaturation": 0.97,

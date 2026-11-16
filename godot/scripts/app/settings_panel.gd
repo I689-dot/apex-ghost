@@ -358,6 +358,12 @@ static func _display(col: Control, changed: Callable) -> void:
 				var sz := DisplayServer.screen_get_size(i)
 				screens.append([str(i), I18n.t("Screen {n} ({w} × {h})", {"n": i + 1, "w": sz.x, "h": sz.y})])
 			_select(col, I18n.t("Monitor"), I18n.t("Which screen the game opens on"), d, "screen", screens, changed, func(v): return int(v))
+			_head(col, I18n.t("Triple screens"))
+			_select(col, I18n.t("Side screens"), I18n.t("While racing, the monitors beside the game's carry the view on, each a window of its own (from the next race)"), d, "sideScreens", [["off", I18n.t("Off")], ["both", I18n.t("Left and right")], ["left", I18n.t("Left only")], ["right", I18n.t("Right only")]], changed)
+			var angles: Array = [["0", I18n.t("Automatic (views meet edge to edge)")]]
+			for a in range(30, 95, 5):
+				angles.append([str(a), "%d°" % a])
+			_select(col, I18n.t("Side screen angle"), I18n.t("How far round each side view is turned: match how your side monitors are angled"), d, "sideAngle", angles, changed, func(v): return int(v))
 	_head(col, I18n.t("Frame rate"))
 	var caps: Array = [["0", I18n.t("No limit")]]
 	for r in [30, 45, 60, 90, 120, 144, 165, 240]:
@@ -548,6 +554,9 @@ static func _controller(col: Control, changed: Callable, app: App = null) -> voi
 	_head(col, I18n.t("Controller"))
 	if app != null and app.gamepad != null:
 		col.add_child(UIW.margins(PadSetup.new(app.gamepad), 10, 8, 10, 4))
+	_head(col, I18n.t("Wheel, pedals and shifter"))
+	col.add_child(UIW.margins(UIW.muted(I18n.t("Bind each function to any connected device: a wheel base, separate pedals, an H-pattern or sequential shifter, a handbrake. Bound devices drive the car directly; nothing bound, a wheel is read as a gamepad."), 13), 10, 8, 10, 6))
+	col.add_child(UIW.margins(DeviceSetup.new(changed), 10, 4, 10, 8))
 	_head(col, I18n.t("Steering wheel"))
 	col.add_child(UIW.margins(UIW.muted(I18n.t("Logitech, Thrustmaster, Fanatec, Moza, Simucube and Simagic wheels are recognised. Set the wheel to 900° in its own software and the same here: each car then turns as its real lock allows."), 13), 10, 8, 10, 6))
 	_select(col, I18n.t("Device"), "", S.wheel, "mode", [["auto", I18n.t("Recognise wheels automatically")], ["wheel", I18n.t("Always a steering wheel")], ["pad", I18n.t("Always a gamepad")]], changed)

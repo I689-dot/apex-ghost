@@ -1402,3 +1402,13 @@ The user asked to delete every brand from the game, cars and maps, and to make t
 - **The menus' car pictures** are rendered in the game from the brand-free cars (`CarStudio.picture`, in your paint) instead of the shipped thumbnails and photos, which the exports now leave out.
 - **The safety car** is the same paint in race-control green with a white side stripe.
 - Tests no longer write the player's settings (a menu test had saved a livery and a last car into them).
+
+## Godot: pit lane, garages, peripherals, triple screens (2026-11-16)
+
+From the user's list (DECISIONS: the rest follows):
+- **No car contact in the pit lane**: with the contact rule on, a car in the pit lane passes through the others and they through it (`RaceSession.pit_lane_contact`; an online driver's stand-in body by the standings' in-pit flag). Out of the lane it is solid again only once no car is within 5.5 m.
+- **No driving into the garages**: an unseen wall just behind the measured garage fronts along the boxes (`_build_garage_wall`, `PitLaneMonitor.garage_front`), on its own collision layer that every car meets: a bot in the pit lane has its other walls off to get through the narrow entry and exit, and drove into the buildings.
+- **No people in the boxes**: the pit crews are off (`SHOW_PIT_CREWS`); the stops' timing and service are the same.
+- **Wheels, pedals, shifters, handbrakes** (`DeviceBindings`, `DeviceSetup` in Settings → Controller): every driving function bound to any axis or button of any connected device, several devices at once (a wheel base, separate pedals, an H-pattern shifter, a handbrake), each axis calibrated by moving it (its rest and far end; the wheel turned left first so either direction of axis works) and kept by device name. Bound devices drive the car as a wheel does (direct steering with the soft lock, linear pedals); an H-pattern position selects its gear (the gearbox manual while one is bound); paddles and buttons press the game's actions. Checked with simulated devices (`tests/devices_test.gd`, 14 checks). Force feedback needs a native plugin Godot does not have: not done.
+- **Triple screens** (`SideScreens`, Display → Side screens / Side screen angle): while racing, a native full-screen window on the monitor left and / or right of the game's, drawing the same world from the camera in use turned by the centre view's width (views meet edge to edge) or the player's angle. Checked on this PC's two monitors.
+- `tests/race_test.gd` `RULES` sets the room's rules (a mandatory stop, car contact) and checks the garage wall.
