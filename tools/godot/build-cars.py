@@ -23,7 +23,8 @@ CARS_JSON = os.path.join(ROOT, 'godot/data/cars.json')
 
 # id -> {zip folder, model (relative to it), prep settings ("{tex}" is the zip's textures/ folder), name}
 CARS = {
-    '2020_audi_r8_lms_evo': {'dir': '2020-audi-r8-lms-evo', 'model': 'source/audi_r8_evo_acc_loda_sprint_2.glb',
+    # (its own eye search placed it well: the R8's low roof bar sits over the seat-reach eye)
+    '2020_audi_r8_lms_evo': {'eye': [0.3377, 0.9854, -0.0982], 'dir': '2020-audi-r8-lms-evo', 'model': 'source/audi_r8_evo_acc_loda_sprint_2.glb',
         'prep': {'rename': True, 'hide': ['^Numberplate_'], 'livery': [
             ['EXT_Carpaint_Inst|EXT_CARPAINT_CARBON', '{tex}/EXT_Skin_Colour.png', 'replace', 'flip'],
             ['EXT_Banner_EXT_Banner', '{tex}/EXT_Banner_Colour.png', 'replace', 'flip']]}},
@@ -40,10 +41,10 @@ CARS = {
         # (the eye search landed 0.44 m out, beside the seat: behind the wheel the model has at 0.33 m)
         'eye': [0.332, 0.86, -0.03]},
         'name': 'Ferrari 296 GT3'},
-    'ford_mustang_gt3': {'dir': 'ford-mustang-gt3-2024', 'model': 'inner/ford_mustang_gt3_2024__www.vecarz.com.glb', 'prep': {'rename': True}},
-    # (the eye search put the eye 0.50 m out, behind the cage's padding: in line with the steering wheel instead)
-    'mercedes_amg_gt3_evo': {'dir': 'mercedes-amg-gt3-evo-2020-wwwvecarzcom', 'model': 'source/2020_mercedes-amg_gt3_evo.glb', 'prep': {'rename': True},
-        'eye': [0.42, 1.05, -0.62]},
+    # (its steering node takes in the column: the seat-reach eye from that centre sat high, the rim at the view's edge)
+    'ford_mustang_gt3': {'dir': 'ford-mustang-gt3-2024', 'model': 'inner/ford_mustang_gt3_2024__www.vecarz.com.glb', 'prep': {'rename': True},
+        'eye': [0.329, 1.01, -0.69]},
+    'mercedes_amg_gt3_evo': {'dir': 'mercedes-amg-gt3-evo-2020-wwwvecarzcom', 'model': 'source/2020_mercedes-amg_gt3_evo.glb', 'prep': {'rename': True}},
     # the white NASA / DTM AMG Evo (user's choice: the Red Bull AMG's id, shown as the AMG GT3 EVO)
     'mercedes_amg_gt3_red_bull_racing': {'dir': 'mercedes-amg-gt3-wwwvecarzcom', 'model': 'source/amg_evo_3.glb', 'prep': {'rename': True, 'hide': ['^Numberplate_'], 'livery': [
         ['EXT_Carpaint_Inst', '{tex}/EXT_Skin_Colour.png', 'replace', 'flip'],
@@ -109,13 +110,24 @@ def install(cid, c, meta, out, png, entries):
         'steering': c.get('steering', meta['steering']),
         # the converter's eye search, or a hand-set one ("eye"), counts as tuned: CockpitCamera's auto-lift casts rays at the
         # whole mesh, and these models keep the windscreen in the body's mesh, so it always lifted the eye 14 cm into the roof
-        'cockpitCamera': {**meta['cockpitCamera'], **({'position': c['eye']} if 'eye' in c else {}), 'tuned': True},
+        'cockpitCamera': {**meta['cockpitCamera'], 'position': c.get('eye') or seat_eye(c.get('steering', meta['steering'])), 'tuned': True},
         # (a model with anonymous materials has a cabin the name-based detection cannot see: "hasInterior" set by hand)
         'look': None, 'hasInterior': c.get('hasInterior', meta['hasInterior']), 'lights': meta['lights'], 'genericWheels': meta['genericWheels'],
         'source': 'godot-m6',
     })
     if 'name' in c:
         e['name'] = c['name']
+
+
+# the driver's eye from the steering wheel, where the converter's eye search is not trusted (it put several eyes 15-25 cm
+# behind the wheel, which then fell below the view, or 8 cm to the side of it): a GT3 driver's reach, 0.58 m behind the
+# wheel's centre and 0.30 m above it, less what CockpitCamera adds (EYE_FORWARD 0.2, EYE_UP 0.02)
+EYE_BACK, EYE_ABOVE = 0.58, 0.30
+
+
+def seat_eye(st):
+    x, y, z = st['position']
+    return [round(x, 4), round(y + EYE_ABOVE - 0.02, 4), round(z - EYE_BACK - 0.2, 4)]
 
 
 GODOT = os.path.expanduser(os.environ.get('GODOT', '~/.local/opt/godot/godot'))
@@ -175,6 +187,9 @@ def main():
     # own id, role, name and specs kept (race control and the server know it by id); its look in SafetyCarLook
     van = next((e for e in data['cars'] if e['id'] == 'vantage_gt3_evo_heart_of_racing'), None)
     sc = next((e for e in data['cars'] if e['id'] == 'aston_martin_vantage_safety_car'), None)
+    if van:
+        # the Vantage's eye from its steering wheel as the new cars' (it was 0.26 m from the wheel, below the view)
+        van['cockpitCamera'] = {**van['cockpitCamera'], 'position': seat_eye(van['steering']), 'tuned': True}
     if van and sc:
         for k in ('thumbnail', 'lods', 'bytes', 'cockpit', 'cockpitBytes', 'dims', 'wheels', 'wheelbase', 'trackFront', 'trackRear',
                   'steering', 'cockpitCamera', 'look', 'hasInterior', 'lights', 'genericWheels'):

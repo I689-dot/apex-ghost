@@ -37,6 +37,9 @@ const BAKED_WHEELS := {
 const GENERIC := [
 	["(?i)^INT_(Carbon|Occlusion)", {"tint": 0.15, "metallic": 0.0, "roughness": 0.6}],
 	["(?i)^INT_ELECTRONICS", {"tint": 0.35, "metallic": 0.0, "roughness": 0.55}],
+	# carbon left as a plain light grey with no texture (the NASA AMG's: its cage, dash, steering wheel and splitter,
+	# 119k triangles, drawn white): the dark of real carbon, a little gloss from its clear coat
+	["(?i)^EXT_Carbon$", {"untextured": true, "tint": 0.06, "metallic": 0.1, "roughness": 0.35}],
 ]
 static var _generic_re: Array = []
 
@@ -49,6 +52,8 @@ static func apply_generic(car_id: String, sm: StandardMaterial3D) -> void:
 			_generic_re.append([RegEx.create_from_string(g[0]), g[1]])
 	for g in _generic_re:
 		if (g[0] as RegEx).search(sm.resource_name) != null:
+			if (g[1] as Dictionary).get("untextured", false) and sm.albedo_texture != null:
+				return
 			_fix(sm, g[1])
 			return
 

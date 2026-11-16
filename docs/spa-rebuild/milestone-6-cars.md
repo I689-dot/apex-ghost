@@ -47,12 +47,16 @@ models into the git-ignored `godot/assets/cars/`:
 4. Godot's generated mesh LODs are switched off for these files (`patch_imports`). Together with the earlier 300k/60k
    cut, they caused the faceted curves that were reported.
 
-The cockpit eye is set per car (`eye` in build-cars.py, checked with `tests/cockpit_probe.gd`) and marked `tuned`, so
-the camera's automatic lift no longer pushes it into the roof.
+The cockpit eye sits where a driver reaches the wheel: 0.58 m behind the steering wheel's centre and 0.30 m above it
+(`seat_eye` in build-cars.py, the Vantage's too). The converter's eye search had put several eyes only 15-25 cm behind
+the wheel, so the wheel fell below the bottom of the view, and some 8 cm to the side of it. The Audi, Ferrari and Mustang
+keep an eye set by hand (`eye`, checked with `tests/cockpit_probe.gd`). Every eye is marked `tuned`, so the camera's
+automatic lift no longer pushes it into the roof.
 
 ## In the game
 
-- **Interiors**: `InteriorLook.apply_generic` darkens carbon and occlusion surfaces that render too bright.
+- **Interiors**: `InteriorLook.apply_generic` darkens carbon and occlusion surfaces that render too bright, and gives
+  untextured light-grey `EXT_Carbon` the dark of real carbon (the NASA AMG's cage, dash and steering wheel were white).
 - **Live screens**: `DashDisplay` finds display materials by name. Overlays placed per model cover the models where the
   screen is just a face of the dash: the Vantage, and the Ferrari's Bosch dash plus its two side screens. A dash
   surface on a merged mesh gets a hidden material instead of hiding the whole mesh (this had hidden the Porsche's body).
