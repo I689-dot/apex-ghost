@@ -39,6 +39,7 @@ func _apply_display() -> void:
 	Engine.max_fps = int(d.maxFps)
 	if OS.has_feature("mobile"):
 		return
+	Settings.place_window()
 	var mode: DisplayServer.WindowMode = {
 		"windowed": DisplayServer.WINDOW_MODE_WINDOWED, "borderless": DisplayServer.WINDOW_MODE_FULLSCREEN,
 		"fullscreen": DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN,

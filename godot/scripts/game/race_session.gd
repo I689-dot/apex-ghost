@@ -382,6 +382,7 @@ func load_session(progress: Callable) -> void:
 	var outside = Assets.load_car_model(my_entry, 1, false).lods[0] if with_cockpit else null
 	my_visual = CarVisual.new(my_entry, my_model, true, outside)
 	vehicle.add_child(my_visual)
+	CarPaint.apply(my_visual, Settings.data.livery)
 	InputState.wheel.carLockDeg = float(SteeringLock.lock_deg(my_entry.id))
 	if bool(q.ownHeadlightSpots):
 		my_visual.add_headlights(bool(q.ownHeadlightShadows))
@@ -419,6 +420,7 @@ func load_session(progress: Callable) -> void:
 		rem.visual.position = Vector3(g.p[0], g.p[1], g.p[2])
 		rem.visual.rotation = Vector3(0, g.yaw, 0)
 		add_child(rem.visual)
+		CarPaint.apply(rem.visual, livery_of(r.id))
 		rem.node = rem.visual
 		remotes[rem.slot] = rem
 	await step.call(I18n.t("Bringing out the other drivers"))
@@ -484,6 +486,13 @@ func load_session(progress: Callable) -> void:
 	# network
 	conn.message.connect(_on_message)
 	conn.binary.connect(_on_binary)
+
+## A driver's paint: the room's when it carries one (a player's choice), else one made from their id and number.
+func livery_of(id: String) -> Dictionary:
+	var p = _player(id)
+	if p != null and p.get("livery") is Dictionary and not (p.livery as Dictionary).is_empty():
+		return p.livery
+	return CarPaint.livery_for(id, int(p.num) if p != null and p.get("num") != null else -1)
 
 func _player(id: String):
 	for p in room.players:
@@ -1825,6 +1834,7 @@ func ensure_ghost_visual() -> void:
 	v.set_opacity(0.3)
 	v.visible = false
 	add_child(v)
+	CarPaint.apply(v, Settings.data.livery)
 	ghost_visual = v
 
 # --------------------------------------------------------------- frame ---

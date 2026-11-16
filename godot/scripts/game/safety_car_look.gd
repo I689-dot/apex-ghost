@@ -1,7 +1,7 @@
 class_name SafetyCarLook
 extends Node3D
-## The safety car's look (the Vantage GT3 model, docs/prompts/spa-and-cars-rebuild.md): its livery in the safety car's
-## green (shaders/safety_paint.gdshader on the "Body" material) and an SRO-style roof light bar, its amber lamps
+## The safety car's look (the Vantage GT3 model, docs/prompts/spa-and-cars-rebuild.md): race-control green (CarPaint,
+## brand-free since 2026-11-16; shaders/safety_paint.gdshader before) and an SRO-style roof light bar, its amber lamps
 ## flashing in turn while the car is deployed, off while it waits in the pit lane.
 
 const BAR_SIZE := Vector3(1.1, 0.07, 0.2)
@@ -14,21 +14,12 @@ var _on_mat := StandardMaterial3D.new()
 var _off_mat := StandardMaterial3D.new()
 var _t := 0.0
 
+## The safety car's paint (CarPaint): race-control green with a white stripe along the flanks, no number.
+const LIVERY := {"base": "#0b5d3b", "accent": "#f2f2f2", "finish": "metallic", "design": "side", "number": 0, "showNumber": false, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"}
+
 ## Applies the look to a safety car's visual (its root, the entry for the sizes).
 static func dress(visual: Node3D, entry: Dictionary) -> SafetyCarLook:
-	var shader: Shader = load("res://shaders/safety_paint.gdshader")
-	for n in CarVisual._walk(visual):
-		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
-			continue
-		var mi := n as MeshInstance3D
-		for s in mi.mesh.get_surface_count():
-			var m := mi.get_active_material(s) as StandardMaterial3D
-			if m == null or m.resource_name != "Body" or m.albedo_texture == null:
-				continue
-			var sm := ShaderMaterial.new()
-			sm.shader = shader
-			sm.set_shader_parameter("livery", m.albedo_texture)
-			mi.set_surface_override_material(s, sm)
+	CarPaint.apply(visual as CarVisual, LIVERY)
 	var look := SafetyCarLook.new()
 	look.name = "safety-look"
 	var dims: Dictionary = entry.get("dims", {})

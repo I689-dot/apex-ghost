@@ -39,6 +39,8 @@ class Player:
 	var bumps := 0
 	var bump_window := 0.0
 	var last_chat_at := -1e12
+	## The driver's paint (CarPaint), {} until they send one.
+	var livery := {}
 
 var env: RoomEnv
 var code := ""
@@ -173,7 +175,7 @@ func snapshot() -> Dictionary:
 		list.append({
 			"id": p.id, "nick": p.nick, "carId": p.car_id, "ready": p.ready, "host": p.id == host_id,
 			"connected": p.conn != null or p.bot, "waiting": p.waiting, "bot": p.bot, "tyre": p.tyre,
-			"briefed": p.briefed, "country": p.country, "num": p.num,
+			"briefed": p.briefed, "country": p.country, "num": p.num, "livery": p.livery,
 		})
 	return {
 		"code": code, "phase": phase, "players": list, "carLocks": car_locks.duplicate(), "raceId": race_id,
@@ -348,6 +350,9 @@ func _handle(p: Player, msg: Dictionary) -> void:
 	match msg.t:
 		"selectCar":
 			select_car(p, msg.carId)
+		"setLivery":
+			p.livery = msg.livery
+			_broadcast_room()
 		"ready":
 			if phase != "lobby":
 				return

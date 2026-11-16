@@ -3,6 +3,18 @@ extends RefCounted
 ## Spanish for the strings the Godot client added to the web game's (data/i18n_es.json is exported from the web game).
 
 const ES := {
+	# the monitor the game opens on (Display page)
+	"Monitor": "Monitor",
+	"Which screen the game opens on": "En qué pantalla se abre el juego",
+	"Automatic": "Automático",
+	"Screen {n} ({w} × {h})": "Pantalla {n} ({w} × {h})",
+	# the cars' brand-free facts (CarsDb.BRAND_FREE)
+	"3.0 L twin-turbo straight-six": "Seis en línea biturbo de 3,0 L",
+	"3.0 L twin-turbo V6": "V6 biturbo de 3,0 L",
+	"6.2 L V8, naturally aspirated": "V8 6,2 L, atmosférico",
+	"6-speed transaxle": "Transeje de 6 marchas",
+	"Works team": "Equipo oficial",
+	"Customer racing": "Equipo cliente",
 	# the driver's dial (HudDial)
 	"{l} L ({laps} laps)": "{l} L ({laps} vueltas)",
 	# settings pages (Graphics, Display, View, Driving, Interface, Audio)

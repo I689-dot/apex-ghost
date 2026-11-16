@@ -1391,3 +1391,14 @@ The user asked for the HUD of the deployed website (web commit 78f0aeb, 2026-11-
 - **The relative list** bottom left over the tyres; **the map** under the lap times, 200 px wide.
 - **The HUD scales to the window** on a computer: full size from 1600 x 900 up, smaller below (to 0.58), times the player's HUD size. A phone keeps its layout (the corners are the touch controls), with the dial in the bottom centre.
 - `tests/session_test.gd` `SHOW_HUD=1` draws the HUD as the app does.
+
+## Godot: no brands, and your own paint (2026-11-16)
+
+The user asked to delete every brand from the game, cars and maps, and to make the cars customisable from the car menu (colours and the like). Their answers: invented car names, the circuits keep their place names, everything visible on the cars goes (badges, tyres, cockpit too), and the paint choices are body colour, second colour and design, race number, rims and calipers.
+
+- **Names**: the cars go by invented names and makers (`CarsDb.BRAND_FREE`: Hartwell Vanguard GT3, Kessler RS10 GT3, Vogt R6 GT3 / Evo, Corsari V6 GT3, Ardent V8 GT3, Halden Sabre GT3, Steinmark S8 GT3 Evo / Evo II, Wrenfeld F6 GT3 R), and their facts name no engine maker or team. The ids stay (setups, records, the server's lists).
+- **The paint** (`CarPaint`, `shaders/car_paint.gdshader`): the livery material of every car becomes the driver's paint: a colour, a finish (gloss, metallic, matte, pearl), a design in a second colour (stripes, two-tone, fade, side stripe, hoop) and the race number on both doors and the bonnet. Designs and numbers are placed in the car's own space, so they fit every model whatever its UV layout. The crash dents move the body's vertices in the same shader. Decals, banners, stickers, logos and number plates are not drawn; rims and calipers take the driver's colours without their textures; tyres are plain rubber.
+- **Paint tab** in the race weekend (between Car and Event): your car turning (`CarStudio.Preview`), the choices beside it; each change shows at once, is kept in the settings (`livery`) and goes to the room (`setLivery`: rooms this app hosts show each driver's paint; bots and drivers without one get a fixed scheme from their id and number).
+- **The menus' car pictures** are rendered in the game from the brand-free cars (`CarStudio.picture`, in your paint) instead of the shipped thumbnails and photos, which the exports now leave out.
+- **The safety car** is the same paint in race-control green with a white side stripe.
+- Tests no longer write the player's settings (a menu test had saved a livery and a last car into them).

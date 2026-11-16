@@ -51,6 +51,9 @@ func update(dt: float, car: Node3D, car_vel: Vector3, mode: String, back: bool) 
 		dist = float(tune.get("dist", dist))
 		height = float(tune.get("height", height))
 	var yaw := _yaw + PI if back else _yaw
+	# tests: the camera round the car by this many degrees (a side view), looking at it
+	var orbit := deg_to_rad(float(tune.get("yaw", 0.0))) if not tune.is_empty() and not far else 0.0
+	yaw += orbit
 	var fx := sin(yaw)
 	var fz := cos(yaw)
 	# a touch of sideways sway with the cornering g (the camera lags the car into the corner)
@@ -62,6 +65,8 @@ func update(dt: float, car: Node3D, car_vel: Vector3, mode: String, back: bool) 
 	if not tune.is_empty() and not far:
 		ahead = float(tune.get("ahead", ahead))
 		look_y = float(tune.get("look_y", look_y))
+	if orbit != 0.0:
+		ahead = 0.0
 	camera.look_at(Vector3(o.origin.x + fx * ahead, _y + look_y, o.origin.z + fz * ahead), Vector3.UP)
 	camera.fov = (54.0 if far else 58.0) + fast * 7.0
 	if not tune.is_empty() and not far and tune.has("fov"):

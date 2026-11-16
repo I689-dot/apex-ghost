@@ -8,7 +8,29 @@ static var _file: Dictionary = {}
 static func file() -> Dictionary:
 	if _file.is_empty():
 		_file = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
+		for c in _file.get("cars", []):
+			var o: Dictionary = BRAND_FREE.get(c.id, {})
+			if not o.is_empty():
+				c.name = o.name
+				c.manufacturer = o.maker
+				c.info = {"engine": o.engine, "gearbox": o.gearbox, "team": o.team}
 	return _file
+
+## The game carries no brands (the user, 2026-11-16): the cars go by invented names and makers, and their facts name
+## no maker, engine supplier or team. The ids stay (saved setups, records, the server's lists).
+const BRAND_FREE := {
+	"vantage_gt3_evo_heart_of_racing": {"name": "Hartwell Vanguard GT3", "maker": "Hartwell", "engine": "4.0 L twin-turbo V8", "gearbox": "6-speed sequential", "team": "Works team"},
+	"aston_martin_vantage_safety_car": {"name": "Hartwell Vanguard Safety Car", "maker": "Hartwell", "engine": "4.0 L twin-turbo V8", "gearbox": "8-speed automatic", "team": "Race control"},
+	"2020_audi_r8_lms_evo": {"name": "Kessler RS10 GT3", "maker": "Kessler", "engine": "5.2 L V10, naturally aspirated", "gearbox": "6-speed sequential", "team": "Customer racing"},
+	"bmw_m4_gt3_vecarz": {"name": "Vogt R6 GT3", "maker": "Vogt", "engine": "3.0 L twin-turbo straight-six", "gearbox": "6-speed sequential", "team": "Customer racing"},
+	"bmw_m4_gt3_evo_2026": {"name": "Vogt R6 GT3 Evo", "maker": "Vogt", "engine": "3.0 L twin-turbo straight-six", "gearbox": "6-speed sequential", "team": "Works team"},
+	"ferrari_296_gt3_verstappen": {"name": "Corsari V6 GT3", "maker": "Corsari", "engine": "3.0 L twin-turbo V6", "gearbox": "6-speed sequential", "team": "Customer racing"},
+	"ford_mustang_gt3": {"name": "Ardent V8 GT3", "maker": "Ardent", "engine": "5.4 L V8, naturally aspirated", "gearbox": "6-speed transaxle", "team": "Works team"},
+	"2020_mclaren_720s_gt3": {"name": "Halden Sabre GT3", "maker": "Halden", "engine": "4.0 L twin-turbo V8", "gearbox": "6-speed sequential", "team": "Customer racing"},
+	"mercedes_amg_gt3_evo": {"name": "Steinmark S8 GT3 Evo", "maker": "Steinmark", "engine": "6.2 L V8, naturally aspirated", "gearbox": "6-speed sequential transaxle", "team": "Customer racing"},
+	"mercedes_amg_gt3_red_bull_racing": {"name": "Steinmark S8 GT3 Evo II", "maker": "Steinmark", "engine": "6.2 L V8, naturally aspirated", "gearbox": "6-speed sequential transaxle", "team": "Works team"},
+	"2024_porsche_992_gt3_r": {"name": "Wrenfeld F6 GT3 R", "maker": "Wrenfeld", "engine": "4.2 L flat-six, naturally aspirated", "gearbox": "6-speed sequential", "team": "Customer racing"},
+}
 
 static func all() -> Array:
 	return file().cars

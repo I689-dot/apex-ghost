@@ -352,6 +352,12 @@ static func _display(col: Control, changed: Callable) -> void:
 		_head(col, I18n.t("Window"))
 		_select(col, I18n.t("Window mode"), "", d, "windowMode", [["windowed", I18n.t("Windowed")], ["borderless", I18n.t("Borderless full screen")], ["fullscreen", I18n.t("Exclusive full screen")]], changed)
 		_toggle(col, I18n.t("Vertical sync"), I18n.t("No tearing; the frame rate stays at most the display's refresh rate"), d, "vsync", changed)
+		if DisplayServer.get_screen_count() > 1:
+			var screens: Array = [["-1", I18n.t("Automatic")]]
+			for i in DisplayServer.get_screen_count():
+				var sz := DisplayServer.screen_get_size(i)
+				screens.append([str(i), I18n.t("Screen {n} ({w} × {h})", {"n": i + 1, "w": sz.x, "h": sz.y})])
+			_select(col, I18n.t("Monitor"), I18n.t("Which screen the game opens on"), d, "screen", screens, changed, func(v): return int(v))
 	_head(col, I18n.t("Frame rate"))
 	var caps: Array = [["0", I18n.t("No limit")]]
 	for r in [30, 45, 60, 90, 120, 144, 165, 240]:

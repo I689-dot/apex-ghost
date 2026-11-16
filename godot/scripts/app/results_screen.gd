@@ -74,12 +74,12 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		who.add_child(UIKit.label(t_text, 16, UIKit.SOFT, false, 600))
 		top.add_child(who)
 		card.add_child(top)
-		var img := UIW.image("res://assets/ui/cars/%s.webp" % r.carId, Vector2(0, 50 if touch else 96))
-		if img.texture == null:
-			for c in cars:
-				if c.id == r.carId:
-					img.texture = UIW.tex(c.thumbnail)
-		card.add_child(img)
+		var car_shown := CarsDb.resolve(str(r.carId))
+		var lv: Dictionary = CarStudio.my_livery() if r.get("id") == app.me else CarPaint.livery_for(str(r.get("id", "")))
+		for pl in app.room.get("players", []):
+			if pl.id == r.get("id") and pl.get("livery") is Dictionary and not (pl.livery as Dictionary).is_empty() and pl.id != app.me:
+				lv = pl.livery
+		card.add_child(CarStudio.picture_rect(car_shown, lv, Vector2(0, 50 if touch else 96)))
 		var cn := UIKit.label(car_name.call(r.carId), 13, UIKit.SOFT)
 		cn.clip_text = true
 		card.add_child(cn)

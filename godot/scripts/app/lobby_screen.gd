@@ -66,6 +66,8 @@ static func ensure_car(app: App) -> void:
 	if pick != "":
 		_car_sent_for = room.code + app.me
 		app.send({"t": "selectCar", "carId": pick})
+		# your paint, for the others to see
+		app.send({"t": "setLivery", "livery": (Settings.data.livery as Dictionary).duplicate()})
 
 # ----------------------------------------------------------------- lobby ---
 
@@ -87,6 +89,8 @@ static func build(app: App) -> Control:
 			extra.append(UIKit.button(I18n.t("Continue") + "  ›", func(): _go(app, "car")))
 		"car":
 			body = _car_page(app, room, cars, mine, extra)
+		"paint":
+			body = _paint_page(app, cars, mine, extra)
 		"session", "conditions", "rules":
 			body = _event_page(app, room, _page, edit, is_host)
 		"drivers":
@@ -117,7 +121,7 @@ static func _frame(app: App, room: Dictionary, mine: Dictionary, cars: Array, is
 	right.append(MenuScreen._icon_button("⚙", I18n.t("Settings"), app.open_settings))
 	var opts := {
 		"title": I18n.t("Race weekend") if not UIKit.touch() else "", "back": app.leave if _page == "hub" else func(): _go(app, "hub"),
-		"tabs": [["hub", I18n.t("Overview")], ["circuit", I18n.t("Circuit")], ["car", I18n.t("Car")], ["event", I18n.t("Event")], ["drivers", I18n.t("Drivers")]],
+		"tabs": [["hub", I18n.t("Overview")], ["circuit", I18n.t("Circuit")], ["car", I18n.t("Car")], ["paint", I18n.t("Paint")], ["event", I18n.t("Event")], ["drivers", I18n.t("Drivers")]],
 		"tab": tab, "on_tab": func(k): _go(app, "session" if k == "event" else k), "tabs_left": UIKit.touch(), "right": right,
 	}
 	if tab == "event":
@@ -255,21 +259,9 @@ static func _car_stats(car: Dictionary) -> Control:
 static var _hero_rects: Dictionary = {}
 
 ## The car's menu picture without its empty margins (data/car_hero_rects.json, from tools/godot/make-car-bbox.py).
+## The car's picture (CarStudio: brand-free, in your paint; the shipped photos showed the real liveries).
 static func _car_image(car: Dictionary, size: Vector2) -> TextureRect:
-	var img := UIW.image("res://assets/ui/cars/%s.webp" % car.id, size)
-	if img.texture == null:
-		img.texture = UIW.tex(car.thumbnail)
-		return img
-	if _hero_rects.is_empty():
-		var f := FileAccess.get_file_as_string("res://data/car_hero_rects.json")
-		_hero_rects = JSON.parse_string(f) if f != "" else {"": []}
-	var r: Array = _hero_rects.get(car.id, [])
-	if r.size() == 4:
-		var at := AtlasTexture.new()
-		at.atlas = img.texture
-		at.region = Rect2(r[0], r[1], r[2], r[3])
-		img.texture = at
-	return img
+	return CarStudio.picture_rect(car, CarStudio.my_livery(), size)
 
 static func _race_label(k: String) -> String:
 	var n := int(k.substr(1))
@@ -672,7 +664,7 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 		if chosen:
 			hr.add_child(UIKit.label("✓", 14, UIKit.GOOD, false, 700))
 		cc.add_child(hr)
-		var img := UIW.image(c.thumbnail, Vector2(0, 36 if touch else 58))
+		var img := CarStudio.picture_rect(c, CarStudio.my_livery(), Vector2(0, 36 if touch else 58))
 		img.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		img.modulate = Color(1, 1, 1, 0.4 if taken != "" else 1.0)
 		cc.add_child(img)
@@ -697,6 +689,101 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 	sp.add_child(UIW.hscroll(strip))
 	col.add_child(sp)
 	return col
+
+# ----------------------------------------------------------------- paint ---
+
+## Your car's paint (CarPaint): the car turning on the left, the choices on the right. Every change shows at once on
+## the car, is kept in the settings and goes to the room (the others see your colours).
+static func _paint_page(app: App, cars: Array, mine: Dictionary, extra: Array) -> Control:
+	var touch := UIKit.touch()
+	var car := _car_by_id(cars, mine.get("carId"))
+	if car.is_empty() and not cars.is_empty():
+		car = cars[0]
+	var lv: Dictionary = Settings.data.livery
+	var row := UIW.hbox(20)
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var preview := CarStudio.Preview.new(car, lv)
+	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview.custom_minimum_size = Vector2(0, 180 if touch else 320)
+	row.add_child(preview)
+	var col := UIW.vbox(4)
+	var changed := func(key: String, v: Variant) -> void:
+		lv[key] = v
+		Settings.save()
+		preview.set_livery(lv)
+		app.send({"t": "setLivery", "livery": lv.duplicate()})
+	col.add_child(UIW.section(I18n.t("Body")))
+	col.add_child(UIW.row(I18n.t("Colour"), _swatches(lv.base, CarPaint.PALETTE, func(c): changed.call("base", c))))
+	col.add_child(UIW.row(I18n.t("Finish"), _live_chips(lv.finish, [["gloss", I18n.t("Gloss")], ["metallic", I18n.t("Metallic")], ["matte", I18n.t("Matte")], ["pearl", I18n.t("Pearl")]], func(v): changed.call("finish", v))))
+	col.add_child(UIW.section(I18n.t("Design")))
+	col.add_child(UIW.row(I18n.t("Design"), _live_chips(lv.design, [["plain", I18n.t("Plain")], ["stripes", I18n.t("Stripes")], ["twotone", I18n.t("Two-tone")], ["fade", I18n.t("Fade")], ["side", I18n.t("Side stripe")], ["hoop", I18n.t("Hoop")]], func(v): changed.call("design", v))))
+	col.add_child(UIW.row(I18n.t("Second colour"), _swatches(lv.accent, CarPaint.PALETTE, func(c): changed.call("accent", c))))
+	col.add_child(UIW.section(I18n.t("Race number")))
+	var nums: Array = []
+	for n in range(1, 100):
+		nums.append([str(n), str(n)])
+	var num_row := UIW.hbox(12)
+	num_row.add_child(UIW.stepper(str(int(lv.number)), nums, func(v): changed.call("number", int(v))))
+	num_row.add_child(UIW.switch(bool(lv.showNumber), func(on): changed.call("showNumber", on)))
+	col.add_child(UIW.row(I18n.t("Number"), num_row))
+	col.add_child(UIW.row(I18n.t("Number colour"), _swatches(lv.numberColor, ["#ffffff", "#111214", "#ffd60a", "#c8102e", "#0a3d91", "#00843d"], func(c): changed.call("numberColor", c))))
+	col.add_child(UIW.section(I18n.t("Wheels")))
+	col.add_child(UIW.row(I18n.t("Rims"), _swatches(lv.rims, ["#1c1c1e", "#9a9fa5", "#f2f2f2", "#c9a227", "#c8102e", "#0a3d91"], func(c): changed.call("rims", c))))
+	col.add_child(UIW.row(I18n.t("Calipers"), _swatches(lv.calipers, ["#ffd60a", "#c8102e", "#1c1c1e", "#0a84ff", "#30d158", "#f2f2f2"], func(c): changed.call("calipers", c))))
+	var right := UIW.scroll(col)
+	right.custom_minimum_size = Vector2(380 if touch else 520, 0)
+	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	row.add_child(right)
+	extra.append(UIKit.button(I18n.t("Continue") + "  ›", func(): _go(app, "session")))
+	return row
+
+## Chips that show the new choice themselves (the page is not rebuilt for each change: the turning car stays).
+static func _live_chips(current: Variant, options: Array, on: Callable) -> Control:
+	var holder := UIW.vbox(0)
+	# wide enough for the choices to sit side by side
+	holder.custom_minimum_size = Vector2(130.0 * minf(4.0, options.size()), 0)
+	var fill := func(cur: Variant, again: Callable) -> void:
+		for c in holder.get_children():
+			c.queue_free()
+		holder.add_child(UIW.chips(cur, options, func(v):
+			on.call(v)
+			again.call(v, again)))
+	fill.call(current, fill)
+	return holder
+
+## A row of colour swatches (the chosen one ringed) and a picker for any other colour.
+static func _swatches(current: String, colours: Array, on: Callable) -> Control:
+	var box := UIW.hbox(6)
+	var buttons: Array = []
+	var mark := func(sel: String) -> void:
+		for b: Button in buttons:
+			var c := Color(b.get_meta("colour"))
+			var on_it: bool = c.to_html(false) == Color(sel).to_html(false)
+			for st in ["normal", "hover", "pressed", "focus"]:
+				b.add_theme_stylebox_override(st, UIKit.box(c, Color.WHITE if on_it else Color(1, 1, 1, 0.18), 3 if on_it else 1, 6))
+	for hex in colours:
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(30, 30)
+		b.set_meta("colour", hex)
+		b.focus_mode = Control.FOCUS_ALL
+		b.tooltip_text = hex
+		b.pressed.connect(func():
+			mark.call(hex)
+			on.call(hex))
+		buttons.append(b)
+		box.add_child(b)
+	var pick := ColorPickerButton.new()
+	pick.custom_minimum_size = Vector2(30, 30)
+	pick.color = Color(current)
+	pick.edit_alpha = false
+	pick.tooltip_text = I18n.t("Any colour")
+	pick.color_changed.connect(func(c: Color):
+		mark.call(c.to_html(false))
+		on.call("#" + c.to_html(false)))
+	box.add_child(pick)
+	mark.call(current)
+	return box
 
 # ----------------------------------------------------------------- event ---
 
@@ -894,15 +981,20 @@ static func _player_row(app: App, p: Dictionary, all_cars: Array, can_remove: bo
 		row.add_child(UIW.tag(I18n.t("BOT"), Color(1, 1, 1, 0.6), false))
 	var car_name := I18n.t("choosing…")
 	var thumb := ""
+	var shown_car := {}
 	if p.carId != null:
 		# a car the app no longer has shows as the one it is drawn as (CarsDb.FALLBACK)
 		var shown := CarsDb.resolve(str(p.carId))
 		car_name = shown.get("name", str(p.carId))
-		thumb = shown.get("thumbnail", "")
+		thumb = "car"
+		shown_car = shown
 	elif p.waiting:
 		car_name = I18n.t("next race")
 	if thumb != "":
-		row.add_child(UIW.image(thumb, Vector2(56, 30)))
+		var lv: Dictionary = p.get("livery", {}) if p.get("livery") is Dictionary and not (p.get("livery") as Dictionary).is_empty() else CarPaint.livery_for(str(p.id), int(p.num) if p.get("num") != null else -1)
+		if p.id == app.me:
+			lv = CarStudio.my_livery()
+		row.add_child(CarStudio.picture_rect(shown_car, lv, Vector2(56, 30)))
 	var car := UIKit.label(car_name, 15, UIKit.SOFT)
 	car.clip_text = true
 	car.custom_minimum_size = Vector2(150 if touch else 220, 0)

@@ -142,7 +142,25 @@ func _run() -> void:
 	_esc()
 	await _frames()
 	_ok(LobbyScreen._page == "hub", "Esc from a lobby page returns to the overview")
-	_ok(_count(app.ui, UIW.Stepper) == 0 and _count(app.ui, UIW.TabButton) == 5, "the overview shows the five weekend tabs")
+	_ok(_count(app.ui, UIW.Stepper) == 0 and _count(app.ui, UIW.TabButton) == 6, "the overview shows the six weekend tabs")
+	# the paint page: your car turning, its choices
+	LobbyScreen._page = "paint"
+	app.render_lobby()
+	await _frames()
+	_ok(_count(app.ui, CarStudio.Preview) == 1 and _count(app.ui, ColorPickerButton) >= 5, "the paint page shows your car and the colour choices")
+	if OS.get_environment("PAINT_SHOT") != "":
+		# a rendered run: the page as it looks, once the car has loaded and turned a little
+		await get_tree().create_timer(2.5).timeout
+		get_viewport().get_texture().get_image().save_png(OS.get_environment("PAINT_SHOT"))
+	if OS.get_environment("PAINT_SHOT") != "":
+		# the car page too: the big picture and the strip of cars (CarStudio's brand-free pictures)
+		LobbyScreen._page = "car"
+		app.render_lobby()
+		await get_tree().create_timer(4.0).timeout
+		get_viewport().get_texture().get_image().save_png(OS.get_environment("PAINT_SHOT").replace(".png", "_car.png"))
+	LobbyScreen._page = "hub"
+	app.render_lobby()
+	await _frames()
 
 	# the results from made-up rows, with the room closed (no championship is scored)
 	var ids: Array = CarsDb.selectable().map(func(c): return c.id)

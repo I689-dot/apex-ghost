@@ -43,13 +43,37 @@ func _ready() -> void:
 	data = load_settings()
 	I18n.set_lang(data.language)
 
+## The monitor the game's window belongs on: APEX_SCREEN, else the Display page's choice; -1 leaves it to the desktop.
+static func wanted_screen() -> int:
+	if OS.get_environment("APEX_SCREEN") != "":
+		return int(OS.get_environment("APEX_SCREEN"))
+	if Engine.get_main_loop() != null and (Engine.get_main_loop() as SceneTree).root.has_node("Settings"):
+		var st = (Engine.get_main_loop() as SceneTree).root.get_node("Settings")
+		return int(st.data.get("display", {}).get("screen", -1))
+	return -1
+
+## Moves the window to that monitor (the desktop places a new window on the main one whatever Godot asks).
+static func place_window() -> void:
+	var scr := wanted_screen()
+	if scr < 0 or scr >= DisplayServer.get_screen_count() or OS.has_feature("mobile"):
+		return
+	if DisplayServer.window_get_current_screen() == scr:
+		return
+	var mode := DisplayServer.window_get_mode()
+	if mode != DisplayServer.WINDOW_MODE_WINDOWED:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	DisplayServer.window_set_current_screen(scr)
+	if mode != DisplayServer.WINDOW_MODE_WINDOWED:
+		DisplayServer.window_set_mode(mode)
+
 static func default_settings() -> Dictionary:
 	return {
 		"nickname": "", "language": I18n.default_lang(), "quality": "medium", "qualityAuto": true, "graphics": {},
 		"resolutionScale": 1.0, "dynamicResolution": true, "refreshRate": 60, "fov": 58, "seatHeight": 0.0, "seatForward": 0.0,
 		# the window and the picture (Display page): windowed / borderless / fullscreen, vsync, a frame-rate cap (0: none),
+		# the monitor it opens on (-1: where the desktop puts it; APEX_SCREEN overrides),
 		# the upscaler used under a resolution scale below 100 %, and contrast / saturation over the game's own grade
-		"display": {"windowMode": "windowed", "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0},
+		"display": {"windowMode": "windowed", "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0, "screen": -1},
 		# the field-of-view calculator: the screen's visible width and the eyes' distance from it (cm)
 		"screen": {"widthCm": 60.0, "distanceCm": 70.0},
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,
@@ -62,6 +86,8 @@ static func default_settings() -> Dictionary:
 		"chase": {"distance": 1.0, "height": 1.0, "lag": 1.0}, "lookToApex": 1.0, "brightness": 1.0, "ai": {"difficulty": 1.0},
 		"carSetup": {"tyre": "medium", "wing": "medium", "brakeBias": 0.6, "pressure": null, "ride": [0, 0], "arb": [4, 4], "bump": [4, 4], "rebound": [4, 4], "fuelL": 60},
 		"savedSetups": {}, "ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
+		# your car's paint (CarPaint, the car page of the lobby): colours, finish, design, race number, rims, calipers
+		"livery": {"base": "#c8102e", "accent": "#f2f2f2", "finish": "gloss", "design": "stripes", "number": 7, "showNumber": true, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"},
 		"wheel": {"mode": "auto", "rotationDeg": 900, "brakeCurve": 1.0},
 		"pad": {
 			"deadzone": 0.06, "steerCurve": 1.7, "steerSpeed": 1.0, "speedSens": 0.5, "brakeCurve": 1.4, "throttleDeadzone": 0.04,
@@ -93,7 +119,13 @@ func load_settings() -> Dictionary:
 		merged.fov = defaults.fov
 	return merged
 
+## Tests run through tests/runner.gd: nothing is written to the player's settings file.
+static var testing := false
+
 func save() -> void:
+	if testing:
+		changed.emit()
+		return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(data))

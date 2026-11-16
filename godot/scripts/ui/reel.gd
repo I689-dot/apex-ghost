@@ -38,7 +38,11 @@ func _init(reel_shots: Array, opts: Dictionary = {}) -> void:
 		item.add_child(img)
 		item.set_meta("img", img)
 		if s.move == "car" and s.get("car") != null:
-			var car := UIW.image(s.car, Vector2.ZERO)
+			# a picture's path, or a texture (CarStudio's brand-free car)
+			var car := UIW.image(s.car, Vector2.ZERO) if s.car is String else TextureRect.new()
+			if s.car is Texture2D:
+				car.texture = s.car
+				car.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			car.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			car.set_anchors_preset(Control.PRESET_CENTER)
 			car.custom_minimum_size = Vector2(760, 380)

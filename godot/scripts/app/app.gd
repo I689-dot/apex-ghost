@@ -491,7 +491,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	var my_car = null
 	for c in cars.cars:
 		if c.id == my_info().get("carId"):
-			my_car = {"url": "res://assets/ui/cars/%s.webp" % c.id, "name": c.name}
+			my_car = {"url": CarStudio.picture(c, CarStudio.my_livery()), "name": c.name}
 	var reel := CinematicReel.new(CinematicReel.track_reel(str(tr.get("map", "")), I18n.t(tr.get("name", "")), my_car, I18n.t("RACE") if race.kind == "race" else I18n.t("QUALIFYING")), {"loop": true, "shotMs": 4600.0})
 	root.add_child(reel)
 	var center := CenterContainer.new()

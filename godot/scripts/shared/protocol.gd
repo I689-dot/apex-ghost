@@ -16,6 +16,28 @@ static func default_rules() -> Dictionary:
 	## cleanStreak (Time trial, solo only): a lap counts as the best only after another clean lap in a row, as in iRacing.
 	return {"contact": false, "pitWindow": false, "fuel": false, "raceControl": false, "cleanStreak": false}
 
+## A livery from the network, or {} when anything in it is wrong.
+static func clean_livery(lv: Dictionary) -> Dictionary:
+	var hex := RegEx.create_from_string("^#[0-9a-fA-F]{6}$")
+	var out := {}
+	for k in ["base", "accent", "numberColor", "rims", "calipers"]:
+		var c = lv.get(k)
+		if typeof(c) != TYPE_STRING or hex.search(c) == null:
+			return {}
+		out[k] = c
+	if not ["gloss", "metallic", "matte", "pearl"].has(lv.get("finish")):
+		return {}
+	if not ["plain", "stripes", "twotone", "fade", "side", "hoop"].has(lv.get("design")):
+		return {}
+	var n = lv.get("number")
+	if not (_num(n) and float(n) == floorf(float(n)) and n >= 0 and n <= 99) or typeof(lv.get("showNumber")) != TYPE_BOOL:
+		return {}
+	out.finish = lv.finish
+	out.design = lv.design
+	out.number = int(n)
+	out.showNumber = lv.showNumber
+	return out
+
 static func _str(v, max_len: int = 64) -> bool:
 	return typeof(v) == TYPE_STRING and (v as String).length() <= max_len
 
@@ -76,6 +98,10 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			return {"t": "chat", "text": line} if not line.is_empty() else {}
 		"leave":
 			return {"t": "leave"}
+		"setLivery":
+			# a driver's paint (CarPaint): colours as #rrggbb, a known finish and design, a number 0-99
+			var lv = v.get("livery")
+			return {"t": "setLivery", "livery": clean_livery(lv)} if typeof(lv) == TYPE_DICTIONARY and not clean_livery(lv).is_empty() else {}
 		"addBot":
 			return {"t": "addBot"}
 		"removeBot":
