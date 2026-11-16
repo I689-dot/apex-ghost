@@ -436,11 +436,6 @@ static func _driving(col: Control, changed: Callable) -> void:
 static func _interface(col: Control, changed: Callable) -> void:
 	var S: Dictionary = Settings.data
 	_packs(col)
-	_head(col, I18n.t("Language"))
-	col.add_child(_row("Language / Idioma", UIW.stepper(S.language, I18n.LANGUAGES, func(v):
-		S.language = v
-		I18n.set_lang(v)
-		changed.call())))
 	_head(col, I18n.t("On-screen displays"))
 	_select(col, I18n.t("Speed units"), "", S, "units", [["kmh", "km/h"], ["mph", "mph"]], changed)
 	_toggle(col, I18n.t("Performance overlay"), I18n.t("Frame time, network and draw calls in a corner"), S, "showPerf", changed)

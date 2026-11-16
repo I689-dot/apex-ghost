@@ -41,7 +41,6 @@ var _sessions := {}
 
 func _ready() -> void:
 	data = load_settings()
-	I18n.set_lang(data.language)
 
 ## The monitor the game's window belongs on: APEX_SCREEN, else the Display page's choice; -1 leaves it to the desktop.
 static func wanted_screen() -> int:
@@ -68,7 +67,7 @@ static func place_window() -> void:
 
 static func default_settings() -> Dictionary:
 	return {
-		"nickname": "", "language": I18n.default_lang(), "quality": "medium", "qualityAuto": true, "graphics": {},
+		"nickname": "", "quality": "medium", "qualityAuto": true, "graphics": {},
 		"resolutionScale": 1.0, "dynamicResolution": true, "refreshRate": 60, "fov": 58, "seatHeight": 0.0, "seatForward": 0.0,
 		# the window and the picture (Display page): windowed / borderless / fullscreen, vsync, a frame-rate cap (0: none),
 		# the monitor it opens on (-1: where the desktop puts it; APEX_SCREEN overrides),

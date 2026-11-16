@@ -43,8 +43,7 @@ func _run() -> void:
 	_ok(app.ui.theme != null and app.ui.theme == UIKit.theme, "the menu layer carries the theme")
 	var f := get_viewport().gui_get_focus_owner()
 	_ok(f != null and app.ui.is_ancestor_of(f), "the menu focuses a control for the pad (%s)" % (f.get_class() if f != null else "none"))
-	for lang in ["en", "es"]:
-		I18n.set_lang(lang)
+	for lang in ["en"]:
 		for t in ["play", "online", "friends"]:
 			MenuScreen._tab = t
 			app.show_menu()
@@ -63,7 +62,6 @@ func _run() -> void:
 			_ok(rows > 6 and panel.theme == UIKit.theme, "settings %s builds (%s): %d controls" % [page, lang, rows])
 			panel.queue_free()
 			await _frames(1)
-	I18n.set_lang("en")
 	MenuScreen._tab = "play"
 	CareerScreen._tab = "profile"
 

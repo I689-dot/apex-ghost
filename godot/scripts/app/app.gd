@@ -51,8 +51,6 @@ func _ready() -> void:
 	# a phone's CPU: the vehicle model runs at 60 Hz (the lap time holds within 0.3 % of 120 Hz)
 	if OS.has_feature("mobile"):
 		Engine.physics_ticks_per_second = 60
-	Settings.data.language = Settings.data.get("language", I18n.default_lang())
-	I18n.set_lang(Settings.data.language)
 	get_tree().root.theme = UIKit.build_theme()
 	_build_layers()
 	cars = CarsDb.file()
@@ -605,11 +603,7 @@ func set_replay(open: bool) -> void:
 	overlay_layer.add_child(replay_ui)
 
 func open_settings() -> void:
-	var lang := I18n.get_lang()
 	var panel := SettingsPanel.build(self, func():
-		if I18n.get_lang() != lang:
-			if screen == "menu":
-				show_menu()
 		if session != null:
 			session.apply_settings()
 		audio.set_levels(Settings.data.audio)

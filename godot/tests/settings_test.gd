@@ -17,8 +17,7 @@ func _ready() -> void:
 	var S: Dictionary = Settings.data
 	var changed := func(): pass
 	var show := func(_k): pass
-	for lang in ["en", "es"]:
-		I18n.set_lang(lang)
+	for lang in ["en"]:
 		for page in ["graphics", "display", "view", "driving", "interface", "audio"]:
 			var col := VBoxContainer.new()
 			add_child(col)
@@ -37,7 +36,6 @@ func _ready() -> void:
 					SettingsPanel._sound(col, changed)
 			_ok(col.get_child_count() > 3, "%s page builds (%s): %d rows" % [page, lang, col.get_child_count()])
 			col.queue_free()
-	I18n.set_lang("en")
 	# presets and the extra groups
 	S.quality = "ultra"
 	S.graphics = {}
