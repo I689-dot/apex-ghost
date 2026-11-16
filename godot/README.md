@@ -22,16 +22,29 @@ godotengine/webrtc-native 1.2.2) carries the Linux x86_64 and Android arm64 buil
 * `tools/godot/gd.sh tests/compile_all.gd` compiles every script.
 * `tools/godot/gd.sh tests/<name>.gd`: `simtest` (vehicle), `tracktest`, `roomtest`, `ailap` (`HZ=60` for the phone's physics rate),
   `conntest`, `prngtest`, `audiotest`, `p2ptest` (a race hosted on this device, needs network).
-* `tests/session_test.gd` runs a whole offline race (non-headless: it renders). Environment: `CAR_ID`, `WEATHER`, `TIME`,
-  `TELEPORT=<lap metres>`, `LATERAL=<m>`, `LINE=full`, `SHOT_DIR=<dir>` for screenshots.
+* `tests/session_test.gd` runs an offline session (non-headless: it renders). Environment: `CAR_ID`, `WEATHER`, `TIME`,
+  `TELEPORT=<lap metres>`, `LATERAL=<m>`, `LINE=full`, `SHOT_DIR=<dir>` for screenshots, `BOTS=<n>`, `AUTODRIVE=1`,
+  `RENDER_SCALE=1.3333` (a 1080p screen drawing 1440p's pixels), `TIMELINE=1` (frame time, GPU time and position per
+  half second), `BOT_REPORT=1`, `LIGHTS=brake|tail|off`. It prints the average fps and the 1 % low with what the
+  slowest frames spent their time on.
+* `tests/race_test.gd` runs a whole race weekend with a full grid (one minute of qualifying, then `RACE_LAPS` laps, the
+  AI driving every car) and checks the classification. `tests/features_test.gd` and `tests/menu_test.gd` check the
+  in-car features and every menu screen.
 * `APEX_AUTO=solo SHOT_DIR=… godot --path godot` plays menu → lobby → briefing → race by itself; `APEX_AUTO=intro` shows the intro.
 * `APEX_PROF=1` prints a per-section CPU profile; the performance overlay (Settings → General) shows it on a device.
+  `APEX_PROF_SPIKES=<ms>` also prints the sections of every frame longer than that.
 
 ## Android
 
 `export_presets.cfg` has the Android preset (arm64, package `app.apexghost.racing.godot`, so it installs next to the old app).
 Debug build: `godot --headless --path godot --export-debug Android ../build/apex-ghost-godot.apk` (the Android SDK and JDK paths are in
-the editor settings; Godot's debug keystore signs it). A release build needs a keystore in the preset's options.
+the editor settings; Godot's debug keystore signs it).
+Release build: the keystore stays outside the repo, and Godot reads it from the environment:
+`env $(cat ~/.config/apex-ghost/release-keystore.env) godot --headless --path godot --export-release Android ../build/apex-ghost-godot.apk`
+(`GODOT_ANDROID_KEYSTORE_RELEASE_PATH`, `_USER`, `_PASSWORD`). The Android SDK (build tools 35, platform tools) is in
+`~/Android/Sdk` (`android sdk install build-tools/35.0.0 platform-tools`), the JDK path is
+`/usr/lib/jvm/java-21-openjdk-amd64` in the editor settings. The APK is about 1.6 GB (the cars at full detail); Spa
+is not in it (a download).
 
 Phone adaptations (a Pixel 10a is the reference): physics at 60 Hz (the lap time holds within 0.3 %), dynamic resolution from the GPU's
 time, forest and far scenery capped on Medium, ground overlays and shells for High / Ultra, the mirror without the far scenery.
@@ -66,6 +79,17 @@ a full page for each; a car is picked automatically (the last one used).
 (on Wayland a covered, vsync'd window gets no frames and the laps crawl; real time: the
 physics does not survive a faster clock) drives laps with the AI alone and writes `data/ai_learned/<layout>.json`, a grip
 multiplier per 25 m that every bot plans with (AiDriver.learned_grip). Retrain after changing the tyres or the cars.
+
+## Cars
+
+The line-up is built from the user's models (docs/spa-rebuild/milestone-6-cars.md):
+`python3 -I tools/godot/build-cars.py <unzipped CAR-MODELS dir> [--car <id>]`, then `godot --headless --path godot --import`.
+For each car: `car_prep.py` (Blender: material names, liveries, mirrored and turned exports), the web game's
+`convert_car.py` (read-only), `car-lods.mjs` (cockpit / lod0 at full detail, lod1 for other cars near you, lod2 far;
+light materials kept apart), `tail-lights.mjs` (the rear lamps' glow maps). The cockpit eye defaults to 0.58 m behind and
+0.30 m above the steering wheel (`seat_eye`). Lamps in materials not named `LIGHT_TAIL_` are listed in
+`CarVisual.TAIL_LAMPS` (and `'tail'` in build-cars.py); screens that are only faces of the dash in
+`DashDisplay.OVERLAYS`.
 
 ## Track packs (downloads)
 

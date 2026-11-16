@@ -70,11 +70,12 @@ automatic lift no longer pushes it into the roof.
 | scene | avg fps | 1 % low |
 |---|---|---|
 | no bots | 67 | 40 |
-| 11 bots, full-detail cars | 41.3 | 15.3 |
-| 11 bots, after the CPU work (DECISIONS: "a full grid's CPU cost") | 60.1 | 31.4 |
-| 11 bots, nearby cars drawn (both rows above were measured without them) | 40.3 | 15.7 |
+| full grid (10 cars), full-detail cars | 41.3 | 15.3 |
+| full grid, after the CPU work (DECISIONS: "a full grid's CPU cost") | 60.1 | 31.4 |
+| full grid, nearby cars drawn (both rows above were measured without them) | 40.3 | 15.7 |
+| full grid, after the slow-frame fixes (DECISIONS: "the full grid's slowest frames") | 66.1 | 43.5 |
 
-With a full grid the frame was CPU-bound: about 24 ms of process time, 9 ms of it physics, and about 2,900 draws. The
+A grid is at most 10 cars: a room gives each car to one driver. With a full grid the frame was CPU-bound: about 24 ms of process time, 9 ms of it physics, and about 2,900 draws. The
 user chose full detail everywhere and accepted about 40 fps with full grids (option B). After that, the bots' driving
 moved to 60 Hz with cheaper track lookups, and the tyre forces' per-step terms are no longer recomputed in each
 sub-step: process time 18.7 ms, physics 6.3 ms a frame.

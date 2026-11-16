@@ -1334,14 +1334,14 @@ The user asked for a completely new, more modern and more intuitive menu, taking
 - **Nine new cars on the old ids** (`tools/godot/build-cars.py`): each keeps the replaced car's specs, engine sound and bot setup; only the models change. The other 16 cars are gone from the app; an id the server still lists draws as the closest remaining car (`CarsDb.FALLBACK`, e.g. a Huracán as the R8).
 - **Liveries from the zips**: the Audi, Porsche and NASA AMG ship theirs as separate textures the models never referenced (applied in `car_prep.py`, flipped where stored DirectX-style); the placeholder "00" door boards are dropped where the livery has its own number.
 - **Full detail near, as the user asked**: cockpit and your own car from outside are the source models unsimplified (302k-2.56M triangles), other cars near you ~400k, far ~80k; Godot's own generated mesh LODs are off for the car files (they turned curves into facets).
-- **Same-material pieces merged** per named part (`join`, keepNamed): about half the draw calls (a 12-car grid at Ultra 1440p: 47 -> 52 fps average).
+- **Same-material pieces merged** per named part (`join`, keepNamed): about half the draw calls (a full grid at Ultra 1440p: 47 -> 52 fps average).
 - **Cockpit eyes count as tuned**: the auto-lift ray-tested whole meshes, and these models keep the windscreen in the body mesh, so it always lifted the eye 14 cm into the roof.
 - **The safety car is the Vantage GT3** (its model fields, its own id and role), green paint by brightness over the Vantage livery and an amber roof light bar that flashes while deployed (`SafetyCarLook`).
 - `tools/godot/sync-assets.sh` refuses to run unless FORCE_SYNC=1: its mirror would delete the Godot-only Spa and car files.
 
 ## Godot: a full grid's CPU cost (2026-11-16)
 
-A 12-car grid at Spa (Ultra, 1440p) ran at 41.3 fps average with a 15.3 fps 1 % low: CPU-bound, about 9 ms of every frame in the cars' physics and the bots' driving, and more physics steps fall into each frame as the frame rate drops.
+A full grid at Spa (Ultra, 1440p) ran at 41.3 fps average with a 15.3 fps 1 % low: CPU-bound, about 9 ms of every frame in the cars' physics and the bots' driving, and more physics steps fall into each frame as the frame rate drops.
 
 - **Bots decide at 60 Hz** (`RaceSession.AI_HZ`; half the grid one physics step, half the next); their controls hold between decisions and their cars' physics still runs at 120 Hz. A Spa bot lap is the same either way (`tests/ailap.gd` with `AI_DIV`: 2:39.064 against 2:38.999).
 - **The bots' track lookups**: the sharpest curve in the next 120 m is a per-point table built once per track (`AiDriver.curvature_ahead`), not 13 searches each decision; the nearest-point search looks ±8 points around the last one, not ±30 (a car moves under 2 m between decisions, the points are 5 m apart). The lap comes out the same to the millisecond.
@@ -1361,8 +1361,17 @@ The user asked for realistic rear lights on every car. They were a whole materia
 
 ## Godot: the full grid's slowest frames (2026-11-16)
 
-With the nearby cars drawn, Spa at 1440p Ultra with 11 bots ran at 40.3 fps average, 15.7 at the 1 % low. `tests/session_test.gd` now breaks down the slowest 1 % of frames (process, physics, render, GPU, physics steps) with a timeline of where the car was (`TIMELINE`), and `APEX_PROF_SPIKES=<ms>` prints the sections of each slow frame.
+With the nearby cars drawn, Spa at 1440p Ultra with a full grid ran at 40.3 fps average, 15.7 at the 1 % low. `tests/session_test.gd` now breaks down the slowest 1 % of frames (process, physics, render, GPU, physics steps) with a timeline of where the car was (`TIMELINE`), and `APEX_PROF_SPIKES=<ms>` prints the sections of each slow frame.
 
 - **The HUD's tyre panel redrew the car's line drawing (about 10 ms) at every degree of tyre temperature** (`CarStatus`): it only shows the damage, so it is redrawn when that changes. A long frame put 3-5 physics steps into the next, which was long too: most of the slow frames started there, and it cost about 8 ms a frame on average.
 - **Spa's near forest on the climb from Raidillon up Kemmel** was the slowest scenery (GPU 24.4 ms, 36 fps there with no other cars). The near models' range went from 0.6 to 0.49 of the preset's (108 m on Ultra), and the near trees cast shadows to 30 m, not 45 (`SpaLook.FOREST_NEAR_SCALE`, `FOREST_SHADOW`): 20.1 ms. Measured there: the full models' range (30 m) kept, as a shorter one showed a seam; shadow map size, AO, scenery and soft shadows cost nothing measurable.
 - Result, two runs: **65.6 and 66.6 fps average, 43.2 and 43.8 at the 1 % low**, worst frame 24 ms. The slowest frames are now on the GPU (about 20 ms, Kemmel).
+
+**The full grid is 10 cars** (measured afterwards with `tests/race_test.gd`): a room gives each car to one driver, and the line-up now has 10 cars, so the "11 bots" asked for in these measurements were 9 bots and the player. The old line-up of 25 cars allowed the room's 12.
+
+## Godot: the rebuild's final checks and the APK (2026-11-16)
+
+- **Checks**: `compile_all` (130 scripts), `settings_test`, `setup_codes_test`, `prngtest`, `lapdelta_test`, `replay_test`, `menu_test` (51), `chat_test`, `time_trial_test`, `roomtest`, `pack_test` (13), `simtest`, `features_test` (29, rendered), `ailap` (Spa 2:39.0, Zandvoort 1:47.1, no resets): no failures. `conntest` and `p2ptest` reach the live server and were not run.
+- **A full offline race weekend at Spa** (`tests/race_test.gd`, new): one minute of qualifying, then 2 laps with the full grid of 10, every car driven by the AI. All 10 classified in order, all finished both laps, the field within 16 s at the flag; about 106 fps average at Medium in a 1280 x 720 window.
+- **The APK** (`build/apex-ghost-godot.apk`, arm64, release): 1.58 GB, almost all of it the cars at full detail (the user: the size is fine). Signed with a new key (the old one is lost, as agreed: a phone with the old app must uninstall it first), kept outside the repo in `~/.config/apex-ghost/` and passed to Godot through `GODOT_ANDROID_KEYSTORE_RELEASE_*`. Spa is not in it: it comes as the download once the packs are hosted (until then a phone can fetch it from `tools/godot/pack-server.py` on the same network, `APEX_PACKS_URL`).
+- The phone's frame rate with the full-detail cars is not measured yet: if it falls short, lighter phone models for the cars (lod1 with 2K textures for your car, lod2 for the others) are the first step.
