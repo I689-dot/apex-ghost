@@ -533,14 +533,25 @@ func _update_bot_tyres() -> void:
 		if b.bot:
 			b.tyre = tyre
 
-## Host adds an AI driver with a random free car (respects the car locks).
+## Host adds an AI driver with a random free car (respects the car locks). With every car taken (the line-up has fewer
+## cars than the room has places), the bot shares one of the cars the fewest drivers have: the grid still fills.
 func _add_bot(host: Player) -> void:
 	if host.id != host_id or phase != "lobby":
 		return
 	if players.size() >= Const.MAX_PLAYERS:
 		_send(host, {"t": "error", "code": "room_full", "message": "Room is full (%d players)." % Const.MAX_PLAYERS, "fatal": false})
 		return
-	var free: Array = (env.car_ids if env.car_ids != null else []).filter(func(c): return not car_locks.has(c))
+	var all: Array = env.car_ids if env.car_ids != null else []
+	var free: Array = all.filter(func(c): return not car_locks.has(c))
+	var shared := false
+	if free.is_empty() and not all.is_empty():
+		var uses := {}
+		for x in players.values():
+			if x.car_id != null:
+				uses[x.car_id] = int(uses.get(x.car_id, 0)) + 1
+		var least: int = all.map(func(c): return int(uses.get(c, 0))).min()
+		free = all.filter(func(c): return int(uses.get(c, 0)) == least)
+		shared = true
 	if free.is_empty():
 		_send(host, {"t": "error", "code": "car_taken", "message": "No free car left for a bot.", "fatal": false})
 		return
@@ -576,7 +587,8 @@ func _add_bot(host: Player) -> void:
 	bot.num = num
 	bot.tyre = "wet" if Weather.plan_weather(conditions.seed, conditions).initialWetness > 0.35 else "medium"
 	players[bot.id] = bot
-	car_locks[car_id] = bot.id
+	if not shared:
+		car_locks[car_id] = bot.id
 	_persist()
 	_broadcast_room()
 
