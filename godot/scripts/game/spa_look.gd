@@ -475,7 +475,11 @@ static func _hidden() -> StandardMaterial3D:
 
 ## Spa's forest stands up to the track all round (build_forest.py plants it every 6.5 m): the models' range is cut so
 ## Ultra draws about as many as at the Nordschleife (10,500 trees within 220 m: 36 fps on the RX 7600 XT at 1440p).
-const FOREST_NEAR_SCALE := 0.6
+## 0.49 (108 m on Ultra) with FOREST_SHADOW: the climb from Raidillon up the Kemmel straight, forest close on both
+## sides, was the lap's slowest stretch (GPU 24.4 ms, 36 fps at 1440p Ultra with no other cars; 20.1 ms, 46 fps now).
+const FOREST_NEAR_SCALE := 0.49
+## How far Spa's near trees cast shadows (45 m before: 1.5 x FOREST_HERO; the tree shadows were 4 ms of that stretch).
+const FOREST_SHADOW := 30.0
 ## Spa's full tree models out to 30 m (60 elsewhere): the far models keep the crowns' cover (build_trees.py) and the
 ## change is a blend (Forest.fades), so it is hard to see; the full layer reaches the range + Forest.HERO_BAND +
 ## PICK_MARGIN. Ultra at 2560 x 1440 (60 s drive from 0.5 km): 30 m 67 fps average / 40 at the 1 % low, 40 m 59 / 35

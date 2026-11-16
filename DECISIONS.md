@@ -1358,3 +1358,11 @@ The user asked for realistic rear lights on every car. They were a whole materia
 - **The Vantage and the Ferrari** name their lamp materials (`CarVisual.TAIL_LAMPS`, `--also`): the Vantage's glass, the Ferrari's red strip. The Vantage's glow maps are added to its installed models (they come from the web game's pipeline, which is not touched).
 - **Light materials stay apart in the merge** (`car-lods.mjs`: tagged by role before `dedup`).
 - **Levels**: off by day, tail lamps 2.2 with the headlights or at dusk, braking adds 4 (the same LEDs driven harder). Higher levels turned pink-white in the AgX tone mapping by day. Braking passes the bloom threshold, so it spreads a soft halo at night. A smoked cover over the lamps lets more of them through (the BMW M4 Evo's hid them), and glass that glows itself counts half.
+
+## Godot: the full grid's slowest frames (2026-11-16)
+
+With the nearby cars drawn, Spa at 1440p Ultra with 11 bots ran at 40.3 fps average, 15.7 at the 1 % low. `tests/session_test.gd` now breaks down the slowest 1 % of frames (process, physics, render, GPU, physics steps) with a timeline of where the car was (`TIMELINE`), and `APEX_PROF_SPIKES=<ms>` prints the sections of each slow frame.
+
+- **The HUD's tyre panel redrew the car's line drawing (about 10 ms) at every degree of tyre temperature** (`CarStatus`): it only shows the damage, so it is redrawn when that changes. A long frame put 3-5 physics steps into the next, which was long too: most of the slow frames started there, and it cost about 8 ms a frame on average.
+- **Spa's near forest on the climb from Raidillon up Kemmel** was the slowest scenery (GPU 24.4 ms, 36 fps there with no other cars). The near models' range went from 0.6 to 0.49 of the preset's (108 m on Ultra), and the near trees cast shadows to 30 m, not 45 (`SpaLook.FOREST_NEAR_SCALE`, `FOREST_SHADOW`): 20.1 ms. Measured there: the full models' range (30 m) kept, as a shorter one showed a seam; shadow map size, AO, scenery and soft shadows cost nothing measurable.
+- Result, two runs: **65.6 and 66.6 fps average, 43.2 and 43.8 at the 1 % low**, worst frame 24 ms. The slowest frames are now on the GPU (about 20 ms, Kemmel).

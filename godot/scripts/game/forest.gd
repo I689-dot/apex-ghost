@@ -45,6 +45,8 @@ var near_scale := 1.0
 var fades := false
 ## How far trees are drawn as their full models unless the quality says (forestHero); a circuit can set its own.
 var hero_m := 60.0
+## The circuit's own tree shadow range (m), or 0: SHADOW_REACH x hero_m.
+var shadow_m := 0.0
 ## Half the width of the full / light model blend about the hero range, and the width of the light model / card blend
 ## beyond the near range (m); the margin each layer is picked with for the travel between picks.
 const HERO_BAND := 5.0
@@ -111,6 +113,7 @@ func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 		species_file = "res://assets/vegetation/trees_spa.glb"
 		near_scale = SpaLook.FOREST_NEAR_SCALE
 		hero_m = SpaLook.FOREST_HERO
+		shadow_m = SpaLook.FOREST_SHADOW
 		# FOREST_NO_FADE: hard level changes (measuring what the blends cost)
 		fades = OS.get_environment("FOREST_NO_FADE") == ""
 	var ref = track_data.get("forest", null)
@@ -513,7 +516,7 @@ func update(cam: Vector3, q: Dictionary, force: bool = false) -> void:
 		near_d2.append(pow(near_range(quality) * sp.near_share + ((FAR_BAND + PICK_MARGIN) if b else 0.0), 2.0))
 	var nd: float = quality.forestNearDensity
 	var hero_d2 := pow(hero_range(quality), 2.0)
-	var shadow_d2 := hero_d2 * SHADOW_REACH * SHADOW_REACH
+	var shadow_d2 := pow(shadow_range(quality), 2.0)
 	# blended: the full layer out to the hero range + the band + the margin, the light one in from as far inside
 	var full_d2 := pow(hero_range(quality) + HERO_BAND + PICK_MARGIN, 2.0)
 	var light_d2 := pow(maxf(0.0, hero_range(quality) - HERO_BAND - PICK_MARGIN), 2.0)
@@ -569,6 +572,11 @@ const SHADOW_REACH := 1.5
 
 func hero_range(q: Dictionary) -> float:
 	return float(q.get("forestHero", hero_m))
+
+## How far the near trees cast shadows (the light shadow models): the quality's "forestShadow", else the circuit's own
+## (shadow_m), else SHADOW_REACH x its hero range (not the quality's: a shorter full-model range keeps the shadows).
+func shadow_range(q: Dictionary) -> float:
+	return float(q.get("forestShadow", shadow_m if shadow_m > 0.0 else hero_m * SHADOW_REACH))
 
 ## Total trees drawn as models (near).
 func drawn() -> int:

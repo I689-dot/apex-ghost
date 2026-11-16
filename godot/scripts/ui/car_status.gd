@@ -103,7 +103,9 @@ func set_car(entry: Dictionary, lines: TopView.Lines) -> void:
 ## The car's line drawing (renderTopLines): it replaces the damage blocks.
 func set_lines(entry: Dictionary, lines: TopView.Lines) -> void:
 	art.set_car(entry, lines)
-	_show_lines([0.0, 0.0, 0.0, 0.0, 0.0])
+	_show_lines(_lines_zones if not _lines_zones.is_empty() else [0.0, 0.0, 0.0, 0.0, 0.0])
+
+var _lines_zones: Array = []
 
 func _show_lines(zones: Array) -> void:
 	if art.lines == null:
@@ -132,7 +134,11 @@ func update_status(temps: Array, zones, abs_on: bool, tc_on: bool, compound: Str
 	var cmap := {"c": Color("5ec8ff"), "o": Color("30d158"), "h": Color("ff9f0a"), "f": Color("ff453a")}
 	for i in 4:
 		_brake_cols[i] = cmap[bk[i] if i < bk.size() else "c"]
-	_show_lines(z)
+	# the line drawing shows only the damage: redrawn when that changes (about 10 ms of work: it was redone at every
+	# degree of tyre temperature, a third of the slowest frames with a full grid)
+	if z != _lines_zones:
+		_lines_zones = z
+		_show_lines(z)
 	queue_redraw()
 
 func _u(v: Vector2) -> Vector2:

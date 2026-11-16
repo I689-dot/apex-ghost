@@ -977,6 +977,8 @@ func _physics_process(dt: float) -> void:
 	if not running or vehicle == null:
 		return
 	Prof.b("S.physics")
+	if Prof.spike_ms > 0.0:
+		Prof._cur["#steps"] = Prof._cur.get("#steps", 0) + 1
 	_physics_inner(dt)
 	Prof.e("S.physics")
 
