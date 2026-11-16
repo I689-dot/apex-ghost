@@ -1382,3 +1382,12 @@ With the nearby cars drawn, Spa at 1440p Ultra with a full grid ran at 40.3 fps 
 
 - **Report: "when crashing a car, the screen freezes for a few seconds".** Cause: each hit dented the body on the CPU, copying the body's geometry and moving every vertex in GDScript, then recomputing its normals: 0.5-2.3 s a hit with the full-detail cars (`tests/dent_bench.gd`), several hits in a crash. Fix: `CarVisual.dent` keeps the impacts (up to 8, a hit near an earlier one deepens it) for the paint shader to apply on the GPU: 0.1 ms. Until the paint shader is in, the body does not deform (sparks, debris, smoke, the damage panel and the handling effects are as before).
 - **Report: "a huge gray thing in the middle of the road that cars trespass", at Spa's start.** Cause: without car contact, another car near the camera faded to 15 % and no further, and other cars fade by stochastic transparency (alpha hash): a car right behind yours on the grid, between it and the chase camera, became a speckled grey shell over the road. Fix: such a car goes completely within 4 m of the camera and is whole from 8.5 m (`RaceSession.near_fade`). Cars already pass through each other without the contact rule (off by default).
+
+## Godot: the web game's new HUD (2026-11-16)
+
+The user asked for the HUD of the deployed website (web commit 78f0aeb, 2026-11-13) in the game:
+- **The driver's dial** (`HudDial`, after `ui/dial.ts`) in the bottom right: a ring of revs round a dark face (white, amber in the shift zone, blue at the cut, the zones marked), the gear big with the speed under it, the headlight / TC / ABS / engine lamps beside the gear, the fuel as a bar below (litres and laps, pulsing when low). It replaces the shift lights, the rev bar, the speed and the fuel label; the HUD setting "rev lights" switches the ring.
+- **The inputs widget** beside the dial, without the gear and the speed (they are on the dial): 400 px wide.
+- **The relative list** bottom left over the tyres; **the map** under the lap times, 200 px wide.
+- **The HUD scales to the window** on a computer: full size from 1600 x 900 up, smaller below (to 0.58), times the player's HUD size. A phone keeps its layout (the corners are the touch controls), with the dial in the bottom centre.
+- `tests/session_test.gd` `SHOW_HUD=1` draws the HUD as the app does.

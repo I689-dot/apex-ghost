@@ -87,6 +87,13 @@ func _run() -> void:
 	if OS.get_environment("HIDE_OUTSIDE") != "" and session.my_visual._outside_root != null:
 		# debugging: is the exterior model drawn inside the cockpit view?
 		session.my_visual._outside_root.visible = false
+	if OS.get_environment("SHOW_HUD") != "" and session.hud != null:
+		# the race HUD as the app shows it (its own canvas layer over the 3D)
+		var layer := CanvasLayer.new()
+		layer.layer = 5
+		add_child(layer)
+		layer.add_child(session.hud)
+		UIKit.full(session.hud)
 	if OS.get_environment("SKIP_INTRO") != "" and session.cinematic != null:
 		session.cinematic.skip()
 	if OS.get_environment("TELEPORT") != "":

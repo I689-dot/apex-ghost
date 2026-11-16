@@ -2629,6 +2629,8 @@ func race_control_hud(server_now: float) -> Dictionary:
 		"flag": flag, "flagText": flag_text,
 		"fuelText": "" if fuel < 0.0 else I18n.t("FUEL {l} L · {laps} LAPS", {"l": "%.1f" % fuel, "laps": "%.1f" % laps}),
 		"fuelLow": fuel >= 0.0 and laps < 2.0,
+		# the dial's fuel bar: share of the tank, litres, laps left ({} without the fuel rule)
+		"fuel": {} if fuel < 0.0 else {"frac": fuel / float(VehicleConsts.FUEL.tankL), "litres": fuel, "laps": laps},
 	}
 
 ## Session clock: time left until the chequered flag (the flag falls at start + session length).
@@ -3116,7 +3118,7 @@ func update_spectator_ui(server_now: float, dt: float) -> void:
 		"brakeTemps": [0.0, 0.0, 0.0, 0.0], "slipstream": 0.0, "resetHint": false, "tyreTemps": [0.0, 0.0, 0.0, 0.0],
 		"flag": "sc" if sc_course else ("fcy" if rc.course == "fcy" else ""),
 		"flagText": I18n.t("SAFETY CAR · NO OVERTAKING") if sc_course else (I18n.t("FCY · {kmh} KM/H", {"kmh": int(RaceControl.C.fcyKmh)}) if rc.course == "fcy" else ""),
-		"fuelText": "", "fuelLow": false,
+		"fuelText": "", "fuelLow": false, "fuel": {},
 	})
 	map_timer -= dt
 	if map_timer <= 0.0 and r != null:
@@ -3176,7 +3178,7 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 		"pitText": I18n.t("PIT BOX") if pit_hold else (I18n.t("PIT LANE · LIMITER {n}", {"n": int(pit.lane.speedLimitKmh)}) if pit != null and pit.in_lane else ""),
 		"compound": v.compound.id, "tyreWear": v.wheels.map(func(w): return w.wear), "brakeTemps": v.wheels.map(func(w): return w.brake_temp),
 		"slipstream": v.wake.strength, "resetHint": stuck_time > 3.0, "tyreTemps": v.wheels.map(func(w): return w.temp),
-		"damageZones": damage.zones, "throttle": v.pedals.throttle, "brake": v.pedals.brake, "steer": v.steer_angle / v.max_steer,
+		"damageZones": damage.zones, "headlights": headlights_on, "throttle": v.pedals.throttle, "brake": v.pedals.brake, "steer": v.steer_angle / v.max_steer,
 	}
 	state.merge(rc_hud)
 	hud.update_state(state)

@@ -4,9 +4,6 @@ extends Control
 ## shift lights, gear and speed, the minimap or the circuit map, race messages, flags, the pit banner, the status
 ## instrument and the damage report, and the race overlays. Built from Controls; update_state() every frame.
 
-var _speed := Label.new()
-var _unit := Label.new()
-var _gear := Label.new()
 var _lap := Label.new()
 var _lap_tag := Label.new()
 var _pos := Label.new()
@@ -22,18 +19,16 @@ var _pit_banner := Label.new()
 var _pit_panel := PanelContainer.new()
 var _flag := Label.new()
 var _flag_panel := PanelContainer.new()
-var _fuel := Label.new()
 var _draft := Label.new()
 var _wrong := Label.new()
 var _wrong_panel := PanelContainer.new()
 var _reset_hint := Label.new()
-var _rpm_fill := ColorRect.new()
-var _rpm_bar := Control.new()
-var _leds: Array = []
+## The driver's dial (bottom right): revs, gear, speed, lamps, fuel (as the web game's since 2026-11-13).
+var dial := HudDial.new()
 var _board := VBoxContainer.new()
 var _tl := HBoxContainer.new()
 var _tr := VBoxContainer.new()
-var _bc := VBoxContainer.new()
+var _bc := HBoxContainer.new()
 var _br := Control.new()
 var _bl := Control.new()
 var _times_grid := GridContainer.new()
@@ -43,7 +38,6 @@ var status := CarStatus.new()
 var damage_panel := DamagePanel.new()
 var overlays := RaceOverlays.new()
 var timing := TimingScreen.new()
-var _last_rpm_pct := -1
 var _last_pen_key := ""
 var _board_key := ""
 var _hud_key := ""
@@ -154,69 +148,31 @@ func _build() -> void:
 	_style(_delta, 24, 800)
 	_tr.add_child(_delta)
 	_tr.add_child(overlays.delta_bar)
-	_tr.add_child(overlays.relative)
+	# the relative list: bottom left over the tyres, as in the sims (a phone keeps it here, its corners are the
+	# touch controls')
+	if touch:
+		_tr.add_child(overlays.relative)
 
-	# bottom centre: shift lights, rpm bar, gear and speed, fuel, inputs
-	_bc.add_theme_constant_override("separation", 4)
+	# bottom right: the inputs widget beside the driver's dial (bottom centre on a phone)
+	_bc.add_theme_constant_override("separation", 12)
 	_bc.alignment = BoxContainer.ALIGNMENT_END
 	add_child(_bc)
-	var leds_row := HBoxContainer.new()
-	leds_row.add_theme_constant_override("separation", 4)
-	leds_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	for i in 10:
-		var led := Panel.new()
-		led.custom_minimum_size = Vector2(14, 6)
-		led.add_theme_stylebox_override("panel", UIKit.box(Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 0, 3))
-		leds_row.add_child(led)
-		_leds.append(led)
-	_bc.add_child(leds_row)
-	_rpm_bar.custom_minimum_size = Vector2(220, 4)
-	_rpm_bar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	var rpm_bg := ColorRect.new()
-	rpm_bg.color = Color(1, 1, 1, 0.15)
-	UIKit.full(rpm_bg)
-	_rpm_bar.add_child(rpm_bg)
-	_rpm_fill.color = Color.WHITE
-	_rpm_fill.size = Vector2(0, 4)
-	_rpm_bar.add_child(_rpm_fill)
-	_bc.add_child(_rpm_bar)
-	var speedo := HBoxContainer.new()
-	speedo.alignment = BoxContainer.ALIGNMENT_CENTER
-	speedo.add_theme_constant_override("separation", 14)
-	_style(_gear, 54, 800, UIKit.ACCENT_2)
-	_gear.text = "N"
-	_gear.custom_minimum_size.x = 35
-	_gear.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	speedo.add_child(_gear)
-	var sp := HBoxContainer.new()
-	sp.add_theme_constant_override("separation", 5)
-	_style(_speed, 51, 800)
-	_speed.text = "0"
-	_speed.custom_minimum_size.x = 90
-	_speed.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	sp.add_child(_speed)
-	_style(_unit, 14, 500, UIKit.MUTED)
-	sp.add_child(_unit)
-	speedo.add_child(sp)
-	_speedo = speedo
-	_bc.add_child(speedo)
-	var fuel_panel := PanelContainer.new()
-	fuel_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.45), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1)))
-	_style(_fuel, 14, 700)
-	fuel_panel.add_child(_fuel)
-	fuel_panel.visible = false
-	_fuel_panel = fuel_panel
-	_bc.add_child(fuel_panel)
+	overlays.inputs.size_flags_vertical = Control.SIZE_SHRINK_END
 	_bc.add_child(overlays.inputs)
+	_bc.add_child(dial)
 
-	# bottom right: minimap or the circuit map
+	# the minimap or the circuit map: under the lap times (the bottom right corner is the dial's)
 	add_child(_br)
 	_br.add_child(mini_map)
 	_br.add_child(circuit_map)
 	circuit_map.visible = false
 	# bottom left: status instrument
 	add_child(_bl)
-	_bl.add_child(status)
+	_bl_col.add_theme_constant_override("separation", 8)
+	_bl.add_child(_bl_col)
+	if not touch:
+		_bl_col.add_child(overlays.relative)
+	_bl_col.add_child(status)
 	add_child(damage_panel)
 	add_child(overlays.spot_l)
 	add_child(overlays.spot_r)
@@ -267,8 +223,8 @@ func _build() -> void:
 	resized.connect(_layout)
 
 var _times_cur_lbl: Label
-var _speedo: HBoxContainer
-var _fuel_panel: PanelContainer
+## Bottom left: the relative list over the tyres (desktop).
+var _bl_col := VBoxContainer.new()
 
 func _msg_box(kind: String = "info") -> StyleBoxFlat:
 	var s := UIKit.box(Color(10 / 255.0, 12 / 255.0, 16 / 255.0, 0.8), Color(0, 0, 0, 0), 0, 4, Vector2(10, 3))
@@ -281,15 +237,14 @@ func _layout() -> void:
 	var s := size
 	if s.x <= 0:
 		return
-	var hs: Dictionary = Settings.data.hud
-	var sc := float(hs.scale)
+	var sc := hud_scale()
 	_tl.position = Vector2(20, 18)
 	_tl.scale = Vector2(sc, sc)
 	_tr.size.x = 0
 	_tr.position = Vector2(s.x - 20.0 - _tr.get_combined_minimum_size().x * sc, 18)
 	_tr.scale = Vector2(sc, sc)
 	_bc.size = Vector2(0, 0)
-	_bc.position = Vector2((s.x - _bc.get_combined_minimum_size().x * sc) / 2.0, s.y - 22.0 - _bc.get_combined_minimum_size().y * sc)
+	_place_bc()
 	_bc.scale = Vector2(sc, sc)
 	if touch:
 		# the pedals and the steering pad take the bottom corners: the map sits at the right edge above the pedals'
@@ -302,12 +257,11 @@ func _layout() -> void:
 		_br.position = Vector2(s.x - 14.0 - mw * msc, s.y * 0.25)
 		_br.scale = Vector2(msc, msc)
 		var steer_top := s.y - 12.0 * k - 118.0 * u * k
-		_bl.position = Vector2(14, steer_top - 10.0 - status.size.y * sc * 0.8)
+		_bl.position = Vector2(14, steer_top - 10.0 - _bl_height() * sc * 0.8)
 		_bl.scale = Vector2(sc * 0.8, sc * 0.8)
 	else:
-		_br.position = Vector2(s.x - 18.0 - 220.0 * sc, s.y - 18.0 - 220.0 * sc)
-		_br.scale = Vector2(sc, sc)
-		_bl.position = Vector2(18, s.y - 18.0 - status.size.y * sc)
+		_place_map()
+		_bl.position = Vector2(18, s.y - 18.0 - _bl_height() * sc)
 		_bl.scale = Vector2(sc, sc)
 	damage_panel.position = Vector2(20, s.y * 0.26)
 	damage_panel.scale = Vector2(sc, sc)
@@ -321,6 +275,42 @@ func _layout() -> void:
 	_center(_draft, s.y - 118.0 - 14.0)
 	_center(_reset_hint, s.y - 140.0 - 24.0)
 	timing.position = Vector2((s.x - timing.size.x) / 2.0, s.y * 0.12)
+
+## The HUD's size: the player's scale, and on a computer the window's (as the web game's fit(): full size from
+## 1600 x 900 up, smaller below, as on a laptop's 1366 x 768).
+func hud_scale() -> float:
+	var sc := float(Settings.data.hud.scale)
+	if touch:
+		return sc
+	return sc * clampf(minf(size.x / 1600.0, size.y / 900.0), 0.58, 1.0)
+
+## The dial and the inputs: the bottom right corner on a computer, the bottom centre on a phone.
+func _place_bc() -> void:
+	var s := size
+	var sc := hud_scale()
+	var m := _bc.get_combined_minimum_size() * sc
+	if touch:
+		_bc.position = Vector2((s.x - m.x) / 2.0, s.y - 22.0 - m.y)
+	else:
+		_bc.position = Vector2(s.x - 18.0 - m.x, s.y - 14.0 - m.y)
+
+## The bottom-left column's height: the tyre widget sets its own size (larger than its minimum), the relative list
+## over it when it is there.
+func _bl_height() -> float:
+	var h := maxf(status.size.y, status.get_combined_minimum_size().y)
+	if overlays.relative.get_parent() == _bl_col and overlays.relative.visible:
+		h += overlays.relative.get_combined_minimum_size().y + float(_bl_col.get_theme_constant("separation"))
+	return h
+
+## The map under the lap times (computer): MAP_W wide, as the web game's column.
+const MAP_W := 200.0
+
+func _place_map() -> void:
+	var sc := hud_scale()
+	var mw: float = CircuitMap.W if Settings.data.overlays.trackMap else MiniMap.SIZE
+	var msc := sc * MAP_W / mw
+	_br.scale = Vector2(msc, msc)
+	_br.position = Vector2(size.x - 20.0 - MAP_W * sc, 18.0 + _tr.get_combined_minimum_size().y * sc + 8.0 * sc)
 
 ## The race's notices, one compact stack at the top centre (under the mirror when it is shown, under the touch
 ## buttons on a phone): flag, session, pit lane, then the latest message.
@@ -414,20 +404,11 @@ static func fmt_delta(ms: float) -> String:
 func update_state(s: Dictionary) -> void:
 	var mph: bool = Settings.data.units == "mph"
 	var v: float = s.speedMs * 2.23694 if mph else s.speedMs * 3.6
-	_speed.text = str(roundi(absf(v)))
-	_unit.text = "MPH" if mph else "KM/H"
-	_gear.text = "R" if s.gear < 0 else ("N" if s.gear == 0 else str(s.gear))
-	var pct := roundi(minf(1.0, s.rpm / s.limiter) * 100.0)
-	if pct != _last_rpm_pct:
-		_last_rpm_pct = pct
-		_rpm_fill.size = Vector2(220.0 * pct / 100.0, 4)
-		_rpm_fill.color = Color.WHITE.lerp(UIKit.ACCENT, clampf((pct - 75.0) / 15.0, 0.0, 1.0))
-		var lit := clampi(roundi(((s.rpm / s.redline - 0.75) / 0.25) * 10.0), 0, 10)
-		for i in 10:
-			var c := Color(1, 1, 1, 0.12)
-			if i < lit:
-				c = Color("30d158") if i < 4 else (Color("ff453a") if i < 8 else Color("0a84ff"))
-			(_leds[i].get_theme_stylebox("panel") as StyleBoxFlat).bg_color = c
+	dial.update_dial({
+		"speed": v, "unit": "MPH" if mph else "KM/H", "gear": s.gear, "manual": s.manual, "rpm": s.rpm, "redline": s.redline,
+		"limiter": s.limiter, "abs": s.abs, "tc": s.tc, "headlights": s.get("headlights", false),
+		"engine": float(s.damageZones[4]) if (s.damageZones as Array).size() > 4 else 0.0, "fuel": s.get("fuel", {}), "fuelLow": s.fuelLow,
+	})
 	_lap.text = s.lapLabel
 	var pen_key := "%s|%s" % [s.lapPenaltyMs, s.get("lapInvalid", false)]
 	if pen_key != _last_pen_key:
@@ -480,11 +461,7 @@ func update_state(s: Dictionary) -> void:
 		_flag_panel.modulate.a = 1.0
 		_flag_panel.add_theme_stylebox_override("panel", _flag_box(s.flag))
 		_flag.add_theme_color_override("font_color", Color.WHITE if s.flag in ["blue", "meatball", "dt"] else Color("111111"))
-	_set_text_panel(_fuel_panel, _fuel, s.fuelText)
-	_fuel.add_theme_color_override("font_color", Color("ff5a5a") if s.fuelLow else Color.WHITE)
 	_reset_hint.visible = s.resetHint
-	# the inputs widget shows the gear and speed: the old speedometer only without it
-	_speedo.visible = not Settings.data.overlays.inputs
 	var hs: Dictionary = Settings.data.hud
 	var key := "%s|%s|%s|%s|%s|%s|%s|%s" % [hs.scale, hs.opacity, hs.timing, hs.lapInfo, hs.tyres, hs.revLights, hs.messages, hs.map]
 	if key != _hud_key:
@@ -494,7 +471,7 @@ func update_state(s: Dictionary) -> void:
 		_board.get_parent().visible = hs.timing
 		_times_grid.visible = hs.lapInfo
 		_bl.visible = hs.tyres and not _spectating
-		(_leds[0].get_parent() as Control).visible = hs.revLights
+		dial.show_ring = hs.revLights
 		_msg_panel.get_parent()
 		_br.visible = hs.map
 		_layout()
@@ -504,9 +481,12 @@ func update_state(s: Dictionary) -> void:
 func _layout_dynamic() -> void:
 	# the blocks that change width follow their anchors
 	var s := size
-	var sc := float(Settings.data.hud.scale)
+	var sc := hud_scale()
 	_tr.position.x = s.x - 20.0 - _tr.get_combined_minimum_size().x * sc
-	_bc.position = Vector2((s.x - _bc.get_combined_minimum_size().x * sc) / 2.0, s.y - 22.0 - _bc.get_combined_minimum_size().y * sc)
+	_place_bc()
+	if not touch:
+		_place_map()
+		_bl.position.y = s.y - 18.0 - _bl_height() * sc
 	_wrong_panel.position.x = (s.x - _wrong_panel.get_combined_minimum_size().x) / 2.0
 	_stack_banners()
 	if touch and _board_panel != null:

@@ -3,6 +3,8 @@ extends RefCounted
 ## Spanish for the strings the Godot client added to the web game's (data/i18n_es.json is exported from the web game).
 
 const ES := {
+	# the driver's dial (HudDial)
+	"{l} L ({laps} laps)": "{l} L ({laps} vueltas)",
 	# settings pages (Graphics, Display, View, Driving, Interface, Audio)
 	"Presets": "Preajustes",
 	"Custom: {n} settings differ from the preset.": "Personalizado: {n} ajustes distintos del preajuste.",

@@ -4,7 +4,7 @@ extends RefCounted
 ## the inputs widget, the spotter bands and the delta under the mirror. Each can be switched off in the settings.
 ## The controls are built here; the Hud places them.
 
-const INPUT_W := 540.0
+const INPUT_W := 400.0
 const INPUT_H := 112.0
 
 class InputsWidget:
@@ -43,19 +43,7 @@ class InputsWidget:
 			draw_polyline(pts, cols[k], 3.0, true)
 		_bar(tx + tw + 14.0, brake, Color("ff453a"), ty, th)
 		_bar(tx + tw + 38.0, throttle, Color("30d158"), ty, th)
-		# the gear on yellow
-		var gx := tx + tw + 70.0
-		draw_style_box(UIKit.box(Color("ffd60a"), Color(0, 0, 0, 0), 0, 6), Rect2(gx, ty + 6.0, 46.0, th - 12.0))
-		var f56 := UIKit.font(true, 700)
-		var gs := "R" if gear < 0 else ("N" if gear == 0 else str(gear))
-		var gsz := f56.get_string_size(gs, HORIZONTAL_ALIGNMENT_CENTER, -1, 56)
-		draw_string(f56, Vector2(gx + 23.0 - gsz.x / 2.0, ty + th / 2.0 + 2.0 + gsz.y * 0.3), gs, HORIZONTAL_ALIGNMENT_LEFT, -1, 56, Color("111111"))
-		# the speed
-		var ss := str(roundi(absf(speed)))
-		var ssz := f56.get_string_size(ss, HORIZONTAL_ALIGNMENT_CENTER, -1, 40)
-		draw_string(f56, Vector2(gx + 100.0 - ssz.x / 2.0, ty + th / 2.0 - 8.0 + ssz.y * 0.3), ss, HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color.WHITE)
-		var usz := UIKit.font(true, 500).get_string_size(unit, HORIZONTAL_ALIGNMENT_CENTER, -1, 20)
-		draw_string(UIKit.font(true, 500), Vector2(gx + 100.0 - usz.x / 2.0, ty + th / 2.0 + 22.0 + usz.y * 0.3), unit, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(1, 1, 1, 0.6))
+		# (the gear and the speed are on the dial: HudDial)
 		# the wheel, turned as far as a real one would be (+-1 is about 270 degrees)
 		var c := Vector2(W - 52.0, H / 2.0)
 		var rot := -steer * deg_to_rad(270.0)
