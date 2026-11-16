@@ -1373,13 +1373,35 @@ static func _advanced(app: App, cs: Dictionary, air_c: float) -> Control:
 	pair.call(I18n.t("Anti-roll bar"), clicks.call("arb", I18n.t("soft"), I18n.t("stiff")))
 	pair.call(I18n.t("Dampers: bump"), clicks.call("bump", I18n.t("soft"), I18n.t("stiff")))
 	pair.call(I18n.t("Dampers: rebound"), clicks.call("rebound", I18n.t("soft"), I18n.t("stiff")))
-	body.add_child(UIW.margins(UIW.muted(I18n.t("Hot target {p} psi: too low runs hot and soft, too high loses grip. Lower = more downforce but it bottoms over kerbs; rear higher than front moves grip to the front. A stiffer anti-roll bar takes grip from its axle (stiff front = understeer). Stiffer dampers react faster but skip over bumps.", {"p": P.targetPsi}), 13), 10, 10, 10, 6))
+	pair.call(I18n.t("Springs"), clicks.call("springs", I18n.t("soft"), I18n.t("stiff")))
+	# alignment
+	body.add_child(UIW.section(I18n.t("Alignment")))
+	pair.call(I18n.t("Camber"), func(axle): return slider.call(float(cs.camber[axle]), CarSetup.SETUP.camber[axle][0], CarSetup.SETUP.camber[axle][1], 0.1,
+		func(v): return "%.1f°" % v, func(v): cs.camber[axle] = snappedf(v, 0.1)))
+	pair.call(I18n.t("Toe"), func(axle): return slider.call(float(cs.toe[axle]), CarSetup.SETUP.toe[axle][0], CarSetup.SETUP.toe[axle][1], 0.01,
+		func(v): return ("%.2f° " % absf(v)) + (I18n.t("out") if v < 0.0 else (I18n.t("in") if v > 0.0 else "")), func(v): cs.toe[axle] = snappedf(v, 0.01)))
+	# differential, brakes, gearing, engine
+	var one := func(key: String, lo: float, hi: float, step: float, fmt: Callable) -> Control:
+		return slider.call(float(cs[key]), lo, hi, step, fmt, func(v): cs[key] = v if step < 1.0 else int(v))
+	body.add_child(UIW.section(I18n.t("Differential")))
+	body.add_child(UIW.row(I18n.t("Preload"), one.call("diffPreload", CarSetup.SETUP.preload[0], CarSetup.SETUP.preload[1], 5.0, func(v): return "%d Nm" % int(v))))
+	body.add_child(UIW.row(I18n.t("Locking on power"), one.call("diffLock", 1, CarSetup.SETUP.clicks, 1.0, func(v): return "%d / %d" % [int(v), CarSetup.SETUP.clicks])))
+	body.add_child(UIW.row(I18n.t("Locking off power"), one.call("diffCoast", 1, CarSetup.SETUP.clicks, 1.0, func(v): return "%d / %d" % [int(v), CarSetup.SETUP.clicks])))
+	body.add_child(UIW.section(I18n.t("Brakes and engine")))
+	body.add_child(UIW.row(I18n.t("Brake pressure"), one.call("brakePressure", CarSetup.SETUP.brakePressure[0], CarSetup.SETUP.brakePressure[1], 0.01, func(v): return "%d %%" % roundi(v * 100.0))))
+	body.add_child(UIW.row(I18n.t("Brake ducts"), one.call("brakeDucts", 1, 5, 1.0, func(v): return "%d / 5%s" % [int(v), " · " + I18n.t("cooler") if v > 3 else (" · " + I18n.t("hotter") if v < 3 else "")])))
+	body.add_child(UIW.row(I18n.t("Final drive"), one.call("finalDrive", -CarSetup.SETUP.finalDriveSteps, CarSetup.SETUP.finalDriveSteps, 1.0, func(v): return I18n.t("baseline") if int(v) == 0 else ("%+d %% · %s" % [int(v) * 2, I18n.t("shorter") if v > 0 else I18n.t("longer")]))))
+	body.add_child(UIW.row(I18n.t("Engine map"), one.call("engineMap", 1, 3, 1.0, func(v): return "%d · %s" % [int(v), I18n.t(CarSetup.SETUP.maps[int(v) - 1].label)])))
+	body.add_child(UIW.margins(UIW.muted(I18n.t("Hot target {p} psi: too low runs hot and soft, too high loses grip. Lower = more downforce but it bottoms over kerbs; rear higher than front moves grip to the front. A stiffer anti-roll bar takes grip from its axle (stiff front = understeer). Stiffer dampers react faster but skip over bumps. Stiffer springs: sharper, less grip over bumps. More negative camber: more grip in long corners, too much costs braking. Front toe-out: quicker turn-in; rear toe-in: a stable rear. More diff locking: better traction, more understeer on the way in. Bigger ducts cool the brakes and tyres. A shorter final drive accelerates harder, tops out sooner. Leaner maps save fuel for a little power.", {"p": P.targetPsi}), 13), 10, 10, 10, 6))
 	var reset := UIKit.button(I18n.t("Reset to baseline"), func():
 		cs.pressure = null
 		cs.ride = [0, 0]
 		cs.arb = [4, 4]
 		cs.bump = [4, 4]
 		cs.rebound = [4, 4]
+		var d: Dictionary = Settings.default_settings().carSetup
+		for k in ["springs", "camber", "toe", "diffPreload", "diffLock", "diffCoast", "brakePressure", "brakeDucts", "finalDrive", "engineMap"]:
+			cs[k] = d[k] if typeof(d[k]) != TYPE_ARRAY else (d[k] as Array).duplicate()
 		Settings.save()
 		app.render_briefing())
 	reset.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN

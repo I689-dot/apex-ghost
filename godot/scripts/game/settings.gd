@@ -83,7 +83,9 @@ static func default_settings() -> Dictionary:
 		"keyboard": {"throttleRamp": 0.2, "brakeRamp": 0.2, "steerSpeed": 1.0},
 		"hud": {"scale": 1.0, "opacity": 1.0, "timing": true, "lapInfo": true, "tyres": true, "revLights": true, "messages": true, "map": true},
 		"chase": {"distance": 1.0, "height": 1.0, "lag": 1.0}, "lookToApex": 1.0, "brightness": 1.0, "ai": {"difficulty": 1.0},
-		"carSetup": {"tyre": "medium", "wing": "medium", "brakeBias": 0.6, "pressure": null, "ride": [0, 0], "arb": [4, 4], "bump": [4, 4], "rebound": [4, 4], "fuelL": 60},
+		"carSetup": {"tyre": "medium", "wing": "medium", "brakeBias": 0.6, "pressure": null, "ride": [0, 0], "arb": [4, 4], "bump": [4, 4], "rebound": [4, 4], "fuelL": 60,
+			"springs": [4, 4], "camber": [-3.2, -2.6], "toe": [-0.05, 0.15], "diffPreload": 110, "diffLock": 4, "diffCoast": 4,
+			"brakePressure": 1.0, "brakeDucts": 3, "finalDrive": 0, "engineMap": 1},
 		"savedSetups": {}, "ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
 		# your car's paint (CarPaint, the car page of the lobby): colours, finish, design, race number, rims, calipers
 		"livery": {"base": "#c8102e", "accent": "#f2f2f2", "finish": "gloss", "design": "stripes", "number": 7, "showNumber": true, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"},

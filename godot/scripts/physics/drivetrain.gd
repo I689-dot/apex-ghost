@@ -14,6 +14,8 @@ var manual := false
 var limiter_cut := false
 ## Power multiplier from engine damage (0.6..1).
 var power_scale := 1.0
+## The engine map's share of full power (CarSetup: the leaner maps save fuel).
+var map_scale := 1.0
 ## Power multiplier from the air the engine breathes.
 var air_scale := 1.0
 ## Out of fuel: the engine gets none.
@@ -99,7 +101,7 @@ func update(dt: float, throttle: float, wheel_omega: float, speed_ms: float) -> 
 	elif rpm < limiter - 250.0:
 		limiter_cut = false
 	var thr := 0.0 if (limiter_cut or starved) else throttle
-	var full := torque_at(rpm) * power_scale * air_scale
+	var full := torque_at(rpm) * power_scale * map_scale * air_scale
 	var turning := wheel_omega * rt > 0.0
 	var drag := (0.06 + 0.12 * (rpm / redline)) * full if turning else 0.0
 	var tq := thr * full - (1.0 - thr) * drag

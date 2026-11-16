@@ -16,6 +16,8 @@ var travel: float
 var rest_len0: float
 var travel0: float
 var k: float
+## The spring rate before the setup's springs (apply_setup scales it).
+var k0: float
 var c_bump: float
 var c_rebound: float
 var c_bump0: float
@@ -67,6 +69,7 @@ func _init(wheel_key: String, geom_pos: Vector3, geom_radius: float, s: Dictiona
 	radius = geom_radius
 	travel = float(s.suspTravelM)
 	k = float(s.springRateFront) if front else float(s.springRateRear)
+	k0 = k
 	var quarter_mass := static_load / VehicleConsts.G
 	var crit := 2.0 * sqrt(k * quarter_mass)
 	c_bump = crit * 0.32

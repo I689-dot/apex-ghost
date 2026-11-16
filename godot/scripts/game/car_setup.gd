@@ -14,6 +14,14 @@ const WING := {
 const SETUP := {
 	"clicks": 7, "baseline": 4, "arb": [0.55, 0.7, 0.85, 1.0, 1.2, 1.4, 1.6], "damperPerClick": 0.1, "rideMm": 10.0,
 	"downforcePerM": 3.5, "dragPerM": 1.0, "balancePerM": 3.0, "comPerM": 0.8,
+	# springs and the differential's locking per click, the brake ducts' cooling (1 closed .. 5 open)
+	"springs": [0.78, 0.86, 0.93, 1.0, 1.08, 1.17, 1.27], "diffLock": [0.6, 0.73, 0.87, 1.0, 1.13, 1.27, 1.4],
+	"diffCoast": [0.3, 0.38, 0.47, 0.55, 0.63, 0.72, 0.8], "ducts": [0.7, 0.85, 1.0, 1.15, 1.3],
+	# static camber and toe (degrees; front toe negative = out, rear positive = in), differential preload (Nm)
+	"camber": [[-4.0, -1.5], [-3.5, -1.0]], "toe": [[-0.3, 0.2], [-0.1, 0.4]], "preload": [40.0, 200.0],
+	# brake pressure (share of the system's maximum), final drive (2 % a step, + shorter), engine maps
+	"brakePressure": [0.8, 1.0], "finalDriveStep": 0.02, "finalDriveSteps": 3,
+	"maps": [{"power": 1.0, "fuel": 1.0, "label": "Race"}, {"power": 0.975, "fuel": 0.93, "label": "Lean"}, {"power": 0.95, "fuel": 0.87, "label": "Save fuel"}],
 }
 
 static func _clamp_click(c: float) -> int:
@@ -39,6 +47,9 @@ static func apply_setup(entry: Dictionary, setup: Dictionary) -> Dictionary:
 	s.antiRollFront = s.antiRollFront * SETUP.arb[_clamp_click(_pair(setup.get("arb"), 0, 4.0)) - 1]
 	s.antiRollRear = s.antiRollRear * SETUP.arb[_clamp_click(_pair(setup.get("arb"), 1, 4.0)) - 1]
 	s.brakeBiasFront = clampf(setup.brakeBias, 0.54, 0.66)
+	s.diffLock = float(s.diffLock) * SETUP.diffLock[_clamp_click(float(setup.get("diffLock", SETUP.baseline))) - 1]
+	s.finalDrive = float(s.finalDrive) * (1.0 + SETUP.finalDriveStep * clampi(int(setup.get("finalDrive", 0)), -SETUP.finalDriveSteps, SETUP.finalDriveSteps))
+	s.brakeTorqueNm = float(s.brakeTorqueNm) * clampf(float(setup.get("brakePressure", 1.0)), SETUP.brakePressure[0], SETUP.brakePressure[1])
 	return out
 
 ## The part of the setup the vehicle applies itself (pressures, ride height on the springs, dampers).
@@ -53,6 +64,14 @@ static func vehicle_setup(setup: Dictionary) -> Dictionary:
 		"ride": [ride.call(0), ride.call(1)],
 		"bump": [damper.call(setup.get("bump"), 0), damper.call(setup.get("bump"), 1)],
 		"rebound": [damper.call(setup.get("rebound"), 0), damper.call(setup.get("rebound"), 1)],
+		"springs": [SETUP.springs[_clamp_click(_pair(setup.get("springs"), 0, 4.0)) - 1], SETUP.springs[_clamp_click(_pair(setup.get("springs"), 1, 4.0)) - 1]],
+		"camber": [clampf(_pair(setup.get("camber"), 0, -3.0), SETUP.camber[0][0], SETUP.camber[0][1]), clampf(_pair(setup.get("camber"), 1, -2.5), SETUP.camber[1][0], SETUP.camber[1][1])],
+		"toe": [clampf(_pair(setup.get("toe"), 0, 0.0), SETUP.toe[0][0], SETUP.toe[0][1]), clampf(_pair(setup.get("toe"), 1, 0.0), SETUP.toe[1][0], SETUP.toe[1][1])],
+		"diffPreload": clampf(float(setup.get("diffPreload", 110.0)), SETUP.preload[0], SETUP.preload[1]),
+		"diffCoast": SETUP.diffCoast[_clamp_click(float(setup.get("diffCoast", SETUP.baseline))) - 1],
+		"ducts": SETUP.ducts[clampi(int(setup.get("brakeDucts", 3)), 1, 5) - 1],
+		"mapPower": SETUP.maps[clampi(int(setup.get("engineMap", 1)), 1, 3) - 1].power,
+		"mapFuel": SETUP.maps[clampi(int(setup.get("engineMap", 1)), 1, 3) - 1].fuel,
 	}
 
 ## What an engineer would suggest for this forecast. Returns {tyre, wing, note}.
@@ -108,7 +127,28 @@ static func sanitize(raw: Variant) -> Variant:
 		"bump": pair.call("bump", 1, SETUP.clicks, SETUP.baseline, true),
 		"rebound": pair.call("rebound", 1, SETUP.clicks, SETUP.baseline, true),
 		"fuelL": clampf(float(fuel), 5.0, 200.0) if (typeof(fuel) == TYPE_FLOAT or typeof(fuel) == TYPE_INT) else 60.0,
+		"springs": pair.call("springs", 1, SETUP.clicks, SETUP.baseline, true),
+		"camber": [_num_in(raw.get("camber"), 0, SETUP.camber[0], -3.2), _num_in(raw.get("camber"), 1, SETUP.camber[1], -2.6)],
+		"toe": [_num_in(raw.get("toe"), 0, SETUP.toe[0], -0.05), _num_in(raw.get("toe"), 1, SETUP.toe[1], 0.15)],
+		"diffPreload": roundi(_one(raw.get("diffPreload"), SETUP.preload, 110.0)),
+		"diffLock": roundi(_one(raw.get("diffLock"), [1, SETUP.clicks], SETUP.baseline)),
+		"diffCoast": roundi(_one(raw.get("diffCoast"), [1, SETUP.clicks], SETUP.baseline)),
+		"brakePressure": _one(raw.get("brakePressure"), SETUP.brakePressure, 1.0),
+		"brakeDucts": roundi(_one(raw.get("brakeDucts"), [1, 5], 3)),
+		"finalDrive": roundi(_one(raw.get("finalDrive"), [-SETUP.finalDriveSteps, SETUP.finalDriveSteps], 0)),
+		"engineMap": roundi(_one(raw.get("engineMap"), [1, 3], 1)),
 	}
+
+## A number from a setup code, kept within [lo, hi], else the default.
+static func _one(v, range_: Array, def: float) -> float:
+	if typeof(v) == TYPE_FLOAT or typeof(v) == TYPE_INT:
+		return clampf(float(v), float(range_[0]), float(range_[1]))
+	return def
+
+static func _num_in(arr, i: int, range_: Array, def: float) -> float:
+	if typeof(arr) == TYPE_ARRAY and arr.size() > i:
+		return _one(arr[i], range_, def)
+	return def
 
 static func to_code(setup: Dictionary) -> String:
 	var clean = sanitize(setup)

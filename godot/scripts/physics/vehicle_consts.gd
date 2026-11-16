@@ -59,7 +59,8 @@ const FUEL := {
 
 ## Neutral garage setup.
 static func neutral_setup() -> Dictionary:
-	return {"pressure": null, "ride": [0.0, 0.0], "bump": [1.0, 1.0], "rebound": [1.0, 1.0]}
+	return {"pressure": null, "ride": [0.0, 0.0], "bump": [1.0, 1.0], "rebound": [1.0, 1.0], "springs": [1.0, 1.0],
+		"camber": [-3.0, -2.5], "toe": [0.0, 0.0], "diffPreload": 110.0, "diffCoast": 0.55, "ducts": 1.0, "mapPower": 1.0, "mapFuel": 1.0}
 
 ## Rubber on the line raises grip through a session; rain washes it away.
 static func track_rubber(session_ms: float, wetness: float) -> float:

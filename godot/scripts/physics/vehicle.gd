@@ -71,6 +71,15 @@ var _last_good := Transform3D.IDENTITY
 var _shape: CollisionShape3D
 var _material := PhysicsMaterial.new()
 var _tmp_hit := {}
+## The setup's alignment, differential, ducts and engine map (apply_setup): static camber (deg, front / rear), toe
+## (rad; front negative = out, rear positive = in), the differential's preload (Nm) and coast lock, the brake ducts'
+## cooling, the map's fuel use.
+var _camber: Array = [-3.0, -2.5]
+var _toe: Array = [0.0, 0.0]
+var _diff_preload := 110.0
+var _diff_coast := 0.55
+var _ducts := 1.0
+var _map_fuel := 1.0
 
 ## Build the car from its cars.json entry. Call before adding to the tree.
 func setup_car(car_entry: Dictionary, ground_query, assist_set: Dictionary, damage_state: DamageState) -> void:
@@ -190,6 +199,16 @@ func apply_setup(new_setup: Dictionary) -> void:
 		w.travel = maxf(0.02, w.travel0 + setup.ride[a])
 		w.c_bump = w.c_bump0 * setup.bump[a]
 		w.c_rebound = w.c_rebound0 * setup.rebound[a]
+		w.k = w.k0 * float(setup.get("springs", [1.0, 1.0])[a])
+	var n := C.neutral_setup()
+	_camber = setup.get("camber", n.camber)
+	var toe: Array = setup.get("toe", n.toe)
+	_toe = [deg_to_rad(float(toe[0])), deg_to_rad(float(toe[1]))]
+	_diff_preload = float(setup.get("diffPreload", n.diffPreload))
+	_diff_coast = float(setup.get("diffCoast", n.diffCoast))
+	_ducts = float(setup.get("ducts", n.ducts))
+	drivetrain.map_scale = float(setup.get("mapPower", 1.0))
+	_map_fuel = float(setup.get("mapFuel", 1.0))
 
 ## Fuel load (the fuel rule): the car's mass follows it. Pass -1 for no fuel rule.
 func set_fuel(litres: float) -> void:
@@ -467,6 +486,10 @@ func step(dt: float, c: Controls) -> void:
 	wheels[1].steer = steer_angle * (1.0 - ack)
 	wheels[2].steer = 0.0
 	wheels[3].steer = 0.0
+	# toe: each wheel turned a little in or out (left wheels one way, right the other)
+	for w in wheels:
+		var t: float = _toe[0 if w.front else 1]
+		w.steer += -t if w.left else t
 
 	Prof.mark("v.gear_assist_steer")
 	# ---------------------------------------------------- suspension
@@ -533,7 +556,7 @@ func step(dt: float, c: Controls) -> void:
 	var axle_torque := dt2.update(dt, throttle, driven_omega, speed)
 	if fuel_l >= 0.0 and not frozen:
 		var power := maxf(0.0, dt2.engine_torque) * dt2.rpm * Drivetrain.RPM_TO_RADS
-		var used: float = (power / (C.FUEL.efficiency * C.FUEL.jPerL) + C.FUEL.idleLps) * dt
+		var used: float = (power / (C.FUEL.efficiency * C.FUEL.jPerL) + C.FUEL.idleLps) * dt * _map_fuel
 		fuel_l = maxf(0.0, fuel_l - used)
 		fuel_used_l += used
 		_mass_timer -= dt
@@ -572,7 +595,7 @@ func step(dt: float, c: Controls) -> void:
 			bt += esc_brake
 		w.brake_torque = bt
 		var heat := absf(bt * w.omega) * (1.0 if w.front else 0.85)
-		var cool: float = (BT.coolBase + BT.coolPerMs * speed) * (w.brake_temp - ambient_c)
+		var cool: float = (BT.coolBase + BT.coolPerMs * speed) * (w.brake_temp - ambient_c) * _ducts
 		w.brake_temp += ((heat - cool) / BT.heatCapacity) * dt
 
 	Prof.mark("v.brakes")
@@ -619,7 +642,9 @@ func step(dt: float, c: Controls) -> void:
 		# camber in roll
 		var body_roll := roll_f if w.front else roll_r
 		var lean: float = CH.camberRoll * (body_roll if w.left else -body_roll)
-		var off: float = lean - CH.camberRoll * CH.camberRollRef
+		# the static camber against the alignment the tyre was designed round (-3.0 front, -2.5 rear): more negative
+		# keeps the loaded outer tyre flatter in a corner, too much stands it on its inner shoulder
+		var off: float = lean - CH.camberRoll * CH.camberRollRef + (float(_camber[0 if w.front else 1]) - (-3.0 if w.front else -2.5))
 		var camber_grip: float = 1.0 - minf(0.08, CH.camberGrip * off * off)
 		var mu: float = (mu_base * surf.grip * dmg.grip_scale(w.key) * C.tyre_temp_grip(w.temp, compound.optimumC)
 			* Tyres.wear_grip(w.wear) * C.pressure_grip(w.pressure) * camber_grip * (1.0 - 0.06 * w.flat_spot)
@@ -672,7 +697,7 @@ func step(dt: float, c: Controls) -> void:
 		var past := maxf(0.0, w.temp - compound.optimumC - TT.windowC)
 		var heat: float = (slip_power + (TT.rolling * fz + TT.flex * flex_k * (absf(fx_t) + absf(fy_t))) * absf(vx)) / (1.0 + past / TT.hotFadeC)
 		var size: float = s.tyreHeatScale if s.has("tyreHeatScale") and s.tyreHeatScale != null else 1.0
-		var cool: float = ((TT.coolBase + TT.coolPerMs * absf(vx)) * (1.0 + TT.wetCool * wetness) * (w.temp - ambient_c)
+		var cool: float = ((TT.coolBase + TT.coolPerMs * absf(vx)) * (1.0 + TT.wetCool * wetness) * (1.0 + 0.15 * (_ducts - 1.0)) * (w.temp - ambient_c)
 			+ (TT.road if w.contact else 0.0) * (w.temp - track_c)) * size
 		w.temp += ((heat - cool) / (TT.heatCapacity * compound.heatCap * size)) * dt
 		# tread wear from sliding energy, faster when overheated
@@ -719,9 +744,9 @@ func _split_axle(a: int, b: int, torque: float) -> void:
 		wb.drive_torque = 0.0
 		return
 	var CH := C.CHASSIS
-	var lock: float = float(specs.diffLock) * (1.0 if torque >= 0.0 else CH.diffCoast)
+	var lock: float = float(specs.diffLock) * (1.0 if torque >= 0.0 else _diff_coast)
 	var d := wa.omega - wb.omega
-	var limit: float = CH.diffPreload + lock * absf(torque) * 0.5
+	var limit: float = _diff_preload + lock * absf(torque) * 0.5
 	var bias := clampf(d * 90.0, -limit, limit)
 	wa.drive_torque = torque / 2.0 - bias
 	wb.drive_torque = torque / 2.0 + bias
