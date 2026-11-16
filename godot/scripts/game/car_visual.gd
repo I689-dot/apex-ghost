@@ -33,7 +33,17 @@ var entry: Dictionary
 var local: bool
 var _levels: Array = [] # LevelRig
 var _head_mats: Array = []
-var _tail_mats: Array = []
+var _tail_mats: Array = [] # [StandardMaterial3D, share]
+## Tail lamps in materials not named LIGHT_TAIL_ (by model id): the Vantage's are in its glass, the Ferrari's in an
+## anonymous Sketchfab material (tools/godot/tail-lights.mjs gives them their glow map, --also).
+const TAIL_LAMPS := {
+	"vantage_gt3_evo_heart_of_racing": ["Glass"],
+	"ferrari_296_gt3_verstappen": ["mat_50"],
+}
+## Rear lamp brightness (emission energy): off by day, lit with the headlights or at dusk, and the brake lights, which
+## add to the tail lamps (the same LEDs, driven harder, as on the cars).
+const TAIL_ON := 2.2
+const BRAKE_ADD := 4.0
 var _fade_mats: Array = [] # StandardMaterial3D (cloned)
 var _glass_mats: Array = [] # [material, base colour] pairs for the cockpit dimming
 var _strip_mats: Array = []
@@ -268,13 +278,19 @@ func _setup_material(sm: StandardMaterial3D) -> void:
 			sm.emission_enabled = true
 			sm.emission = Color(1, 0.97, 0.9)
 		_head_mats.append(sm)
-	elif nm.begins_with("LIGHT_TAIL_"):
-		sm.emission_enabled = true
-		if sm.emission_texture == null and sm.emission == Color.BLACK:
-			sm.emission = Color(1, 0.05, 0.02)
-		else:
-			sm.emission = Color(1, 0.12, 0.08)
-		_tail_mats.append(sm)
+	elif nm.begins_with("LIGHT_TAIL_") or (TAIL_LAMPS.get(model_id(entry), []) as Array).has(nm):
+		# the glow map lights only the lamps (tools/godot/tail-lights.mjs: the red of the lamp atlas); a material named
+		# as a tail lamp that has no glow (grey plastic, an amber indicator glass) is not one
+		if sm.emission_texture != null or sm.emission != Color.BLACK:
+			sm.emission_enabled = true
+			# a deeper red: lit hard (braking) a lamp went pink-white in the tone mapping
+			sm.emission = Color(sm.emission.r, sm.emission.g * 0.5, sm.emission.b * 0.5)
+			# glass over a lamp adds to the lamp's own glow: half of it
+			_tail_mats.append([sm, 0.5 if sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED else 1.0])
+			sm.emission_energy_multiplier = 0.0
+		elif sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+			# a smoked cover over the lamps (the BMW M4 Evo's, half opaque, hid them): it lets more of them through
+			sm.albedo_color.a *= 0.45
 	# an untextured opaque "glass" is really the untextured cabin shell: give it a dark trim colour
 	if sm.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and sm.albedo_texture == null and _is_glass(nm):
 		sm.albedo_color = Color("1b1d21")
@@ -430,11 +446,17 @@ func set_pose(steer: float, rot_f: float, rot_r: float, susp) -> void:
 			# the axis points at the driver, so a positive angle turns the rim counter-clockwise (left)
 			lvl.steering.quaternion = Quaternion(_steer_axis, steer * _steer_ratio)
 
+## Tests: the lights held as given ("brake", "tail" for lit rear lamps without braking, "off"); "" plays normally.
+static var test_lights := ""
+
 func set_lights(brake: bool, headlights_on: bool, night: float) -> void:
+	if test_lights != "":
+		brake = test_lights == "brake"
+		headlights_on = test_lights == "tail"
 	brake_on = brake
-	var tail := 5.0 if brake else (1.1 if headlights_on or night > 0.3 else 0.12)
-	for m in _tail_mats:
-		m.emission_energy_multiplier = tail
+	var tail := (TAIL_ON if headlights_on or night > 0.3 else 0.0) + (BRAKE_ADD if brake else 0.0)
+	for t in _tail_mats:
+		(t[0] as StandardMaterial3D).emission_energy_multiplier = tail * float(t[1])
 	var head := 4.0 if headlights_on else 0.35
 	for m in _head_mats:
 		m.emission_energy_multiplier = head

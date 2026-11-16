@@ -40,7 +40,9 @@ CARS = {
         'align': '^Tyre_', 'hasInterior': True,
         # (the eye search landed 0.44 m out, beside the seat: behind the wheel the model has at 0.33 m)
         'eye': [0.332, 0.86, -0.03]},
-        'name': 'Ferrari 296 GT3'},
+        'name': 'Ferrari 296 GT3',
+        # its tail lamp: the thin red strip across the back (an anonymous Sketchfab material)
+        'tail': ['mat_50']},
     # (its steering node takes in the column: the seat-reach eye from that centre sat high, the rim at the view's edge)
     'ford_mustang_gt3': {'dir': 'ford-mustang-gt3-2024', 'model': 'inner/ford_mustang_gt3_2024__www.vecarz.com.glb', 'prep': {'rename': True},
         'eye': [0.329, 1.01, -0.69]},
@@ -78,6 +80,9 @@ def build(src_root, cid, c):
     run([BLENDER, '-b', '--factory-startup', '-P', os.path.join(ROOT, 'tools/asset-pipeline/blender/convert_car.py'), '--', prepped, glb, meta, png, cid], 'convert')
     out = os.path.join(WORK, 'godot', cid)
     run(['node', os.path.join(ROOT, 'tools/godot/car-lods.mjs'), glb, out], 'lods')
+    # the rear lamps' glow maps (lamps in materials not named LIGHT_TAIL_: 'tail')
+    run(['node', os.path.join(ROOT, 'tools/godot/tail-lights.mjs')] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')]
+        + ([f'--also={",".join(c["tail"])}'] if c.get('tail') else []), 'tail lamps')
     return json.load(open(meta)), out, png
 
 

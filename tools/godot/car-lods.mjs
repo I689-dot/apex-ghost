@@ -110,6 +110,12 @@ async function buildOne(name, { tris, maxError, interior, tiny, color, dataSize,
     // sorting problems, and Godot's depth prepass sees it)
     if (mat.getAlphaMode() === 'BLEND' && !GLASS_NAME_RE.test(mat.getName())) mat.setAlphaMode('MASK').setAlphaCutoff(0.5);
   }
+  // the lights keep their own materials: the merge below joined identical materials whatever their names, and a tail
+  // lamp's copy went into a headlight's (the AMG Evo) or the glass (the BMW M4), so the game no longer found it
+  for (const mat of doc.getRoot().listMaterials()) {
+    const role = /^LIGHT_TAIL_/.test(mat.getName()) ? 'tail' : /^LIGHT_HEAD_/.test(mat.getName()) ? 'head' : null;
+    if (role) mat.setExtras({ ...mat.getExtras(), apexLight: role });
+  }
   if (!interior) dropInterior(doc);
   if (tiny) dropTiny(doc, tiny);
   // one primitive per material within each named part (body, wheel_XX_spin, steering_wheel stay apart): the sources

@@ -36,6 +36,8 @@ func _run() -> void:
 	if OS.get_environment("CHASE_DIST") != "":
 		ChaseCamera.tune = {"dist": float(OS.get_environment("CHASE_DIST")), "height": float(OS.get_environment("CHASE_H")), "fov": float(OS.get_environment("CHASE_FOV")),
 			"ahead": float(OS.get_environment("CHASE_AHEAD")) if OS.get_environment("CHASE_AHEAD") != "" else 10.0, "look_y": float(OS.get_environment("CHASE_LOOKY")) if OS.get_environment("CHASE_LOOKY") != "" else 0.95}
+	if OS.get_environment("LIGHTS") != "":
+		CarVisual.test_lights = OS.get_environment("LIGHTS")
 	if OS.get_environment("CAMERA") != "":
 		Settings.data.camera = OS.get_environment("CAMERA")
 	LocalRoom.create()

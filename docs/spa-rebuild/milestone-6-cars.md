@@ -60,6 +60,8 @@ automatic lift no longer pushes it into the roof.
 - **Live screens**: `DashDisplay` finds display materials by name. Overlays placed per model cover the models where the
   screen is just a face of the dash: the Vantage, and the Ferrari's Bosch dash plus its two side screens. A dash
   surface on a merged mesh gets a hidden material instead of hiding the whole mesh (this had hidden the Porsche's body).
+- **Rear lamps**: a glow map per lamp material from its own colour map (`tools/godot/tail-lights.mjs`), so only the lamps
+  light, dim with the headlights or at dusk and bright under braking (DECISIONS: "realistic rear lamps").
 - **Safety car**: `SafetyCarLook` turns the Vantage's livery green by brightness, so lettering and stripes stay white
   (`shaders/safety_paint.gdshader`). Six amber lamps on the roof bar flash in two halves while the car is deployed.
 
