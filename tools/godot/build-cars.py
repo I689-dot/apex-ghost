@@ -85,6 +85,8 @@ def build(src_root, cid, c):
         + ([f'--also={",".join(c["tail"])}'] if c.get('tail') else []), 'tail lamps')
     # the makers' badges and suppliers' marks inside the texture atlases (tools/godot/debrand.json)
     run(['node', os.path.join(ROOT, 'tools/godot/debrand.mjs'), cid] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')], 'debrand')
+    # the parts a crash can tear off (bumpers, the wing), cut out of the body
+    run(['node', os.path.join(ROOT, 'tools/godot/car-parts.mjs')] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')], 'parts')
     return json.load(open(meta)), out, png
 
 

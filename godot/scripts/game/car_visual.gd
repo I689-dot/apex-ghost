@@ -91,6 +91,7 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 		if _cockpit_pass and InteriorLook.BAKED_WHEELS.has(model_id(entry)):
 			_cut_out_wheel(root, InteriorLook.BAKED_WHEELS[model_id(entry)])
 		_prepare_materials(root, cache)
+		_collect_parts(root)
 		_cockpit_pass = false
 		var rig := _rig(root)
 		_levels.append(rig)
@@ -106,6 +107,7 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 	if local and outside != null:
 		var root2: Node3D = outside.instantiate()
 		_prepare_materials(root2, cache)
+		_collect_parts(root2)
 		_levels.append(_rig(root2))
 		_add_body(root2)
 		add_child(root2)
@@ -210,6 +212,93 @@ static func _walk(n: Node) -> Array:
 	return out
 
 ## Dents go on the most detailed level (and on the outside model of your own car).
+## Parts a heavy hit can tear off (tools/godot/car-parts.mjs cuts them out of the body): name -> its mesh nodes on
+## every level, and the parts already gone.
+var _parts := {}
+var detached := {}
+## Debris in the world, from every car (the oldest goes past MAX_DEBRIS).
+static var _debris: Array = []
+const MAX_DEBRIS := 24
+const DEBRIS_LIFE := 25.0
+const DEBRIS_LAYER := 32
+
+func _collect_parts(root: Node) -> void:
+	for n in _walk(root):
+		if n is MeshInstance3D and String(n.name).begins_with("part_"):
+			var key := String(n.name).trim_prefix("part_")
+			if not _parts.has(key):
+				_parts[key] = []
+			(_parts[key] as Array).append(n)
+
+## The parts this car has: "bumper_front", "bumper_rear", "wing" (those its models were cut with).
+func part_names() -> Array:
+	return _parts.keys()
+
+## Throws a part off (once): hidden on every level, and a piece of debris with its mesh and a box round it flies from
+## where it was, with the car's velocity, the hit's push (world, m/s) and a tumble; it lands on the track and stays a
+## while. scene_root: where the debris lives (the world, not the car).
+func detach(part: String, car_velocity: Vector3, push: Vector3, scene_root: Node) -> void:
+	if detached.has(part) or not _parts.has(part):
+		return
+	detached[part] = true
+	var source: MeshInstance3D = null
+	for mi: MeshInstance3D in _parts[part]:
+		if source == null and mi.is_visible_in_tree():
+			source = mi
+		mi.visible = false
+	if source == null:
+		source = _parts[part][0]
+	if not is_inside_tree() or source.mesh == null:
+		return
+	var aabb := source.mesh.get_aabb()
+	if aabb.size.length() < 0.05:
+		return
+	var body := RigidBody3D.new()
+	body.name = "debris-" + part
+	body.collision_layer = DEBRIS_LAYER
+	body.collision_mask = VehicleConsts.LAYER_TRACK | VehicleConsts.LAYER_WALL
+	body.mass = clampf(aabb.size.x * aabb.size.y * aabb.size.z * 40.0, 3.0, 18.0)
+	body.continuous_cd = true
+	var pm := PhysicsMaterial.new()
+	pm.friction = 0.7
+	pm.bounce = 0.25
+	body.physics_material_override = pm
+	var mesh_node := MeshInstance3D.new()
+	mesh_node.mesh = source.mesh
+	for sidx in source.mesh.get_surface_count():
+		mesh_node.set_surface_override_material(sidx, source.get_active_material(sidx))
+	var cs := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(maxf(0.05, aabb.size.x), maxf(0.05, aabb.size.y), maxf(0.05, aabb.size.z))
+	cs.shape = box
+	# the body's origin at the part's centre: the mesh and the box offset by it
+	var c := aabb.get_center()
+	mesh_node.position = -c
+	body.add_child(mesh_node)
+	body.add_child(cs)
+	scene_root.add_child(body)
+	var xf := source.global_transform
+	body.global_transform = Transform3D(xf.basis, xf * c)
+	body.linear_velocity = car_velocity * 0.9 + push + Vector3(0, 2.0 + randf() * 2.0, 0)
+	body.angular_velocity = Vector3(randf_range(-6, 6), randf_range(-8, 8), randf_range(-6, 6))
+	_debris.append(body)
+	while _debris.size() > MAX_DEBRIS:
+		var old = _debris.pop_front()
+		if is_instance_valid(old):
+			old.queue_free()
+	var tree := get_tree()
+	tree.create_timer(DEBRIS_LIFE).timeout.connect(func():
+		if is_instance_valid(body):
+			_debris.erase(body)
+			body.queue_free())
+
+## The parts back on (a reset, a repair in the pits).
+func restore_parts() -> void:
+	detached.clear()
+	for key in _parts:
+		for mi: MeshInstance3D in _parts[key]:
+			mi.visible = true
+
 func _add_body(root: Node) -> void:
 	var b := root.find_child("body", true, false)
 	if b != null:
@@ -541,6 +630,7 @@ func apply_dents() -> void:
 func reset_damage() -> void:
 	dents.clear()
 	apply_dents()
+	restore_parts()
 
 ## Engine smoke at high damage. scene_root: where the sprites live (the world).
 func update_smoke(dt: float, engine_damage: float, scene_root: Node) -> void:

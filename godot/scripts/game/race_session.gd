@@ -99,6 +99,9 @@ var cars_file: Dictionary
 var spectator := false
 var contact := false
 var side_screens: SideScreens
+## Damage at which a part comes off (its zone's value), and the jump in one hit that tears it off sooner.
+const TEAR_AT := {"bumper_front": [0, 0.45], "bumper_rear": [1, 0.45], "wing": [1, 0.7]}
+const TEAR_JUMP := 0.25
 ## The H-pattern lever's last gear (DeviceBindings), -99 none.
 var _h_gear := -99
 
@@ -796,6 +799,7 @@ func _on_message(m: Dictionary) -> void:
 					var inc: float = r.damage.zones[z] - before[z]
 					if inc > 0.02:
 						r.visual.dent(zone_point(z, r.entry), zone_dir(z), inc * 2.0)
+				tear_parts(r.visual, r.damage.zones, before, r.vel, Vector3.ZERO)
 		"results":
 			if m.raceId == race.raceId and cb.has("on_results"):
 				cb.on_results.call(m)
@@ -1172,6 +1176,24 @@ func move_kinematics(_dt: float) -> void:
 			sc.body.linear_velocity = sc.vel + (sc.visual.global_position - sc.body.global_position) / PROXY_TAU_S
 			sc.body.global_transform.basis = sc.visual.global_transform.basis
 
+## Crashes throw parts off (the user, 2026-11-16: bumpers flying off): a bumper once its zone of damage (front or
+## rear) passes TEAR_AT or one hit adds TEAR_JUMP, the wing at heavier rear damage. push: the hit's (world, m/s).
+func tear_parts(visual: CarVisual, zones: PackedFloat32Array, before: PackedFloat32Array, vel: Vector3, push: Vector3) -> void:
+	if visual == null:
+		return
+	# repaired (another driver's bodywork back near new): the parts are back on
+	if not visual.detached.is_empty() and zones[0] < 0.05 and zones[1] < 0.05:
+		visual.restore_parts()
+		return
+	for part in TEAR_AT:
+		if visual.detached.has(part):
+			continue
+		var z: int = TEAR_AT[part][0]
+		var at: float = TEAR_AT[part][1]
+		var jump := zones[z] - before[z]
+		if zones[z] >= at or (part != "wing" and jump >= TEAR_JUMP):
+			visual.detach(part, vel, push, self)
+
 ## No car contact in the pit lane (the user, 2026-11-16): a car simulated here that is in the pit lane passes
 ## through the others, and they through it; it is solid again once out of the lane and clear of every car (it never
 ## turns solid inside another).
@@ -1350,6 +1372,7 @@ func drain_contacts() -> void:
 func impact_damage(impulse: float, push: Vector3, is_car: bool = false) -> void:
 	var local := vehicle.global_transform.basis.inverse() * push
 	var flats: int = damage.punctured.count(true)
+	var before_zones := damage.zones.duplicate()
 	var res := damage.impact(impulse, -local.x, -local.z, vehicle.mass)
 	if res.is_empty():
 		return
@@ -1381,6 +1404,8 @@ func impact_damage(impulse: float, push: Vector3, is_car: bool = false) -> void:
 	var loc_dir := Vector3(-local.x, 0, -local.z).normalized()
 	var p := box_point(loc_dir, vehicle.car)
 	my_visual.dent(p, -loc_dir, res.amount * 2.0)
+	# a heavy hit tears parts off (bumpers, the wing)
+	tear_parts(my_visual, damage.zones, before_zones, vehicle.linear_velocity, vehicle.global_transform.basis * (-loc_dir) * minf(12.0, impulse / vehicle.mass * 2.0))
 	# sparks and debris where it hit, and the driver's head thrown away from the hit
 	var world := vehicle.global_transform * p
 	if crash_fx != null:

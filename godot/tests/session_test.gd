@@ -125,6 +125,7 @@ func _run() -> void:
 	var phys := 0.0
 	var frames := 0
 	var dts := PackedFloat32Array()
+	var crashed := false
 	# per measured frame, for what the slowest frames spend their time on: process, physics, render CPU, GPU (main
 	# viewport), physics steps, and when
 	var f_proc := PackedFloat32Array()
@@ -157,6 +158,13 @@ func _run() -> void:
 			for k in rids:
 				if rids[k].is_valid():
 					gpu[k] = gpu.get(k, 0.0) + RenderingServer.viewport_get_measured_render_time_gpu(rids[k])
+		# CRASH=<s>: a heavy front hit, then a rear one, at that time (parts torn off)
+		if OS.get_environment("CRASH") != "" and elapsed >= float(OS.get_environment("CRASH")) and not crashed:
+			crashed = true
+			var fwd := session.vehicle.global_transform.basis.z
+			session.impact_damage(session.vehicle.mass * 16.0, -fwd)
+			session.impact_damage(session.vehicle.mass * 16.0, fwd)
+			print("crash: detached ", session.my_visual.detached.keys(), " of ", session.my_visual.part_names())
 		# BOT_REPORT: each bot's race distance and speed every 15 s (traffic, passing, nobody stuck)
 		if OS.get_environment("BOT_REPORT") != "" and session.local_tracker != null and int(elapsed / 15.0) != int((elapsed - get_process_delta_time()) / 15.0):
 			var row := []
