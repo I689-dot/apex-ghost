@@ -633,6 +633,7 @@ func step(dt: float, c: Controls) -> void:
 		var kx: float = (mu * fz * tire.bx * tire.cx) / tire.p.kappa_peak
 		var fx_sum := 0.0
 		var fy_sum := 0.0
+		tire.prepare(w.slip_angle * stiff, fz, w.fz0, mu)
 		for sub in SUB:
 			# implicit linear step for wheel spin, then evaluate the non-linear tyre at the new slip
 			var tq := w.drive_torque
@@ -640,7 +641,7 @@ func step(dt: float, c: Controls) -> void:
 			var kappa := (om * R - vx) / den
 			if absf(kappa) > tire.p.kappa_peak * 0.7:
 				# saturated: explicit step with the actual (flat) force
-				var ff := tire.force(kappa, w.slip_angle * stiff, fz, w.fz0, mu)
+				var ff := tire.force_k(kappa)
 				om = w.omega + ((tq - ff.x * R) / w.inertia) * h_sub
 				kappa = (om * R - vx) / den
 			# brakes: friction torque that can stop but never reverse the wheel
@@ -651,7 +652,7 @@ func step(dt: float, c: Controls) -> void:
 				om -= signf(om) * bd
 			w.omega = om
 			kappa = (om * R - vx) / den
-			var f2 := tire.force(kappa, w.slip_angle * stiff, fz, w.fz0, mu)
+			var f2 := tire.force_k(kappa)
 			fx_sum += f2.x
 			fy_sum += f2.y
 			w.slip_ratio = kappa

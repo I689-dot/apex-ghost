@@ -157,6 +157,30 @@ static func profile_lap_time(line: Dictionary, v: PackedFloat32Array) -> float:
 
 static var _line_cache := {} # track id -> line
 static var _learned_cache := {} # track id -> PackedFloat32Array (per centreline point)
+static var _kahead_cache := {} # track id -> PackedFloat32Array: the sharpest racing-line curvature in the next KAHEAD_M
+
+## How far ahead a bot looks for a corner before it leaves its own lane for the racing line, and in what steps.
+const KAHEAD_M := 120
+const KAHEAD_STEP := 10
+
+## Per centreline point, the largest |curvature| of the racing line at 0, 10, ... KAHEAD_M m ahead of it: what update()
+## sampled with 13 searches of the track each decision, built once per track.
+static func curvature_ahead(track: Dictionary, line: Dictionary) -> PackedFloat32Array:
+	if _kahead_cache.has(track.id):
+		return _kahead_cache[track.id]
+	var cum: Array = track.cumS
+	var curv: PackedFloat32Array = line.curvature
+	var out := PackedFloat32Array()
+	out.resize(cum.size())
+	for i in cum.size():
+		var k := 0.0
+		var d := 0
+		while d <= KAHEAD_M:
+			k = maxf(k, absf(curv[index_at(track, float(cum[i]) + d)]))
+			d += KAHEAD_STEP
+		out[i] = k
+	_kahead_cache[track.id] = out
+	return out
 
 ## What the bots learned driving this layout (tests/ai_learn.gd: laps on the game's physics, braking later and
 ## carrying more speed where they had grip to spare, less where they ran wide, slid or left the track): a grip
@@ -198,6 +222,7 @@ var controls := Controls.new()
 var _profile: PackedFloat32Array
 var _profile_grip := 1.0
 var _line: Dictionary
+var _kahead: PackedFloat32Array
 var _limits: Dictionary
 var _hint := -1
 var _stuck := 0.0
@@ -256,6 +281,7 @@ func _init(track_data: Dictionary, veh: Vehicle, skill_value: float, lane_offset
 	lane = lane_offset
 	controls.digital = false
 	_line = racing_line_for(track)
+	_kahead = curvature_ahead(track, _line)
 	_limits = car_limits(veh.specs, skill, veh.air_density)
 	_profile = speed_profile(_line, _limits, 1.0, false, learned_grip(track))
 	_rng.seed = hash(get_instance_id())
@@ -359,7 +385,8 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 	var t := track
 	var p := v.global_position
 	var speed: float = v.telemetry.speed
-	var i := TrackMath.nearest_centerline_index(t, p.x, p.y, p.z, _hint, 30)
+	# a car moves under 2 m between decisions; the points are about 5 m apart (a reset scans the whole track: _hint -1)
+	var i := TrackMath.nearest_centerline_index(t, p.x, p.y, p.z, _hint, 8)
 	_hint = i
 	var s := TrackMath.progress_at(t, i, p.x, p.z)
 	var cl: Array = t.centerline
@@ -367,7 +394,6 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 	var lx_: PackedFloat32Array = _line.x
 	var lz_: PackedFloat32Array = _line.z
 	var loff: PackedFloat32Array = _line.offset
-	var lcurv: PackedFloat32Array = _line.curvature
 	if _need_blend:
 		# where the car stands relative to its own racing line (+ = left)
 		var k2 := (i + 1) % n
@@ -404,11 +430,7 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 	tz /= tl
 	var line_off := loff[j] + (loff[j2] - loff[j]) * f
 	# the bot's own lane only on straights; it moves back onto the line before a corner
-	var k_max := 0.0
-	var d := 0
-	while d <= 120:
-		k_max = maxf(k_max, absf(lcurv[index_at(t, s + d)]))
-		d += 10
+	var k_max := _kahead[index_at(t, s)]
 	var lane_target := lane * clampf(1.0 - k_max * 300.0, 0.0, 1.0)
 	var lane_step := 0.04 * maxf(speed, 5.0) * dt
 	_lane_now += clampf(lane_target - _lane_now, -lane_step, lane_step)

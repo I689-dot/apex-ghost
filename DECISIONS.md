@@ -1338,3 +1338,14 @@ The user asked for a completely new, more modern and more intuitive menu, taking
 - **Cockpit eyes count as tuned**: the auto-lift ray-tested whole meshes, and these models keep the windscreen in the body mesh, so it always lifted the eye 14 cm into the roof.
 - **The safety car is the Vantage GT3** (its model fields, its own id and role), green paint by brightness over the Vantage livery and an amber roof light bar that flashes while deployed (`SafetyCarLook`).
 - `tools/godot/sync-assets.sh` refuses to run unless FORCE_SYNC=1: its mirror would delete the Godot-only Spa and car files.
+
+## Godot: a full grid's CPU cost (2026-11-16)
+
+A 12-car grid at Spa (Ultra, 1440p) ran at 41.3 fps average with a 15.3 fps 1 % low: CPU-bound, about 9 ms of every frame in the cars' physics and the bots' driving, and more physics steps fall into each frame as the frame rate drops.
+
+- **Bots decide at 60 Hz** (`RaceSession.AI_HZ`; half the grid one physics step, half the next); their controls hold between decisions and their cars' physics still runs at 120 Hz. A Spa bot lap is the same either way (`tests/ailap.gd` with `AI_DIV`: 2:39.064 against 2:38.999).
+- **The bots' track lookups**: the sharpest curve in the next 120 m is a per-point table built once per track (`AiDriver.curvature_ahead`), not 13 searches each decision; the nearest-point search looks ±8 points around the last one, not ±30 (a car moves under 2 m between decisions, the points are 5 m apart). The lap comes out the same to the millisecond.
+- **Tyre forces**: what depends only on a wheel's load and slip angle (two powers, two tangents, the load factor) is worked out once a step (`TireModel.prepare` / `force_k`) instead of in each of the 4-8 force evaluations of the sub-steps; the same arithmetic, the same lap.
+- **The profiler records nothing unless in use** (`APEX_PROF` or the performance overlay): its calls sit in every car's physics step.
+- **Bots follow and pass again**: `follow_cap` assigned the speed cap and the car to pass from inside a lambda, which GDScript captures by value, so no bot ever backed off or pulled out for a car ahead (only the safety-car cap worked). It is a plain loop now.
+- Result: **60.1 fps average, 31.4 fps 1 % low** (process 18.7 ms, physics 6.3 ms a frame). The steady 45 fps target is met on average, not yet in the 1 % low; what the slowest frames spend their time on is still to be measured (M7).

@@ -127,6 +127,13 @@ func _run() -> void:
 			for k in rids:
 				if rids[k].is_valid():
 					gpu[k] = gpu.get(k, 0.0) + RenderingServer.viewport_get_measured_render_time_gpu(rids[k])
+		# BOT_REPORT: each bot's race distance and speed every 15 s (traffic, passing, nobody stuck)
+		if OS.get_environment("BOT_REPORT") != "" and session.local_tracker != null and int(elapsed / 15.0) != int((elapsed - get_process_delta_time()) / 15.0):
+			var row := []
+			for r in session.remotes.values():
+				if r.bot != null and session.local_tracker.players.has(r.id):
+					row.append("%d:%.0fm/%.0fkmh%s" % [r.slot, session.local_tracker.players[r.id].race_dist, r.bot.vehicle.telemetry.speed * 3.6, "P" if r.bot.ai.pass_target != 0.0 else ""])
+			print("[bots %3.0f s] " % elapsed, " ".join(row))
 		if OS.get_environment("COCKPIT_DEBUG") != "" and session.cockpit != null and int(elapsed * 2.0) != int((elapsed - get_process_delta_time()) * 2.0):
 			var cam: Camera3D = session.cockpit.camera
 			var car: Node3D = session.my_visual

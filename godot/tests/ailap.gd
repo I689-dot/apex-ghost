@@ -4,6 +4,8 @@ extends SceneTree
 
 var HZ := int(OS.get_environment("HZ")) if OS.get_environment("HZ") != "" else 120
 var DT := 1.0 / HZ
+## AI_DIV=n: the driver decides every n physics steps, as RaceSession's bots (AI_DIV there), controls held between
+var AI_DIV := int(OS.get_environment("AI_DIV")) if OS.get_environment("AI_DIV") != "" else 1
 
 func _initialize() -> void:
 	Engine.physics_ticks_per_second = HZ
@@ -16,6 +18,10 @@ func _fmt(ms: float) -> String:
 func _run() -> void:
 	var args := OS.get_cmdline_user_args()
 	var layouts := TrackData.list_layouts()
+	if OS.get_environment("LAYOUTS") != "":
+		print(layouts.map(func(l): return [l.get("track", ""), l.get("id", "")]))
+		quit()
+		return
 	var layout: Dictionary = layouts[int(args[0]) if args.size() > 0 else 0]
 	var skill := float(args[1]) if args.size() > 1 else 0.97
 	var car_id: String = args[2] if args.size() > 2 else "2024_porsche_992_gt3_r"
@@ -58,7 +64,9 @@ func _run() -> void:
 		if pr.passed >= 0:
 			var gates: Array = track.gates
 			cp = gates[posmod(pr.next_gate - 1 + gates.size(), gates.size())].s
-		var c := ai.update(DT, true, v.weather_grip * v.tyre_grip_avg(), cp)
+		if i % AI_DIV == 0:
+			ai.update(DT * AI_DIV, true, v.weather_grip * v.tyre_grip_avg(), cp)
+		var c := ai.controls
 		if ai.reset_requested:
 			resets += 1
 			ai.reset_requested = false

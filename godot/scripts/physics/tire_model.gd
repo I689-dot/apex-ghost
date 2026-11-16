@@ -56,3 +56,35 @@ func force(kappa: float, alpha: float, fz: float, fz0: float, mu: float) -> Vect
 	var c := cx * wx + cy * (1.0 - wx)
 	var f := mu_eff * fz * curve(sigma, b, c)
 	return Vector2(f * sx / sigma, f * sy / sigma)
+
+# The same force for many slip ratios at one slip angle and load (Vehicle's tyre sub-steps): prepare() once per wheel
+# and step, then force_k(kappa). What depends only on the angle and load is not worked out again each sub-step;
+# the arithmetic is force()'s, in the same order, so the results are the same.
+var _fz := 0.0
+var _kx_den := 1.0
+var _sy := 0.0
+var _mu_fz := 0.0
+
+func prepare(alpha: float, fz: float, fz0: float, mu: float) -> void:
+	_fz = fz
+	if fz <= 0.0:
+		return
+	var r := clampf(fz / fz0, 0.3, 2.5)
+	_kx_den = p.kappa_peak * pow(r, 0.1)
+	_sy = tan(alpha) / tan(p.alpha_peak * pow(r, 0.25))
+	var load := maxf(0.65, 1.0 - p.load_sens * (fz / fz0 - 1.0))
+	_mu_fz = mu * load * fz
+
+func force_k(kappa: float) -> Vector2:
+	if _fz <= 0.0:
+		return Vector2.ZERO
+	var sx := kappa / _kx_den
+	var sy := _sy
+	var sigma := Vector2(sx, sy).length()
+	if sigma < 1e-6:
+		return Vector2.ZERO
+	var wx := absf(sx) / (absf(sx) + absf(sy))
+	var b := bx * wx + by * (1.0 - wx)
+	var c := cx * wx + cy * (1.0 - wx)
+	var f := _mu_fz * curve(sigma, b, c)
+	return Vector2(f * sx / sigma, f * sy / sigma)

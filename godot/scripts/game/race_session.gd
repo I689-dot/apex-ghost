@@ -23,6 +23,9 @@ const BUMP_MIN := 300.0
 const BUMP_SEND_MS := 60.0
 const BUMP_DEDUPE_MS := 500.0
 var RESCUE_STEPS := maxi(1, Engine.physics_ticks_per_second / 10)
+## The bots' driving decisions per second (their physics runs at every step), and the physics steps per decision.
+const AI_HZ := 60
+var AI_DIV := maxi(1, Engine.physics_ticks_per_second / AI_HZ)
 const FCY_MS := 80.0 / 3.6
 ## Maps whose pit lane gets our own surface: Zandvoort's model draws it near-white.
 const PIT_SURFACE_MAPS := ["zandvoort"]
@@ -73,6 +76,8 @@ class LocalBot:
 	var hint := -1
 	## Seconds left before a pass manoeuvre is given up (traffic cleared).
 	var pass_hold := 0.0
+	## Whether the driver has decided since its start (the first decision after the green light is not held back).
+	var decided := false
 	var pit: PitLaneMonitor = null
 	var stop_lap := 0
 	var service_end := 0.0
@@ -1675,18 +1680,27 @@ func step_bots(race_t: float) -> void:
 		# qualifying: one at a time; the race: everyone at the green light
 		var started: bool = race_t >= (0.0 if race.kind == "race" else order * BOT_RELEASE_MS)
 		b.vehicle.frozen = not started or b.service_end > 0.0
+		# the driver decides at AI_HZ (half the bots one physics step, half the next) and its controls hold in between:
+		# the car's physics still runs every step. A bot's decisions (track position, racing line, traffic against every
+		# car) were the larger share of a full grid's physics time.
+		if (step_count + r.slot) % AI_DIV != 0 and b.decided != started:
+			continue
+		b.decided = started
+		var dt := FIXED_DT * AI_DIV
 		var tr: RaceTracker.PlayerRaceState = local_tracker.players.get(r.id) if local_tracker != null else null
 		var gates: Array = track_data.gates
 		var cp := -1.0
 		if tr != null and tr.passed >= 0:
 			cp = gates[posmod(tr.next_gate - 1 + gates.size(), gates.size())].s
-		var cap := follow_cap(r) if started else INF
-		var c := b.ai.update(FIXED_DT, started, b.vehicle.weather_grip * b.vehicle.tyre_grip_avg(), cp, cap)
+		var cap := follow_cap(r, dt) if started else INF
+		var c := b.ai.update(dt, started, b.vehicle.weather_grip * b.vehicle.tyre_grip_avg(), cp, cap)
 		b.vehicle.controls = c
 
 ## Traffic for a bot: a slower car ahead in its lane makes it pull out and pass, keeping to that side until the car
 ## is behind it; it only lifts when it is about to run into one before it has moved over. Returns the speed cap.
-func follow_cap(r: Remote) -> float:
+## (A plain loop: this was a lambda assigning to the function's locals, which GDScript captures by value, so no bot
+## ever backed off or pulled out for traffic.)
+func follow_cap(r: Remote, dt: float) -> float:
 	var b := r.bot
 	var v := b.vehicle
 	var p := v.global_position
@@ -1695,13 +1709,32 @@ func follow_cap(r: Remote) -> float:
 	var fz := fb.z
 	var my_speed: float = v.telemetry.speed
 	var cap := INF
-	var block := {}
+	var block_along := INF
+	var block_lat := 0.0
 	var beside := false
-	var check := func(op: Vector3, speed: float, ofx: float, ofz: float) -> void:
+	var lane_w := 1.6 if b.ai.pass_target != 0.0 else 2.2
+	var n := remotes.size() + (0 if spectator else 1)
+	var others := remotes.values()
+	for k in n:
+		var op: Vector3
+		var speed: float
+		var ob: Vector3
+		if k < others.size():
+			var o: Remote = others[k]
+			if o == r:
+				continue
+			var node: Node3D = o.bot.vehicle if o.bot != null else o.visual
+			op = node.global_position
+			ob = node.global_transform.basis.z
+			speed = o.vel.length()
+		else:
+			op = vehicle.global_position
+			ob = vehicle.global_transform.basis.z
+			speed = vehicle.telemetry.speed
 		# not the same piece of road: a car on the other leg of a hairpin or on a bridge / underpass looked like a car
 		# ahead; a stopped car is avoided whichever way
-		if absf(op.y - p.y) > 2.5 or (speed > 5.0 and ofx * fx + ofz * fz < 0.3):
-			return
+		if absf(op.y - p.y) > 2.5 or (speed > 5.0 and ob.x * fx + ob.z * fz < 0.3):
+			continue
 		var dx := op.x - p.x
 		var dz := op.z - p.z
 		var along := dx * fx + dz * fz
@@ -1710,23 +1743,15 @@ func follow_cap(r: Remote) -> float:
 		if along > -6.0 and along <= 3.0 and absf(lat) < 3.4:
 			beside = true
 		if along <= 0.0 or along > 40.0 or absf(lat) > 2.6:
-			return
+			continue
 		# in our path (narrower once we are pulling out): keep about 10 m, back off if closer
-		if absf(lat) < (1.6 if b.ai.pass_target != 0.0 else 2.2):
+		if absf(lat) < lane_w:
 			cap = minf(cap, maxf(0.0, speed + (along - 10.0) * 0.7))
 		if along <= 3.0 or (speed > my_speed - 1.5 and along > 14.0):
-			return # as fast as us and not close: just follow
-		if block.is_empty() or along < block.along:
-			block = {"along": along, "lat": lat}
-	for o: Remote in remotes.values():
-		if o == r:
-			continue
-		var node: Node3D = o.bot.vehicle if o.bot != null else o.visual
-		var ob := node.global_transform.basis.z
-		check.call(node.global_position, o.vel.length(), ob.x, ob.z)
-	if not spectator:
-		var mb := vehicle.global_transform.basis.z
-		check.call(vehicle.global_position, vehicle.telemetry.speed, mb.x, mb.z)
+			continue # as fast as us and not close: just follow
+		if along < block_along:
+			block_along = along
+			block_lat = lat
 	# the safety car: queue behind it, seen from far enough to stop behind it
 	if sc != null and sc.visible:
 		var trp: RaceTracker.PlayerRaceState = local_tracker.players.get(r.id) if local_tracker != null else null
@@ -1736,16 +1761,16 @@ func follow_cap(r: Remote) -> float:
 	# no overtaking under a caution (FCY, safety car, a yellow flag here): follow instead
 	var prog: float = local_tracker.players[r.id].progress_s if local_tracker != null and local_tracker.players.has(r.id) else -1e9
 	var caution: bool = rc.course != "green" or in_yellow(prog)
-	var found := {} if caution else block
-	if not found.is_empty() and (b.ai.pass_target != 0.0 or b.ai.can_pass()):
+	var found := not caution and block_along < INF
+	if found and (b.ai.pass_target != 0.0 or b.ai.can_pass()):
 		# pass on the side away from it (it is left of us -> go right), else keep the side already chosen
 		if b.ai.pass_target == 0.0:
-			b.ai.pass_target = -PASS_OFFSET if found.lat > 0.3 else (PASS_OFFSET if found.lat < -0.3 else b.ai.roomy_side() * PASS_OFFSET)
+			b.ai.pass_target = -PASS_OFFSET if block_lat > 0.3 else (PASS_OFFSET if block_lat < -0.3 else b.ai.roomy_side() * PASS_OFFSET)
 		b.pass_hold = 1.0
 	elif beside and b.ai.pass_target != 0.0:
 		b.pass_hold = 1.0
 	else:
-		b.pass_hold -= FIXED_DT
+		b.pass_hold -= dt
 		if b.pass_hold <= 0.0:
 			b.ai.pass_target = 0.0
 	return cap

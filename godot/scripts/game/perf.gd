@@ -13,7 +13,11 @@ var _text := ""
 var _label := Label.new()
 
 func _ready() -> void:
+	Prof.active = true
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+
+func _exit_tree() -> void:
+	Prof.active = Prof.on
 
 func _init() -> void:
 	_times.resize(120)

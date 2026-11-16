@@ -69,10 +69,12 @@ automatic lift no longer pushes it into the roof.
 |---|---|---|
 | no bots | 67 | 40 |
 | 11 bots, full-detail cars | 41.3 | 15.3 |
+| 11 bots, after the CPU work (DECISIONS: "a full grid's CPU cost") | 60.1 | 31.4 |
 
-With a full grid the frame is CPU-bound: about 24 ms of process time, 9 ms of it physics, and about 2,900 draws. The
-user chose full detail everywhere and accepted about 40 fps with full grids (option B). M7 cuts the bots' physics cost,
-which is the larger share.
+With a full grid the frame was CPU-bound: about 24 ms of process time, 9 ms of it physics, and about 2,900 draws. The
+user chose full detail everywhere and accepted about 40 fps with full grids (option B). After that, the bots' driving
+moved to 60 Hz with cheaper track lookups, and the tyre forces' per-step terms are no longer recomputed in each
+sub-step: process time 18.7 ms, physics 6.3 ms a frame.
 
 ## Check-in images
 
