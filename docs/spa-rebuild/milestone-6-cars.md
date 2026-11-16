@@ -70,6 +70,7 @@ automatic lift no longer pushes it into the roof.
 | no bots | 67 | 40 |
 | 11 bots, full-detail cars | 41.3 | 15.3 |
 | 11 bots, after the CPU work (DECISIONS: "a full grid's CPU cost") | 60.1 | 31.4 |
+| 11 bots, nearby cars drawn (both rows above were measured without them) | 40.3 | 15.7 |
 
 With a full grid the frame was CPU-bound: about 24 ms of process time, 9 ms of it physics, and about 2,900 draws. The
 user chose full detail everywhere and accepted about 40 fps with full grids (option B). After that, the bots' driving
