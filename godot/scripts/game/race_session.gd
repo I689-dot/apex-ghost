@@ -2169,7 +2169,7 @@ func update_remote(r: Remote, server_now: float, dt: float, cam_pos: Vector3) ->
 		r.visual.set_lights(v.pedals.brake > 0.1 and not v.is_reverse(), headlights_on, env.night)
 		r.visual.update_smoke(dt, 0.0, self)
 		var d := r.visual.global_position.distance_to(cam_pos)
-		r.visual.set_opacity(1.0 if cinematic != null or contact else clampf((d - 2.5) / 6.0, 0.15, 1.0))
+		r.visual.set_opacity(1.0 if cinematic != null or contact else near_fade(d))
 		return
 	# driving: where the car is now (both drivers of a fight see the same order); watching: smooth, in the past
 	var s := r.buffer.sample(server_now, dt, float(Const.INTERP_DELAY_MS) if spectator else 0.0)
@@ -2185,8 +2185,17 @@ func update_remote(r: Remote, server_now: float, dt: float, cam_pos: Vector3) ->
 	o.update_smoke(dt, maxf(0.6, r.damage.zones[4]) if (s.flags & CarState.FLAG_SMOKE) != 0 else 0.0, self)
 	# ghost: fade out when very close to the camera so it never blocks the cockpit view
 	var dd := o.global_position.distance_to(cam_pos)
-	var fade := 1.0 if cinematic != null or contact or (spectator and r.id == spec_target) else clampf((dd - 2.5) / 6.0, 0.15, 1.0)
+	var fade := 1.0 if cinematic != null or contact or (spectator and r.id == spec_target) else near_fade(dd)
 	o.set_opacity(0.35 if s.stale_ms > 5000.0 else fade)
+
+## How visible another car is at this distance from the camera without car contact (cars drive through each other):
+## gone within NEAR_HIDE_M, whole from NEAR_FULL_M. It used to stay at 15 % up close, which with the stochastic
+## transparency of other cars (alpha hash) drew a speckled grey shell over the road, worst on the grid behind you.
+const NEAR_HIDE_M := 4.0
+const NEAR_FULL_M := 8.5
+
+static func near_fade(d: float) -> float:
+	return clampf((d - NEAR_HIDE_M) / (NEAR_FULL_M - NEAR_HIDE_M), 0.0, 1.0)
 
 ## The ghost car: your best lap replayed.
 func update_ghost(server_now: float) -> void:

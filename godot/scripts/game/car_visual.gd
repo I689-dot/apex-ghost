@@ -48,7 +48,6 @@ var _fade_mats: Array = [] # StandardMaterial3D (cloned)
 var _glass_mats: Array = [] # [material, base colour] pairs for the cockpit dimming
 var _strip_mats: Array = []
 var _body_meshes: Array = [] # MeshInstance3D
-var _orig_arrays := {} # mesh instance id -> original surface arrays
 var _steer_axis := Vector3(0, 0, 1)
 ## Steering-wheel angle : road-wheel angle, from the real car's lock.
 var _steer_ratio: float
@@ -488,79 +487,60 @@ func set_opacity(a: float) -> void:
 		m.albedo_color = c
 	visible = a > 0.04
 
-## Dent the body around a car-local impact point.
+## Dent the body around a car-local impact point: the impact is kept (up to MAX_DENTS, a hit near an earlier one
+## deepens it) for the paint shader, which moves the body's vertices on the GPU (apply_dents). The dents used to be
+## made on the CPU, copying the body's geometry and moving every vertex in GDScript: 0.5-2.3 s a hit with the
+## full-detail cars, the freeze on a crash.
+const MAX_DENTS := 8
+var dents: Array = [] # [Vector4(point.xyz, radius), Vector4(direction.xyz, depth)] in car space
+
 func dent(local_point: Vector3, direction: Vector3, amount: float) -> void:
 	var radius := 0.45 + amount * 0.6
 	var depth := minf(0.09, amount * 0.12)
-	for mi: MeshInstance3D in _body_meshes:
-		var key := mi.get_instance_id()
-		var mesh := mi.mesh as ArrayMesh
-		if mesh == null:
-			continue
-		if not _orig_arrays.has(key):
-			# per-instance geometry: the mesh resource is shared between cars
-			var copy := ArrayMesh.new()
-			var arrays_all: Array = []
-			for s in mesh.get_surface_count():
-				var arr := mesh.surface_get_arrays(s)
-				arrays_all.append(arr)
-				copy.add_surface_from_arrays(mesh.surface_get_primitive_type(s), arr)
-				copy.surface_set_material(s, mesh.surface_get_material(s))
-			var mats: Array = []
-			for s in mi.mesh.get_surface_count():
-				mats.append(mi.get_surface_override_material(s))
-			mi.mesh = copy
-			for s in mats.size():
-				mi.set_surface_override_material(s, mats[s])
-			_orig_arrays[key] = arrays_all.map(func(a): return a.duplicate(true))
-			mesh = copy
-		# impact point into the mesh's local space
-		var inv := mi.global_transform.affine_inverse() * global_transform
-		var p := inv * local_point
-		var dir := (inv.basis * direction).normalized()
-		var r2 := radius * radius
-		for s in mesh.get_surface_count():
-			var arr := mesh.surface_get_arrays(s)
-			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-			var touched := false
-			for i in verts.size():
-				var d2 := verts[i].distance_squared_to(p)
-				if d2 > r2:
-					continue
-				var f := 1.0 - sqrt(d2) / radius
-				var k := depth * f * f
-				verts[i] += Vector3(dir.x * k, dir.y * k * 0.5, dir.z * k)
-				touched = true
-			if touched:
-				arr[Mesh.ARRAY_VERTEX] = verts
-				_rebuild_surface(mesh, s, arr, true)
+	var dir := direction.normalized()
+	for d in dents:
+		var p0 := Vector3(d[0].x, d[0].y, d[0].z)
+		if p0.distance_to(local_point) < float(d[0].w) * 0.6:
+			d[0].w = maxf(float(d[0].w), radius)
+			d[1].w = minf(0.12, float(d[1].w) + depth * 0.5)
+			apply_dents()
+			return
+	if dents.size() >= MAX_DENTS:
+		# the shallowest goes
+		var k := 0
+		for i in dents.size():
+			if float(dents[i][1].w) < float(dents[k][1].w):
+				k = i
+		dents.remove_at(k)
+	dents.append([Vector4(local_point.x, local_point.y, local_point.z, radius), Vector4(dir.x, dir.y, dir.z, depth)])
+	apply_dents()
 
-func _rebuild_surface(mesh: ArrayMesh, s: int, arr: Array, recompute_normals: bool) -> void:
-	var mat := mesh.surface_get_material(s)
-	var prim := mesh.surface_get_primitive_type(s)
-	if recompute_normals and arr[Mesh.ARRAY_INDEX] != null:
-		var st := SurfaceTool.new()
-		st.create_from_arrays(arr, prim)
-		st.generate_normals()
-		arr = st.commit_to_arrays()
-	# replace the surface: rebuild the mesh without it, then re-add in place
-	var all: Array = []
-	for i in mesh.get_surface_count():
-		all.append([mesh.surface_get_arrays(i) if i != s else arr, mesh.surface_get_primitive_type(i), mesh.surface_get_material(i)])
-	mesh.clear_surfaces()
-	for i in all.size():
-		mesh.add_surface_from_arrays(all[i][1], all[i][0])
-		mesh.surface_set_material(i, all[i][2] if i != s else mat)
+## Hands the dents to the car's paint materials (the ones with the dent uniforms), in each body mesh's own space.
+func apply_dents() -> void:
+	for mi: MeshInstance3D in _body_meshes:
+		if mi.mesh == null:
+			continue
+		var inv := mi.global_transform.affine_inverse() * global_transform
+		var pts := PackedVector4Array()
+		var dirs := PackedVector4Array()
+		for i in MAX_DENTS:
+			if i < dents.size():
+				var p := inv * Vector3(dents[i][0].x, dents[i][0].y, dents[i][0].z)
+				var dv := (inv.basis * Vector3(dents[i][1].x, dents[i][1].y, dents[i][1].z)).normalized()
+				pts.append(Vector4(p.x, p.y, p.z, dents[i][0].w))
+				dirs.append(Vector4(dv.x, dv.y, dv.z, dents[i][1].w))
+			else:
+				pts.append(Vector4.ZERO)
+				dirs.append(Vector4.ZERO)
+		for s in mi.mesh.get_surface_count():
+			var m := mi.get_active_material(s) as ShaderMaterial
+			if m != null and m.shader != null and m.shader.code.contains("dent_p"):
+				m.set_shader_parameter("dent_p", pts)
+				m.set_shader_parameter("dent_d", dirs)
 
 func reset_damage() -> void:
-	for mi: MeshInstance3D in _body_meshes:
-		var key := mi.get_instance_id()
-		if not _orig_arrays.has(key):
-			continue
-		var mesh := mi.mesh as ArrayMesh
-		var orig: Array = _orig_arrays[key]
-		for s in mesh.get_surface_count():
-			_rebuild_surface(mesh, s, (orig[s] as Array).duplicate(false), false)
+	dents.clear()
+	apply_dents()
 
 ## Engine smoke at high damage. scene_root: where the sprites live (the world).
 func update_smoke(dt: float, engine_damage: float, scene_root: Node) -> void:
