@@ -83,6 +83,8 @@ def build(src_root, cid, c):
     # the rear lamps' glow maps (lamps in materials not named LIGHT_TAIL_: 'tail')
     run(['node', os.path.join(ROOT, 'tools/godot/tail-lights.mjs')] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')]
         + ([f'--also={",".join(c["tail"])}'] if c.get('tail') else []), 'tail lamps')
+    # the makers' badges and suppliers' marks inside the texture atlases (tools/godot/debrand.json)
+    run(['node', os.path.join(ROOT, 'tools/godot/debrand.mjs'), cid] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')], 'debrand')
     return json.load(open(meta)), out, png
 
 

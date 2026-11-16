@@ -1,0 +1,189 @@
+{
+ "_doc": "Makers' badges and suppliers' marks inside the cars' texture atlases (the game carries no brands, 2026-11-16): per car, per material (its name, with or without a LIGHT_HEAD_ / LIGHT_TAIL_ prefix), the regions to paint over as [u0, v0, u1, v1] of the texture. tools/godot/debrand.mjs fills each with the median colour round it.",
+ "2020_audi_r8_lms_evo": {
+  "EXT_Details": [
+   [
+    0.0,
+    0.24,
+    0.26,
+    0.33
+   ],
+   [
+    0.0,
+    0.33,
+    0.38,
+    0.5
+   ],
+   [
+    0.5,
+    0.0,
+    1.0,
+    0.49
+   ],
+   [
+    0.5,
+    0.5,
+    1.0,
+    0.61
+   ]
+  ]
+ },
+ "ferrari_296_gt3_verstappen": {
+  "mat_236": [
+   [
+    0.0,
+    0.37,
+    0.24,
+    0.53
+   ],
+   [
+    0.5,
+    0.42,
+    0.68,
+    0.61
+   ]
+  ],
+  "mat_37": [
+   [
+    0.55,
+    0.4,
+    0.96,
+    0.98
+   ]
+  ],
+  "mat_225": [
+   [
+    0.0,
+    0.0,
+    0.31,
+    0.28
+   ]
+  ]
+ },
+ "2024_porsche_992_gt3_r": {
+  "EXT_Details_1": [
+   [
+    0.48,
+    0.02,
+    0.7,
+    0.61
+   ],
+   [
+    0.7,
+    0.0,
+    1.0,
+    0.63
+   ],
+   [
+    0.6,
+    0.62,
+    0.9,
+    1.0
+   ]
+  ],
+  "DISPLAY": [
+   [
+    0.0,
+    0.05,
+    0.08,
+    0.26
+   ]
+  ]
+ },
+ "mercedes_amg_gt3_red_bull_racing": {
+  "Details_door": [
+   [
+    0.0,
+    0.72,
+    0.36,
+    0.86
+   ],
+   [
+    0.61,
+    0.59,
+    1.0,
+    1.0
+   ],
+   [
+    0.04,
+    0.0,
+    0.32,
+    0.07
+   ],
+   [
+    0.72,
+    0.0,
+    0.96,
+    0.07
+   ]
+  ]
+ },
+ "ford_mustang_gt3": {
+  "EXT_Grid": [
+   [
+    0.27,
+    0.6,
+    0.8,
+    0.92
+   ]
+  ],
+  "DISPLAY": [
+   [
+    0.2,
+    0.15,
+    0.8,
+    0.37
+   ]
+  ]
+ },
+ "bmw_m4_gt3_evo_2026": {
+  "refractrear": [
+   [
+    0.46,
+    0.3,
+    1.0,
+    0.41
+   ],
+   [
+    0.8,
+    0.0,
+    1.0,
+    0.07
+   ]
+  ]
+ },
+ "bmw_m4_gt3_vecarz": {
+  "WINDOW_GLASS.005": [
+   [
+    0.02,
+    0.68,
+    0.46,
+    0.75
+   ]
+  ],
+  "WHEEL": [
+   [
+    0.87,
+    0.74,
+    1.0,
+    1.0
+   ],
+   [
+    0.59,
+    0.58,
+    0.73,
+    0.71
+   ]
+  ]
+ },
+ "vantage_gt3_evo_heart_of_racing": {
+  "Glass": [
+   [
+    0.32,
+    0.46,
+    0.49,
+    1.0
+   ]
+  ]
+ }
+}

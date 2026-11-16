@@ -25,6 +25,14 @@ const PAINT_MATS := {
 	"vantage_gt3_evo_heart_of_racing": ["Body"],
 }
 const TYRE_MATS := {"ferrari_296_gt3_verstappen": ["mat_75"]}
+## Label sheets and straps that are mostly lettering (seat belts, safety nets, display and switch labels full of
+## suppliers' names): drawn in one plain dark colour. By name, and per model for anonymous materials.
+const PLAIN_MATS := {
+	"ferrari_296_gt3_verstappen": ["mat_46", "mat_215", "mat_216", "mat_217", "mat_47"],
+	"bmw_m4_gt3_evo_2026": ["FUEL_LCD"],
+}
+static var _plain_re := RegEx.create_from_string("(?i)belt|schroth|^INT_NET$|lumi|_SAS$|^INT_SAS|INT_DETAILS_TEXT|INT_Details_2|LED_STEER|^Material_25$")
+
 ## Materials with brands or the model's own race number, not drawn (anonymous ones the name rules cannot see).
 const HIDE_MATS := {"ferrari_296_gt3_verstappen": ["mat_73"]}
 const RIM_MATS := {"ferrari_296_gt3_verstappen": ["mat_235", "mat_36"]}
@@ -90,6 +98,8 @@ static func apply(visual: CarVisual, livery: Dictionary) -> void:
 					pm.set_shader_parameter("normal_depth", sm.normal_scale)
 				_set_paint(pm, livery, fin, number_tex, visual, mi, aabb)
 				mi.set_surface_override_material(s, pm)
+			elif _plain_re.search(nm) != null or (PLAIN_MATS.get(mid, []) as Array).has(nm):
+				_flat(sm, Color(0.11, 0.11, 0.12), 0.0, 0.8)
 			elif in_caliper or (in_spin and (RIM_MATS.get(mid, []) as Array).has(nm)):
 				_flat(sm, Color(livery.get("calipers" if in_caliper else "rims", "#1c1c1e")), 0.45 if in_caliper else 0.6, 0.35)
 			elif _tyre_re.search(nm) != null or (TYRE_MATS.get(mid, []) as Array).has(nm):
