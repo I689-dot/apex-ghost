@@ -4,7 +4,8 @@ extends Node3D
 ## per-instance light materials, dents, ghost fading, headlights, smoke. Local axes: +X left, +Y up, +Z forward.
 
 const WHEELS := ["FL", "FR", "RL", "RR"]
-## Where other cars switch to lighter models (x CAR_LOD.scale): full detail up close, LOD1 from 30 m, LOD2 beyond 130 m.
+## Where a car's levels switch (x car_lod_scale), by their place in its list: the first up to 30 m, the second to 130 m,
+## the third beyond. Other cars load lod1 and lod2 (Assets.load_car_model's first_level 1): lod1 near, lod2 from 30 m.
 const LOD_DIST := [0.0, 30.0, 130.0]
 ## The quality preset's car detail distance (QualityConfig.carLodScale): set before the cars are built.
 static var car_lod_scale := 1.0
@@ -71,7 +72,6 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 	if st != null:
 		_steer_axis = Vector3(st.axis[0], st.axis[1], st.axis[2]).normalized()
 	var levels: Array = model.lods.slice(0, 1) if local else model.lods
-	var first: int = 0 if local else model.first_level
 	var cache := {}
 	for i in levels.size():
 		var src: PackedScene = levels[i]
@@ -87,7 +87,10 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 		_levels.append(rig)
 		add_child(root)
 		if levels.size() > 1:
-			_set_lod_range(root, (LOD_DIST[mini(first + i, 2)] if first + i < LOD_DIST.size() else 200.0) * car_lod_scale, (LOD_DIST[first + i + 1] * car_lod_scale) if first + i + 1 < LOD_DIST.size() else 0.0)
+			# the ranges go by the level's place in the list, not its file: other cars start at lod1 (first 1), and
+			# their nearest level must be drawn from 0 m (it took lod1's 30 m start: within 30 m x the preset's scale,
+			# 120 m on Ultra, other cars were not drawn at all, and lod1 went on to 520 m)
+			_set_lod_range(root, LOD_DIST[i] * car_lod_scale, (LOD_DIST[i + 1] * car_lod_scale) if i + 1 < levels.size() else 0.0)
 		if i == 0:
 			_add_body(root)
 			_inside_root = root

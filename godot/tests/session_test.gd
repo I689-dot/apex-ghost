@@ -116,14 +116,35 @@ func _run() -> void:
 	var phys := 0.0
 	var frames := 0
 	var dts := PackedFloat32Array()
+	# per measured frame, for what the slowest frames spend their time on: process, physics, render CPU, GPU (main
+	# viewport), physics steps, and when
+	var f_proc := PackedFloat32Array()
+	var f_phys := PackedFloat32Array()
+	var f_rcpu := PackedFloat32Array()
+	var f_gpu := PackedFloat32Array()
+	var f_steps := PackedInt32Array()
+	var f_at := PackedFloat32Array()
+	var f_pos := PackedVector3Array()
+	var last_pf := Engine.get_physics_frames()
 	while elapsed < seconds:
 		await get_tree().process_frame
 		elapsed += get_process_delta_time()
+		if elapsed <= seconds * 0.5:
+			last_pf = Engine.get_physics_frames()
 		if elapsed > seconds * 0.5:
 			dts.append(get_process_delta_time())
 			proc += Performance.get_monitor(Performance.TIME_PROCESS)
 			phys += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+			var vrid := get_viewport().get_viewport_rid()
+			f_proc.append(Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0)
+			f_phys.append(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0)
+			f_rcpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vrid) + RenderingServer.get_frame_setup_time_cpu())
+			f_gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vrid))
+			f_steps.append(Engine.get_physics_frames() - last_pf)
+			f_at.append(elapsed)
+			f_pos.append(session.vehicle.global_position)
 			frames += 1
+			last_pf = Engine.get_physics_frames()
 			for k in rids:
 				if rids[k].is_valid():
 					gpu[k] = gpu.get(k, 0.0) + RenderingServer.viewport_get_measured_render_time_gpu(rids[k])
@@ -173,6 +194,42 @@ func _run() -> void:
 		for i in n_low:
 			low += sorted_dts[sorted_dts.size() - 1 - i]
 		print("avg fps %.1f, 1%% low %.1f, worst frame %.1f ms (%d frames)" % [dts.size() / total, n_low / low, sorted_dts[sorted_dts.size() - 1] * 1000.0, dts.size()])
+		# the slowest 1 % against all frames: where the time goes (the monitors are the previous frame's for some)
+		var order := range(dts.size())
+		order.sort_custom(func(a, b): return dts[a] > dts[b])
+		var sums := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+		var alls := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+		for k in dts.size():
+			var row := [dts[k] * 1000.0, f_proc[k], f_phys[k], f_rcpu[k], f_gpu[k], float(f_steps[k])]
+			for c in 6:
+				alls[c] += row[c]
+				if order.find(k) < n_low:
+					sums[c] += row[c]
+		var names := ["frame", "process", "physics", "render cpu", "gpu", "physics steps"]
+		for c in 6:
+			print("  %-14s slowest 1%%: %6.2f   all: %6.2f" % [names[c], sums[c] / n_low, alls[c] / dts.size()])
+		var at := []
+		for i in mini(n_low, 20):
+			at.append("%.1f" % f_at[order[i]])
+		print("  slowest frames at s: ", ", ".join(at))
+		# TIMELINE: per half second, the frame time, GPU time, physics steps and where the car was
+		if OS.get_environment("TIMELINE") != "":
+			var k0 := 0
+			while k0 < dts.size():
+				var t_end := f_at[k0] + 0.5
+				var n := 0
+				var sd := 0.0
+				var sg := 0.0
+				var ss := 0
+				var worst := 0.0
+				while k0 < dts.size() and f_at[k0] < t_end:
+					sd += dts[k0]
+					sg += f_gpu[k0]
+					ss += f_steps[k0]
+					worst = maxf(worst, dts[k0] * 1000.0)
+					n += 1
+					k0 += 1
+				print("  t %5.1f  frame %5.1f ms (worst %5.1f)  gpu %5.1f  steps %.1f  at %s" % [t_end - 0.5, sd * 1000.0 / n, worst, sg / n, float(ss) / n, f_pos[k0 - 1]])
 		# what was actually drawn: the window can be smaller than asked (capped at the screen), the 3D scaled from it
 		var vp := get_viewport()
 		var win := DisplayServer.window_get_size()
