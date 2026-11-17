@@ -1415,3 +1415,23 @@ From the user's list (DECISIONS: the rest follows):
 - **Parts fly off in crashes** (the user: "bumpers flying off"): the models' bodies are one piece, so `tools/godot/car-parts.mjs` (run by build-cars.py) cuts the parts out of the body by where they sit, the same way for every car: the front bumper and splitter, the rear bumper and diffuser (the outer half of each overhang, below 62 % of the height), the rear wing (above 82 %, behind the rear axle; heights from the 0.5th-99.5th percentile, an antenna does not set the top). In the game a bumper comes off when its zone of damage passes 0.45 or one hit adds 0.25, the wing at 0.7 (`RaceSession.tear_parts`, other drivers' cars from their damage updates too): it is hidden on every level of the car and flies as a piece of debris with its mesh and a box round it (the car's velocity, the hit's push, a tumble), lands on the track, stays 25 s (24 pieces at most); a bodywork repair puts the parts back. Shown with `tests/session_test.gd` `CRASH=<s>`.
 - **English only** (the user): the Spanish translation (`I18nExtra`, `data/i18n_es.json`, left out of the exports), its export from the web game (`tools/godot/export-i18n.mjs`) and the language setting are gone; `I18n.t` only fills in placeholders, kept as the one place every text goes through.
 - **Deeper setup** (the user: "improve the advanced settings, deeper into physics"): the briefing's Advanced page adds springs (7 clicks, front / rear), alignment (static camber and toe per axle), the differential (preload in Nm, locking on and off power), brake pressure and brake ducts, final drive (±3 steps of 2 %) and the engine map (race / lean / save fuel). Each is in the physics: springs scale the wheels' rates; camber moves the camber-grip curve against the tyre's design alignment; toe turns each wheel in or out; preload and coast locking replace the differential's fixed values; ducts cool the brakes (and a little the tyres); brake pressure scales the brakes' torque; the final drive scales the gearing; the maps trade power for fuel. Setup codes and saved setups carry them (validated, clamped). At their neutral values the physics is as before (`tests/ailap.gd`: the same Spa lap with and without them, 2:39.021; it moved 22 ms from 2:38.999 with the garage layer added to every car's collision mask earlier the same day).
+
+## Godot: cars' look, headlamps, badges, and the store preview (2026-11-17)
+
+- The paint shader shades a car as a baked occlusion map would (darker towards the ground and on downward faces), has
+  metallic flakes up close, and draws the wing, splitter, sills and diffuser in carbon (or the body or second colour:
+  the Paint page's Aero). A contact-shadow decal sits under every car; your car carries a reflection probe on High and
+  Ultra (cars on render layers 3 and 4 so neither shades or reflects itself); the presets' "ao" now switches on SSAO
+  (it never did); SSR on Ultra. Measured: Spa, Ultra, 1080p, 83 fps with the probe, 82 without.
+- The Vantage was the one car still on the web game's simplified models (135k / 70k / 18k triangles against its
+  378k): misshapen, panels collapsed and open. Now as the others. The menus drew every car from its far model; now from
+  the near one.
+- Headlamps are set up by what each part is (glass, reflector, lamp) instead of every LIGHT_HEAD_ material glowing
+  flat white; the Vantage's headlamps have their own material (tools/godot/head-lamps.mjs) so they light.
+- Modelled badges (Audi rings, Mercedes stars, Porsche crest, Ferrari horse) are removed by
+  tools/godot/debrand-mesh.mjs; godot/tests/headlights_sheet.gd MODE=badges shows every nose and tail to check.
+- The store is a preview only (the user: "dont make it work, just show me how it would be"): Store tab with coin packs
+  (500 / 1,100 / 2,400 / 6,500 / 14,000 for €4.99-99.99), what coins buy shown on your car, the welcome pack (€2.99),
+  first-purchase double coins, a weekly deal, promotional codes, invites. The checkout shows the payment step with the
+  pay button off; the balance is a session-only number. Making it real needs Stripe on the PC, Google Play Billing in
+  the Android app (Play requires it for digital goods), and the server holding balances, codes and referrals.

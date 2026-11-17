@@ -1,9 +1,9 @@
 class_name MenuScreen
 extends RefCounted
 ## The main menu (port of App.showMenu), laid out after Le Mans Ultimate's: a top bar with the sections (Play, Online,
-## Friends, Career), the driver chip and the gear; Play shows the modes as tall photo cards (solo, online room,
+## Friends, Career, Store), the coins, the driver chip and the gear; Play shows the modes as tall photo cards (solo, online room,
 ## championship, join) with their facts at the bottom; Online joins by code, hosts on this device or watches a live
-## session; Friends lists them with where each one is.
+## session; Friends lists them with where each one is; Store sells coins and paint (StoreScreen: a preview, no payments).
 
 static var _tab := "play"
 
@@ -122,6 +122,8 @@ static func build(app: App, error: String = "") -> Control:
 		var body: Control
 		if _tab == "online":
 			body = _online_tab(app, online, code, err, join_it, create, sign_in, host)
+		elif _tab == "store":
+			body = StoreScreen.build(app, render)
 		elif _tab == "friends":
 			body = SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("Sign in to add friends, see where they are and join their lobbies."), sign_in)
 			# a readable column in the middle, as the references' entry list
@@ -140,9 +142,10 @@ static func build(app: App, error: String = "") -> Control:
 			_tab = k
 			render.call()
 		var top := UIW.top_bar({
-			"tabs": [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")], ["career", I18n.t("Career")]],
+			"tabs": [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")], ["career", I18n.t("Career")], ["store", I18n.t("Store")]],
 			"tab": _tab, "on_tab": on_tab, "tabs_left": UIKit.touch(),
-			"right": _driver_chip(app, signed_in, nick_label, edit_nick, sign_in),
+			# the coins (the store, a preview for now) beside the driver
+			"right": [StoreScreen.balance_chip(func(): _tab = "store"; render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick, sign_in),
 		})
 		var scr := UIW.screen(top, body)
 		UIKit.full(scr)

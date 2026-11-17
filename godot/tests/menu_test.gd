@@ -62,6 +62,42 @@ func _run() -> void:
 			_ok(rows > 6 and panel.theme == UIKit.theme, "settings %s builds (%s): %d controls" % [page, lang, rows])
 			panel.queue_free()
 			await _frames(1)
+	# the store (a preview: no payments): every page builds, a code adds to the preview balance, the checkout's pay
+	# button is off. STORE_SHOT=<dir>: each page and the checkout as pictures
+	var store_shot := OS.get_environment("STORE_SHOT")
+	MenuScreen._tab = "store"
+	for t in ["coins", "items", "offers", "redeem", "invite"]:
+		StoreScreen._tab = t
+		app.show_menu()
+		await _frames()
+		_ok(_count(app.ui, UIW.TabButton) >= 10, "store %s builds" % t)
+		if store_shot != "":
+			await get_tree().create_timer(2.5 if t == "items" else 0.6).timeout
+			get_viewport().get_texture().get_image().save_png("%s/store_%s.png" % [store_shot, t])
+	var before := StoreScreen.preview_coins
+	StoreScreen._tab = "redeem"
+	app.show_menu()
+	await _frames()
+	var code_box: LineEdit = _find(app.ui, LineEdit, func(n): return (n as LineEdit).placeholder_text == "XXXX-XXXX")
+	code_box.text = "welcome500"
+	code_box.text_submitted.emit(code_box.text)
+	await _frames()
+	_ok(StoreScreen.preview_coins == before + 500, "a promotional code adds its coins to the preview balance")
+	StoreScreen._tab = "coins"
+	app.show_menu()
+	await _frames()
+	StoreScreen._checkout(app, "2,400 coins", [["2,000 coins", ""], ["Bonus coins", "+400"]], 19.99, func(): pass)
+	await _frames(3)
+	var pay: Button = _find(app.overlay_layer, Button, func(n): return (n as Button).text.to_upper().begins_with("PAY €"))
+	_ok(pay != null and pay.disabled, "the checkout's pay button is off in the preview")
+	if store_shot != "":
+		await get_tree().create_timer(0.5).timeout
+		get_viewport().get_texture().get_image().save_png("%s/store_checkout.png" % store_shot)
+	for c in app.overlay_layer.get_children():
+		if c.has_meta("modal"):
+			c.queue_free()
+	StoreScreen.preview_coins = before
+	StoreScreen._redeemed.clear()
 	MenuScreen._tab = "play"
 	CareerScreen._tab = "profile"
 
@@ -178,3 +214,10 @@ func _run() -> void:
 	Settings.data = saved
 	print("%d failures" % failures)
 	get_tree().quit(1 if failures else 0)
+
+## The first node under `root` of `type` that `ok` accepts.
+func _find(root: Node, type, ok: Callable) -> Node:
+	for n in root.find_children("*", "", true, false):
+		if is_instance_of(n, type) and ok.call(n):
+			return n
+	return null
