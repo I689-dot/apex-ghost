@@ -40,7 +40,30 @@ var _cached_q: Dictionary = {}
 var _sessions := {}
 
 func _ready() -> void:
+	_move_old_user_dir()
 	data = load_settings()
+
+## The game was called Apex Ghost until 2026-11-17, and Godot keeps a game's data (settings, career, track packs) in a
+## folder named after it: on the first start as CorsaGhost, what the old folder holds moves to the new one, so nothing
+## is lost. (The Android app has a new package id: a new install with its own data.)
+static func _move_old_user_dir() -> void:
+	if OS.has_feature("mobile") or OS.has_feature("web"):
+		return
+	var now := OS.get_user_data_dir()
+	var old := now.get_base_dir().path_join("Apex Ghost")
+	if now.get_file() == "Apex Ghost" or FileAccess.file_exists(now.path_join("settings.json")) or not DirAccess.dir_exists_absolute(old):
+		return
+	DirAccess.make_dir_recursive_absolute(now)
+	var d := DirAccess.open(old)
+	if d == null:
+		return
+	var names := Array(d.get_files()) + Array(d.get_directories())
+	for n in names:
+		if n in ["logs", "shader_cache", "vulkan", "objectdb_snapshots"]:
+			continue
+		if DirAccess.rename_absolute(old.path_join(n), now.path_join(n)) != OK:
+			DirAccess.copy_absolute(old.path_join(n), now.path_join(n))
+	print("[settings] moved the saved data from %s to %s" % [old, now])
 
 ## The monitor the game's window belongs on: APEX_SCREEN, else the Display page's choice; -1 leaves it to the desktop.
 static func wanted_screen() -> int:

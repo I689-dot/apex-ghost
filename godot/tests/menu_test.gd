@@ -62,6 +62,16 @@ func _run() -> void:
 			_ok(rows > 6 and panel.theme == UIKit.theme, "settings %s builds (%s): %d controls" % [page, lang, rows])
 			panel.queue_free()
 			await _frames(1)
+	# the sign-in screen the game opens on (signed out), and no sign-in of the menu's own
+	_ok(_find(app.ui, Button, func(n): return (n as Button).text.to_upper() == "SIGN IN") == null, "the menu has no sign-in button")
+	app.show_sign_in()
+	await _frames(3)
+	_ok(app.screen == "signin" and _find(app.ui, LineEdit, func(n): return (n as LineEdit).secret) != null, "the sign-in screen asks for the password")
+	if OS.get_environment("STORE_SHOT") != "":
+		await get_tree().create_timer(0.8).timeout
+		get_viewport().get_texture().get_image().save_png("%s/signin.png" % OS.get_environment("STORE_SHOT"))
+	app.show_menu()
+	await _frames()
 	# the store (a preview: no payments): every page builds, a code adds to the preview balance, the checkout's pay
 	# button is off. STORE_SHOT=<dir>: each page and the checkout as pictures
 	var store_shot := OS.get_environment("STORE_SHOT")
@@ -138,10 +148,10 @@ func _run() -> void:
 	# back steps: a modal closes, the career returns to the menu
 	app.show_menu()
 	await _frames()
-	SocialUI.sign_in_modal(app, func(): pass)
+	SocialUI.records_modal(app)
 	await _frames()
 	var modals := func() -> int: return app.overlay_layer.get_children().filter(func(c): return c.has_meta("modal") and not c.is_queued_for_deletion()).size()
-	_ok(modals.call() == 1, "the sign-in modal opens")
+	_ok(modals.call() == 1, "the records modal opens")
 	_esc()
 	await _frames()
 	_ok(modals.call() == 0, "Esc closes the modal")

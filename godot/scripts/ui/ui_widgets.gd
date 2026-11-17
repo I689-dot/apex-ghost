@@ -82,7 +82,7 @@ static func muted(text: String, size: int = 15) -> Label:
 ## The game's mark: APEX in white, GHOST in the livery's crimson, slanted like a car number.
 static func logo(size: int = 34) -> Control:
 	var h := UIW.hbox(maxi(4, size / 6))
-	h.add_child(_logo_word("APEX", size, Color.WHITE))
+	h.add_child(_logo_word("CORSA", size, Color.WHITE))
 	h.add_child(_logo_word("GHOST", size, UIKit.CRIMSON))
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return h

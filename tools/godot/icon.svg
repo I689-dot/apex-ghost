@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0b0c0f"/>
+  <!-- the ghost: a grey C a little behind and to the left, as the old mark's grey A -->
+  <path d="M 318 170 A 112 112 0 1 0 318 342" fill="none" stroke="#3d3e43" stroke-width="58" transform="translate(4 0)"/>
+  <!-- the C: a corner taken flat out, its ends cut square as a kerb (tools/godot/icon.svg; godot/icon.png is made from it) -->
+  <path d="M 318 170 A 112 112 0 1 0 318 342" fill="none" stroke="#ff2b3d" stroke-width="58" transform="translate(32 0)"/>
+</svg>

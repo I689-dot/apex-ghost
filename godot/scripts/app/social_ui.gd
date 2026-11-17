@@ -11,13 +11,45 @@ static func fmt_lap(ms: float) -> String:
 
 # ----------------------------------------------------------------- sign in ---
 
-static func sign_in_modal(app: App, on_done: Callable, mode: String = "login") -> void:
-	var m := UIW.modal(app.overlay_layer, 480)
-	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
-	UIW.modal_head(body, I18n.t("Your account"), close, "APEX GHOST")
+## The sign-in screen the game opens on (the user, 2026-11-17: you are signed in before the menu; the menu has no
+## sign-in of its own): the logo, sign in or create an account, then the menu. If the server cannot be reached, a
+## solo-only way in ("Play offline"); if it keeps no accounts at all, the game goes straight to the menu (App.show_start).
+static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) -> Control:
+	var root := CenterContainer.new()
+	UIKit.full(root)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NAVY_SOLID, 0.94), Color(1, 1, 1, 0.18), 1, 10, Vector2(34, 28)))
+	var vp := app.get_viewport().get_visible_rect().size
+	card.custom_minimum_size = Vector2(minf(520.0, vp.x - 32.0), 0)
+	var body := UIW.vbox(12)
+	var logo := UIW.logo(52)
+	logo.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_child(logo)
+	body.add_child(UIW.hair())
+	var offline_box := UIW.vbox(8)
+	offline_box.visible = false
+	_sign_in_form(body, "login", on_done, func(): offline_box.visible = true)
+	var ol := UIW.muted(I18n.t("The game server cannot be reached, so your account cannot be checked. You can still race the AI offline."), 14)
+	ol.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	offline_box.add_child(ol)
+	offline_box.add_child(UIKit.button(I18n.t("Play offline (solo only)"), on_offline))
+	body.add_child(offline_box)
+	card.add_child(body)
+	root.add_child(card)
+	# unreachable already? say so at once
+	var probe := func() -> void:
+		var r: Dictionary = await Account.api("account/me")
+		if is_instance_valid(offline_box) and r.status == 0:
+			offline_box.visible = true
+	probe.call()
+	return root
+
+## The sign-in form: Sign in / Create account tabs, nickname, password, the button. on_unreachable: called when the
+## server cannot be reached.
+static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, on_unreachable: Callable = Callable()) -> void:
 	var state := {"mode": mode}
 	var lead := UIW.muted("")
+	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var nick := LineEdit.new()
 	nick.max_length = 16
 	nick.placeholder_text = I18n.t("Your nickname")
@@ -33,18 +65,19 @@ static func sign_in_modal(app: App, on_done: Callable, mode: String = "login") -
 	var ref := {}
 	var tabs := UIW.tabs([["login", I18n.t("Sign in")], ["register", I18n.t("Create account")]], mode, func(k): ref.set_mode.call(k), true)
 	tabs.alignment = BoxContainer.ALIGNMENT_BEGIN
+	var pw_field := UIW.field(I18n.t("Password"), pw)
 	var set_mode := func(md: String):
 		state.mode = md
 		for b in tabs.get_children():
 			b.set_active(b.get_meta("key") == md)
-		lead.text = I18n.t("Welcome back. Sign in to play online with your friends.") if md == "login" else I18n.t("Just a nickname and a password. Your laps and results are kept, and friends can find you.")
+		lead.text = I18n.t("Welcome back. Sign in to race.") if md == "login" else I18n.t("Just a nickname and a password. Your laps, results, licence and coins are kept, and friends can find you.")
 		submit.text = (I18n.t("Sign in") if md == "login" else I18n.t("Create account")).to_upper()
 		err.text = ""
 	ref.set_mode = set_mode
 	body.add_child(tabs)
 	body.add_child(lead)
 	body.add_child(UIW.field(I18n.t("Nickname"), nick))
-	body.add_child(UIW.field(I18n.t("Password") + ("  (" + I18n.t("4 to 72 characters") + ")" if mode == "register" else ""), pw))
+	body.add_child(pw_field)
 	body.add_child(show)
 	body.add_child(err)
 	var go := func():
@@ -55,17 +88,20 @@ static func sign_in_modal(app: App, on_done: Callable, mode: String = "login") -
 			r = await Account.register(nick.text, pw.text)
 		else:
 			r = await Account.login(nick.text, pw.text)
+		if not is_instance_valid(submit):
+			return
 		submit.disabled = false
 		if r.ok:
-			close.call()
 			on_done.call()
 		else:
 			err.text = I18n.t(str(r.error))
+			if r.status == 0 and on_unreachable.is_valid():
+				on_unreachable.call()
 	submit.pressed.connect(go)
 	pw.text_submitted.connect(func(_t): go.call())
-	submit.custom_minimum_size = Vector2(0, 48)
+	nick.text_submitted.connect(func(_t): pw.grab_focus())
+	submit.custom_minimum_size = Vector2(0, 52)
 	body.add_child(submit)
-	body.add_child(UIW.muted(I18n.t("Online play needs an account. Solo races work without one."), 13))
 	set_mode.call(mode)
 	nick.grab_focus.call_deferred()
 

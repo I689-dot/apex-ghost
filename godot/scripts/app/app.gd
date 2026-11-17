@@ -67,8 +67,8 @@ func _ready() -> void:
 	devices = DeviceBindings.new()
 	add_child(devices)
 	gamepad.connected_changed.connect(func(on, name): toast(I18n.t("Controller connected: {name}", {"name": name}) if on else I18n.t("Controller disconnected")))
-	Account.changed.connect(func(_a): if screen == "menu": show_menu())
-	show_menu()
+	Account.changed.connect(func(_a): if screen == "menu": show_start())
+	show_start()
 	var auto := OS.get_environment("APEX_AUTO")
 	if auto == "intro" or (auto == "" and Settings.data.get("introCinematic", true)):
 		_play_intro()
@@ -228,6 +228,27 @@ func send(m: Dictionary) -> void:
 		conn.send_json(m)
 
 # ------------------------------------------------------------------ menu ---
+
+## Raced offline this session (the sign-in screen's way in when the server cannot be reached): solo only.
+var offline := false
+
+## Where the game opens: the sign-in screen, or the menu once signed in (also when playing offline, when the server
+## keeps no accounts, in tests and in the automated runs).
+func show_start() -> void:
+	if Account.account() != null or offline or Account.accounts_enabled() == false or Settings.testing or OS.get_environment("APEX_AUTO") != "":
+		show_menu()
+		return
+	show_sign_in()
+
+func show_sign_in() -> void:
+	screen = "signin"
+	teardown_connection()
+	set_backdrop("hero")
+	set_ui(SocialUI.sign_in_screen(self, func(): show_menu(), func(): offline = true; show_menu()))
+	# a server that keeps no accounts: nobody signs in, straight on
+	var on: bool = await Account.probe_accounts()
+	if not on and screen == "signin":
+		show_menu()
 
 func show_menu(error: String = "") -> void:
 	screen = "menu"
@@ -763,10 +784,9 @@ func _ui_shots() -> void:
 		show_career()
 		await shot.call("career_" + t)
 	CareerScreen._tab = "profile"
-	show_menu()
-	SocialUI.sign_in_modal(self, func(): pass)
+	show_sign_in()
 	await shot.call("signin")
-	clear.call()
+	show_menu()
 	ChampionshipUI.open(self, func(): return "Max")
 	await shot.call("champ")
 	clear.call()

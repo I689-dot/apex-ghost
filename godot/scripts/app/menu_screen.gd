@@ -106,7 +106,8 @@ static func build(app: App, error: String = "") -> Control:
 			if r.has("error"):
 				return r.error
 			return await app.join(r.code, n))
-	var sign_in := func(): SocialUI.sign_in_modal(app, func(): app.show_menu())
+	# (no sign-in here: the game opens on the sign-in screen. Signed out only when playing offline: back to it)
+	var sign_in := func(): app.offline = false; app.show_start()
 
 	var frame := Control.new()
 	UIKit.full(frame)
@@ -125,7 +126,7 @@ static func build(app: App, error: String = "") -> Control:
 		elif _tab == "store":
 			body = StoreScreen.build(app, render)
 		elif _tab == "friends":
-			body = SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("Sign in to add friends, see where they are and join their lobbies."), sign_in)
+			body = SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("You are playing offline. Friends need the game server."), sign_in)
 			# a readable column in the middle, as the references' entry list
 			var holder := HBoxContainer.new()
 			holder.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -190,10 +191,10 @@ static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Call
 	out.append(prof)
 	if signed_in != null:
 		out.append(_icon_button("✎", I18n.t("Edit driver profile"), func(): SocialUI.profile_modal(app, func(): app.show_menu())))
-		out.append(UIKit.button(I18n.t("Sign out"), func(): await Account.logout(); app.show_menu()))
+		out.append(UIKit.button(I18n.t("Sign out"), func(): await Account.logout(); app.show_start()))
 	else:
+		# offline (or a server without accounts): the nickname is this device's
 		out.append(_icon_button("✎", I18n.t("Your nickname"), edit_nick))
-		out.append(UIKit.button(I18n.t("Sign in"), sign_in, true))
 	out.append(_icon_button("⚙", I18n.t("Settings"), app.open_settings))
 	return out
 
@@ -233,7 +234,7 @@ static func _gate(title: String, text: String, sign_in: Callable) -> Control:
 	var col := UIW.vbox(12)
 	col.add_child(UIW.h2(title))
 	col.add_child(UIW.muted(text))
-	var b := UIKit.button(I18n.t("Sign in / create account"), sign_in, true)
+	var b := UIKit.button(I18n.t("Connect again"), sign_in, true)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	col.add_child(UIW.default_focus(b))
 	var p := UIW.panel(col)
@@ -256,7 +257,7 @@ static func _play_tab(app: App, online: bool, err: Label, solo: Callable, create
 	var champ = Championship.load_saved()
 	var cards := UIW.hbox(14 if UIKit.touch() else 18)
 	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var lock := "" if online else I18n.t("Sign in to play online")
+	var lock := "" if online else I18n.t("Offline: connect again to play online")
 	var solo_card := _card("photo_hero_spa.webp", [[I18n.t("OFFLINE"), UIKit.SOFT]], I18n.t("Play solo"), I18n.t("Race the AI on any circuit. No account, no server."),
 		[[I18n.t("Circuits"), str(circuits.size())], [I18n.t("Cars"), str(CarsDb.selectable().size())]], solo, "")
 	cards.add_child(UIW.default_focus(solo_card))
@@ -273,7 +274,7 @@ static func _play_tab(app: App, online: bool, err: Label, solo: Callable, create
 	return col
 
 ## A tall mode card: the photo with a navy fade, tags, a big title, one line, its facts at the bottom and the hatched
-## corner. `lock` set: dimmed, LOCKED and why (pressing it signs in).
+## corner. `lock` set: dimmed, LOCKED and why (pressing it goes back to the sign-in screen).
 static func _card(photo: String, tags: Array, title: String, sub: String, stats: Array, on: Callable, lock: String) -> Button:
 	var touch := UIKit.touch()
 	var b := UIW.card_button()
@@ -342,7 +343,7 @@ static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join
 		left.add_child(UIW.panel(join_p))
 		left.add_child(_host_panel(host))
 	else:
-		left.add_child(_gate(I18n.t("Online needs an account"), I18n.t("Sign in to create rooms, join friends and watch live sessions. Solo races work without one."), sign_in))
+		left.add_child(_gate(I18n.t("You are offline"), I18n.t("Rooms, friends and live sessions need the game server. Solo races and the championship work offline."), sign_in))
 		join_p.add_child(UIW.section(I18n.t("Join a race hosted on a device")))
 		var jr := UIW.hbox(8)
 		code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
