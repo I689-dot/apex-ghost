@@ -110,6 +110,17 @@ func save_profile(p: Dictionary) -> Dictionary:
 		_save(a)
 	return r
 
+## A new password (the current one again first). The server signs out every other device.
+func change_password(old_pw: String, new_pw: String) -> Dictionary:
+	return await api("account/password", {"password": old_pw, "newPassword": new_pw})
+
+## Deletes the account and everything of it on the server (the password again first), then signs out here.
+func delete_account(pw: String) -> Dictionary:
+	var r := await api("account/delete", {"password": pw})
+	if r.ok:
+		_save(null)
+	return r
+
 func logout() -> void:
 	if current != null:
 		await api("account/logout", {})
@@ -150,14 +161,18 @@ func set_presence(p: Dictionary) -> void:
 	if JSON.stringify(p) != _last_sent:
 		_send_presence()
 
+## Settings › Account › Privacy: off, nothing is sent and friends see you offline (the server forgets you in ~90 s).
+static func _shows_online() -> bool:
+	return bool(Settings.data.get("privacy", {}).get("showOnline", true))
+
 func _send_presence() -> void:
-	if current == null:
+	if current == null or not _shows_online():
 		return
 	_last_sent = JSON.stringify(_presence)
 	api("presence", {"presence": _presence})
 	if _timer == null:
 		_timer = Timer.new()
 		_timer.wait_time = 45.0
-		_timer.timeout.connect(func(): if current != null: api("presence", {"presence": _presence}))
+		_timer.timeout.connect(func(): if current != null and _shows_online(): api("presence", {"presence": _presence}))
 		add_child(_timer)
 		_timer.start()

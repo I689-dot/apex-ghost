@@ -61,5 +61,26 @@ func _ready() -> void:
 	_ok(re.search("amd radeon rx 7600 xt (radv navi33)") != null, "RX 7600 XT ranks ultra")
 	_ok(re.search("intel(r) uhd graphics 630") == null, "UHD 630 does not")
 	Settings.data = saved
+	# assist levels (F1's) and presets (SettingsPages)
+	var keep: Dictionary = Settings.data.duplicate(true)
+	SettingsPages.apply_assist_level("casual")
+	_ok(SettingsPages.assist_level() == "casual" and Settings.data.assists.steering and Settings.data.racingLine == "full", "assist level Casual sets every assist and the full line")
+	SettingsPages.apply_assist_level("expert")
+	_ok(SettingsPages.assist_level() == "expert" and Settings.data.manualGearbox and Settings.data.assists.tc == 0, "Expert: manual gears, no traction control")
+	Settings.data.assists.tc = 2
+	_ok(SettingsPages.assist_level() == "custom", "changing one assist makes it Custom")
+	Settings.data.fov = 63.0
+	Settings.data.livery.base = "#123456"
+	var p := SettingsPages.snapshot()
+	_ok(not p.has("livery") and not p.has("profiles") and p.fov == 63.0, "a preset keeps the settings, not the paint or the presets")
+	Settings.data.fov = 80.0
+	Settings.data.assists.tc = 0
+	SettingsPages.load_profile(p)
+	_ok(Settings.data.fov == 63.0 and Settings.data.assists.tc == 2 and Settings.data.livery.base == "#123456", "loading it brings the settings back, the paint stays")
+	p.assists.tc = 1
+	_ok(Settings.data.assists.tc == 2, "a loaded preset is a copy (changing it later does not reach the settings)")
+	SettingsPages.load_profile(SettingsPages.STARTERS[2][2])
+	_ok(Settings.data.camera == "cockpit" and Settings.data.manualGearbox and Settings.data.fov == 63.0, "a starting point sets its own keys and leaves the rest")
+	Settings.data = keep
 	print("%d failures" % failures)
 	get_tree().quit(1 if failures else 0)

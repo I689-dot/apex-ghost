@@ -54,12 +54,13 @@ func _run() -> void:
 			app.show_career()
 			await _frames()
 			_ok(app.ui.get_child_count() > 0 and _count(app.ui, UIW.TabButton) == 3, "career %s builds (%s)" % [t, lang])
-		for page in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller"]:
+		for page in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller", "account", "presets"]:
 			SettingsPanel._tab = page
 			var panel := SettingsPanel.build(app, func(): pass)
 			await _frames(2)
 			var rows := _count(panel, UIW.Stepper) + _count(panel, UIW.Switch) + _count(panel, HSlider) + _count(panel, Button)
-			_ok(rows > 6 and panel.theme == UIKit.theme, "settings %s builds (%s): %d controls" % [page, lang, rows])
+			# (the account page offline: only "Connect again")
+			_ok(rows > (0 if page == "account" else 6) and panel.theme == UIKit.theme, "settings %s builds (%s): %d controls" % [page, lang, rows])
 			panel.queue_free()
 			await _frames(1)
 	# the sign-in screen the game opens on (signed out), and no sign-in of the menu's own
@@ -108,6 +109,15 @@ func _run() -> void:
 			c.queue_free()
 	StoreScreen.preview_coins = before
 	StoreScreen._redeemed.clear()
+	if OS.get_environment("STORE_SHOT") != "":
+		# the settings' driving page (assist levels) and the presets page, as pictures
+		for page in ["driving", "presets", "account"]:
+			SettingsPanel._tab = page
+			var sp := SettingsPanel.build(app, func(): pass)
+			await get_tree().create_timer(0.6).timeout
+			get_viewport().get_texture().get_image().save_png("%s/settings_%s.png" % [OS.get_environment("STORE_SHOT"), page])
+			sp.queue_free()
+			await _frames(2)
 	MenuScreen._tab = "play"
 	CareerScreen._tab = "profile"
 

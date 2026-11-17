@@ -20,6 +20,7 @@ export type AccountOp =
   | 'login'
   | 'logout'
   | 'delete'
+  | 'password'
   | 'me'
   | 'profile'
   | 'friends'
@@ -184,6 +185,9 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
         case 'delete':
           await this.deleteAccount(token, body);
           return { status: 200, body: { ok: true } };
+        case 'password':
+          await this.changePassword(token, body);
+          return { status: 200, body: { ok: true } };
         case 'me': {
           const u = this.userOf(token);
           return u ? { status: 200, body: { user: u } } : { status: 401, body: { error: 'Sign in first.' } };
@@ -339,6 +343,22 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     if (!u || !sameHash(await hashPassword(pw, u.salt), u.pass_hash)) throw new HttpError(401, 'Wrong nickname or password.');
     this.sql.exec('update users set last_seen = ? where id = ?', Date.now(), u.id);
     return { token: this.newToken(u.id), user: { id: u.id, nick: u.nick } };
+  }
+
+  /** A new password: signed in, the current one again. Every other device signed in as me is signed out (this one keeps
+   * its token). */
+  private async changePassword(token: string | null, body: Record<string, unknown>): Promise<void> {
+    const me = this.requireUser(token);
+    const pw = checkPassword(body.password);
+    const next = checkPassword(body.newPassword);
+    const u = this.rows<{ pass_hash: string; salt: string }>('select pass_hash, salt from users where id = ?', me.id)[0];
+    if (!u || !sameHash(await hashPassword(pw, u.salt), u.pass_hash)) throw new HttpError(401, 'Wrong password.');
+    const salt = randomHex(16);
+    const hash = await hashPassword(next, salt);
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec('update users set pass_hash = ?, salt = ? where id = ?', hash, salt, me.id);
+      this.sql.exec('delete from tokens where user_id = ? and token <> ?', me.id, token);
+    });
   }
 
   /** Delete my account and everything of it (friends, laps, results): signed in, and the password again. */

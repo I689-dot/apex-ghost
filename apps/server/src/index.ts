@@ -4,7 +4,7 @@
  *   GET  /api/rooms          → public rooms (the room list before joining), from the DirectoryDO
  *   GET  /api/rooms/:code/ws → WebSocket into the room's Durable Object
  *   GET  /health
- *   /api/account/register|login|logout|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats
+ *   /api/account/register|login|logout|delete|password|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats
  *       → accounts.ts (AccountsDO, its own SQLite database); presence lives in the DirectoryDO
  * One Durable Object per room (idFromName(code)); WebSocket Hibernation API.
  */
@@ -112,7 +112,7 @@ export default {
       return out;
     }
     const am = url.pathname.match(
-      /^\/api\/(?:account\/)?(register|login|logout|delete|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/,
+      /^\/api\/(?:account\/)?(register|login|logout|delete|password|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/,
     );
     if (am) return accountApi(req, env, am[1]);
 

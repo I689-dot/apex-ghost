@@ -1,8 +1,8 @@
 class_name SettingsPanel
 extends RefCounted
 ## Settings (port of ui/settingsPanel.ts, reorganised after iRacing's options and laid out as Le Mans Ultimate's):
-## four top tabs (Graphics, Gameplay, Audio, Controls) with their pages as sub-tabs (Quality, Display, View; Driving,
-## Interface; Keyboard / Touch, Controller), each page in big titled sections of hairline rows with ‹ value › steppers,
+## five top tabs (Graphics, Gameplay, Audio, Controls, Account) with their pages as sub-tabs (Quality, Display, View;
+## Driving, Interface; Keyboard / Touch, Controller; Account, Presets: SettingsPages), each page in big titled sections of hairline rows with ‹ value › steppers,
 ## switches and sliders, and the help for the row under the pointer or the pad on the right. Every change is saved and
 ## `on_change` called after it.
 
@@ -39,8 +39,9 @@ const PRESET_NOTE := {
 static var _tab := "graphics"
 ## Old page names (a player's last page) and their new ones.
 const RENAMED := {"general": "interface", "camera": "view", "sound": "audio"}
-## The pages under the four top tabs (Le Mans Ultimate's Gameplay / Controls / Graphics / Sound with sub-tabs).
-const GROUPS := [["graphics", "Graphics", ["graphics", "display", "view"]], ["gameplay", "Gameplay", ["driving", "interface"]], ["audio", "Audio", ["audio"]], ["controls", "Controls", ["controls", "controller"]]]
+## The pages under the five top tabs (Le Mans Ultimate's Gameplay / Controls / Graphics / Sound with sub-tabs, and the
+## account with its presets).
+const GROUPS := [["graphics", "Graphics", ["graphics", "display", "view"]], ["gameplay", "Gameplay", ["driving", "interface"]], ["audio", "Audio", ["audio"]], ["controls", "Controls", ["controls", "controller"]], ["account", "Account", ["account", "presets"]]]
 ## The help column: the row under the pointer or the pad's focus explains itself there (a phone shows the help in the rows).
 static var _help_title: Label = null
 static var _help_text: Label = null
@@ -85,6 +86,7 @@ static func build(app: App, on_change: Callable) -> Control:
 	var page_label := {
 		"graphics": I18n.t("Quality"), "display": I18n.t("Display"), "view": I18n.t("View"), "driving": I18n.t("Driving"), "interface": I18n.t("Interface"),
 		"audio": I18n.t("Audio"), "controls": I18n.t("Touch") if is_touch else I18n.t("Keyboard"), "controller": I18n.t("Controller"),
+		"account": I18n.t("Account"), "presets": I18n.t("Presets"),
 	}
 	var holder := MarginContainer.new()
 	holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -140,7 +142,7 @@ static func build(app: App, on_change: Callable) -> Control:
 			"view":
 				_view(col, changed)
 			"driving":
-				_driving(col, changed)
+				_driving(col, changed, func(): show.call("driving"))
 			"interface":
 				_interface(col, changed)
 			"audio":
@@ -152,6 +154,10 @@ static func build(app: App, on_change: Callable) -> Control:
 					_controls(col, changed, show)
 			"controller":
 				_controller(col, changed, app)
+			"account":
+				SettingsPages.account(col, app, changed, func(): show.call("account"))
+			"presets":
+				SettingsPages.presets(col, app, changed, func(): show.call("presets"))
 		col.add_child(UIW.spacer(false))
 		var sc := UIW.scroll(UIW.margins(col, 0, 0, 14, 12))
 		holder.add_child(sc)
@@ -419,8 +425,10 @@ static func _view(col: Control, changed: Callable) -> void:
 	_range(col, I18n.t("Height"), "", S.chase, "height", 0.5, 2.0, 0.05, _pct, changed)
 	_range(col, I18n.t("Camera lag"), I18n.t("More: the car turns more in the frame before the camera follows"), S.chase, "lag", 0.3, 2.5, 0.05, _pct, changed)
 
-static func _driving(col: Control, changed: Callable) -> void:
+static func _driving(col: Control, changed: Callable, refresh: Callable = Callable()) -> void:
 	var S: Dictionary = Settings.data
+	_head(col, I18n.t("Assist level"))
+	col.add_child(_row(I18n.t("Level"), SettingsPages.assist_row(changed, refresh if refresh.is_valid() else func(): pass), I18n.t("Casual: every assist and the full racing line. Standard: ABS, some traction control, braking zones. Expert: as the real car, manual gears, no line. Change any one below for Custom.")))
 	_head(col, I18n.t("Assists"))
 	_toggle(col, I18n.t("ABS"), "", S.assists, "abs", changed)
 	_select(col, I18n.t("Traction control"), "", S.assists, "tc", [["0", I18n.t("Off")], ["1", I18n.t("Low")], ["2", I18n.t("High")]], changed, func(v): return int(v))
