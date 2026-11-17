@@ -1,0 +1,153 @@
+{
+ "_doc": "Makers' badges modelled as pieces of the cars (the game carries no brands, 2026-11-16), removed by tools/godot/debrand-mesh.mjs: per car, the badge's material (without a LIGHT_ prefix) and a box [x0, y0, z0, x1, y1, z1] in the car's frame (+Z forward, +Y up, m) that the whole piece lies in. Found by tools/godot sheets of the nose and tail (godot/tests/headlights_sheet.gd MODE=badges). Entries with \"kind\": \"cut\" or \"flatten\" (see the tool) for badges joined to a bigger part or pressed into a panel.",
+ "2020_audi_r8_lms_evo": [
+  {
+   "what": "rings, nose",
+   "mat": "EXT_Details",
+   "box": [
+    -0.11,
+    0.55,
+    2.29,
+    0.11,
+    0.62,
+    2.37
+   ]
+  },
+  {
+   "what": "rings, tail",
+   "mat": "EXT_Details",
+   "box": [
+    -0.11,
+    0.67,
+    -2.14,
+    0.11,
+    0.76,
+    -2.08
+   ]
+  }
+ ],
+ "2024_porsche_992_gt3_r": [
+  {
+   "what": "crest, bonnet",
+   "mat": "EXT_Details",
+   "box": [
+    -0.04,
+    0.52,
+    2.06,
+    0.04,
+    0.58,
+    2.16
+   ]
+  },
+  {
+   "what": "crest recess, bonnet",
+   "kind": "flatten",
+   "mat": "EXT_Carpaint_Inst_livery",
+   "box": [
+    -0.036,
+    0.515,
+    2.065,
+    0.036,
+    0.58,
+    2.17
+   ],
+   "band": 0.03
+  }
+ ],
+ "ferrari_296_gt3_verstappen": [
+  {
+   "what": "horse, tail",
+   "mat": "mat_37",
+   "box": [
+    -0.045,
+    0.66,
+    -2.18,
+    0.045,
+    0.77,
+    -2.14
+   ]
+  }
+ ],
+ "mercedes_amg_gt3_evo": [
+  {
+   "what": "star, grille",
+   "mat": "MI_Mercedes_AMG_GT3_Evo_Grille_Logo",
+   "box": [
+    -0.045,
+    0.63,
+    2.19,
+    0.045,
+    0.69,
+    2.27
+   ]
+  },
+  {
+   "what": "star, tail",
+   "mat": "MI_Carbon_Fiber_Tile_Tow_Normalmap_Exterior_Details",
+   "box": [
+    -0.06,
+    0.74,
+    -2.42,
+    0.06,
+    0.84,
+    -2.32
+   ]
+  },
+  {
+   "what": "star in its ring, grille",
+   "kind": "cut",
+   "mat": "MI_Carbon_Fiber_Tile_Tow_Normalmap_Exterior_Details",
+   "centre": [
+    0,
+    0.383
+   ],
+   "radius": 0.175,
+   "z": [
+    2.2,
+    2.42
+   ],
+   "minPiece": 0.5
+  }
+ ],
+ "mercedes_amg_gt3_red_bull_racing": [
+  {
+   "what": "star, grille",
+   "mat": "Details_door",
+   "box": [
+    -0.045,
+    0.62,
+    2.19,
+    0.045,
+    0.69,
+    2.28
+   ]
+  },
+  {
+   "what": "star, tail",
+   "mat": "EXT_Carbon",
+   "box": [
+    -0.06,
+    0.74,
+    -2.41,
+    0.06,
+    0.84,
+    -2.31
+   ]
+  },
+  {
+   "what": "star in its ring, grille",
+   "kind": "cut",
+   "mat": "EXT_Carbon",
+   "centre": [
+    0,
+    0.383
+   ],
+   "radius": 0.15,
+   "z": [
+    2.2,
+    2.36
+   ],
+   "minPiece": 0.5
+  }
+ ]
+}

@@ -49,4 +49,8 @@ file). They are for this private game only and are not published anywhere else. 
 The Aston Martin Vantage GT3 (`vantage_gt3_evo_heart_of_racing`) and the safety car built from it are the app's
 earlier model. Since 2026-11-17 its exterior and near models are its full model (the cockpit file, 378k triangles) as
 for the other cars, and its far model is built from that by tools/godot/car-lods.mjs (80k); before, they were the web
-game's simplified ones (135k, 70k, 18k), and the car looked misshapen, panels collapsed and open.
+game's simplified ones (135k, 70k, 18k), and the car looked misshapen, panels collapsed and open. Its headlamps, in its "Glass" material with the windows and tail lamps, were moved to a lamp material of their own
+(`node tools/godot/head-lamps.mjs Glass 0.35,0.45,1.6,0.95,0.85,2.4 cockpit.glb lod0.glb lod1.glb`) so they light.
+
+Modelled makers' badges (the Audi's rings, the Mercedes stars, the Porsche crest, the Ferrari horse) are taken off by
+tools/godot/debrand-mesh.mjs with tools/godot/debrand-mesh.json (build-cars.py runs it after the parts are cut).

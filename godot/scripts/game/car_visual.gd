@@ -39,7 +39,14 @@ class LevelRig:
 var entry: Dictionary
 var local: bool
 var _levels: Array = [] # LevelRig
-var _head_mats: Array = []
+var _head_mats: Array = [] # [StandardMaterial3D, by day, lit] (emission energy)
+## Headlamp brightness: the lamps (LEDs, projectors) and the reflectors behind them, by day (a faint daytime running
+## glow on the lamps only) and lit.
+const HEAD_LAMP_DAY := 0.3
+const HEAD_LAMP_ON := 4.0
+const HEAD_REFLECTOR_ON := 1.2
+static var _head_glass_re := RegEx.create_from_string("(?i)glass|lens|cover")
+static var _head_reflector_re := RegEx.create_from_string("(?i)chrome|cup|lighthouse|housing|reflector")
 var _tail_mats: Array = [] # [StandardMaterial3D, share]
 ## Tail lamps in materials not named LIGHT_TAIL_ (by model id): the Vantage's are in its glass, the Ferrari's in an
 ## anonymous Sketchfab material (tools/godot/tail-lights.mjs gives them their glow map, --also).
@@ -373,10 +380,7 @@ func _prepare_materials(root: Node, cache: Dictionary) -> void:
 func _setup_material(sm: StandardMaterial3D) -> void:
 	var nm := sm.resource_name
 	if nm.begins_with("LIGHT_HEAD_"):
-		if not sm.emission_enabled or (sm.emission_texture == null and sm.emission == Color.BLACK):
-			sm.emission_enabled = true
-			sm.emission = Color(1, 0.97, 0.9)
-		_head_mats.append(sm)
+		_setup_head(sm, nm)
 	elif nm.begins_with("LIGHT_TAIL_") or (TAIL_LAMPS.get(model_id(entry), []) as Array).has(nm):
 		# the glow map lights only the lamps (tools/godot/tail-lights.mjs: the red of the lamp atlas); a material named
 		# as a tail lamp that has no glow (grey plastic, an amber indicator glass) is not one
@@ -406,6 +410,46 @@ func _setup_material(sm: StandardMaterial3D) -> void:
 		if sm.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
 			sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
 		_fade_mats.append(sm)
+
+## A headlamp material by what it is (the models mark the whole lamp unit LIGHT_HEAD_: glass, chrome, housing and
+## lamps). Every one used to glow flat white, so a lamp without a glow map of its own (the AMGs', the Audi's, the
+## Porsche's, the Mustang's) was a white blob, by day too.
+##   glass (the clear cover): clear and glossy, no glow
+##   a reflector or the housing: polished metal; lit, a faint glow of its own colour (the lamp's light in it)
+##   a lamp (with a glow map, or the emitter's own shape): glows in its texture's pattern, white-blue LED light
+func _setup_head(sm: StandardMaterial3D, nm: String) -> void:
+	var has_glow := sm.emission_enabled and (sm.emission_texture != null or sm.emission != Color.BLACK)
+	if not has_glow and (sm.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or _head_glass_re.search(nm) != null):
+		sm.emission_enabled = false
+		sm.metallic = 0.0
+		sm.roughness = 0.04
+		sm.metallic_specular = 0.7
+		sm.clearcoat_enabled = false
+		if sm.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED:
+			sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		var c := sm.albedo_color
+		sm.albedo_color = Color(c.r, c.g, c.b, minf(c.a, 0.22))
+		return
+	if not has_glow and _head_reflector_re.search(nm) != null:
+		sm.metallic = 1.0
+		sm.roughness = 0.12
+		sm.metallic_texture = null
+		sm.roughness_texture = null
+		if sm.albedo_texture == null:
+			sm.albedo_color = Color(0.86, 0.87, 0.9)
+		sm.emission_enabled = true
+		sm.emission = Color(0.85, 0.9, 1.0)
+		sm.emission_texture = sm.albedo_texture
+		sm.emission_energy_multiplier = 0.0
+		_head_mats.append([sm, 0.0, HEAD_REFLECTOR_ON])
+		return
+	sm.emission_enabled = true
+	if not has_glow:
+		# no glow map: the lamp's own texture is its pattern (the LED strips light, the dark parts stay dark)
+		sm.emission_texture = sm.albedo_texture
+		sm.emission = Color(0.92, 0.96, 1.0)
+	sm.emission_energy_multiplier = HEAD_LAMP_DAY
+	_head_mats.append([sm, HEAD_LAMP_DAY, HEAD_LAMP_ON])
 
 func _rig(root: Node3D) -> LevelRig:
 	var rig := LevelRig.new()
@@ -591,9 +635,8 @@ func set_lights(brake: bool, headlights_on: bool, night: float) -> void:
 	var tail := (TAIL_ON if headlights_on or night > 0.3 else 0.0) + (BRAKE_ADD if brake else 0.0)
 	for t in _tail_mats:
 		(t[0] as StandardMaterial3D).emission_energy_multiplier = tail * float(t[1])
-	var head := 4.0 if headlights_on else 0.35
-	for m in _head_mats:
-		m.emission_energy_multiplier = head
+	for h in _head_mats:
+		(h[0] as StandardMaterial3D).emission_energy_multiplier = float(h[2] if headlights_on else h[1])
 	for l in headlights:
 		l.light_energy = 6.0 if headlights_on else 0.0
 	if _pool != null:

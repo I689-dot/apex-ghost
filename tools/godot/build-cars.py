@@ -87,6 +87,9 @@ def build(src_root, cid, c):
     run(['node', os.path.join(ROOT, 'tools/godot/debrand.mjs'), cid] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')], 'debrand')
     # the parts a crash can tear off (bumpers, the wing), cut out of the body
     run(['node', os.path.join(ROOT, 'tools/godot/car-parts.mjs')] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')], 'parts')
+    # the makers' badges that are modelled: rings, stars, crests (tools/godot/debrand-mesh.json; after the parts are cut,
+    # where the boxes were measured)
+    run(['node', os.path.join(ROOT, 'tools/godot/debrand-mesh.mjs'), cid] + [os.path.join(out, f) for f in ('cockpit.glb', 'lod0.glb', 'lod1.glb', 'lod2.glb')], 'debrand-mesh')
     return json.load(open(meta)), out, png
 
 
