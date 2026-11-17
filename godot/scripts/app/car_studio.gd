@@ -4,7 +4,8 @@ extends RefCounted
 ## and photos showed the real liveries). picture() renders a car in a livery (CarPaint) in a small studio of its own;
 ## Preview is the live, turning car of the lobby's Paint page.
 
-const PIC_SIZE := Vector2i(640, 360)
+## (sharper on a PC: the car page shows the picture large)
+static var PIC_SIZE := Vector2i(640, 360) if OS.has_feature("mobile") else Vector2i(1280, 720)
 
 static var _cache := {} # key -> ImageTexture
 static var _queue: Array = [] # [entry, livery, ImageTexture]
@@ -50,7 +51,7 @@ static func _render_queue() -> void:
 	while not _queue.is_empty():
 		var job: Array = _queue.pop_front()
 		var entry: Dictionary = job[0]
-		var visual := _car(entry, job[1])
+		var visual := _car(entry, job[1], not OS.has_feature("mobile"))
 		if visual == null:
 			continue
 		_studio.add_child(visual)
@@ -127,12 +128,15 @@ static func _frame_camera(cam: Camera3D, entry: Dictionary, turn: float = 0.0) -
 	cam.position = Vector3(sin(a) * d, length * 0.33, cos(a) * d)
 	cam.look_at(Vector3(0, 0.5, 0), Vector3.UP)
 
-## The car's far model (light to load), painted.
-static func _car(entry: Dictionary, _livery: Dictionary) -> CarVisual:
+## The car, painted: its near model (the one other cars are drawn with in a race, the full model or up to 400k
+## triangles), or its far model (light to load, a phone's small pictures). The menus used the far model everywhere,
+## and the cars there looked rough and wrongly shaped, panels collapsed by the simplification.
+static func _car(entry: Dictionary, _livery: Dictionary, near: bool = true) -> CarVisual:
 	var lods: Array = entry.get("lods", [])
 	if lods.is_empty():
 		return null
-	var model := Assets.load_car_model(entry, lods.size(), false, lods.size() - 1)
+	var level := mini(1, lods.size() - 1) if near else lods.size() - 1
+	var model := Assets.load_car_model(entry, level + 1, false, level)
 	if model.lods.is_empty() or model.lods[0] == null:
 		return null
 	return CarVisual.new(entry, model, false)

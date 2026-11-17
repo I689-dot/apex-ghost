@@ -47,4 +47,6 @@ file). They are for this private game only and are not published anywhere else. 
 | `mercedes_amg_gt3_red_bull_racing` | `mercedes-amg-gt3-wwwvecarzcom.zip` (vecarz.com) | livery from the zip |
 
 The Aston Martin Vantage GT3 (`vantage_gt3_evo_heart_of_racing`) and the safety car built from it are the app's
-earlier model, unchanged.
+earlier model. Since 2026-11-17 its exterior and near models are its full model (the cockpit file, 378k triangles) as
+for the other cars, and its far model is built from that by tools/godot/car-lods.mjs (80k); before, they were the web
+game's simplified ones (135k, 70k, 18k), and the car looked misshapen, panels collapsed and open.
