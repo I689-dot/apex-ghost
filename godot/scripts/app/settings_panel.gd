@@ -144,7 +144,7 @@ static func build(app: App, on_change: Callable) -> Control:
 			"driving":
 				_driving(col, changed, func(): show.call("driving"))
 			"interface":
-				_interface(col, changed)
+				_interface(col, changed, app)
 			"audio":
 				_sound(col, changed)
 			"controls":
@@ -441,7 +441,7 @@ static func _driving(col: Control, changed: Callable, refresh: Callable = Callab
 	_head(col, I18n.t("Opponents"))
 	_range(col, I18n.t("AI difficulty"), I18n.t("Their pace in the races you play solo or host (from the next session)"), S.ai, "difficulty", 0.8, 1.06, 0.01, _pct, changed)
 
-static func _interface(col: Control, changed: Callable) -> void:
+static func _interface(col: Control, changed: Callable, app: App = null) -> void:
 	var S: Dictionary = Settings.data
 	_packs(col)
 	_head(col, I18n.t("On-screen displays"))
@@ -450,6 +450,14 @@ static func _interface(col: Control, changed: Callable) -> void:
 	_toggle(col, I18n.t("Opening titles"), I18n.t("The studio cinematic when the game starts"), S, "introCinematic", changed)
 	_head(col, I18n.t("HUD"))
 	var h: Dictionary = S.hud
+	var edit := UIKit.button(I18n.t("Edit layout"), func():
+		var ed := HudEditor.new()
+		if app != null:
+			app.overlay_layer.add_child(ed)
+		else:
+			col.get_tree().root.add_child(ed)
+		ed.closed.connect(changed), true)
+	col.add_child(_row(I18n.t("HUD layout"), edit, I18n.t("Move and size every block of the race HUD: the timing tower, the times, the dial, the map, the tyres.")))
 	_range(col, I18n.t("HUD size"), "", h, "scale", 0.7, 1.4, 0.05, _pct, changed)
 	_range(col, I18n.t("HUD opacity"), "", h, "opacity", 0.3, 1.0, 0.05, _pct, changed)
 	_toggle(col, I18n.t("Timing tower"), "", h, "timing", changed)

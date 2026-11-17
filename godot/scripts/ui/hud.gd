@@ -275,6 +275,33 @@ func _layout() -> void:
 	_center(_draft, s.y - 118.0 - 14.0)
 	_center(_reset_hint, s.y - 140.0 - 24.0)
 	timing.position = Vector2((s.x - timing.size.x) / 2.0, s.y * 0.12)
+	_apply_layout(true)
+
+## The blocks the player can move and size (Settings › Interface › Edit HUD layout, HudEditor): name -> block.
+func blocks() -> Dictionary:
+	return {"lap": _tl, "times": _tr, "dial": _bc, "map": _br, "tyres": _bl, "damage": damage_panel}
+
+const BLOCK_NAMES := {"lap": "Lap, position and timing tower", "times": "Lap times and delta", "dial": "Speed, gear and inputs",
+	"map": "Track map", "tyres": "Relative and tyres", "damage": "Damage report"}
+
+## The player's own layout over the default places (Settings.data.hud.layout: per block {x, y} as a share of the
+## screen for its top-left corner, and a size multiplier). Kept on the screen whatever the window's size.
+func _apply_layout(scales: bool) -> void:
+	var L: Dictionary = Settings.data.hud.get("layout", {})
+	if L.is_empty():
+		return
+	var all := blocks()
+	for k in L:
+		var b: Control = all.get(k)
+		if b == null or typeof(L[k]) != TYPE_DICTIONARY:
+			continue
+		var e: Dictionary = L[k]
+		if scales and e.has("scale"):
+			b.scale *= clampf(float(e.scale), 0.5, 2.0)
+		if e.has("x") and e.has("y"):
+			var w := maxf(b.size.x, b.get_combined_minimum_size().x) * b.scale.x
+			var h := maxf(b.size.y, b.get_combined_minimum_size().y) * b.scale.y
+			b.position = Vector2(clampf(float(e.x) * size.x, 0.0, maxf(0.0, size.x - w)), clampf(float(e.y) * size.y, 0.0, maxf(0.0, size.y - h)))
 
 ## The HUD's size: the player's scale, and on a computer the window's (as the web game's fit(): full size from
 ## 1600 x 900 up, smaller below, as on a laptop's 1366 x 768).
@@ -492,6 +519,7 @@ func _layout_dynamic() -> void:
 	if touch and _board_panel != null:
 		_board_panel.position = Vector2(20, 18 + _tl.get_combined_minimum_size().y * sc + 6.0)
 		_board_panel.scale = Vector2(sc, sc)
+	_apply_layout(false)
 
 func _set_text_panel(panel: Control, label: Label, text: String) -> void:
 	if label.text != text:
