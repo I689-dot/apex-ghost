@@ -690,6 +690,8 @@ The windscreen rain was flat grey discs over the whole view. Now the drops are s
 
 **Budget per race.** State is sampled at **20 Hz** and **two samples go in each packet (10 messages/s)**. That halves the billable request count without lowering the sample rate the interpolation uses.
 
+**Update 2026-11-17: one sample a packet (20 messages/s).** Drivers see the other cars in the present (dead reckoning), and with a packet every 100 ms the prediction ran 150-250 ms ahead at 250 km/h: the cars jumped on each correction ("they teleport"). Now a packet every 50 ms, the clock estimate eased instead of stepped (a few ms step moved every predicted car a metre), the acceleration measured over 150 ms, the prediction kept up for 1.2 s with its turn and braking fading (it used to hold after 0.5 s and then jump), and the snap distance scaled with speed (0.6 s of it; 12 m was a fifth of a second at 250 km/h). `tools/sim/netsmooth.ts`: a 0.7 s hitch from the other driver at 250 km/h jumped 9.2 m in one frame before, 0.06 m after; the mean error 0.33 → 0.17 m. Cost: twice the incoming messages, so about 30 full 12-player races a day on the free plan instead of 60.
+
 - Messages: 12 players × ~10/s for a ~4–6 minute race ≈ 33–43k incoming messages.
 - Races per day: **measured ≈1,645 requests per full 12-player race, so ≈60 races a day** on the free plan (`pnpm loadtest`). A friend group plays far fewer.
 - Duration: well under 1% of the daily allowance.

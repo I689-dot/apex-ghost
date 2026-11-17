@@ -8249,8 +8249,9 @@ select,
   display: block;
 }
 .tw-chassis {
-  fill: rgba(255, 255, 255, 0.05);
-  stroke-width: 1.2;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: square;
 }
 .tw-axle {
   stroke: rgba(255, 255, 255, 0.35);
@@ -8263,12 +8264,18 @@ select,
   stroke-linecap: round;
 }
 .tw-tyre {
-  stroke: rgba(0, 0, 0, 0.55);
-  stroke-width: 1;
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 0.8;
   transition: fill 0.4s;
 }
 .tw-tread {
-  fill: rgba(255, 255, 255, 0.55);
+  fill: rgba(0, 0, 0, 0.35);
+}
+.tw-brake {
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .tw-temp {
   font-size: 9px;
@@ -8309,7 +8316,8 @@ select,
 /* pedal arcs inside the rev ring */
 .dial-in {
   fill: none;
-  stroke-width: 5;
+  stroke-width: 6.5;
+  stroke-linecap: round;
 }
 .dial-in-track {
   stroke: rgba(255, 255, 255, 0.1);
