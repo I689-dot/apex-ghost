@@ -33,28 +33,106 @@ export interface RacingLine {
   ds: Float32Array;
   /** Signed curvature (1/m, + = turning left). */
   curvature: Float32Array;
+  /**
+   * Where the car's centre may go (m from the centreline, + = left): the asphalt and the flat kerbs beside it, less
+   * half a car (tools/sim/raceline.ts, from the collision). Without them, the stored road width less 1.2 m.
+   */
+  lo?: Float32Array;
+  hi?: Float32Array;
+  /** A cautious line (minimum curvature 2 m inside the asphalt edges, no kerbs): the bots' own lines blend the two. */
+  alt?: Float32Array;
 }
 
-export function buildRacingLine(track: TrackData, margin = 2.0, iterations = 3000): RacingLine {
+/** Left normal of the centreline at each point (cached per track). */
+const normalCache = new WeakMap<TrackData, { nx: Float32Array; nz: Float32Array }>();
+function normals(track: TrackData): { nx: Float32Array; nz: Float32Array } {
+  let c = normalCache.get(track);
+  if (c) return c;
   const cl = track.centerline;
   const n = cl.length / 3;
   const nx = new Float32Array(n);
   const nz = new Float32Array(n);
-  const lo = new Float32Array(n);
-  const hi = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const a = ((i - 1 + n) % n) * 3;
     const b = ((i + 1) % n) * 3;
     const tx = cl[b] - cl[a];
     const tz = cl[b + 2] - cl[a + 2];
     const l = Math.hypot(tx, tz) || 1;
-    // left normal
     nx[i] = tz / l;
     nz[i] = -tx / l;
-    lo[i] = -Math.max(0, track.widthR[i] - margin);
-    hi[i] = Math.max(0, track.widthL[i] - margin);
+  }
+  c = { nx, nz };
+  normalCache.set(track, c);
+  return c;
+}
+
+/**
+ * The line's shape from its offsets: points, segment lengths and curvature (a ±10 m three-point stencil, lightly
+ * smoothed: the 5 m resampled line still has small kinks). `from`/`to` (inclusive, may wrap) recompute only the
+ * part a change of offsets between them reaches.
+ */
+function shapeLine(track: TrackData, line: RacingLine, raw: Float32Array, from = 0, to = -1): void {
+  const cl = track.centerline;
+  const n = cl.length / 3;
+  const { nx, nz } = normals(track);
+  const { x, z, offset: off, ds, curvature } = line;
+  const all = to < 0;
+  const span = all ? n : Math.min(n, to - from + 1);
+  const each = (a: number, len: number, f: (i: number) => void) => {
+    for (let k = 0; k < Math.min(n, len); k++) f((((a + k) % n) + n) % n);
+  };
+  each(from, span, (i) => {
+    x[i] = cl[i * 3] + nx[i] * off[i];
+    z[i] = cl[i * 3 + 2] + nz[i] * off[i];
+  });
+  each(from - 1, span + 1, (i) => {
+    const j = (i + 1) % n;
+    ds[i] = Math.hypot(x[j] - x[i], z[j] - z[i]) || 0.01;
+  });
+  const k = 2; // ±10 m stencil
+  each(from - k, span + 2 * k, (i) => {
+    const a = (i - k + n) % n;
+    const c = (i + k) % n;
+    const abx = x[i] - x[a];
+    const abz = z[i] - z[a];
+    const bcx = x[c] - x[i];
+    const bcz = z[c] - z[i];
+    const cross = abx * bcz - abz * bcx;
+    const la = Math.hypot(abx, abz);
+    const lb = Math.hypot(bcx, bcz);
+    const lc = Math.hypot(x[a] - x[c], z[a] - z[c]);
+    // x/z with +X left: a left turn has a negative cross product in this frame
+    raw[i] = la * lb * lc > 1e-6 ? (-2 * cross) / (la * lb * lc) : 0;
+  });
+  each(from - k - 1, span + 2 * k + 2, (i) => {
+    curvature[i] = (raw[(i - 1 + n) % n] + 2 * raw[i] + raw[(i + 1) % n]) / 4;
+  });
+}
+
+/** A racing line from its lateral offsets (m from the centreline, + = left). */
+export function lineFromOffsets(track: TrackData, offset: Float32Array): RacingLine {
+  const n = track.centerline.length / 3;
+  const line: RacingLine = { x: new Float32Array(n), z: new Float32Array(n), offset, ds: new Float32Array(n), curvature: new Float32Array(n) };
+  shapeLine(track, line, new Float32Array(n));
+  return line;
+}
+
+/**
+ * Minimum curvature line (the classic approximation of the fastest line: iterative smoothing towards the neighbours'
+ * midpoint, clamped to the track edges minus `margin`, or to `bounds` when given).
+ */
+export function buildRacingLine(track: TrackData, margin = 2.0, iterations = 3000, bounds?: { lo: Float32Array; hi: Float32Array }): RacingLine {
+  const cl = track.centerline;
+  const n = cl.length / 3;
+  const { nx, nz } = normals(track);
+  const lo = new Float32Array(n);
+  const hi = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    lo[i] = bounds ? bounds.lo[i] : -Math.max(0, track.widthR[i] - margin);
+    hi[i] = bounds ? bounds.hi[i] : Math.max(0, track.widthL[i] - margin);
   }
   const off = new Float32Array(n);
+  for (let i = 0; i < n; i++) off[i] = Math.min(hi[i], Math.max(lo[i], 0));
   const x = new Float32Array(n);
   const z = new Float32Array(n);
   const place = (i: number) => {
@@ -78,31 +156,180 @@ export function buildRacingLine(track: TrackData, margin = 2.0, iterations = 300
       }
     }
   }
-  const ds = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    ds[i] = Math.hypot(x[j] - x[i], z[j] - z[i]) || 0.01;
+  return lineFromOffsets(track, off);
+}
+
+/** A small seeded random generator (mulberry32): the same bot drives the same way every session. */
+export function seededRandom(seed: number): () => number {
+  let a = seed >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const gauss = (r: () => number) => Math.sqrt(-2 * Math.log(Math.max(1e-9, r()))) * Math.cos(2 * Math.PI * r());
+
+/**
+ * Minimum lap time line, as the race engineers' lap-time simulations find it (TUM's global trajectory optimisation:
+ * a minimum-curvature line is only an approximation; the time-optimal one is up to a few % faster). Starting from a
+ * line inside `lo`…`hi`, smooth bumps of offset (30-260 m long, raised cosine) are tried one at a time and kept when
+ * the quasi-steady-state lap time (speedProfile with the power-limited acceleration pass) improves, with a small
+ * penalty on curvature changes so the line stays drivable. What it learns is what drivers are taught: before a long
+ * straight the car turns in later, apexes later and opens the exit (the exit speed is carried down the whole straight);
+ * where a corner leads into a braking zone the entry matters more; compromise the first of two corners for the second.
+ *
+ * Offline (tools/sim/raceline.ts): a few hundred thousand lap evaluations.
+ */
+export function optimiseLapTime(
+  track: TrackData,
+  start: Float32Array,
+  lo: Float32Array,
+  hi: Float32Array,
+  car: CarLimits,
+  evals: number,
+  seed = 1,
+  onProgress?: (e: number, lapS: number) => void,
+): Float32Array {
+  const n = track.centerline.length / 3;
+  // the offsets tried (`off`), and the line scored: their 5-point (25 m) moving average. A car drives no kink shorter
+  // than that (and the ±10 m curvature stencil sees the odd and the even points apart: scored on the raw offsets, the
+  // search found "lines" 20 s faster made of kinks the stencil misread)
+  const off = Float32Array.from(start, (v, i) => Math.min(hi[i], Math.max(lo[i], v)));
+  const sm = new Float32Array(n);
+  const H = 2;
+  const smooth = (i: number) => {
+    let a = 0;
+    for (let d = -H; d <= H; d++) a += off[(i + d + n) % n];
+    sm[i] = Math.min(hi[i], Math.max(lo[i], a / (2 * H + 1)));
+  };
+  for (let i = 0; i < n; i++) smooth(i);
+  const line: RacingLine = { x: new Float32Array(n), z: new Float32Array(n), offset: sm, ds: new Float32Array(n), curvature: new Float32Array(n) };
+  const raw = new Float32Array(n);
+  shapeLine(track, line, raw);
+  // the line's smoothness: the change of curvature per point, squared (a zig-zag the 10 m stencil hardly sees still
+  // turns the wheel)
+  const LAMBDA = 60;
+  const cost = () => {
+    let rough = 0;
+    const c = line.curvature;
+    for (let i = 0; i < n; i++) {
+      const d = c[(i + 1) % n] - c[i];
+      rough += d * d;
+    }
+    return profileLapTime(line, speedProfile(line, car, 1, true)) + LAMBDA * rough;
+  };
+  const restyle = (c: number, w: number) => {
+    for (let d = -w - H; d <= w + H; d++) smooth((c + d + n) % n);
+    shapeLine(track, line, raw, c - w - H, c + w + H);
+  };
+  let best = cost();
+  const rnd = seededRandom(seed);
+  const WIDTHS = [3, 5, 8, 12, 18, 26];
+  const saved = new Float32Array(2 * 26 + 1);
+  for (let e = 0; e < evals; e++) {
+    const sigma = 0.05 + 0.55 * (1 - e / evals);
+    const w = WIDTHS[Math.floor(rnd() * WIDTHS.length)];
+    const c = Math.floor(rnd() * n);
+    const amp = gauss(rnd) * sigma;
+    let moved = false;
+    for (let d = -w; d <= w; d++) {
+      const i = (c + d + n) % n;
+      saved[d + w] = off[i];
+      const b = 0.5 * (1 + Math.cos((Math.PI * d) / (w + 1)));
+      const o = Math.min(hi[i], Math.max(lo[i], off[i] + amp * b));
+      if (o !== off[i]) moved = true;
+      off[i] = o;
+    }
+    if (!moved) continue;
+    restyle(c, w);
+    const t = cost();
+    if (t < best - 1e-7) best = t;
+    else {
+      for (let d = -w; d <= w; d++) off[(c + d + n) % n] = saved[d + w];
+      restyle(c, w);
+    }
+    if (onProgress && e % 5000 === 0) onProgress(e, best);
   }
-  const curvature = new Float32Array(n);
-  const k = 2; // ±10 m stencil
-  for (let i = 0; i < n; i++) {
-    const a = (i - k + n) % n;
-    const c = (i + k) % n;
-    const abx = x[i] - x[a];
-    const abz = z[i] - z[a];
-    const bcx = x[c] - x[i];
-    const bcz = z[c] - z[i];
-    const cross = abx * bcz - abz * bcx;
-    const la = Math.hypot(abx, abz);
-    const lb = Math.hypot(bcx, bcz);
-    const lc = Math.hypot(x[a] - x[c], z[a] - z[c]);
-    // x/z with +X left: a left turn has a negative cross product in this frame
-    curvature[i] = la * lb * lc > 1e-6 ? (-2 * cross) / (la * lb * lc) : 0;
-  }
-  // light smoothing of the curvature (the 5 m resampled line still has small kinks)
-  const tmp = Float32Array.from(curvature);
-  for (let i = 0; i < n; i++) curvature[i] = (tmp[(i - 1 + n) % n] + 2 * tmp[i] + tmp[(i + 1) % n]) / 4;
-  return { x, z, offset: off, ds, curvature };
+  return Float32Array.from(sm);
+}
+
+/** A racing line file (assets/racelines/<layout>.json, tools/sim/raceline.ts): offsets in cm per centreline point. */
+export interface RacelineFile {
+  v: 1;
+  id: string;
+  n: number;
+  length: number;
+  /** The fastest line (minimum lap time, kerbs used), the cautious line, the car centre's bounds. */
+  opt: number[];
+  alt: number[];
+  lo: number[];
+  hi: number[];
+}
+
+/** The racing line from its file, or null when the file is for another version of the layout. */
+export function racingLineFromFile(track: TrackData, f: RacelineFile): RacingLine | null {
+  const n = track.centerline.length / 3;
+  if (!f || f.v !== 1 || f.n !== n || Math.abs(f.length - track.length) > 1 || [f.opt, f.alt, f.lo, f.hi].some((a) => a?.length !== n)) return null;
+  const line = lineFromOffsets(
+    track,
+    Float32Array.from(f.opt, (v) => v / 100),
+  );
+  line.alt = Float32Array.from(f.alt, (v) => v / 100);
+  line.lo = Float32Array.from(f.lo, (v) => v / 100);
+  line.hi = Float32Array.from(f.hi, (v) => v / 100);
+  return line;
+}
+
+/**
+ * How a bot drives (seeded per bot, so the same bot is the same driver every session): drivers differ in pace, in the
+ * line they take (the time-optimal line using the kerbs, the cautious geometric one, or between), where they brake,
+ * how much they trust the downforce in fast corners, how they squeeze the throttle, how keen they are to pass, how
+ * consistent they are lap to lap (and how often they make a mistake), and how they cope in the wet.
+ */
+export interface BotPersona {
+  /** Where in the field's pace spread (0 slowest … 1 fastest). */
+  pace: number;
+  /** Share of the fastest line in its own (the rest the cautious line): 0.3 … 1. */
+  line: number;
+  /** Braking grip it plans with (late brakers above 1). */
+  brake: number;
+  /** Downforce it trusts in fast corners. */
+  aero: number;
+  /** How fast it squeezes the throttle on (full in 1 / rise s). */
+  throttleRise: number;
+  /** 0 patient … 1 opportunist: how early it pulls out to pass. */
+  aggression: number;
+  /** 0 erratic … 1 metronome: corner-to-corner and lap-to-lap variation and how often it makes a mistake. */
+  consistency: number;
+  /** Wet-weather skill (grip it dares to use in the wet). */
+  wet: number;
+}
+
+/** A neutral driver: the fastest line, no variation, no mistakes (the tools' tests). */
+export const NEUTRAL_PERSONA: BotPersona = { pace: 1, line: 1, brake: 1, aero: 1, throttleRise: THROTTLE_RISE, aggression: 0.5, consistency: 1, wet: 1 };
+
+export function botPersona(seed: number): BotPersona {
+  const r = seededRandom(Math.imul(seed, 2654435761) ^ 0x5bd1e995);
+  return {
+    pace: r(),
+    line: 0.3 + 0.7 * r(),
+    brake: 0.95 + 0.07 * r(),
+    aero: 0.96 + 0.08 * r(),
+    throttleRise: 3 + 3 * r(),
+    aggression: r(),
+    consistency: 0.35 + 0.65 * r(),
+    wet: 0.97 + 0.06 * r(),
+  };
+}
+
+/** A string's hash (FNV-1a): a bot's persona seed from its id. */
+export function hashSeed(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return h >>> 0;
 }
 
 /** What the speed profile needs to know about the car. */
@@ -121,8 +348,13 @@ export interface CarLimits {
   airDensity: number;
 }
 
-/** Share of the tyres' grip the bots plan with, cornering and braking (tools/sim/ailap.ts tunes it: AI_CORNER, AI_BRAKE). */
-export const AI_GRIP = { corner: 0.92, brake: 0.98 };
+/**
+ * Share of the tyres' grip the bots plan with, cornering and braking (tools/sim/ailap.ts tunes it: AI_CORNER, AI_BRAKE).
+ * Tuned on the shipped lap-time-optimised lines (Spa, Porsche 992, skill 0.97: 0.80 / 0.92 → 2:27.3, nothing hit, no
+ * track-limit warning; 0.86 brushed walls, 0.92 spun). The old minimum-curvature line hid how much this was: its
+ * curvature spikes slowed the bots in the fast corners whatever the grip.
+ */
+export const AI_GRIP = { corner: 0.8, brake: 0.92 };
 
 export function carLimits(specs: CarSpecs, skill = 1, airDensity = RHO): CarLimits {
   return {
@@ -331,6 +563,11 @@ export class AiDriver {
   private laneIdx = 0;
   private laneStuck = 0;
 
+  /** Lap-to-lap variation: a speed factor per 150 m of the lap (drawn again each lap), and this lap's mistake. */
+  private noise: Float32Array | null = null;
+  private mistake: { apexS: number; kind: 'late' | 'exit' } | null = null;
+  private readonly rnd: () => number;
+
   constructor(
     private readonly track: TrackData,
     private readonly vehicle: Vehicle,
@@ -338,10 +575,75 @@ export class AiDriver {
     readonly skill: number,
     /** extra lateral offset from the racing line (m, + = left), so bots don't drive in single file */
     private readonly lane: number,
+    readonly persona: BotPersona = NEUTRAL_PERSONA,
+    seed = 1,
   ) {
-    this.line = racingLineFor(track);
+    const base = racingLineFor(track);
+    // its own line: between the fastest line and the cautious one (both inside the same bounds, so is the blend)
+    if (base.alt && persona.line < 0.995) {
+      const w = persona.line;
+      const own = lineFromOffsets(
+        track,
+        Float32Array.from(base.offset, (o, i) => base.alt![i] + (o - base.alt![i]) * w),
+      );
+      own.lo = base.lo;
+      own.hi = base.hi;
+      this.line = own;
+    } else this.line = base;
     this.limits = carLimits(vehicle.specs, skill, vehicle.airDensity);
+    this.limits.muBrake *= persona.brake;
+    this.limits.downforceArea *= persona.aero;
     this.profile = speedProfile(this.line, this.limits);
+    this.rnd = seededRandom(seed);
+  }
+
+  /**
+   * A new lap: the corner-to-corner variation drawn again (σ 0.2 % for a metronome … 1.5 % for an erratic driver), and
+   * perhaps a mistake somewhere on it (a late braking that runs wide, or a slow, scrappy exit), more likely for an
+   * inconsistent driver and on a wet track.
+   */
+  private newLap(weatherGrip: number): void {
+    const p = this.persona;
+    if (p.consistency >= 0.999) return;
+    const L = this.track.length;
+    const bins = Math.ceil(L / 150) + 1;
+    const sigma = 0.002 + 0.013 * (1 - p.consistency);
+    this.noise ??= new Float32Array(bins);
+    for (let k = 0; k < bins; k++) this.noise[k] = 1 + Math.max(-2.5, Math.min(2.5, gauss(this.rnd))) * sigma;
+    this.mistake = null;
+    const chance = (0.03 + 0.25 * (1 - p.consistency)) * (weatherGrip < 0.9 ? 2 : 1);
+    if (this.rnd() < chance) {
+      // the next real corner (a slow point of the profile) after a random place on the lap
+      const n = this.profile.length;
+      const vMax = this.limits.vMax;
+      let i = Math.floor(this.rnd() * n);
+      for (let k = 0; k < n; k++, i = (i + 1) % n) {
+        const v = this.profile[i];
+        if (v < 0.75 * vMax && v <= this.profile[(i + 3) % n] && v <= this.profile[(i - 3 + n) % n]) break;
+      }
+      this.mistake = { apexS: this.track.cumS[i] ?? 0, kind: this.rnd() < 0.55 ? 'late' : 'exit' };
+    }
+  }
+
+  /** This bot's variation of the planned speed at lap distance s (1: as planned). */
+  private variation(s: number, vt: number, inTraffic: boolean): number {
+    let f = 1;
+    if (this.noise && vt < this.limits.vMax * 0.93) {
+      const u = (((s % this.track.length) + this.track.length) % this.track.length) / 150;
+      const k = Math.floor(u);
+      const a = this.noise[k % this.noise.length];
+      const b = this.noise[(k + 1) % this.noise.length];
+      f *= a + (b - a) * (u - k);
+    }
+    const m = this.mistake;
+    if (m) {
+      const d = wrapDelta(s, m.apexS, this.track.length);
+      // never with a car close by (a mistake there takes someone else out: it waits for the next lap)
+      if (inTraffic && d > 0 && d < 160) this.mistake = null;
+      else if (m.kind === 'late' && d > -15 && d < 140) f *= d > 0 ? 1.065 : 1.035;
+      else if (m.kind === 'exit' && d <= 0 && d > -110) f *= 0.9;
+    }
+    return f;
   }
 
   private lastS = 0;
@@ -373,7 +675,8 @@ export class AiDriver {
    */
   canPass(): boolean {
     const v = this.vehicle.telemetry.speed;
-    const horizon = this.profileGrip < 0.92 ? 150 : Math.max(50, Math.min(150, v * 1.4));
+    // an opportunist pulls out with 1.1 s of clear road, a patient driver waits for 1.7 s
+    const horizon = this.profileGrip < 0.92 ? 150 : Math.max(50, Math.min(150, v * (1.7 - 0.6 * this.persona.aggression)));
     for (let d = 0; d <= horizon; d += 10) if (this.profile[indexAt(this.track, this.lastS + d)] < Math.max(v, 20) * 0.92) return false;
     return true;
   }
@@ -386,6 +689,31 @@ export class AiDriver {
   /** The crew is done: drive on to the pit exit. */
   pitServed(): void {
     this.boxDone = true;
+  }
+
+  /**
+   * Towed (iRacing's tow after a wreck): put standing in its box, waiting for its crew; it drives out to the pit exit
+   * once served, as after a stop. False without a pit lane.
+   */
+  towToBox(): boolean {
+    const lane = this.track.pitLane;
+    if (!lane || lane.points.length < 4) return false;
+    const pts = lane.points;
+    const k = clamp(this.pitBox, 1, pts.length - 3);
+    const [ax, az] = laneGeometry(this.track).away[k];
+    const yaw = Math.atan2(pts[k + 1][0] - pts[k][0], pts[k + 1][2] - pts[k][2]);
+    this.vehicle.place(pts[k][0] + ax * this.pitBoxShift, pts[k][1] + 0.3, pts[k][2] + az * this.pitBoxShift, yaw);
+    this.vehicle.setWalls(false);
+    this.inPitLane = true;
+    this.laneIdx = k;
+    this.laneStuck = 0;
+    this.boxDone = false;
+    this.pitRequest = 'stop';
+    this.passTarget = 0;
+    this.stuck = this.offTrack = this.wrongWay = 0;
+    this.hint = -1;
+    this.needBlend = true;
+    return true;
   }
 
   /** Pit lane target point and speed, or null when not pitting (`follow` false: still on track, braking for the entry). */
@@ -518,7 +846,10 @@ export class AiDriver {
     const laneStep = 0.04 * Math.max(speed, 5) * dt;
     this.laneNow += clamp(laneTarget - this.laneNow, -laneStep, laneStep);
     const lane = this.laneNow;
-    let want = clamp(lineOff + lane + merge + this.passOff, -t.widthR[j] + 1.2, t.widthL[j] - 1.2);
+    // kept where the car fits: the asphalt and flat kerbs (the line file's bounds), else 1.2 m inside the edges
+    const loB = L.lo ? Math.min(L.lo[j], lineOff) : -t.widthR[j] + 1.2;
+    const hiB = L.hi ? Math.max(L.hi[j], lineOff) : t.widthL[j] - 1.2;
+    let want = clamp(lineOff + lane + merge + this.passOff, loB, hiB);
     if (this.roomL < Infinity || this.roomR < Infinity) {
       // where the car is across the road now (+ = left of the centreline), and the room the cars beside leave
       const iN = (i + 1) % n;
@@ -530,7 +861,7 @@ export class AiDriver {
       const myOff = (p.x - cl[i * 3]) * iz - (p.z - cl[i * 3 + 2]) * ix;
       const held = clamp(want, myOff - this.roomR, myOff + this.roomL);
       this.squeeze = Math.abs(held - want);
-      want = clamp(held, -t.widthR[j] + 0.9, t.widthL[j] - 0.9);
+      want = clamp(held, Math.min(loB, -t.widthR[j] + 0.9), Math.max(hiB, t.widthL[j] - 0.9));
     } else this.squeeze = 0;
     const extra = want - lineOff;
     this.roomy = t.widthL[j] - lineOff > t.widthR[j] + lineOff ? 1 : -1;
@@ -580,9 +911,14 @@ export class AiDriver {
       this.profileGrip = weatherGrip;
       // on a slippery track a driver keeps more in hand than the lost grip alone (wet kerbs, puddles, a slide
       // is harder to catch): 0.8 grip → 7 % more margin
-      this.profile = speedProfile(this.line, this.limits, weatherGrip * (1 - 0.35 * Math.max(0, 1 - weatherGrip)));
+      // (a driver good in the wet dares a little more of what grip there is, a poor one less)
+      const wetSkill = 1 + (this.persona.wet - 1) * Math.min(1, Math.max(0, 1 - weatherGrip) / 0.2);
+      this.profile = speedProfile(this.line, this.limits, weatherGrip * (1 - 0.35 * Math.max(0, 1 - weatherGrip)) * wetSkill);
     }
+    if (raceStarted && s < this.lastS - t.length / 2) this.newLap(weatherGrip);
+    if (raceStarted && !this.noise && this.persona.consistency < 0.999) this.newLap(weatherGrip);
     let vt = this.profile[indexAt(t, s + 2 + speed * 0.12)];
+    vt *= this.variation(s + 2 + speed * 0.12, vt, speedCap < Infinity || this.roomL < Infinity || this.roomR < Infinity);
     // in a car's dirty air (less downforce: Vehicle.wake) corners must be taken slower; straights keep the tow
     if (vt < this.limits.vMax * 0.9) vt *= 1 - 0.35 * (1 - v.wake.downforce);
     // squeezed off its line by a car alongside: a tighter or wider line than the plan, so a little slower (a
@@ -603,7 +939,7 @@ export class AiDriver {
         thr *= clamp(1 - (betaR - 0.6 * a) / (0.5 * a), 0, 1);
       }
       // and squeeze the throttle on instead of stamping on it
-      c.throttle = Math.min(thr, c.throttle + dt * THROTTLE_RISE);
+      c.throttle = Math.min(thr, c.throttle + dt * this.persona.throttleRise);
       c.brake = 0;
     } else if (err > -0.6) {
       // a little over the target: ease off to a balancing throttle instead of snapping it shut (a sudden lift at

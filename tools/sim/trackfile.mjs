@@ -67,3 +67,23 @@ export function collisionParts(buf) {
   }
   return parts;
 }
+
+/**
+ * Primes the AI's racing line with the layout's shipped file (assets/racelines/<id>.json), as the game does; without
+ * one (or with --old-line on the command line) the tools build the minimum-curvature line as before.
+ * @param {any} track the layout's TrackData
+ * @param {{ primeRacingLine: Function, racingLineFromFile: Function }} ai the ai module's two functions
+ */
+export function primeShippedLine(track, ai, argv = process.argv) {
+  if (argv.includes('--old-line')) return false;
+  const file = path.join(PUB, 'assets/racelines', `${track.id}.json`);
+  let data;
+  try {
+    data = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return false;
+  }
+  const line = ai.racingLineFromFile(track, data);
+  if (line) ai.primeRacingLine(track, line);
+  return !!line;
+}

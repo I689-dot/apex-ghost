@@ -196,7 +196,8 @@ export type ClientMsg =
   | { t: 'briefed' }
   | { t: 'loaded'; raceId: number }
   | { t: 'ping'; c: number }
-  | { t: 'damage'; zones: number[] }
+  /** `id`: a bot of the host's. */
+  | { t: 'damage'; zones: number[]; id?: string }
   | { t: 'leave' }
   | { t: 'addBot' }
   | { t: 'removeBot'; id: string }
@@ -211,7 +212,8 @@ export type ClientMsg =
   /** Host: the session rules (only the ones given change). */
   | { t: 'setRules'; rules: Partial<RaceRules> }
   /** Pit lane: in (true) and back out (false). `id`: a bot of the host's. */
-  | { t: 'pit'; in: boolean; id?: string }
+  /** `id`: a bot of the host's; `tow`: put in its box after a wreck (RaceTracker.tow) instead of driving in. */
+  | { t: 'pit'; in: boolean; id?: string; tow?: boolean }
   /**
    * Contact rule: my car hit `to` here (impulse on it, N·s, world; `ty`: yaw torque impulse, N·m·s), for its owner
    * to apply if its own simulation missed the contact. `from`: a bot of the host's that did the hitting.
@@ -332,9 +334,9 @@ export function parseClientMsg(raw: string): ClientMsg | null {
     case 'ping':
       return num(v.c) ? { t: 'ping', c: v.c } : null;
     case 'damage':
-      return Array.isArray(v.zones) && v.zones.length === 6 && v.zones.every((z) => num(z) && z >= 0 && z <= 1)
-        ? { t: 'damage', zones: v.zones as number[] }
-        : null;
+      if (!(Array.isArray(v.zones) && v.zones.length === 6 && v.zones.every((z) => num(z) && z >= 0 && z <= 1))) return null;
+      if (v.id !== undefined && !str(v.id, 32)) return null;
+      return v.id === undefined ? { t: 'damage', zones: v.zones as number[] } : { t: 'damage', zones: v.zones as number[], id: v.id };
     case 'leave':
       return { t: 'leave' };
     case 'addBot':
@@ -357,8 +359,9 @@ export function parseClientMsg(raw: string): ClientMsg | null {
     case 'setRaceLaps':
       return num(v.laps) && Number.isInteger(v.laps) && v.laps >= 0 && v.laps <= 50 ? { t: 'setRaceLaps', laps: v.laps } : null;
     case 'pit':
-      if (typeof v.in !== 'boolean' || (v.id !== undefined && !str(v.id, 32))) return null;
-      return v.id === undefined ? { t: 'pit', in: v.in } : { t: 'pit', in: v.in, id: v.id };
+      if (typeof v.in !== 'boolean' || (v.id !== undefined && !str(v.id, 32)) || (v.tow !== undefined && typeof v.tow !== 'boolean')) return null;
+      if (v.id === undefined) return { t: 'pit', in: v.in };
+      return v.tow ? { t: 'pit', in: v.in, id: v.id, tow: true } : { t: 'pit', in: v.in, id: v.id };
     case 'bump': {
       const ok = (x: unknown, max: number): x is number => num(x) && Math.abs(x) <= max;
       if (!str(v.to, 32) || !ok(v.ix, MAX_BUMP_IMPULSE) || !ok(v.iy, MAX_BUMP_IMPULSE) || !ok(v.iz, MAX_BUMP_IMPULSE) || !ok(v.ty, MAX_BUMP_IMPULSE))

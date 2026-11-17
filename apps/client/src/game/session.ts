@@ -60,7 +60,7 @@ import { FUEL, PROXY_GROUPS, Vehicle, trackRubber } from '../physics/vehicle';
 import { CAMERA_MODES, saveSettings, settings } from '../settings';
 import { Hud } from '../ui/hud';
 import { loadCarModel, loadTrackFile, type Progress } from './assets';
-import { AiDriver, BOT_ASSISTS } from './ai';
+import { AiDriver, BOT_ASSISTS, botPersona, hashSeed } from './ai';
 import { Cinematic, type Entrant } from './cinematic';
 import { TvCameras } from './tvCameras';
 import type { GameAudio } from '../audio/audio';
@@ -217,6 +217,11 @@ interface LocalBot {
   exitAt: number;
   /** Told the server it is in the pit lane. */
   pitSent: boolean;
+  /** Towed to its box after a crash: the crew starts once the tow is over (performance.now() ms; 0 = no tow). */
+  towUntil: number;
+  /** The damage version last sent to the others, and when. */
+  damageSent: number;
+  damageSentAt: number;
 }
 
 export interface SessionCallbacks {
@@ -407,6 +412,8 @@ export class RaceSession {
     /** Its body collides (on track, and placed where no car was). */
     solid: boolean;
   } | null = null;
+  /** The bots this host simulates, by their body's collider (their hits on walls damage them). */
+  private botByCollider = new Map<number, Remote>();
   /** Colliders of other cars (contact rule), for damage. */
   private carColliders = new Set<number>();
   /** Contact rule: when two cars were last seen touching in this world ("victim|other" → performance.now()). */
@@ -874,9 +881,12 @@ export class RaceSession {
       if (this.race.rules?.fuel) vehicle.setFuel(this.race.kind === 'race' ? Math.min(FUEL.tankL, this.raceLaps * perLap * 1.05 + 2) : 40);
       const pit = this.trackData.pitLane ? new PitLaneMonitor(this.trackData) : null;
       const win = pitWindowLaps(this.raceLaps);
-      // the host's bot level (race rules) sets the pace; each bot a little under it so they spread out over a lap
-      // instead of driving nose to tail (deterministic per slot: 96.5–100 % of the level)
-      const skill = ((this.race.rules?.botLevel ?? DEFAULT_BOT_LEVEL) / 100) * (0.965 + ((r.slot * 37) % 10) / 280);
+      // each bot is its own driver (botPersona, seeded by its id: the same driver every session): its line, braking,
+      // throttle, racecraft, consistency and wet skill. The host's bot level (race rules) sets the pace, each bot
+      // somewhere in a 5 % spread under it (95.5–101 %): the field strings out, some are clearly slower than others
+      const seed = hashSeed(r.id);
+      const persona = botPersona(seed);
+      const skill = ((this.race.rules?.botLevel ?? DEFAULT_BOT_LEVEL) / 100) * (0.955 + 0.055 * persona.pace);
       const lane = (((r.slot * 7) % 5) - 2) * 0.45;
       const t = vehicle.body.translation();
       const q = vehicle.body.rotation();
@@ -884,7 +894,7 @@ export class RaceSession {
       const rot = new THREE.Quaternion(q.x, q.y, q.z, q.w);
       r.bot = {
         vehicle,
-        ai: new AiDriver(this.trackData, vehicle, skill, lane),
+        ai: new AiDriver(this.trackData, vehicle, skill, lane, persona, seed),
         prevPos: pos.clone(),
         currPos: pos,
         prevRot: rot.clone(),
@@ -907,7 +917,11 @@ export class RaceSession {
         lift: 0,
         exitAt: 0,
         pitSent: false,
+        towUntil: 0,
+        damageSent: 0,
+        damageSentAt: 0,
       };
+      this.botByCollider.set(vehicle.collider.handle, r);
       if (pit) {
         pit.measureBoxes(this.wallProbe);
         const [a, b] = pit.boxes()[pit.boxOf(r.slot)];
@@ -1442,7 +1456,7 @@ export class RaceSession {
       this.prevPos.copy(this.currPos);
       this.prevRot.copy(this.currRot);
       this.vehicle.step(FIXED_DT, controls);
-      this.stepBots(raceT);
+      this.stepBots(raceT, serverNow);
       if (this.contact) this.moveKinematics();
       this.world.step(this.events);
       if (this.contact) this.afterContacts();
@@ -2044,7 +2058,14 @@ export class RaceSession {
         this.localTracker?.pitOut(r.id, this.trackData.pitLane?.exitS ?? 0, serverNow);
         b.exitAt = now;
       }
-      if (this.race.kind !== 'race' || tr.finishedMs !== null || tr.dnf) continue;
+      // its damage to the others (dents and smoke on their screens; race control's view of it), at most once a second
+      if (r.damage.version !== b.damageSent && now - b.damageSentAt > 1000) {
+        b.damageSent = r.damage.version;
+        b.damageSentAt = now;
+        this.conn.sendJson({ t: 'damage', id: r.id, zones: Array.from(r.damage.zones, (z) => Math.round(z * 100) / 100) });
+      }
+      if (tr.finishedMs !== null || tr.dnf) continue;
+      const isRace = this.race.kind === 'race';
       const lap = tr.laps + 1;
       const st = this.standings.find((s) => s.id === r.id);
       const lapsLeft = this.raceLaps - tr.laps;
@@ -2053,23 +2074,29 @@ export class RaceSession {
       const inWindow = wt
         ? serverNow >= wt.open + ((r.slot % 5) / 6) * (wt.close - wt.open) && serverNow < wt.close - 8000
         : lap >= b.stopLap && lap <= win.close;
-      const mustStop = !!rules?.pitWindow && !st?.stopDone && inWindow;
-      const needFuel = v.fuelL !== null && v.fuelL < perLap * 1.3 && v.fuelL < lapsLeft * perLap;
+      const mustStop = isRace && !!rules?.pitWindow && !st?.stopDone && inWindow;
+      const needFuel = isRace && v.fuelL !== null && v.fuelL < perLap * 1.3 && v.fuelL < lapsLeft * perLap;
+      // damage worth a stop (in any session): a puncture, a bent corner, a broken wing or splitter, a damaged engine
+      const z = r.damage.zones;
+      const needRepair = r.damage.punctured.some(Boolean) || z[5] > 0.25 || Math.max(z[0], z[1]) > 0.3 || Math.max(z[2], z[3]) > 0.45 || z[4] > 0.35;
       if (!b.ai.pitRequest && !b.ai.inPitLane && now - b.exitAt > 5000) {
-        if (mustStop || needFuel) b.ai.pitRequest = 'stop';
-        else if ((st?.driveThroughs ?? 0) > 0) b.ai.pitRequest = 'through';
+        if (mustStop || needFuel || needRepair) b.ai.pitRequest = 'stop';
+        else if (isRace && (st?.driveThroughs ?? 0) > 0) b.ai.pitRequest = 'through';
       }
-      // in the box: the crew's work, timed like a player's stop
-      if (b.ai.atBox && b.serviceEnd === 0) {
+      // in the box: the crew's work, timed like a player's stop (after a tow, once the car is there)
+      if (b.ai.atBox && b.serviceEnd === 0 && now >= b.towUntil) {
+        b.towUntil = 0;
         const wear = v.wheels.reduce((a, w) => a + w.wear, 0) / 4;
         const plan = defaultPlan(
           r.damage.zones,
           wear,
           v.compound.id,
           this.weather.wetness,
-          v.fuelL === null ? 0 : Math.ceil(Math.min(FUEL.tankL - v.fuelL, Math.max(0, (lapsLeft + 1) * perLap - v.fuelL))),
-          !!rules?.pitWindow && !st?.stopDone && (wt ? tr.pitInMs >= wt.open && tr.pitInMs < wt.close : lap >= win.open && lap <= win.close),
+          !isRace || v.fuelL === null ? 0 : Math.ceil(Math.min(FUEL.tankL - v.fuelL, Math.max(0, (lapsLeft + 1) * perLap - v.fuelL))),
+          isRace && !!rules?.pitWindow && !st?.stopDone && (wt ? tr.pitInMs >= wt.open && tr.pitInMs < wt.close : lap >= win.open && lap <= win.close),
         );
+        // a puncture: new tyres whatever their wear
+        if (r.damage.punctured.some(Boolean) && !plan.tyres) plan.tyres = v.compound.id;
         b.servicePlan = plan;
         b.serviceEnd = now + Math.max(1, serviceTime(plan, r.damage.zones).total) * 1000;
         b.serviceStart = now;
@@ -2087,9 +2114,13 @@ export class RaceSession {
         const plan = b.servicePlan;
         if (plan?.tyres) {
           v.fitTyres(COMPOUNDS[plan.tyres], v.ambientC + 12);
+          r.damage.tyresChanged();
           v.weatherGrip = compoundGrip(v.compound, this.weather.wetness, this.weather.rain);
         }
         if (plan && plan.fuelL > 0 && v.fuelL !== null) v.setFuel(v.fuelL + plan.fuelL);
+        // the repairs (dents are visual: gone with any bodywork repair)
+        if (plan?.body) r.visual.resetDamage();
+        if (plan && r.damage.repair({ body: plan.body, suspension: plan.suspension, engine: plan.engine })) v.drivetrain.powerScale = r.damage.powerScale;
         b.serviceEnd = 0;
         b.servicePlan = null;
         b.serviceEvents = null;
@@ -2098,6 +2129,33 @@ export class RaceSession {
         b.ai.pitServed();
       }
     }
+  }
+
+  /**
+   * A bot that put itself back on the track wrecked (a puncture, a broken corner, heavy damage): towed to its box
+   * instead, as iRacing does, where its crew repairs it. The tow takes the time to cover the rest of the way to the
+   * pits at 108 km/h (never quicker than driving there), at least 30 s, before the crew starts.
+   */
+  private towBot(r: Remote, serverNow: number): boolean {
+    const b = r.bot;
+    const lane = this.trackData.pitLane;
+    if (!b || !lane || !b.pit || b.ai.inPitLane || !this.startAt || serverNow < this.startAt) return false;
+    const tr = this.localTracker?.players.get(r.id);
+    if (!tr || tr.finishedMs !== null || tr.dnf) return false;
+    const z = r.damage.zones;
+    const wrecked = r.damage.punctured.some(Boolean) || z[5] > 0.45 || Math.max(...z) > 0.6;
+    if (!wrecked) return false;
+    const p = b.vehicle.body.translation();
+    const s = progressAt(this.trackData, nearestCenterlineIndex(this.trackData, p.x, p.y, p.z, b.hint, 60), p.x, p.z);
+    const L = this.trackData.length;
+    const toEntry = (((lane.entryS - s) % L) + L) % L;
+    if (!b.ai.towToBox()) return false;
+    b.towUntil = performance.now() + Math.max(30, (toEntry + (b.ai.pitBox * lane.length) / Math.max(1, lane.points.length - 1)) / 30) * 1000;
+    b.pitSent = true;
+    this.conn.sendJson({ t: 'pit', in: true, id: r.id, tow: true });
+    this.localTracker?.tow(r.id, serverNow);
+    this.flash(t('{name} is towed to the pits', { name: this.names.get(r.id) ?? t('A driver') }), 3000);
+    return true;
   }
 
   /** Race control's flag for me (the light panel on the HUD) and the fuel readout. */
@@ -2288,7 +2346,7 @@ export class RaceSession {
    * apart, in grid order) instead of all launching side by side onto the same line, and they keep their distance
    * behind a car directly ahead (cars pass through each other here, so without this they drove through it).
    */
-  private stepBots(raceT: number): void {
+  private stepBots(raceT: number, serverNow: number): void {
     const bots = [...this.remotes.values()].filter((r) => r.bot).sort((a, b) => a.slot - b.slot);
     bots.forEach((r, order) => {
       const b = r.bot;
@@ -2305,6 +2363,8 @@ export class RaceSession {
         b.ai.resetRequested = false;
         b.resetFlagSamples = 2;
         b.rejoinAt = performance.now();
+        // too badly damaged to go on: towed to its box instead
+        if (!b.ai.inPitLane) this.towBot(r, serverNow);
       }
       b.vehicle.step(FIXED_DT, c);
     });
@@ -2425,6 +2485,17 @@ export class RaceSession {
   private drainContacts(): void {
     const myHandle = this.vehicle.collider.handle;
     this.events.drainContactForceEvents((e) => {
+      // a bot of mine against a wall: its damage, as for my car (it then pits for repairs: updateBotPits)
+      const bot = this.botByCollider.get(e.collider1()) ?? this.botByCollider.get(e.collider2());
+      if (bot?.bot) {
+        const own = bot.bot.vehicle.collider.handle;
+        const other = e.collider1() === own ? e.collider2() : e.collider1();
+        if (this.track.surfaceOf(other) === 'wall') {
+          const dir = e.maxForceDirection();
+          const sign = e.collider1() === own ? -1 : 1;
+          this.botImpact(bot, e.totalForceMagnitude() * FIXED_DT, dir.x * sign, dir.y * sign, dir.z * sign);
+        }
+      }
       if (e.collider1() !== myHandle && e.collider2() !== myHandle) return;
       // only walls and barriers damage the car; touching the road or grass never does
       const other = e.collider1() === myHandle ? e.collider2() : e.collider1();
@@ -2439,6 +2510,19 @@ export class RaceSession {
       const sign = e.collider1() === myHandle ? -1 : 1;
       this.impactDamage(impulse, dir.x * sign, dir.y * sign, dir.z * sign, car);
     });
+  }
+
+  /** A hit on a bot of mine: damage (the same model as mine), dents, less power with a damaged engine. */
+  private botImpact(r: Remote, impulse: number, fx: number, fy: number, fz: number): void {
+    const b = r.bot;
+    if (!b) return;
+    const q = b.vehicle.body.rotation();
+    _q1.set(q.x, q.y, q.z, q.w).invert();
+    _v1.set(fx, fy, fz).applyQuaternion(_q1);
+    const res = r.damage.impact(impulse, -_v1.x, -_v1.z, b.vehicle.mass);
+    if (!res) return;
+    b.vehicle.drivetrain.powerScale = r.damage.powerScale;
+    if (res.zone < 4) r.visual.dent(zonePoint(res.zone, r.entry, _v1), zoneDir(res.zone, _v2), res.amount * 2);
   }
 
   /** A hit on my car: `impulse` (N·s) pushing it along (fx, fy, fz) (world, unit). Damage, dents, sound, rumble. */

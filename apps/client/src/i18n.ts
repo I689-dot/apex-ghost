@@ -538,6 +538,7 @@ const ES: Record<string, string> = {
   'CHEQUERED FLAG: finish your lap, it still counts': 'BANDERA A CUADROS: termina tu vuelta, todavía cuenta',
   'SESSION COMPLETE': 'SESIÓN COMPLETADA',
   '{name} has completed the session': '{name} ha completado la sesión',
+  '{name} is towed to the pits': '{name} es remolcado a boxes',
   'A driver': 'Un piloto',
   'Out lap: bring the tyres up to temperature. Timing starts at the line.': 'Vuelta de salida: calienta los neumáticos. El cronómetro empieza en la línea.',
   'Manual gearbox': 'Cambio manual',

@@ -490,24 +490,30 @@ float kerbNoise(vec2 p) {
 ${
   paints
     ? `{
-  // where between the two paints this texel is, cut at the middle: a sharp edge, as wide as a pixel on screen
-  // (by hue: the dirt only darkens a paint)
-  vec3 kt = texture2D(map, vMapUv).rgb;
+  // where between the two paints this spot is, cut at the middle: a sharp edge, as wide as a pixel on screen
+  // (by hue: the dirt only darkens a paint). Read from a blurred level of the texture: the maps' kerb textures are
+  // tiny and block-compressed, and judged texel by texel their dirty, greyish texels flipped between the two paints
+  // (specks of red in the yellow); a stripe is many texels long, so its edge stays where it is.
+  vec3 kt = texture2D(map, vMapUv, 1.75).rgb;
   vec3 ha = kerbA / (kerbA.r + kerbA.g + kerbA.b + 1e-3);
   vec3 hb = kerbB / (kerbB.r + kerbB.g + kerbB.b + 1e-3);
   vec3 kd = hb - ha;
   float ku = clamp(dot(kt / (kt.r + kt.g + kt.b + 1e-3) - ha, kd) / dot(kd, kd), 0.0, 1.0);
   float kw = clamp(fwidth(ku) * 0.75, 0.002, 0.5);
   vec3 crisp = mix(kerbA, kerbB, smoothstep(0.5 - kw, 0.5 + kw, ku));
-  // the texture's dirt and wear, as how much darker it is than its clean paint there
+  // the texture's dirt and wear, as how much darker it is than its clean paint there (blurred too, and bounded: a
+  // black texel is no longer a black speck)
   float kl = dot(mix(kerbA, kerbB, ku), vec3(0.2126, 0.7152, 0.0722));
-  float dirt = clamp(dot(kt, vec3(0.2126, 0.7152, 0.0722)) / max(kl, 0.01), 0.25, 1.2);
-  diffuseColor.rgb = diffuse * crisp * mix(1.0, dirt, 0.8);
+  float dirt = clamp(dot(texture2D(map, vMapUv, 0.75).rgb, vec3(0.2126, 0.7152, 0.0722)) / max(kl, 0.01), 0.6, 1.1);
+  diffuseColor.rgb = diffuse * crisp * mix(1.0, dirt, 0.6);
 }`
     : ''
 }
-float kerbG = kerbNoise(vKerbW.xz * 38.0) - 0.5;
-float kerbG2 = kerbNoise(vKerbW.xz * 6.5 + 17.0) - 0.5;
+// the grain fades out where it is finer than a pixel (else it aliases into sparkle along the kerb)
+vec2 kgp = vKerbW.xz * 38.0;
+vec2 kgp2 = vKerbW.xz * 6.5 + 17.0;
+float kerbG = (kerbNoise(kgp) - 0.5) * (1.0 - smoothstep(0.2, 0.6, max(fwidth(kgp.x), fwidth(kgp.y))));
+float kerbG2 = (kerbNoise(kgp2) - 0.5) * (1.0 - smoothstep(0.2, 0.6, max(fwidth(kgp2.x), fwidth(kgp2.y))));
 diffuseColor.rgb *= 1.0 + 0.07 * kerbG + 0.05 * kerbG2;`,
       )
       .replace(
@@ -519,7 +525,7 @@ roughnessFactor = clamp(roughnessFactor + 0.12 * kerbG2 + 0.08 * kerbG, 0.3, 1.0
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
 // the concrete's grain under the paint, in the lighting (screen-space slope of the grain)
-normal = normalize(normal - 0.35 * vec3(dFdx(kerbG), dFdy(kerbG), 0.0) * 6.0);`,
+normal = normalize(normal - 0.35 * vec3(dFdx(kerbG), dFdy(kerbG), 0.0) * 1.5);`,
       );
   };
   sm.customProgramCacheKey = () => `${baseKey()}-kerb${paints ? '2' : '1'}`;

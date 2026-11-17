@@ -15,8 +15,9 @@ import { nearestCenterlineIndex, progressAt } from '../../packages/shared/src/in
 import { Vehicle, type GroundHit, type GroundQuery } from '../../apps/client/src/physics/vehicle.ts';
 import { DamageState } from '../../apps/client/src/physics/damage.ts';
 import { AiDriver, BOT_ASSISTS, trafficView, type TrafficCar } from '../../apps/client/src/game/ai.ts';
+import * as aiMod from '../../apps/client/src/game/ai.ts';
 import { cutWallsAcrossLine } from '../../apps/client/src/game/wallCut.ts';
-import { collisionParts, loadTrack, trackArg } from './trackfile.mjs';
+import { collisionParts, loadTrack, primeShippedLine, trackArg } from './trackfile.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.resolve(here, '../../apps/client/public/assets');
@@ -29,6 +30,7 @@ const PLAYER_SKILL = Number(opt('player-skill', '0.86'));
 const OFF = args.includes('--off');
 const loaded = loadTrack(trackArg(args) ?? 'zandvoort');
 const track = loaded.track as TrackData;
+primeShippedLine(track, aiMod);
 const DT = 1 / 120;
 await RAPIER.init();
 
@@ -84,9 +86,12 @@ for (let slot = 0; slot <= BOTS; slot++) {
   v.setTyreTemps(80);
   const player = slot === 0;
   // the player: slower and on the racing line (no lane), never yielding; bots at a Pro level, spread as in the game
-  const skill = player ? PLAYER_SKILL : 0.97 * (0.965 + ((slot * 37) % 10) / 280);
+  // the bots as in the game: each its own driver (persona), the pace spread under a Pro level
+  const seed = aiMod.hashSeed(`bot${slot}`);
+  const persona = player ? aiMod.NEUTRAL_PERSONA : aiMod.botPersona(seed);
+  const skill = player ? PLAYER_SKILL : 0.97 * (0.955 + 0.055 * persona.pace);
   const lane = player ? 0 : (((slot * 7) % 5) - 2) * 0.45;
-  all.push({ name: player ? 'PLAYER' : `bot${slot}`, v, ai: new AiDriver(track, v, skill, lane), player, hint: -1, s: 0, laps: 0, lastS: 0 });
+  all.push({ name: player ? 'PLAYER' : `bot${slot}`, v, ai: new AiDriver(track, v, skill, lane, persona, seed), player, hint: -1, s: 0, laps: 0, lastS: 0 });
 }
 world.updateSceneQueries();
 
