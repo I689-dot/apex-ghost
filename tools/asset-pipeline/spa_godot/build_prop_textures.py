@@ -7,7 +7,9 @@ for this private game), drawn here, never taken from the video or ACC.
 With <ambientCG dir> (CC0 material sets, <id>/<id>_2K-JPG_<map>.jpg; godot/assets_credits.md) also copies the scanned
 materials the props wear into <out dir>/tex/<id>_<color|rough|metal|normal>.jpg at the size each needs (PBR below), and
 draws balloon_normal.png (the envelope's 24 panels bulging between their seams). Writes balloon.png (the La Source balloon's envelope: red with the lettering three times round), podium.png (the black
-FANATEC PODIUM board), flag.png (a feather flag's print), banner.png (the footbridge's banner)."""
+PODIUM board), flag.png (a feather flag's print), banner.png (the footbridge's banner).
+No real brands (the user, 2026-11-16): the boards keep the video's colours and layout with invented names, the game's
+own name (CORSAGHOST) or the circuit's."""
 import os
 import sys
 
@@ -28,6 +30,10 @@ def font(px):
 def centred(d, box, text, f, fill):
     x0, y0, x1, y1 = box
     l, t, r, b = d.textbbox((0, 0), text, font=f)
+    # no wider than 90 % of its panel: a longer name comes out smaller instead of running into the next one
+    while r - l > (x1 - x0) * 0.9 and f.size > 12:
+        f = font(int(f.size * 0.92))
+        l, t, r, b = d.textbbox((0, 0), text, font=f)
     d.text(((x0 + x1 - (r - l)) / 2 - l, (y0 + y1 - (b - t)) / 2 - t), text, font=f, fill=fill)
 
 
@@ -40,14 +46,14 @@ for k in range(24):
     x = k * W / 24
     d.line([(x, 0), (x, H)], fill=(122, 6, 12), width=4)
 for k in range(3):
-    centred(d, (k * W / 3, H * 0.36, (k + 1) * W / 3, H * 0.6), 'Audi Sport', font(110), (245, 245, 245))
+    centred(d, (k * W / 3, H * 0.36, (k + 1) * W / 3, H * 0.6), 'CORSAGHOST', font(110), (245, 245, 245))
 d.rectangle([0, int(H * 0.88), W, H], fill=(60, 40, 30))
 img.save(os.path.join(out, 'balloon.png'))
 
-# the podium board: black, FANATEC small above PODIUM in yellow, a thin yellow rule
+# the podium board: black, the game's name small above PODIUM in yellow, a thin yellow rule
 img = Image.new('RGB', (1024, 512), (14, 14, 16))
 d = ImageDraw.Draw(img)
-centred(d, (0, 40, 1024, 170), 'FANATEC', font(96), (238, 238, 238))
+centred(d, (0, 40, 1024, 170), 'CORSAGHOST', font(96), (238, 238, 238))
 centred(d, (0, 180, 1024, 420), 'PODIUM', font(190), (246, 196, 40))
 d.rectangle([180, 440, 844, 452], fill=(246, 196, 40))
 img.save(os.path.join(out, 'podium.png'))
@@ -69,7 +75,7 @@ img.save(os.path.join(out, 'flag.png'))
 img = Image.new('RGB', (4096, 154), (246, 246, 246))
 d = ImageDraw.Draw(img)
 for k in range(4):
-    centred(d, (k * 1024, 0, (k + 1) * 1024, 154), 'TotalEnergies', font(104), (30, 60, 150) if k % 2 == 0 else (210, 40, 40))
+    centred(d, (k * 1024, 0, (k + 1) * 1024, 154), 'APEX FUEL', font(104), (30, 60, 150) if k % 2 == 0 else (210, 40, 40))
 img.save(os.path.join(out, 'banner.png'))
 
 # the balloon's panels: a normal map (tangent space, OpenGL: +y up) bulging across each of the 24 gores, the u direction
@@ -104,12 +110,13 @@ if acg:
 print('[prop textures] balloon, podium, flag, banner')
 
 # advertising boards along the track (build_places.py BOARDS), one 2048 x 256 row each (an 8 m run of 1 m tall boards):
-# 0 TotalEnergies banner, 1 Laune, 2 Classic 21, 3 Circuit de Spa, 4 Fanatec
+# 0 fuel (blue and red on white), 1 a red board with a mark, 2 a radio station (purple), 3 Circuit de Spa, 4 black boards
+# (the video's colours; invented names)
 rows = []
 img = Image.new('RGB', (2048, 256), (246, 246, 246))
 d = ImageDraw.Draw(img)
 for k in range(2):
-    centred(d, (k * 1024, 0, (k + 1) * 1024, 256), 'TotalEnergies', font(150), (30, 60, 150) if k == 0 else (215, 45, 40))
+    centred(d, (k * 1024, 0, (k + 1) * 1024, 256), 'APEX FUEL', font(150), (30, 60, 150) if k == 0 else (215, 45, 40))
 rows.append(img)
 img = Image.new('RGB', (2048, 256), (200, 30, 40))
 d = ImageDraw.Draw(img)
@@ -117,12 +124,12 @@ for k in range(4):
     x0 = k * 512
     d.rectangle([x0 + 30, 50, x0 + 110, 206], fill=(245, 245, 245))
     d.rectangle([x0 + 54, 74, x0 + 86, 182], fill=(200, 30, 40))
-    centred(d, (x0 + 130, 0, x0 + 490, 256), 'laune', font(130), (245, 245, 245))
+    centred(d, (x0 + 130, 0, x0 + 490, 256), 'RACE LAB', font(84), (245, 245, 245))
 rows.append(img)
 img = Image.new('RGB', (2048, 256), (88, 40, 150))
 d = ImageDraw.Draw(img)
 for k in range(4):
-    centred(d, (k * 512, 0, (k + 1) * 512, 256), 'CLASSIC 21', font(92), (245, 245, 245))
+    centred(d, (k * 512, 0, (k + 1) * 512, 256), 'PITLANE FM', font(88), (245, 245, 245))
 rows.append(img)
 img = Image.new('RGB', (2048, 256), (244, 244, 244))
 d = ImageDraw.Draw(img)
@@ -133,7 +140,7 @@ rows.append(img)
 img = Image.new('RGB', (2048, 256), (14, 14, 16))
 d = ImageDraw.Draw(img)
 for k in range(4):
-    centred(d, (k * 512, 0, (k + 1) * 512, 256), 'FANATEC', font(110), (238, 238, 238))
+    centred(d, (k * 512, 0, (k + 1) * 512, 256), 'TORQUE WORKS', font(74), (238, 238, 238))
 rows.append(img)
 atlas = Image.new('RGB', (2048, 256 * len(rows)))
 for k, r in enumerate(rows):

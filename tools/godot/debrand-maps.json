@@ -1,0 +1,1163 @@
+{
+ "_doc": "Real brands in the maps' own textures (the game carries no brands, 2026-11-16), painted over by tools/godot/debrand-maps.mjs: per model (under godot/assets/maps), per texture (by name), the size the rectangles are written for and the patches (rect [x0, y0, x1, y1] px; bg '#hex' or [x, y], that pixel's colour; label, fg, flip 'v' for a texture the model maps upside down, rotate in degrees). Circuits' own names and signs stay.",
+ "spa_g/map_scenery.glb": {
+  "texts_updt": {
+   "size": [
+    2048,
+    1024
+   ],
+   "patches": [
+    {
+     "what": "Coca-Cola",
+     "rect": [
+      0,
+      0,
+      1024,
+      124
+     ],
+     "bg": [
+      500,
+      6
+     ],
+     "label": "FULL THROTTLE",
+     "fg": "#f4f4f4",
+     "flip": "v"
+    },
+    {
+     "what": "TOTAL",
+     "rect": [
+      0,
+      124,
+      1024,
+      320
+     ],
+     "bg": "#cf2a36",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4",
+     "flip": "v"
+    },
+    {
+     "what": "Uniroyal lettering",
+     "rect": [
+      1030,
+      6,
+      1530,
+      112
+     ],
+     "bg": [
+      1040,
+      10
+     ],
+     "label": "GRIP+",
+     "fg": "#161616",
+     "flip": "v"
+    },
+    {
+     "what": "Uniroyal mark",
+     "rect": [
+      1030,
+      112,
+      1530,
+      312
+     ],
+     "bg": [
+      1045,
+      300
+     ]
+    },
+    {
+     "what": "Classic 21",
+     "rect": [
+      1542,
+      182,
+      1646,
+      272
+     ],
+     "bg": "#5b2a8c"
+    },
+    {
+     "what": "Classic 21 and partners",
+     "rect": [
+      1656,
+      184,
+      2048,
+      266
+     ],
+     "bg": "#5b2a8c",
+     "label": "PITLANE FM",
+     "fg": "#f4f4f4",
+     "flip": "v"
+    },
+    {
+     "what": "ALD Automotive",
+     "rect": [
+      0,
+      322,
+      610,
+      512
+     ],
+     "bg": [
+      20,
+      500
+     ],
+     "label": "RACE LAB",
+     "fg": "#1d2340",
+     "flip": "v"
+    },
+    {
+     "what": "DHL",
+     "rect": [
+      612,
+      322,
+      1222,
+      512
+     ],
+     "bg": [
+      620,
+      330
+     ],
+     "label": "SLIPSTREAM",
+     "fg": "#c8202a",
+     "flip": "v"
+    },
+    {
+     "what": "Up North",
+     "rect": [
+      1622,
+      514,
+      2048,
+      680
+     ],
+     "bg": [
+      1630,
+      520
+     ]
+    },
+    {
+     "what": "TOTAL",
+     "rect": [
+      1722,
+      682,
+      2048,
+      1024
+     ],
+     "bg": [
+      1730,
+      690
+     ],
+     "label": "APEX FUEL",
+     "fg": "#d0262e",
+     "flip": "v",
+     "rotate": 0
+    }
+   ]
+  },
+  "ADV_add2": {
+   "size": [
+    256,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Silverstone",
+     "rect": [
+      0,
+      0,
+      128,
+      26
+     ],
+     "bg": [
+      4,
+      4
+     ],
+     "label": "SPA 24",
+     "fg": "#d0262e"
+    },
+    {
+     "what": "Silverstone",
+     "rect": [
+      128,
+      0,
+      256,
+      26
+     ],
+     "bg": [
+      132,
+      4
+     ],
+     "label": "SPA 24",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Assetto Corsa",
+     "rect": [
+      0,
+      26,
+      128,
+      76
+     ],
+     "bg": [
+      4,
+      70
+     ],
+     "label": "CORSAGHOST",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "TotalEnergies",
+     "rect": [
+      128,
+      26,
+      256,
+      76
+     ],
+     "bg": [
+      132,
+      70
+     ],
+     "label": "APEX FUEL",
+     "fg": "#d0262e"
+    }
+   ]
+  },
+  "flag_7": {
+   "size": [
+    64,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Assetto Corsa",
+     "rect": [
+      0,
+      0,
+      64,
+      256
+     ],
+     "bg": [
+      2,
+      128
+     ],
+     "label": "CORSAGHOST",
+     "fg": "#f4f4f4",
+     "rotate": -90
+    }
+   ]
+  },
+  "flag_8": {
+   "size": [
+    64,
+    256
+   ],
+   "patches": [
+    {
+     "what": "alpinestars",
+     "rect": [
+      0,
+      0,
+      64,
+      256
+     ],
+     "bg": [
+      2,
+      128
+     ],
+     "label": "GHOST TYRES",
+     "fg": "#f4f4f4",
+     "rotate": -90
+    }
+   ]
+  },
+  "structures": {
+   "size": [
+    256,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Silverstone lettering",
+     "rect": [
+      130,
+      0,
+      256,
+      24
+     ],
+     "bg": [
+      255,
+      23
+     ]
+    }
+   ]
+  }
+ },
+ "zandvoort/map_scenery.glb": {
+  "Dado_LW_041_0_baseColor": {
+   "size": [
+    128,
+    128
+   ],
+   "patches": [
+    {
+     "what": "MyLAPS",
+     "rect": [
+      0,
+      0,
+      54,
+      20
+     ],
+     "bg": "#1b1d22",
+     "label": "PITBOX",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "green boards",
+     "rect": [
+      54,
+      0,
+      108,
+      20
+     ],
+     "bg": "#e8ece6",
+     "label": "GRIP+",
+     "fg": "#1f7a3a"
+    },
+    {
+     "what": "Galaxy Group",
+     "rect": [
+      0,
+      20,
+      56,
+      36
+     ],
+     "bg": "#1d3f8a",
+     "label": "RACE LAB",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "ADVAN",
+     "rect": [
+      56,
+      20,
+      108,
+      36
+     ],
+     "bg": "#1b1d22",
+     "label": "GHOST TYRES",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "red board",
+     "rect": [
+      0,
+      36,
+      54,
+      56
+     ],
+     "bg": "#b8262e",
+     "label": "TRACK DAY",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Kumho Tyres",
+     "rect": [
+      54,
+      36,
+      108,
+      56
+     ],
+     "bg": "#1b1d22",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Pepsi",
+     "rect": [
+      0,
+      56,
+      54,
+      72
+     ],
+     "bg": "#1d3f8a",
+     "label": "SLIPSTREAM",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "white board",
+     "rect": [
+      54,
+      56,
+      108,
+      72
+     ],
+     "bg": "#e9ecef",
+     "label": "HAIRPIN",
+     "fg": "#1d3f8a"
+    },
+    {
+     "what": "blue board",
+     "rect": [
+      0,
+      72,
+      54,
+      88
+     ],
+     "bg": "#2c3e66",
+     "label": "KERB & CO",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Haarlems Dagblad",
+     "rect": [
+      54,
+      72,
+      108,
+      88
+     ],
+     "bg": "#d9dbdd",
+     "label": "DUNES DAILY",
+     "fg": "#1a1a1a"
+    }
+   ]
+  },
+  "Dado_LW_041_2_baseColor": {
+   "size": [
+    128,
+    128
+   ],
+   "patches": [
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      0,
+      90,
+      8
+     ],
+     "bg": "#dfe2e6"
+    },
+    {
+     "what": "Xerox and others",
+     "rect": [
+      0,
+      8,
+      90,
+      16
+     ],
+     "bg": "#e8c9cf",
+     "label": "TORQUE WORKS",
+     "fg": "#9a1c2a"
+    },
+    {
+     "what": "SSR",
+     "rect": [
+      0,
+      16,
+      90,
+      24
+     ],
+     "bg": "#d9b21f",
+     "label": "APEX FUEL",
+     "fg": "#1a1a1a"
+    },
+    {
+     "what": "trade club",
+     "rect": [
+      0,
+      24,
+      90,
+      32
+     ],
+     "bg": "#d7d9dc",
+     "label": "GHOST RACING",
+     "fg": "#1a1a1a"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      32,
+      44,
+      40
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "orange board",
+     "rect": [
+      44,
+      32,
+      90,
+      40
+     ],
+     "bg": "#d8862a",
+     "label": "FULL THROTTLE",
+     "fg": "#1a1a1a"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      40,
+      44,
+      48
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "dark board",
+     "rect": [
+      44,
+      40,
+      90,
+      48
+     ],
+     "bg": "#202226"
+    },
+    {
+     "what": "McGregor",
+     "rect": [
+      0,
+      48,
+      48,
+      56
+     ],
+     "bg": "#1d2c5c",
+     "label": "PITLANE FM",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      48,
+      48,
+      90,
+      56
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      56,
+      90,
+      64
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "dark board",
+     "rect": [
+      0,
+      64,
+      48,
+      72
+     ],
+     "bg": "#202226",
+     "label": "LATE APEX",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      48,
+      64,
+      90,
+      72
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      72,
+      90,
+      82
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "Formido",
+     "rect": [
+      0,
+      86,
+      90,
+      96
+     ],
+     "bg": "#1f3d9c",
+     "label": "DUNE MOTORS",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "red upright",
+     "rect": [
+      104,
+      0,
+      112,
+      42
+     ],
+     "bg": "#7a1a1f"
+    },
+    {
+     "what": "blue upright",
+     "rect": [
+      112,
+      0,
+      128,
+      48
+     ],
+     "bg": "#1f3d9c"
+    },
+    {
+     "what": "uprights",
+     "rect": [
+      100,
+      48,
+      128,
+      100
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      118,
+      128,
+      128
+     ],
+     "bg": "#c9ccd1"
+    }
+   ]
+  },
+  "Dado_LW_041_32_baseColor": {
+   "size": [
+    128,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Assetto Corsa, Simulazioni",
+     "rect": [
+      0,
+      22,
+      128,
+      64
+     ],
+     "bg": "#2a2b30",
+     "label": "CORSAGHOST",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Dado_LW_041_3_baseColor": {
+   "size": [
+    128,
+    32
+   ],
+   "patches": [
+    {
+     "what": "Hormann",
+     "rect": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "bg": "#1d2c5c",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Dado_LW_041_4_baseColor": {
+   "size": [
+    128,
+    16
+   ],
+   "patches": [
+    {
+     "what": "tango",
+     "rect": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "bg": "#eef0f2",
+     "label": "APEX FUEL",
+     "fg": "#d0262e"
+    }
+   ]
+  },
+  "Dado_LW_041_8_baseColor": {
+   "size": [
+    128,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Sylracing",
+     "rect": [
+      0,
+      11,
+      128,
+      34
+     ],
+     "bg": [
+      60,
+      60
+     ]
+    },
+    {
+     "what": "the band",
+     "rect": [
+      0,
+      14,
+      110,
+      23
+     ],
+     "bg": "#1d1e22",
+     "label": "GHOST RACING",
+     "fg": "#f4f4f4"
+    }
+   ]
+  }
+ },
+ "zandvoort/map_track.glb": {
+  "Dado_LW_041_0_baseColor": {
+   "size": [
+    128,
+    128
+   ],
+   "patches": [
+    {
+     "what": "MyLAPS",
+     "rect": [
+      0,
+      0,
+      54,
+      20
+     ],
+     "bg": "#1b1d22",
+     "label": "PITBOX",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "green boards",
+     "rect": [
+      54,
+      0,
+      108,
+      20
+     ],
+     "bg": "#e8ece6",
+     "label": "GRIP+",
+     "fg": "#1f7a3a"
+    },
+    {
+     "what": "Galaxy Group",
+     "rect": [
+      0,
+      20,
+      56,
+      36
+     ],
+     "bg": "#1d3f8a",
+     "label": "RACE LAB",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "ADVAN",
+     "rect": [
+      56,
+      20,
+      108,
+      36
+     ],
+     "bg": "#1b1d22",
+     "label": "GHOST TYRES",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "red board",
+     "rect": [
+      0,
+      36,
+      54,
+      56
+     ],
+     "bg": "#b8262e",
+     "label": "TRACK DAY",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Kumho Tyres",
+     "rect": [
+      54,
+      36,
+      108,
+      56
+     ],
+     "bg": "#1b1d22",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Pepsi",
+     "rect": [
+      0,
+      56,
+      54,
+      72
+     ],
+     "bg": "#1d3f8a",
+     "label": "SLIPSTREAM",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "white board",
+     "rect": [
+      54,
+      56,
+      108,
+      72
+     ],
+     "bg": "#e9ecef",
+     "label": "HAIRPIN",
+     "fg": "#1d3f8a"
+    },
+    {
+     "what": "blue board",
+     "rect": [
+      0,
+      72,
+      54,
+      88
+     ],
+     "bg": "#2c3e66",
+     "label": "KERB & CO",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Haarlems Dagblad",
+     "rect": [
+      54,
+      72,
+      108,
+      88
+     ],
+     "bg": "#d9dbdd",
+     "label": "DUNES DAILY",
+     "fg": "#1a1a1a"
+    }
+   ]
+  },
+  "Dado_LW_041_2_baseColor": {
+   "size": [
+    128,
+    128
+   ],
+   "patches": [
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      0,
+      90,
+      8
+     ],
+     "bg": "#dfe2e6"
+    },
+    {
+     "what": "Xerox and others",
+     "rect": [
+      0,
+      8,
+      90,
+      16
+     ],
+     "bg": "#e8c9cf",
+     "label": "TORQUE WORKS",
+     "fg": "#9a1c2a"
+    },
+    {
+     "what": "SSR",
+     "rect": [
+      0,
+      16,
+      90,
+      24
+     ],
+     "bg": "#d9b21f",
+     "label": "APEX FUEL",
+     "fg": "#1a1a1a"
+    },
+    {
+     "what": "trade club",
+     "rect": [
+      0,
+      24,
+      90,
+      32
+     ],
+     "bg": "#d7d9dc",
+     "label": "GHOST RACING",
+     "fg": "#1a1a1a"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      32,
+      44,
+      40
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "orange board",
+     "rect": [
+      44,
+      32,
+      90,
+      40
+     ],
+     "bg": "#d8862a",
+     "label": "FULL THROTTLE",
+     "fg": "#1a1a1a"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      40,
+      44,
+      48
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "dark board",
+     "rect": [
+      44,
+      40,
+      90,
+      48
+     ],
+     "bg": "#202226"
+    },
+    {
+     "what": "McGregor",
+     "rect": [
+      0,
+      48,
+      48,
+      56
+     ],
+     "bg": "#1d2c5c",
+     "label": "PITLANE FM",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      48,
+      48,
+      90,
+      56
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      56,
+      90,
+      64
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "dark board",
+     "rect": [
+      0,
+      64,
+      48,
+      72
+     ],
+     "bg": "#202226",
+     "label": "LATE APEX",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      48,
+      64,
+      90,
+      72
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      72,
+      90,
+      82
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "Formido",
+     "rect": [
+      0,
+      86,
+      90,
+      96
+     ],
+     "bg": "#1f3d9c",
+     "label": "DUNE MOTORS",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "red upright",
+     "rect": [
+      104,
+      0,
+      112,
+      42
+     ],
+     "bg": "#7a1a1f"
+    },
+    {
+     "what": "blue upright",
+     "rect": [
+      112,
+      0,
+      128,
+      48
+     ],
+     "bg": "#1f3d9c"
+    },
+    {
+     "what": "uprights",
+     "rect": [
+      100,
+      48,
+      128,
+      100
+     ],
+     "bg": "#c9ccd1"
+    },
+    {
+     "what": "logos",
+     "rect": [
+      0,
+      118,
+      128,
+      128
+     ],
+     "bg": "#c9ccd1"
+    }
+   ]
+  },
+  "Dado_LW_041_32_baseColor": {
+   "size": [
+    128,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Assetto Corsa, Simulazioni",
+     "rect": [
+      0,
+      22,
+      128,
+      64
+     ],
+     "bg": "#2a2b30",
+     "label": "CORSAGHOST",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Dado_LW_041_3_baseColor": {
+   "size": [
+    128,
+    32
+   ],
+   "patches": [
+    {
+     "what": "Hormann",
+     "rect": [
+      0,
+      0,
+      128,
+      32
+     ],
+     "bg": "#1d2c5c",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Dado_LW_041_4_baseColor": {
+   "size": [
+    128,
+    16
+   ],
+   "patches": [
+    {
+     "what": "tango",
+     "rect": [
+      0,
+      0,
+      128,
+      16
+     ],
+     "bg": "#eef0f2",
+     "label": "APEX FUEL",
+     "fg": "#d0262e"
+    }
+   ]
+  },
+  "Dado_LW_041_8_baseColor": {
+   "size": [
+    128,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Sylracing",
+     "rect": [
+      0,
+      11,
+      128,
+      34
+     ],
+     "bg": [
+      60,
+      60
+     ]
+    },
+    {
+     "what": "the band",
+     "rect": [
+      0,
+      14,
+      110,
+      23
+     ],
+     "bg": "#1d1e22",
+     "label": "GHOST RACING",
+     "fg": "#f4f4f4"
+    }
+   ]
+  }
+ }
+}

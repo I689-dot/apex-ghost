@@ -1435,3 +1435,17 @@ From the user's list (DECISIONS: the rest follows):
   first-purchase double coins, a weekly deal, promotional codes, invites. The checkout shows the payment step with the
   pay button off; the balance is a session-only number. Making it real needs Stripe on the PC, Google Play Billing in
   the Android app (Play requires it for digital goods), and the server holding balances, codes and referrals.
+
+## Godot: CorsaGhost, sign-in first, no brands on the circuits (2026-11-17)
+
+- The game is CorsaGhost: logo, icon (tools/godot/icon.svg), window and Android app name, package id
+  app.corsaghost.racing (a new install on phones), APK build/corsaghost.apk. On a PC the saved data moves once from the
+  old "Apex Ghost" folder. The server's addresses keep the old name (changing them is a redeploy).
+- The game opens on a sign-in screen (the user: signed in before the menu); the menu has no sign-in. "Play offline"
+  (solo only) appears only when the server cannot be reached; a server without accounts goes straight to the menu.
+- Circuits: the boards that read APEX GHOST read CORSAGHOST (tools/godot/rename-signage.mjs); Spa's built props carry
+  invented names (build_prop_textures.py: Audi Sport, Fanatec, TotalEnergies, Laune, Classic 21 gone); the Spa and
+  Zandvoort models' own sponsor textures are painted over with invented names (tools/godot/debrand-maps.mjs and .json:
+  Coca-Cola, TOTAL, Uniroyal, DHL, ALD, Classic 21, Silverstone, Assetto Corsa, alpinestars; MyLAPS, ADVAN, Kumho,
+  Hörmann, McGregor, Formido...). Circuits' own names and signs stay. The menu photos are shot again in this game
+  (brand-free cars and boards).
