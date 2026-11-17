@@ -1177,3 +1177,302 @@ details.faq p {
   align-self: flex-start;
   margin-bottom: 8px;
 }
+/* the bar with eight sections */
+.nav > li > a,
+.nav > li > button {
+  padding: 22px 9px;
+  font-size: 1rem;
+}
+@media (max-width: 1240px) {
+  .burger {
+    display: grid;
+    place-items: center;
+  }
+  .nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    padding: 8px 20px 20px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+  .nav.open {
+    display: flex;
+  }
+  .nav > li > a {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .sub {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    box-shadow: none;
+    background: none;
+    border: none;
+    padding: 0 0 6px 12px;
+  }
+  .bar .btn-play {
+    margin-left: auto;
+  }
+}
+.filters select {
+  padding: 9px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: #fff;
+  font: inherit;
+}
+.board-wrap {
+  overflow-x: auto;
+}
+table.board th {
+  width: auto;
+  color: var(--muted);
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+table.board td {
+  white-space: nowrap;
+}
+/* ------------------------------------------------------------------ telemetry */
+.tm-pick {
+  align-items: flex-end;
+}
+.tm-lap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tm-lap.a span {
+  color: #ff3d5e;
+}
+.tm-lap.b span {
+  color: #3fc6ff;
+}
+.tm-lap select {
+  min-width: 280px;
+}
+.tm-msg {
+  padding: 30px;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+.tm {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.4fr);
+  gap: 20px;
+  align-items: start;
+}
+.tm-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 120px;
+}
+.tm-map {
+  position: relative;
+  aspect-ratio: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.tm-map canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+.tm-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.tm-legend i {
+  width: 90px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, hsl(220 95% 48%), hsl(110 95% 52%), hsl(50 95% 54%), hsl(0 95% 56%));
+}
+.tm-read {
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tm-at {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 7px;
+}
+.tm-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tm-chart {
+  position: relative;
+  padding: 8px 10px 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.tm-chart[hidden] {
+  display: none;
+}
+.tm-chart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+.tm-chart-head b {
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tm-chart-head span b {
+  margin-left: 8px;
+  font-family: var(--body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.tm-chart canvas {
+  width: 100%;
+  height: var(--h);
+  display: block;
+  cursor: crosshair;
+}
+.tm-cur {
+  position: absolute;
+  top: 28px;
+  bottom: 6px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+.tm-chart .tm-cur {
+  left: 0;
+}
+@media (max-width: 960px) {
+  .tm {
+    grid-template-columns: 1fr;
+  }
+  .tm-left {
+    position: static;
+  }
+  .tm-lap select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+.drv-pick {
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.drv-pick:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.drv-card {
+  margin-top: 30px;
+  padding: 26px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.drv-card h2 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 0;
+}
+.st {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+.promo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, #2a0712, #150b1f);
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  font-size: 0.95rem;
+  text-align: center;
+}
+.promo:hover b {
+  color: var(--accent-2);
+}
+.makes-band {
+  padding: 40px 0;
+  border-top: 1px solid var(--line);
+}
+.makes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 34px;
+  margin-top: 8px;
+}
+.makes a {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.3rem, 2.4vw, 2rem);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 0.15s;
+}
+.makes a:hover {
+  color: #fff;
+}
+.filters select,
+.filters input {
+  max-width: 100%;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .filters > * {
+    flex: 1 1 100%;
+  }
+  .tm-lap select {
+    width: 100%;
+  }
+}

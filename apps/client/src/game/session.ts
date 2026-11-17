@@ -66,6 +66,9 @@ import { TvCameras } from './tvCameras';
 import type { GameAudio } from '../audio/audio';
 import { SessionAudio, type OtherCar } from '../audio/sessionAudio';
 import { LapDelta } from './lapDelta';
+import { LapTrace } from './lapTrace';
+import { account, uploadTrace } from '../net/account';
+import { isLocalCode } from '../net/localRoom';
 import { BestLapGhost, wakeStrength } from './ghost';
 import { applySetup, vehicleSetup } from './carSetup';
 import { PitLaneMonitor, type WallProbe } from './pitLane';
@@ -313,6 +316,9 @@ export class RaceSession {
   /** All four wheels beyond the limits (held): reported to the lap logic, which adds a time penalty. */
   private limits = new TrackLimits();
   private lapDelta: LapDelta | null = null;
+  /** This lap's telemetry, and the last finished valid lap's (sent with a personal best set online). */
+  private lapTrace: LapTrace | null = null;
+  private lastTrace: string | null = null;
   private liveDelta: number | null = null;
   private trackerEvents: RaceEvent[] = [];
   private racingLine: RacingLineFx | null = null;
@@ -1186,6 +1192,11 @@ export class RaceSession {
           if (m.best) {
             this.bestLap = m.lapMs;
             this.bestSectors = m.sectors.slice();
+          }
+          // a personal best online: its telemetry to the website (the server keeps it for a lap it recorded)
+          if (m.best && m.valid && this.lastTrace && account() && !isLocalCode(this.conn.code) && !this.spectator) {
+            void uploadTrace({ track: this.race.trackId, lapMs: m.lapMs, bin: this.lapTrace?.bin ?? 5, data: this.lastTrace });
+            this.lastTrace = null;
           }
           const sessionBest = this.standings.every((s) => s.id === this.me || s.bestLapMs === null || s.bestLapMs > m.lapMs);
           const tag = !m.valid ? t('  ·  INVALID') : m.best ? (sessionBest ? t('  ·  FASTEST LAP') : t('  ·  personal best')) : '';
@@ -2436,9 +2447,13 @@ export class RaceSession {
     const tr = this.localTracker?.players.get(this.me);
     if (!tr) return;
     this.lapDelta ??= new LapDelta(this.trackData.length);
+    this.lapTrace ??= new LapTrace(this.trackData.length);
     const d = this.lapDelta;
+    const trace = this.lapTrace;
     for (const e of ev) {
       if (e.type === 'lap') {
+        this.lastTrace = e.valid && !e.outLap ? trace.encode() : null;
+        trace.start();
         if (e.valid && e.best) d.commitBest();
         this.ghost.lapEnded(e.valid && e.best);
         if (e.valid && e.best) this.ensureGhostVisual();
@@ -2488,8 +2503,21 @@ export class RaceSession {
     }
     const lapDist = tr.raceDist - tr.laps * this.trackData.length;
     const lapMs = nowMs - tr.lapStartMs;
-    if (!tr.outLap && !tr.inPit) this.ghost.record(lapMs, this.currPos, this.currRot);
-    else this.ghost.abortLap();
+    if (!tr.outLap && !tr.inPit) {
+      this.ghost.record(lapMs, this.currPos, this.currRot);
+      const v = this.vehicle;
+      trace.record(
+        lapDist,
+        lapMs,
+        this.currPos.x,
+        this.currPos.z,
+        v.telemetry.speed,
+        v.pedals.throttle,
+        v.pedals.brake,
+        v.steerAngle / v.maxSteer,
+        v.telemetry.gear,
+      );
+    } else this.ghost.abortLap();
     d.record(lapDist, lapMs);
     this.liveDelta = d.delta(lapDist, lapMs);
   }

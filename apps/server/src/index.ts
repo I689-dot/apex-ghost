@@ -55,7 +55,7 @@ async function accountApi(req: Request, env: Env, path: string): Promise<Respons
   const op = path as AccountOp;
   const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
   const query = Object.fromEntries(new URL(req.url).searchParams);
-  const reads: AccountOp[] = ['me', 'friends', 'records', 'stats'];
+  const reads: AccountOp[] = ['me', 'friends', 'records', 'stats', 'telemetry', 'traces', 'drivers'];
   if ((req.method === 'GET') !== reads.includes(op)) return json({ error: 'Not found' }, 404);
   if (op === 'presence' && !isPresence(body.presence)) return json({ error: 'Bad presence.' }, 400);
   const token = bearer(req);
@@ -112,7 +112,7 @@ export default {
       return out;
     }
     const am = url.pathname.match(
-      /^\/api\/(?:account\/)?(register|login|logout|delete|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/,
+      /^\/api\/(?:account\/)?(register|login|logout|delete|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats|trace|telemetry|traces|drivers)$/,
     );
     if (am) return accountApi(req, env, am[1]);
 

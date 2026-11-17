@@ -28,7 +28,11 @@ export type AccountOp =
   | 'friends/remove'
   | 'presence'
   | 'records'
-  | 'stats';
+  | 'stats'
+  | 'trace'
+  | 'telemetry'
+  | 'traces'
+  | 'drivers';
 
 /** An HTTP status and the JSON body (as text: RPC carries it unchanged). */
 export interface AccountReply {
@@ -121,6 +125,20 @@ create table if not exists laps (
 );
 create index if not exists laps_track_time on laps (track_id, lap_ms);
 create index if not exists laps_user_track on laps (user_id, track_id, lap_ms);
+-- each driver's best lap on a layout (dry / wet) as the game recorded it: position, speed, pedals, steering and gear
+-- every few metres (the website's telemetry page). Only for a lap this server recorded (laps), the best one kept.
+create table if not exists traces (
+  user_id text not null references users (id) on delete cascade,
+  track_id text not null,
+  wet integer not null default 0,
+  car_id text not null,
+  lap_ms integer not null,
+  sectors text not null default '',
+  data text not null,
+  created_at integer not null,
+  primary key (user_id, track_id, wet)
+);
+create index if not exists traces_track on traces (track_id, wet, lap_ms);
 create table if not exists results (
   id integer primary key autoincrement,
   user_id text not null references users (id) on delete cascade,
@@ -209,6 +227,14 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
           return { status: 200, body: { ok: true } };
         case 'records':
           return { status: 200, body: { rows: this.records(token, query) } };
+        case 'trace':
+          return { status: 200, body: this.saveTrace(token, body) };
+        case 'telemetry':
+          return { status: 200, body: this.telemetry(query) };
+        case 'drivers':
+          return { status: 200, body: { rows: this.drivers(query) } };
+        case 'traces':
+          return { status: 200, body: { rows: this.traceList(query) } };
         case 'stats':
           return { status: 200, body: { stats: this.stats(token, query) } };
         default:
@@ -242,6 +268,94 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       u.id,
     );
     return this.userOf(token) as AccountUser;
+  }
+
+  /**
+   * A lap's telemetry from the game. It must belong to a lap this server recorded for the driver in the last 15
+   * minutes (same layout, same time to the millisecond): the time cannot be made up, only the trace comes from the
+   * client. Kept when it is the driver's best on that layout in those conditions.
+   */
+  private saveTrace(token: string | null, body: Record<string, unknown>): { saved: boolean } {
+    const u = this.requireUser(token);
+    const track = typeof body.track === 'string' && /^[a-z0-9_]{1,40}$/.test(body.track) ? body.track : null;
+    const lapMs = typeof body.lapMs === 'number' && Number.isFinite(body.lapMs) ? Math.round(body.lapMs) : null;
+    const data = typeof body.data === 'string' && body.data.length <= 160_000 && /^[A-Za-z0-9+/=]+$/.test(body.data) ? body.data : null;
+    const bin = typeof body.bin === 'number' && [5, 10].includes(body.bin) ? body.bin : null;
+    if (!track || !lapMs || !data || !bin) throw new HttpError(400, 'Bad trace.');
+    const lap = this.rows<{ car_id: string; wet: number; sectors: string }>(
+      'select car_id, wet, sectors from laps where user_id = ? and track_id = ? and lap_ms = ? and created_at > ? order by created_at desc limit 1',
+      u.id,
+      track,
+      lapMs,
+      Date.now() - 15 * 60_000,
+    )[0];
+    if (!lap) throw new HttpError(404, 'No such lap.');
+    const old = this.rows<{ lap_ms: number }>('select lap_ms from traces where user_id = ? and track_id = ? and wet = ?', u.id, track, lap.wet)[0];
+    if (old && old.lap_ms <= lapMs) return { saved: false };
+    this.sql.exec(
+      'insert or replace into traces (user_id, track_id, wet, car_id, lap_ms, sectors, data, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
+      u.id,
+      track,
+      lap.wet,
+      lap.car_id,
+      lapMs,
+      lap.sectors,
+      `${bin}:${data}`,
+      Date.now(),
+    );
+    return { saved: true };
+  }
+
+  /** Drivers whose nickname starts with q (public: the website's driver lookup), with their profile. */
+  private drivers(
+    q: Record<string, string>,
+  ): { id: string; nick: string; country: string | null; num: number | null; colour: string | null; abbr: string | null }[] {
+    const s = (q.q ?? '').normalize('NFKC').toLowerCase().trim();
+    if (s.length < 2 || s.length > 16) return [];
+    return this.rows<{ id: string; nick: string; country: string | null; num: number | null; colour: string | null; abbr: string | null }>(
+      "select id, nick, country, num, colour, abbr from users where nick_key like ? escape '\\' order by nick_key limit 20",
+      `${s.replace(/[\\%_]/g, (c) => `\\${c}`)}%`,
+    );
+  }
+
+  /** The laps with telemetry on a layout, fastest first (public: the website's telemetry page). */
+  private traceList(q: Record<string, string>): { userId: string; nick: string; carId: string; lapMs: number; at: number }[] {
+    return this.rows<{ user_id: string; nick: string; car_id: string; lap_ms: number; created_at: number }>(
+      'select t.user_id as user_id, u.nick as nick, t.car_id as car_id, t.lap_ms as lap_ms, t.created_at as created_at from traces t join users u on u.id = t.user_id where t.track_id = ? and t.wet = ? order by t.lap_ms limit 100',
+      q.track ?? '',
+      q.wet === '1' ? 1 : 0,
+    ).map((r) => ({ userId: r.user_id, nick: r.nick, carId: r.car_id, lapMs: r.lap_ms, at: r.created_at }));
+  }
+
+  /** One lap's telemetry (public). */
+  private telemetry(q: Record<string, string>): {
+    userId: string;
+    nick: string;
+    carId: string;
+    lapMs: number;
+    sectors: number[];
+    bin: number;
+    data: string;
+    at: number;
+  } {
+    const r = this.rows<{ user_id: string; nick: string; car_id: string; lap_ms: number; sectors: string; data: string; created_at: number }>(
+      'select t.user_id as user_id, u.nick as nick, t.car_id as car_id, t.lap_ms as lap_ms, t.sectors as sectors, t.data as data, t.created_at as created_at from traces t join users u on u.id = t.user_id where t.track_id = ? and t.wet = ? and t.user_id = ?',
+      q.track ?? '',
+      q.wet === '1' ? 1 : 0,
+      q.user ?? '',
+    )[0];
+    if (!r) throw new HttpError(404, 'No telemetry for that lap.');
+    const [bin, data] = r.data.split(':');
+    return {
+      userId: r.user_id,
+      nick: r.nick,
+      carId: r.car_id,
+      lapMs: r.lap_ms,
+      sectors: r.sectors ? r.sectors.split(',').map(Number) : [],
+      bin: Number(bin),
+      data,
+      at: r.created_at,
+    };
   }
 
   /** The signed-in user of a token (null: not signed in or unknown). */
@@ -356,6 +470,7 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       this.sql.exec('delete from friends where user_id = ?1 or friend_id = ?1', me.id);
       this.sql.exec('delete from laps where user_id = ?', me.id);
       this.sql.exec('delete from results where user_id = ?', me.id);
+      this.sql.exec('delete from traces where user_id = ?', me.id);
       this.sql.exec('delete from users where id = ?', me.id);
     });
   }
