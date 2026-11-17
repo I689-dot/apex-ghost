@@ -1,4 +1,4 @@
-/* global document, location, setInterval, history */
+/* global document, location, setInterval, history, window, requestAnimationFrame, IntersectionObserver */
 // GridCorsa website: the small things a static page needs.
 (() => {
   // invite links from before the game moved to /play/ (…/?join=CODE): into the game with the code
@@ -235,4 +235,156 @@
       document.body.append(box);
     });
   }
+})();
+
+/*
+ * Scroll motion: quiet and tied to the scroll, after the motorsport and automotive sites (Porsche Motorsport, the
+ * pinned and parallax patterns of their sections). Reveals as things enter the view (IntersectionObserver), a
+ * parallax layer behind photos, the cars running sideways while their section is pinned, a story whose photo
+ * changes with the step being read, counters, outlines drawing themselves, a header that steps aside when reading
+ * down and comes back when scrolling up, and a hairline of progress. Nothing moves with prefers-reduced-motion.
+ */
+(() => {
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const body = document.body;
+  const progress = document.querySelector('.progress');
+
+  // reveals, staggered among siblings
+  for (const el of document.querySelectorAll('.rv, .rv-img')) {
+    const sibs = [...el.parentElement.children].filter((c) => c.classList.contains('rv') || c.classList.contains('rv-img'));
+    el.style.setProperty('--d', String(Math.min(6, sibs.indexOf(el))));
+  }
+  for (const svg of document.querySelectorAll('.draw .outline path')) {
+    try {
+      svg.style.setProperty('--len', String(Math.ceil(svg.getTotalLength())));
+    } catch {
+      /* not drawn yet */
+    }
+  }
+  const counters = [...document.querySelectorAll('[data-count]')];
+  const count = (el) => {
+    const end = Number(el.dataset.count);
+    if (still || !end) return;
+    const t0 = performance.now();
+    const dur = 1600;
+    const tick = (now) => {
+      const f = Math.min(1, (now - t0) / dur);
+      el.textContent = String(Math.round(end * (1 - Math.pow(1 - f, 3))));
+      if (f < 1) requestAnimationFrame(tick);
+    };
+    el.textContent = '0';
+    requestAnimationFrame(tick);
+  };
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.classList.add('in');
+        for (const c of e.target.querySelectorAll('[data-count]')) count(c);
+        io.unobserve(e.target);
+      }
+    },
+    { rootMargin: '0px 0px -10% 0px', threshold: 0.12 },
+  );
+  for (const el of document.querySelectorAll('.rv, .rv-img, .draw, .bars')) io.observe(el);
+  if (still) for (const el of document.querySelectorAll('.rv, .rv-img, .draw, .bars')) el.classList.add('in');
+  void counters;
+
+  // the story: the step in the middle of the screen sets the photo
+  const story = document.querySelector('[data-story]');
+  if (story) {
+    const figs = [...story.querySelectorAll('.story-media figure')];
+    const steps = [...story.querySelectorAll('.story-step')];
+    const sio = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const i = Number(e.target.dataset.i);
+          steps.forEach((s, k) => s.classList.toggle('on', k === i));
+          figs.forEach((f, k) => f.classList.toggle('on', k === i));
+        }
+      },
+      { rootMargin: '-45% 0px -45% 0px' },
+    );
+    for (const s of steps) sio.observe(s);
+  }
+
+  // the table of contents follows the section being read
+  const toc = document.querySelector('.toc');
+  if (toc) {
+    const links = [...toc.querySelectorAll('a[href^="#"]')];
+    const tio = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) for (const a of links) a.classList.toggle('on', a.getAttribute('href') === `#${e.target.id}`);
+      },
+      { rootMargin: '-20% 0px -70% 0px' },
+    );
+    for (const a of links) {
+      const h = document.getElementById(a.getAttribute('href').slice(1));
+      if (h) tio.observe(h);
+    }
+  }
+
+  // pinned horizontal run: the section is as tall as the track is wide; scrolling down moves the cars sideways
+  const hs = document.querySelector('[data-hscroll]');
+  const wide = () => window.innerWidth > 1000 && !still;
+  let hsSpan = 0;
+  const hsLayout = () => {
+    if (!hs) return;
+    const track = hs.querySelector('.hscroll-track');
+    if (!wide()) {
+      hs.style.height = '';
+      track.style.transform = '';
+      hs.classList.add('flat');
+      return;
+    }
+    hs.classList.remove('flat');
+    hsSpan = Math.max(0, track.scrollWidth - window.innerWidth + 80);
+    hs.style.height = `${window.innerHeight + hsSpan}px`;
+  };
+
+  // parallax layers
+  const layers = still ? [] : [...document.querySelectorAll('[data-parallax]')];
+  let lastY = window.scrollY;
+  let ticking = false;
+  const frame = () => {
+    ticking = false;
+    const y = window.scrollY;
+    const vh = window.innerHeight;
+    body.classList.toggle('scrolled', y > 40);
+    if (y > 500 && y > lastY + 6) body.classList.add('head-hidden');
+    else if (y < lastY - 6 || y < 200) body.classList.remove('head-hidden');
+    lastY = y;
+    if (progress) progress.style.transform = `scaleX(${Math.min(1, y / Math.max(1, document.documentElement.scrollHeight - vh))})`;
+    for (const el of layers) {
+      const r = (el.parentElement || el).getBoundingClientRect();
+      if (r.bottom < -100 || r.top > vh + 100) continue;
+      const k = Number(el.dataset.parallax) || 0.1;
+      el.style.translate = `0 ${((r.top + r.height / 2 - vh / 2) * k).toFixed(1)}px`;
+    }
+    if (hs && wide()) {
+      const r = hs.getBoundingClientRect();
+      const f = Math.min(1, Math.max(0, -r.top / Math.max(1, r.height - vh)));
+      hs.querySelector('.hscroll-track').style.transform = `translate3d(${(-f * hsSpan).toFixed(1)}px,0,0)`;
+      const bar = hs.querySelector('.hscroll-bar i');
+      if (bar) bar.style.transform = `scaleX(${f})`;
+    }
+  };
+  const onScroll = () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(frame);
+    }
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', () => {
+    hsLayout();
+    onScroll();
+  });
+  window.addEventListener('load', () => {
+    hsLayout();
+    onScroll();
+  });
+  hsLayout();
+  frame();
 })();

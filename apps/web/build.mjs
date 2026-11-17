@@ -266,7 +266,30 @@ const NAV = [
   },
 ];
 
+/** Scroll motion hooks (site.js): reveals on headings, cards, steps and rows; the feature and circuit photos as
+ * parallax layers that wipe in; circuit outlines that draw themselves. */
+function motion(html) {
+  return html
+    .replace(
+      /<div class="feat-img" style="--img:url\('([^']+)'\)"><\/div>/g,
+      '<div class="feat-img rv-img"><i data-parallax="0.1" style="--img:url(\'$1\')"></i></div>',
+    )
+    .replace(
+      /<a class="trk" href="([^"]+)" style="--img:url\('([^']+)'\)">/g,
+      '<a class="trk rv draw" href="$1"><i data-parallax="0.06" style="--img:url(\'$2\')"></i>',
+    )
+    .replace(/class="sec-head"/g, 'class="sec-head rv"')
+    .replace(/class="card"/g, 'class="card rv"')
+    .replace(/class="step"/g, 'class="step rv"')
+    .replace(/class="stats"/g, 'class="stats rv"')
+    .replace(/class="callout"/g, 'class="callout rv"')
+    .replace(/<details class="faq">/g, '<details class="faq rv">')
+    .replace(/<div><span class="eyebrow">/g, '<div class="rv"><span class="eyebrow">')
+    .replace(/<div class="bars">/g, '<div class="bars rv">');
+}
+
 function page({ file, title, desc, body, active = '' }) {
+  body = motion(body);
   const nav = NAV.map(
     (n) =>
       `<li class="${n.label === active ? 'on' : ''}"><a href="${n.href}">${esc(n.label)}</a>${
@@ -287,10 +310,12 @@ function page({ file, title, desc, body, active = '' }) {
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23070b16'/%3E%3Cpath d='M8 23 L15 9 h9 l-7 14z' fill='%23e3183d'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,300..800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<script>document.documentElement.classList.add('js')</script>
 <link rel="stylesheet" href="/site/site.css" />
 </head>
-<body>
+<body class="over-hero">
+<div class="progress" aria-hidden="true"></div>
 <a class="skip" href="#main">Skip to content</a>
 <header class="site-head">
   <div class="util"><div class="wrap"><span>Free GT3 sim racing in your browser · no download</span><nav><a href="/live">Live sessions</a><a href="/leaderboards">Leaderboards</a><a href="/faq">Support</a><a href="/play/">Sign up</a><a href="/play/">Log in</a></nav></div></div>
@@ -334,14 +359,18 @@ ${body}
 
 const hero = ({ img, eyebrow, title, lead, ctas = '', badges = [], short = false }) => `
 <section class="hero${short ? ' short' : ''}">
-  <div class="hero-img" style="--img:url('${img}')"></div>
-  <div class="wrap hero-in">
+  <div class="hero-img" data-parallax="-0.25" style="--img:url('${img}')"></div>
+  <div class="hero-in">
     ${eyebrow ? `<span class="eyebrow">${esc(eyebrow)}</span>` : ''}
-    <h1>${title}</h1>
+    <h1>${String(title)
+      .split(' | ')
+      .map((l, i) => `<span class="line" style="--i:${i}"><span>${l}</span></span>`)
+      .join('')}</h1>
     ${lead ? `<p class="lead">${lead}</p>` : ''}
     ${ctas ? `<div class="cta-row">${ctas}</div>` : ''}
     ${badges.length ? `<div class="badges">${badges.map((b) => `<span>${esc(b)}</span>`).join('')}</div>` : ''}
   </div>
+  ${short ? '' : '<div class="scroll-cue" aria-hidden="true"><i></i>Scroll</div>'}
 </section>`;
 const playBtn = (label = 'Play free now') => `<a class="btn btn-play" href="/play/">${ICON.play} ${esc(label)}</a>`;
 const btn = (href, label, cls = 'btn-ghost') => `<a class="btn ${cls}" href="${href}">${esc(label)} ${ICON.arrow}</a>`;
@@ -423,33 +452,89 @@ const NEWS = [
 
 const makes = [...new Set(cars.map((c) => c.manufacturer))].sort();
 // HOME
+const STORY = [
+  [
+    'Online racing',
+    'Race your friends, anywhere',
+    'Open a room and share its code or an invite link, jump into a public lobby with Quick Match, or host a race on your own device for friends on the same Wi-Fi. Practice, qualifying and the race, with up to twelve drivers.',
+    '/online',
+    photo('grid', 'zandvoort'),
+  ],
+  [
+    'Licences & ratings',
+    'Earn your licence',
+    'Every clean corner counts. Your Safety Rating rises as you drive cleanly and falls with every incident, and lifts you from Rookie to the Pro licence. Levels, experience and achievements track the rest of your career.',
+    '/licences',
+    photo('pole', 'spa'),
+  ],
+  [
+    'Weather & time of day',
+    'Dawn to night, sun to rain',
+    'Six kinds of weather and the full day, with forecasts that can change during a session. A drying line, tyres that need the right temperature, and wets when the rain comes.',
+    '/weather',
+    photo('straight', 'zandvoort'),
+  ],
+  [
+    'Strategy',
+    'Pit stops, fuel and race control',
+    'A pit crew that changes your tyres and fills the tank, mandatory stops as in GT World Challenge, yellow flags, the safety car and drive-through penalties. Turn on what you want for each race.',
+    '/sporting-code',
+    photo('grid', 'spa'),
+  ],
+  [
+    'AI drivers',
+    'Bots that race you fairly',
+    'Choose their level from Rookie to Alien. They leave you room side by side, brake for you in time and make clean passes, so racing them feels like racing people.',
+    '/ai-racing',
+    photo('hero', 'zandvoort'),
+  ],
+];
 page({
   file: 'index.html',
   title: 'GridCorsa · GT3 sim racing in your browser',
   desc: 'Race 20 real GT3 cars at Spa, the Nürburgring and Zandvoort, free in your browser. Online with friends or against the AI, with real physics, weather, pit stops and race control.',
   body: `
-<a class="promo" href="/telemetry"><span class="tag red">New</span> Telemetry: compare your best lap with the fastest drivers, metre by metre <b>→</b></a>
+<a class="promo" href="/telemetry"><span class="tag red">New</span> Telemetry: compare your best lap with the fastest drivers <b>→</b></a>
 ${hero({
   img: photo('hero', 'spa'),
   eyebrow: 'GT3 sim racing · free in your browser',
-  title: 'The grid is waiting',
+  title: 'The grid | is waiting',
   lead: 'Twenty real GT3 cars, three legendary circuits, real physics. Race your friends online or the AI on your own, with nothing to download: open it and drive.',
   ctas: `${playBtn()}${btn('/features', 'Explore the game')}`,
   badges: ['Free to play', 'No download', `${cars.length} GT3 cars`, `${layouts.length} layouts`, 'Up to 12 drivers'],
 })}
 <section class="sec">
   <div class="wrap">
+    <div class="sec-head"><div><span class="eyebrow">The simulation</span><h2>Real cars. Real circuits. Real racing.</h2><p>Built like a sim, played in a browser: tyres, aerodynamics and damage modelled from the real cars, and the rules of a real GT race weekend.</p></div></div>
     <div class="stats">
-      <div><b>${cars.length}</b><span>GT3 race cars</span></div>
-      <div><b>${CIRCUITS.length}</b><span>Circuits · ${layouts.length} layouts</span></div>
-      <div><b>12</b><span>Drivers per race</span></div>
-      <div><b>0</b><span>Downloads needed</span></div>
+      <div><b data-count="${cars.length}">${cars.length}</b><span>GT3 race cars</span></div>
+      <div><b data-count="${layouts.length}">${layouts.length}</b><span>Layouts on ${CIRCUITS.length} circuits</span></div>
+      <div><b data-count="120">120</b><span>Physics steps a second</span></div>
+      <div><b data-count="12">12</b><span>Drivers per race</span></div>
     </div>
   </div>
 </section>
-<section class="sec alt">
+<section class="hscroll" data-hscroll>
+  <div class="hscroll-sticky">
+    <div class="wrap">
+      <div class="sec-head"><div><span class="eyebrow">The cars</span><h2>Drive ${cars.length} of today’s GT3 racers</h2></div><div class="actions">${btn('/cars', 'All cars', 'btn-light')}</div></div>
+    </div>
+    <div class="hscroll-track">${cars.map(carCard).join('')}</div>
+    <div class="hscroll-bar"><i></i></div>
+  </div>
+</section>
+<section class="sec">
+  <div class="wrap story" data-story>
+    <div class="story-media">${STORY.map(([k, , , , img], i) => `<figure class="${i ? '' : 'on'}" style="--img:url('${img}')"><figcaption>${String(i + 1).padStart(2, '0')} · ${esc(k)}</figcaption></figure>`).join('')}</div>
+    <div class="story-steps">${STORY.map(
+      ([k, h, x, href], i) =>
+        `<div class="story-step${i ? '' : ' on'}" data-i="${i}"><span class="n">${String(i + 1).padStart(2, '0')} / ${String(STORY.length).padStart(2, '0')} · ${esc(k)}</span><h3>${esc(h)}</h3><p>${esc(x)}</p><p><a class="link-more" href="${href}">Learn more</a></p></div>`,
+    ).join('')}</div>
+  </div>
+</section>
+<section class="sec paper">
   <div class="wrap">
-    <div class="sec-head"><div><span class="eyebrow">Latest news</span><h2>What’s new</h2></div><a class="link-more" href="/news">All news →</a></div>
+    <div class="sec-head"><div><span class="eyebrow">Latest news</span><h2>What’s new</h2></div><a class="link-more" href="/news">All news</a></div>
     <div class="grid g3">${NEWS.slice(0, 3)
       .map(
         (n) =>
@@ -460,35 +545,11 @@ ${hero({
 </section>
 <section class="sec">
   <div class="wrap">
-    <div class="sec-head"><div><span class="eyebrow">The cars</span><h2>Drive ${cars.length} of today’s GT3 racers</h2><p>Porsche, Ferrari, Lamborghini, McLaren, BMW, Mercedes-AMG, Aston Martin, Audi, Ford, Chevrolet and Lexus: the cars that fight for the Spa 24 Hours, each with its own power, weight, gearbox and character.</p></div><div class="actions">${btn('/cars', 'All cars', 'btn-light')}</div></div>
-    <div class="strip">${cars.map(carCard).join('')}</div>
+    <div class="sec-head"><div><span class="eyebrow">The circuits</span><h2>Race the legends</h2><p>Spa-Francorchamps, the Nürburgring with its Nordschleife, and Zandvoort in the dunes.</p></div><div class="actions">${btn('/tracks', 'All circuits', 'btn-light')}</div></div>
+    <div class="grid g3">${CIRCUITS.map(circuitCard).join('')}</div>
   </div>
 </section>
 <section class="sec alt">
-  <div class="wrap">
-    <div class="feat">
-      <div class="feat-img" style="--img:url('${photo('grid', 'zandvoort')}')"></div>
-      <div><span class="eyebrow">Online racing</span><h3>Race your friends, anywhere</h3><p>Open a room and share its code or an invite link, jump into a public lobby with Quick Match, or host a race on your own device for friends on the same Wi-Fi. Practice, qualifying and the race, with up to twelve drivers.</p>${btn('/online', 'Online racing')}</div>
-    </div>
-    <div class="feat flip">
-      <div class="feat-img" style="--img:url('${photo('pole', 'spa')}')"></div>
-      <div><span class="eyebrow">Licences & ratings</span><h3>Earn your licence</h3><p>Every clean corner counts. Your Safety Rating rises as you drive cleanly and falls with every incident, and lifts you from Rookie to the Pro licence. Levels, experience and achievements track the rest of your career.</p>${btn('/licences', 'Licences & ratings')}</div>
-    </div>
-    <div class="feat">
-      <div class="feat-img" style="--img:url('${photo('straight', 'zandvoort')}')"></div>
-      <div><span class="eyebrow">Weather & time of day</span><h3>Dawn to night, sun to rain</h3><p>Six kinds of weather and the full day, with forecasts that can change during a session. A drying line, tyres that need the right temperature, and wets when the rain comes.</p>${btn('/features#weather', 'Weather & tyres')}</div>
-    </div>
-    <div class="feat flip">
-      <div class="feat-img" style="--img:url('${photo('grid', 'spa')}')"></div>
-      <div><span class="eyebrow">Strategy</span><h3>Pit stops, fuel and race control</h3><p>A pit crew that changes your tyres and fills the tank, mandatory stops as in GT World Challenge, yellow flags, the safety car and drive-through penalties. Turn on what you want for each race.</p>${btn('/features#strategy', 'Strategy')}</div>
-    </div>
-    <div class="feat">
-      <div class="feat-img" style="--img:url('${photo('hero', 'zandvoort')}')"></div>
-      <div><span class="eyebrow">AI drivers</span><h3>Bots that race you fairly</h3><p>Choose their level from Rookie to Alien. They leave you room side by side, brake for you in time and make clean passes, so racing them feels like racing people.</p>${btn('/features#ai', 'Bot levels')}</div>
-    </div>
-  </div>
-</section>
-<section class="sec">
   <div class="wrap">
     <div class="sec-head"><div><span class="eyebrow">Live</span><h2>The paddock, live</h2><p>Who is racing now, who is fastest, and how they do it.</p></div></div>
     <div class="grid g3">
@@ -498,37 +559,22 @@ ${hero({
     </div>
   </div>
 </section>
-<section class="sec alt">
+<section class="sec paper">
   <div class="wrap">
-    <div class="sec-head"><div><span class="eyebrow">Free</span><h2>The racing game that stays free</h2><p>No subscription, no content to buy, no adverts.</p></div><div class="actions">${btn('/account', 'What comes with an account', 'btn-light')}</div></div>
+    <div class="sec-head"><div><span class="eyebrow">New to sim racing?</span><h2>Start in three steps</h2><p>No subscription, no content to buy, no adverts. Racing the AI needs no account at all.</p></div><div class="actions">${btn('/account', 'What comes with an account', 'btn-ghost')}</div></div>
     <div class="grid g3">
-      <div class="step"><h3>Updates all the time</h3><p>New features and fixes, often weekly. See the <a href="/builds">release notes</a>.</p></div>
-      <div class="step"><h3>Your career, kept</h3><p>Licence, Safety Rating, levels, achievements, results and records.</p></div>
-      <div class="step"><h3>Race on your terms</h3><p>Solo, with friends or in public rooms, with the rules and the AI level you choose.</p></div>
+      <div class="step"><div class="n">01</div><h3>Your computer</h3><p>A recent browser with WebGL 2 is all it takes. A graphics card makes it shine.</p><a class="link-more" href="/getting-started#requirements">System requirements</a></div>
+      <div class="step"><div class="n">02</div><h3>Keyboard, controller or wheel</h3><p>Drive with the keyboard, an Xbox or PlayStation controller, or a steering wheel with its real lock.</p><a class="link-more" href="/wheels-controllers">Wheels & controllers</a></div>
+      <div class="step"><div class="n">03</div><h3>Pick a car and race</h3><p>Choose your nickname and your car in the garage, then race solo or join your friends.</p><a class="link-more" href="/play/">Play now</a></div>
     </div>
   </div>
 </section>
-<section class="sec">
-  <div class="wrap">
-    <div class="sec-head"><div><span class="eyebrow">The circuits</span><h2>Race the legends</h2><p>Spa-Francorchamps, the Nürburgring with its Nordschleife, and Zandvoort in the dunes.</p></div><div class="actions">${btn('/tracks', 'All circuits', 'btn-light')}</div></div>
-    <div class="grid g3">${CIRCUITS.map(circuitCard).join('')}</div>
-  </div>
-</section>
-<section class="sec alt">
-  <div class="wrap">
-    <div class="sec-head"><div><span class="eyebrow">New to sim racing?</span><h2>Start in three steps</h2></div></div>
-    <div class="grid g3">
-      <div class="step"><div class="n">01</div><h3>Your computer</h3><p>A recent browser with WebGL 2 is all it takes. A graphics card makes it shine.</p><a class="link-more" href="/getting-started#requirements">System requirements →</a></div>
-      <div class="step"><div class="n">02</div><h3>Keyboard, controller or wheel</h3><p>Drive with the keyboard, an Xbox or PlayStation controller, or a steering wheel with its real lock.</p><a class="link-more" href="/getting-started#controls">Controls →</a></div>
-      <div class="step"><div class="n">03</div><h3>Pick a car and race</h3><p>Choose your nickname and your car in the garage, then race solo or join your friends.</p><a class="link-more" href="/play/">Play now →</a></div>
-    </div>
-  </div>
-</section>
-<section class="sec makes-band">
-  <div class="wrap"><span class="eyebrow">On the grid</span><div class="makes">${makes.map((m) => `<a href="/cars#${slug(m)}">${esc(m)}</a>`).join('')}</div></div>
+<section class="makes-band">
+  <div class="wrap"><span class="eyebrow">On the grid</span></div>
+  <div class="makes">${[...makes, ...makes].map((m) => `<a href="/cars#${slug(m)}">${esc(m)}</a>`).join('')}</div>
 </section>
 <section class="band">
-  <div class="wrap"><div><h2>Free. In your browser. Right now.</h2><p>No download, no account needed to race the AI.</p></div><div class="cta-row">${playBtn('Start racing')}</div></div>
+  <div class="wrap"><div class="rv"><h2>Free. In your browser. Right now.</h2><p>No download, no account needed to race the AI.</p></div><div class="cta-row rv">${playBtn('Start racing')}</div></div>
 </section>`,
 });
 
@@ -645,10 +691,10 @@ ${hero({ img: photo('hero', c.photoMap), eyebrow: `${c.country} · ${c.place}`, 
 <section class="sec">
   <div class="wrap">
     <h2>Layouts</h2>
-    <div class="grid g${Math.min(3, c.layouts.length)}">${c.layouts
+    <div class="grid g3">${c.layouts
       .map(
         (l) =>
-          `<div class="card"><div class="card-img" style="display:grid;place-items:center;padding:20px;background:#0e1528">${l.svg.replace('class="outline"', 'class="outline" style="width:70%;height:100%"')}</div><div class="card-body"><h3>${esc(l.name)}</h3><div class="meta"><span class="tag red">${(l.length / 1000).toFixed(2)} km</span>${l.turns ? `<span class="tag">${l.turns} turns</span>` : ''}${l.default ? '<span class="tag gt3">Main layout</span>' : ''}</div></div></div>`,
+          `<div class="card"><div class="card-img" style="display:grid;place-items:center;padding:26px;background:var(--ink-3)">${l.svg.replace('class="outline"', 'class="outline" style="width:62%;height:100%"')}</div><div class="card-body"><h3>${esc(l.name)}</h3><div class="meta"><span class="tag red">${(l.length / 1000).toFixed(2)} km</span>${l.turns ? `<span class="tag">${l.turns} turns</span>` : ''}${l.default ? '<span class="tag gt3">Main layout</span>' : ''}</div></div></div>`,
       )
       .join('')}</div>
     <div class="grid g2" style="margin-top:56px;gap:40px">
@@ -706,7 +752,7 @@ ${hero({ img: photo('straight', 'spa'), eyebrow: 'The game', title: 'Built like 
         ['Elite', '101%'],
         ['Alien', '105%'],
       ]
-        .map(([n, p], i) => `<div style="background:hsl(${210 - i * 38} 60% ${26 + i * 3}%)"><b>${p}</b><span>${n}</span></div>`)
+        .map(([n, p], i) => `<div style="--lc:hsl(${210 - i * 38} 70% 52%)"><b>${p}</b><span>${n}</span></div>`)
         .join('')}</div>
       <h2 id="assists">Racing line & assists</h2>
       <p>The racing line is drawn as flat chevrons, as in the F1 games: green to go, yellow to lift, orange and red to brake, coloured from your speed so it turns red only when you arrive too fast. Show it everywhere, only in braking zones, or not at all. ABS, traction control (two levels), stability control and an automatic or manual gearbox are yours to choose.</p>
@@ -770,9 +816,9 @@ ${hero({ img: photo('pole', 'spa'), eyebrow: 'Your career', title: 'Licences & r
       ['C', 'Class C', '#c9a40f'],
       ['B', 'Class B', '#2f9e44'],
       ['A', 'Class A', '#2f7de1'],
-      ['P', 'Pro', '#1b1d22'],
+      ['P', 'Pro', '#d9d9d9'],
     ]
-      .map(([l, n, col]) => `<div style="background:${col}"><b>${l}</b><span>${n}</span></div>`)
+      .map(([l, n, col]) => `<div style="--lc:${col}"><b>${l}</b><span>${n}</span></div>`)
       .join('')}</div>
     <h2>Safety Rating</h2>
     <p>Your Safety Rating starts at 2.50 in Rookie. It moves with the corners you drive for each incident point, the way iRacing measures it: around a hundred corners for each point keeps it level, cleaner driving raises it, more incidents lower it.</p>
@@ -886,7 +932,7 @@ ${hero({ img: photo('pole', 'zandvoort'), eyebrow: 'Media', title: 'Screenshots'
   <div class="wrap">
     <div class="gallery">${shots.map(([src, name]) => `<a href="${src}" aria-label="${esc(name)}" style="background-image:url('${src}')"></a>`).join('')}</div>
     <h2 style="margin-top:56px">The cars</h2>
-    <div class="gallery">${cars.map((c) => `<a href="${carImg(c.id)}" aria-label="${esc(c.name)}" style="background-image:url('${carImg(c.id)}');background-size:contain;background-color:#0e1528"></a>`).join('')}</div>
+    <div class="gallery">${cars.map((c) => `<a href="${carImg(c.id)}" aria-label="${esc(c.name)}" style="background-image:url('${carImg(c.id)}');background-size:contain;background-color:var(--ink-3)"></a>`).join('')}</div>
   </div>
 </section>`,
 });
@@ -1218,7 +1264,7 @@ sub(
     ['101%', 'Elite'],
     ['105%', 'Alien'],
   ]
-    .map(([p, n], i) => `<div style="background:hsl(${210 - i * 38} 60% ${26 + i * 3}%)"><b>${p}</b><span>${n}</span></div>`)
+    .map(([p, n], i) => `<div style="--lc:hsl(${210 - i * 38} 70% 52%)"><b>${p}</b><span>${n}</span></div>`)
     .join('')}</div>
   <h2>Racecraft</h2>
   <ul>
