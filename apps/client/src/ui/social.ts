@@ -81,7 +81,7 @@ export function signInModal(onDone: () => void, mode: 'login' | 'register' = 'lo
     h(
       'header.auth-head',
       {},
-      h('div', {}, h('span.auth-kicker', { text: 'APEX GHOST' }), h('h2', { text: t('Your account') })),
+      h('div', {}, h('span.auth-kicker', { text: 'GRIDCORSA' }), h('h2', { text: t('Your account') })),
       h('button.auth-close', { type: 'button', html: ICONS.close, title: t('Close'), 'aria-label': t('Close'), onclick: close }),
     ),
     h('div.auth-tabs', {}, tabLogin, tabRegister),

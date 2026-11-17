@@ -641,8 +641,8 @@ const ES: Record<string, string> = {
   'Timing screen (hold)': 'Pantalla de tiempos (mantener)',
   'Pause menu': 'Menú de pausa',
   // mobile app, install page
-  'The website is made for a keyboard. On your phone, race with the APEX GHOST app: touch or tilt steering, the same rooms as your friends.':
-    'La web está pensada para teclado. En el móvil, corre con la app de APEX GHOST: dirección táctil o por inclinación, las mismas salas que tus amigos.',
+  'The website is made for a keyboard. On your phone, race with the GRIDCORSA app: touch or tilt steering, the same rooms as your friends.':
+    'La web está pensada para teclado. En el móvil, corre con la app de GRIDCORSA: dirección táctil o por inclinación, las mismas salas que tus amigos.',
   'Install the app': 'Instalar la app',
   'Frame rate': 'Frecuencia de imagen',
   'Planting the forest': 'Plantando el bosque',
@@ -660,8 +660,8 @@ const ES: Record<string, string> = {
   'Tip: follow another car closely to use its slipstream.': 'Consejo: sigue de cerca a otro coche para aprovechar su rebufo.',
   'Tip: Settings → Quality changes how the world looks.': 'Consejo: Ajustes → Calidad cambia cómo se ve el mundo.',
   'Try the beta': 'Probar la beta',
-  'The newest changes before everyone else. Installs next to the normal app as “APEX GHOST Beta”.':
-    'Las últimas novedades antes que nadie. Se instala junto a la app normal como «APEX GHOST Beta».',
+  'The newest changes before everyone else. Installs next to the normal app as “GRIDCORSA Beta”.':
+    'Las últimas novedades antes que nadie. Se instala junto a la app normal como «GRIDCORSA Beta».',
   '90 / 120 / 144 Hz on phones that have it: smoother, uses more battery': '90 / 120 / 144 Hz en los móviles que lo tienen: más fluido, gasta más batería',
   'Android 7 or newer · APK': 'Android 7 o posterior · APK',
   'After the download, open the file and allow your browser to install apps when Android asks.':
@@ -670,7 +670,7 @@ const ES: Record<string, string> = {
     'iPhone y iPad: la app de iOS aún no está disponible. Mientras tanto, juega en un ordenador.',
   'iPhone and iPad: the iOS app is not available yet.': 'iPhone y iPad: la app de iOS aún no está disponible.',
   'Get the mobile app': 'App para móvil',
-  'APEX GHOST on your phone': 'APEX GHOST en tu móvil',
+  'GRIDCORSA on your phone': 'GRIDCORSA en tu móvil',
   'Scan the code with your Android phone, or open this website on it and tap “Install the app”.':
     'Escanea el código con tu Android, o abre esta web en él y toca «Instalar la app».',
   'Download the APK': 'Descargar el APK',

@@ -693,7 +693,7 @@ export class App {
         h(
           'header.mm-top',
           {},
-          h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
+          h('div.logo', {}, h('span', { text: 'GRID' }), h('b', { text: 'CORSA' })),
           tabs,
           profile,
           h('button.mm-gear', { type: 'button', html: ICONS.gear, title: t('Settings'), 'aria-label': t('Settings'), onclick: () => this.openSettings() }),
@@ -2192,7 +2192,7 @@ export class App {
         h(
           'div.ld-brand',
           {},
-          h('div.logo.small', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
+          h('div.logo.small', {}, h('span', { text: 'GRID' }), h('b', { text: 'CORSA' })),
           h('span.ld-slashes', {}, h('i'), h('i'), h('i')),
         ),
       ),

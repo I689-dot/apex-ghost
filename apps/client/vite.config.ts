@@ -25,7 +25,9 @@ function appPublicFiles(outDir: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const app = mode === 'app';
-  const outDir = app ? 'dist/app' : 'dist/apex-ghost'; // the website folder name becomes the Vercel project name on first deploy
+  // the website (apps/web) fills dist/apex-ghost and the game sits under it at /play/ (the folder name became the
+  // Vercel project's name on its first deploy)
+  const outDir = app ? 'dist/app' : 'dist/apex-ghost/play';
   return {
     base: './',
     server: { port: 5173 },
