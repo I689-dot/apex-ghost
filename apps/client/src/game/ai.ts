@@ -567,8 +567,9 @@ export class AiDriver {
       // front wheels where the car is going (counter-steer), quickly. Following the line through a wet
       // chicane kept the fronts loaded at their limit while the rear swung round (a spin per lap).
       const betaR = Math.atan2(vL - 0.5 * v.wheelbase * yawRate, vF);
-      slide = clamp((Math.abs(betaR) - v.tire.p.alphaPeak) / v.tire.p.alphaPeak, 0, 1);
-      const lim = 0.9 * v.tire.p.alphaPeak * (1 - 0.85 * slide);
+      const apR = v.peakSlip(false);
+      slide = clamp((Math.abs(betaR) - apR) / apR, 0, 1);
+      const lim = 0.9 * v.peakSlip(true) * (1 - 0.85 * slide);
       steerAngle = clamp(steerAngle, betaF - lim, betaF + lim);
     }
     const target = clamp(steerAngle / v.maxSteer, -1, 1);
@@ -598,7 +599,7 @@ export class AiDriver {
       // the rear out into a spin. Like a driver, back out of it as the rear axle's slip angle passes the tyre's peak.
       if (vF > 3) {
         const betaR = Math.abs(Math.atan2(vL - 0.5 * v.wheelbase * yawRate, vF));
-        const a = v.tire.p.alphaPeak;
+        const a = v.peakSlip(false);
         thr *= clamp(1 - (betaR - 0.6 * a) / (0.5 * a), 0, 1);
       }
       // and squeeze the throttle on instead of stamping on it

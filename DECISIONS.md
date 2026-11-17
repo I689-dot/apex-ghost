@@ -1451,3 +1451,26 @@ From the user's list (DECISIONS: the rest follows):
   Coca-Cola, TOTAL, Uniroyal, DHL, ALD, Classic 21, Silverstone, Assetto Corsa, alpinestars; MyLAPS, ADVAN, Kumho,
   Hörmann, McGregor, Formido...). Circuits' own names and signs stay. The menu photos are shot again in this game
   (brand-free cars and boards).
+
+## Physics pass, 2026-11-17: unsprung mass, tyre enveloping, anti-geometry, load-dependent peak slip
+
+What the sims model and the web car did not (researched: Jolt's VehicleConstraint / WheeledVehicleController, the
+Godot driving projects AdvancedVehicle and VitaVehicle, kerb-impact and tyre-model papers):
+
+- **Unsprung mass and the tyre's spring** (`CHASSIS.unsprungKg` 45 kg a corner, `tyreRateN` 300 kN/m, `tyreDampNs`):
+  each wheel is a mass between the suspension spring and the tyre, integrated in 4 sub-steps a physics step. The
+  tyre's load is what its spring carries, so over bumps and kerbs it rises and falls with the wheel (wheel hop). The
+  body keeps the whole car's mass (a body of only the sprung mass accelerated, braked and cornered ~12 % harder); the
+  wheels' mass only adds inertia to their vertical motion. The road's push across the suspension axis goes through the
+  links (straight to the body), the spring's along it.
+- **Tyre enveloping:** the road is sampled under the tyre at ±9 and ±18 cm and the wheel rolls over it as a ring of
+  its radius, so a kerb's edge is a rounded rise, not a step in one point.
+- **Anti-dive 30 %, anti-lift 15 %, anti-squat 40 %:** that share of the longitudinal force goes into the body at the
+  centre of mass's height. `tools/sim/platform.ts`: nose dive from 200 km/h 1.17 → 0.80°, squat 0.32 → 0.19°.
+- **Peak slip later under load** (the Godot port's tyre, racing tyre data): peak slip angle × (Fz/Fz0)^0.25, slip ratio
+  × ^0.1; a more progressive slide (85 / 84 % past the peak). The AI and the keyboard filter use the axle's current
+  peak (`Vehicle.peakSlip`).
+
+Results: braking and cornering grip unchanged (200→0 km/h 85 m); trail-braking slide ~2.5° (was ~4–5°); Spa AI lap:
+no spins or resets, ride heave rms 1.33 → 1.17 m/s², worst jolt 14 → 8 m/s², ~1 s slower (the AI's speed plan still
+assumes the old peak; retune AI_GRIP if needed).

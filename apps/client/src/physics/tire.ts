@@ -19,7 +19,9 @@ export interface TireParams {
   loadSens: number;
 }
 
-export const SLICK: TireParams = { kappaPeak: 0.1, alphaPeak: 0.115, slideX: 0.82, slideY: 0.8, loadSens: 0.12 };
+/** A GT3 slick: past its peak the force falls ~15 % (a progressive slide, as the sims' newer tyre models and the
+ * Godot port), not 20 %. */
+export const SLICK: TireParams = { kappaPeak: 0.1, alphaPeak: 0.115, slideX: 0.85, slideY: 0.84, loadSens: 0.12 };
 
 /** C coefficient for a target slide fraction: sin(C·π/2) = slide (C between 1 and 2). */
 function cForSlide(slide: number): number {
@@ -63,8 +65,11 @@ export class TireModel {
       out[1] = 0;
       return;
     }
-    const sx = kappa / this.p.kappaPeak;
-    const sy = Math.tan(alpha) / Math.tan(this.p.alphaPeak);
+    // a loaded tyre's carcass deflects more before it slides: its peak slip comes later (cornering stiffness grows
+    // less than the load: racing tyre data, the peak angle rising with load), a light one peaks earlier
+    const r = Math.min(2.5, Math.max(0.3, fz / fz0));
+    const sx = kappa / (this.p.kappaPeak * Math.pow(r, 0.1));
+    const sy = Math.tan(alpha) / Math.tan(this.p.alphaPeak * Math.pow(r, 0.25));
     const sigma = Math.hypot(sx, sy);
     if (sigma < 1e-6) {
       out[0] = 0;
