@@ -6,7 +6,8 @@ render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_sc
 
 uniform vec3 base_color : source_color = vec3(0.78, 0.06, 0.18);
 uniform vec3 accent_color : source_color = vec3(0.95);
-// 0 plain, 1 twin stripes over the top, 2 two-tone (the lower part), 3 fade towards the rear, 4 side stripe, 5 hoop
+// 0 plain, 1 twin stripes over the top, 2 two-tone (the lower part), 3 fade towards the rear, 4 side stripe, 5 hoop,
+// 6 one wide centre stripe, 7 chevron (a V pointing forward), 8 pinstripes along the flanks, 9 split (the front part)
 uniform int design = 0;
 uniform float metallic_v = 0.0;
 uniform float roughness_v = 0.3;
@@ -28,6 +29,16 @@ uniform bool has_normal = false;
 uniform float normal_depth = 1.0;
 uniform vec4 dent_p[8];
 uniform vec4 dent_d[8];
+// the aero and lower trim in dark carbon, as on the real cars (the wing's whole mesh: trim_all), and how far up the
+// sills, splitter and diffuser count as trim (a share of the body's height; 0: none)
+uniform vec3 trim_color : source_color = vec3(0.035, 0.037, 0.04);
+uniform bool trim_all = false;
+// the trim painted (the second colour as paint) instead of carbon
+uniform bool trim_paint = false;
+uniform float trim_height = 0.11;
+// metallic flakes (a finish's sparkle under the clear coat): their strength and size (m)
+uniform float flakes = 0.0;
+uniform float flake_size = 0.0009;
 
 varying vec3 cpos;
 
@@ -83,8 +94,21 @@ void fragment() {
 	} else if (design == 5) {
 		// a hoop round the car behind the doors
 		a = band(zf, 0.3, 0.4);
+	} else if (design == 6) {
+		float x = ax / hw;
+		a = (1.0 - smoothstep(0.17 - fwidth(x), 0.17 + fwidth(x), x)) * step(0.15, cnrm.y);
+	} else if (design == 7) {
+		a = band(zf + ax / hw * 0.32, 0.7, 0.79);
+	} else if (design == 8) {
+		a = (band(yf, 0.4, 0.425) + band(yf, 0.455, 0.48)) * step(0.35, abs(cnrm.x));
+	} else if (design == 9) {
+		a = smoothstep(0.56 - fwidth(zf), 0.56 + fwidth(zf), zf);
 	}
 	c = mix(c, accent_color, a);
+	// carbon: the wing, and the lowest band of the body (sills, splitter, diffuser)
+	float trim = trim_all ? 1.0 : 1.0 - smoothstep(trim_height - 0.012, trim_height + 0.012, yf);
+	trim *= step(0.001, trim_height) + (trim_all ? 1.0 : 0.0);
+	trim = clamp(trim, 0.0, 1.0);
 	if (show_number) {
 		// on the doors (each side reads left to right), and on the bonnet (upright seen from the front)
 		float s = door_number.z;
@@ -110,11 +134,47 @@ void fragment() {
 		float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
 		c = mix(c, c.gbr * 0.6 + c * 0.6, fr * pearl);
 	}
-	ALBEDO = c;
-	METALLIC = metallic_v;
-	ROUGHNESS = roughness_v;
-	CLEARCOAT = clearcoat_v;
-	CLEARCOAT_ROUGHNESS = 0.06;
+	// carbon's weave (2 x 2 twill, 4 mm tows), on the plane the surface faces most; it fades out where a tow would be
+	// smaller than a pixel
+	vec3 tc = trim_color;
+	float carbon = trim_paint ? 0.0 : trim;
+	if (carbon > 0.0) {
+		vec3 an = abs(cnrm);
+		vec2 uvw = an.x > an.y && an.x > an.z ? cpos.zy : (an.y > an.z ? cpos.xz : cpos.xy);
+		vec2 tow = uvw / 0.004;
+		float px = length(fwidth(tow));
+		float dir = mod(floor(tow.x) + floor(tow.y), 4.0) < 2.0 ? 1.0 : 0.0;
+		float along = dir > 0.5 ? fract(tow.x) : fract(tow.y);
+		float sheen = 0.75 + 0.5 * dir * (0.6 + 0.4 * sin(along * 3.14159));
+		tc *= mix(sheen, 1.0, smoothstep(0.4, 1.2, px));
+	}
+	c = mix(c, tc, trim);
+	// what a baked occlusion map gives a car body: the panels darker towards the ground (the floor is the biggest
+	// occluder), surfaces facing down darker still, the roof and bonnet open to the sky
+	float ground = smoothstep(-0.05, 0.55, yf);
+	float facing = clamp(cnrm.y * 0.5 + 0.5, 0.0, 1.0);
+	float ao = mix(0.42, 1.0, ground) * mix(0.55, 1.0, facing);
+	AO = ao;
+	AO_LIGHT_AFFECT = 0.35;
+	// flakes: tiny facets under the clear coat, each tilted its own way, sparkling where the light catches them
+	float rough = mix(roughness_v, 0.55, carbon);
+	if (flakes > 0.0 && trim < 0.5) {
+		// a flake smaller than a pixel would only flicker: further off they blend into a slightly rougher sheen
+		float px = length(fwidth(cpos));
+		float near_f = 1.0 - smoothstep(flake_size * 0.6, flake_size * 2.5, px);
+		rough = mix(rough, min(1.0, rough + 0.08), flakes * (1.0 - near_f));
+		if (near_f > 0.0) {
+			vec3 cell = floor(cpos / flake_size);
+			vec3 rnd = fract(sin(vec3(dot(cell, vec3(127.1, 311.7, 74.7)), dot(cell, vec3(269.5, 183.3, 246.1)), dot(cell, vec3(113.5, 271.9, 124.6)))) * 43758.5453);
+			NORMAL = normalize(NORMAL + (rnd - 0.5) * 0.35 * flakes * near_f);
+			c *= 1.0 + (rnd.x - 0.5) * 0.12 * flakes * near_f;
+		}
+	}
+	ALBEDO = c * mix(0.88, 1.0, ao);
+	METALLIC = mix(metallic_v, 0.25, carbon);
+	ROUGHNESS = rough;
+	CLEARCOAT = mix(clearcoat_v, 0.6, carbon);
+	CLEARCOAT_ROUGHNESS = mix(0.06, 0.25, carbon);
 	if (has_normal) {
 		NORMAL_MAP = texture(normal_tex, UV).rgb;
 		NORMAL_MAP_DEPTH = normal_depth;

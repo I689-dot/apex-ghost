@@ -27,8 +27,13 @@ static func clean_livery(lv: Dictionary) -> Dictionary:
 		out[k] = c
 	if not ["gloss", "metallic", "matte", "pearl"].has(lv.get("finish")):
 		return {}
-	if not ["plain", "stripes", "twotone", "fade", "side", "hoop"].has(lv.get("design")):
+	if not ["plain", "stripes", "twotone", "fade", "side", "hoop", "center", "chevron", "pinstripe", "split"].has(lv.get("design")):
 		return {}
+	# (older clients send no aero: carbon)
+	var aero = lv.get("aero", "carbon")
+	if not ["carbon", "body", "accent"].has(aero):
+		return {}
+	out.aero = aero
 	var n = lv.get("number")
 	if not (_num(n) and float(n) == floorf(float(n)) and n >= 0 and n <= 99) or typeof(lv.get("showNumber")) != TYPE_BOOL:
 		return {}

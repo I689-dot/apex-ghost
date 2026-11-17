@@ -276,6 +276,23 @@ func _apply_post(q: Dictionary) -> void:
 	env.adjustment_enabled = bool(q.grade) or user_grade or lk
 	env.adjustment_contrast = (float(look.get("contrast", 1.06)) if bool(q.grade) or lk else 1.0) * float(d.contrast)
 	env.adjustment_saturation = float(look.get("saturation", 1.0)) * float(d.saturation)
+	# ambient occlusion (the "ao" setting; it was carried in the presets but never switched on): soft shade where
+	# surfaces meet, under the cars and in the barriers' and kerbs' corners. Forward+ only (a phone's renderer has none)
+	env.ssao_enabled = bool(q.get("ao", false))
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 2.2
+	env.ssao_power = 1.6
+	env.ssao_detail = 0.6
+	env.ssao_light_affect = 0.15
+	env.ssao_ao_channel_affect = 0.4
+	var aoq := {"Low": RenderingServer.ENV_SSAO_QUALITY_LOW, "Medium": RenderingServer.ENV_SSAO_QUALITY_MEDIUM, "High": RenderingServer.ENV_SSAO_QUALITY_HIGH}
+	RenderingServer.environment_set_ssao_quality(aoq.get(String(q.get("aoQuality", "Medium")), RenderingServer.ENV_SSAO_QUALITY_MEDIUM), not bool(q.get("aoFullRes", false)), 0.5, 2, 50.0, 300.0)
+	# screen-space reflections (Ultra)
+	env.ssr_enabled = bool(q.get("ssr", false))
+	env.ssr_max_steps = 48
+	env.ssr_fade_in = 0.15
+	env.ssr_fade_out = 2.0
+	env.ssr_depth_tolerance = 0.3
 	# the sun's cascades: two are enough on a phone
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 

@@ -5,15 +5,17 @@ extends RefCounted
 ## - decals, banners, stickers, logos and number plates are not drawn;
 ## - rims and calipers take the driver's colours, without their textures (and their makers' marks);
 ## - tyres are plain rubber (no sidewall lettering).
-## A livery: {base, accent, finish, design, number, showNumber, numberColor, rims, calipers} (Settings' "livery").
+## A livery: {base, accent, finish, design, aero, number, showNumber, numberColor, rims, calipers} (Settings' "livery").
 
 const SHADER := preload("res://shaders/car_paint.gdshader")
-const DESIGNS := ["plain", "stripes", "twotone", "fade", "side", "hoop"]
+const DESIGNS := ["plain", "stripes", "twotone", "fade", "side", "hoop", "center", "chevron", "pinstripe", "split"]
+## The wing, splitter, sills and diffuser: bare carbon, the body's colour, or the second colour.
+const AERO := ["carbon", "body", "accent"]
 const FINISHES := {
-	"gloss": {"metallic": 0.0, "roughness": 0.28, "clearcoat": 1.0, "pearl": 0.0},
-	"metallic": {"metallic": 0.65, "roughness": 0.32, "clearcoat": 1.0, "pearl": 0.0},
-	"matte": {"metallic": 0.0, "roughness": 0.62, "clearcoat": 0.0, "pearl": 0.0},
-	"pearl": {"metallic": 0.35, "roughness": 0.3, "clearcoat": 1.0, "pearl": 0.6},
+	"gloss": {"metallic": 0.0, "roughness": 0.28, "clearcoat": 1.0, "pearl": 0.0, "flakes": 0.0},
+	"metallic": {"metallic": 0.65, "roughness": 0.32, "clearcoat": 1.0, "pearl": 0.0, "flakes": 1.0},
+	"matte": {"metallic": 0.0, "roughness": 0.62, "clearcoat": 0.0, "pearl": 0.0, "flakes": 0.0},
+	"pearl": {"metallic": 0.35, "roughness": 0.3, "clearcoat": 1.0, "pearl": 0.6, "flakes": 0.6},
 }
 ## The colours bots and other drivers get (by their id): racing colours that read well against the circuits.
 const PALETTE := ["#c8102e", "#0a3d91", "#f2f2f2", "#111214", "#ffb000", "#00843d", "#ff5f00", "#5b2c83", "#00a3e0", "#9a9fa5", "#7a0019", "#e4002b", "#1d428a", "#ffd60a", "#2e7d32", "#ff6fae"]
@@ -54,7 +56,7 @@ static func livery_for(id: String, number: int = -1) -> Dictionary:
 	return {
 		"base": base, "accent": accent, "finish": ["gloss", "metallic", "pearl", "gloss"][absi(h / 7) % 4],
 		"design": DESIGNS[absi(h / 3) % DESIGNS.size()], "number": number if number >= 0 else 2 + absi(h / 11) % 97,
-		"showNumber": true, "numberColor": "#111214" if Color(base).get_luminance() > 0.6 else "#ffffff",
+		"aero": AERO[absi(h / 19) % 2], "showNumber": true, "numberColor": "#111214" if Color(base).get_luminance() > 0.6 else "#ffffff",
 		"rims": ["#1c1c1e", "#9a9fa5", "#c9a227", "#f2f2f2"][absi(h / 5) % 4], "calipers": ["#ffd60a", "#c8102e", "#1c1c1e"][absi(h / 13) % 3],
 	}
 
@@ -125,6 +127,15 @@ static func _set_paint(pm: ShaderMaterial, livery: Dictionary, fin: Dictionary, 
 	pm.set_shader_parameter("roughness_v", fin.roughness)
 	pm.set_shader_parameter("clearcoat_v", fin.clearcoat)
 	pm.set_shader_parameter("pearl", fin.pearl)
+	pm.set_shader_parameter("flakes", fin.get("flakes", 0.0))
+	# the aero (the livery's "aero"): the wing all of it, the lowest band of the body too; carbon, or painted in
+	# the second colour; "body": no trim
+	var aero: String = livery.get("aero", "carbon")
+	var trimmed := aero != "body"
+	pm.set_shader_parameter("trim_all", trimmed and String(mi.name) == "part_wing")
+	pm.set_shader_parameter("trim_height", 0.11 if trimmed else 0.0)
+	pm.set_shader_parameter("trim_paint", aero == "accent")
+	pm.set_shader_parameter("trim_color", Color(livery.get("accent", "#f2f2f2")) if aero == "accent" else Color(0.035, 0.037, 0.04))
 	pm.set_shader_parameter("show_number", bool(livery.get("showNumber", true)))
 	pm.set_shader_parameter("number_tex", number_tex)
 	# mesh space -> car space (the visual's own frame)

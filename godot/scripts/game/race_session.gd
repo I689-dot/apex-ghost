@@ -389,6 +389,8 @@ func load_session(progress: Callable) -> void:
 	my_visual = CarVisual.new(my_entry, my_model, true, outside)
 	vehicle.add_child(my_visual)
 	CarPaint.apply(my_visual, Settings.data.livery)
+	if bool(q.get("carProbe", false)) and not OS.has_feature("mobile"):
+		_add_car_probe(my_visual)
 	InputState.wheel.carLockDeg = float(SteeringLock.lock_deg(my_entry.id))
 	if bool(q.ownHeadlightSpots):
 		my_visual.add_headlights(bool(q.ownHeadlightShadows))
@@ -3466,3 +3468,23 @@ func dispose() -> void:
 	if hud != null:
 		hud.queue_free()
 	queue_free()
+
+## A reflection probe riding with your car (High / Ultra): the paint, glass and rims reflect the track, the barriers,
+## the pit buildings and the cars round you, not only the sky. Your own car is left out of it (it would reflect its
+## own inside), and so are the forest, grass and crowd (layer 2: the cost of drawing six views of them every frame).
+var car_probe: ReflectionProbe = null
+
+func _add_car_probe(v: CarVisual) -> void:
+	var p := ReflectionProbe.new()
+	p.name = "car_probe"
+	p.update_mode = ReflectionProbe.UPDATE_ALWAYS
+	p.size = Vector3(40, 20, 40)
+	p.position = Vector3(0, 1.0, 0)
+	p.max_distance = 400.0
+	p.cull_mask = 1 | CarVisual.VIS_CARS
+	p.enable_shadows = false
+	p.intensity = 1.0
+	p.blend_distance = 4.0
+	p.mesh_lod_threshold = 4.0
+	v.add_child(p)
+	car_probe = p

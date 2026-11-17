@@ -82,7 +82,21 @@ static func _make_studio(size: Vector2i) -> SubViewport:
 	env.ambient_light_color = Color(0.62, 0.66, 0.74)
 	env.ambient_light_energy = 0.55
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
+	# a showroom to reflect (the background stays clear): a bright ceiling, a soft horizon band, a dark floor. Without
+	# anything to reflect the clear-coated paint looked like flat plastic, one colour all over
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color(0.92, 0.94, 0.98)
+	sky_mat.sky_horizon_color = Color(0.55, 0.58, 0.64)
+	sky_mat.sky_curve = 0.09
+	sky_mat.ground_bottom_color = Color(0.03, 0.035, 0.04)
+	sky_mat.ground_horizon_color = Color(0.22, 0.23, 0.26)
+	sky_mat.ground_curve = 0.05
+	sky_mat.sun_angle_max = 0.0
+	sky_mat.energy_multiplier = 1.1
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	env.sky = sky
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	var we := WorldEnvironment.new()
 	we.environment = env
 	vp.add_child(we)

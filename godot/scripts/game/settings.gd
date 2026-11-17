@@ -88,7 +88,7 @@ static func default_settings() -> Dictionary:
 			"brakePressure": 1.0, "brakeDucts": 3, "finalDrive": 0, "engineMap": 1},
 		"savedSetups": {}, "ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
 		# your car's paint (CarPaint, the car page of the lobby): colours, finish, design, race number, rims, calipers
-		"livery": {"base": "#c8102e", "accent": "#f2f2f2", "finish": "gloss", "design": "stripes", "number": 7, "showNumber": true, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"},
+		"livery": {"base": "#c8102e", "accent": "#f2f2f2", "finish": "gloss", "design": "stripes", "aero": "carbon", "number": 7, "showNumber": true, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"},
 		"wheel": {"mode": "auto", "rotationDeg": 900, "brakeCurve": 1.0},
 		# wheels, pedals, shifters, handbrakes (DeviceBindings): function -> {dev, nth, kind, index, min, max, deadzone}
 		"devices": {},
@@ -150,6 +150,16 @@ func set_session(room_code: String, token: Variant) -> void:
 ## each takes these keys from the preset it names.
 const EXTRA_GROUPS := {"mirrors": ["mirrorEvery"], "cockpit": ["cockpitDetail"], "carDetail": ["carLodScale"]}
 
+## Settings only this app has (the web game's presets do not carry them), by preset: a reflection probe that follows
+## your car (the paint reflects the track, the barriers and the cars round it, not only the sky) and screen-space
+## reflections (Ultra: the wet track and the paint mirror what is on screen). Taken with the "ao" group's preset.
+const GODOT_PRESET_KEYS := {
+	"low": {"carProbe": false, "ssr": false},
+	"medium": {"carProbe": false, "ssr": false},
+	"high": {"carProbe": true, "ssr": false},
+	"ultra": {"carProbe": true, "ssr": true},
+}
+
 ## True when some graphics setting differs from the preset (the page then says "Custom").
 func is_custom() -> bool:
 	return not (data.graphics as Dictionary).is_empty()
@@ -169,6 +179,8 @@ func quality_config() -> Dictionary:
 		return _cached_q
 	var q: Dictionary = presets()[data.quality].duplicate()
 	var o: Dictionary = data.graphics
+	var gk = o.get("ao", data.quality)
+	q.merge(GODOT_PRESET_KEYS.get(gk if GODOT_PRESET_KEYS.has(gk) else data.quality, GODOT_PRESET_KEYS.low), true)
 	var groups: Dictionary = _quality().groups
 	for g in groups:
 		var from = o.get(g)

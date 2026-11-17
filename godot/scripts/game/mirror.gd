@@ -27,8 +27,9 @@ func _init(car_object: Node3D, dims: Dictionary) -> void:
 	camera.near = 0.4
 	camera.far = 600.0
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
-	# the world without the far scenery: forest, crowd, grass, racing line (those sit on layer 2)
-	camera.cull_mask = 1
+	# the world without the far scenery: forest, crowd, grass, racing line (those sit on layer 2); the cars (CarVisual's
+	# layers: the others 3, your own 4)
+	camera.cull_mask = 1 | CarVisual.VIS_CARS | CarVisual.VIS_OWN
 	viewport.add_child(camera)
 	add_child(viewport)
 	rect = TextureRect.new()

@@ -717,8 +717,9 @@ static func _paint_page(app: App, cars: Array, mine: Dictionary, extra: Array) -
 	col.add_child(UIW.row(I18n.t("Colour"), _swatches(lv.base, CarPaint.PALETTE, func(c): changed.call("base", c))))
 	col.add_child(UIW.row(I18n.t("Finish"), _live_chips(lv.finish, [["gloss", I18n.t("Gloss")], ["metallic", I18n.t("Metallic")], ["matte", I18n.t("Matte")], ["pearl", I18n.t("Pearl")]], func(v): changed.call("finish", v))))
 	col.add_child(UIW.section(I18n.t("Design")))
-	col.add_child(UIW.row(I18n.t("Design"), _live_chips(lv.design, [["plain", I18n.t("Plain")], ["stripes", I18n.t("Stripes")], ["twotone", I18n.t("Two-tone")], ["fade", I18n.t("Fade")], ["side", I18n.t("Side stripe")], ["hoop", I18n.t("Hoop")]], func(v): changed.call("design", v))))
+	col.add_child(UIW.row(I18n.t("Design"), _live_chips(lv.design, [["plain", I18n.t("Plain")], ["stripes", I18n.t("Stripes")], ["twotone", I18n.t("Two-tone")], ["fade", I18n.t("Fade")], ["side", I18n.t("Side stripe")], ["hoop", I18n.t("Hoop")], ["center", I18n.t("Centre stripe")], ["chevron", I18n.t("Chevron")], ["pinstripe", I18n.t("Pinstripes")], ["split", I18n.t("Split")]], func(v): changed.call("design", v))))
 	col.add_child(UIW.row(I18n.t("Second colour"), _swatches(lv.accent, CarPaint.PALETTE, func(c): changed.call("accent", c))))
+	col.add_child(UIW.row(I18n.t("Aero"), _live_chips(lv.get("aero", "carbon"), [["carbon", I18n.t("Carbon")], ["body", I18n.t("Body colour")], ["accent", I18n.t("Second colour")]], func(v): changed.call("aero", v))))
 	col.add_child(UIW.section(I18n.t("Race number")))
 	var nums: Array = []
 	for n in range(1, 100):

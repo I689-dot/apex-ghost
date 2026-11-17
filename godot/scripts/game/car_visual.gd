@@ -12,8 +12,15 @@ static var car_lod_scale := 1.0
 ## 1 while the camera is in your own cockpit (set by the session each frame).
 static var cockpit_glass := 0.0
 
+## The render layers the cars are drawn on (bit values): the others' cars, your own. The contact shadow under each car
+## and your car's reflection probe leave them out (a car is not shaded by its own blob, nor reflects itself); the rear
+## view mirror draws both.
+const VIS_CARS := 4
+const VIS_OWN := 8
+
 static var _glass_re: RegEx
 static var _pool_tex: GradientTexture2D
+static var _blob_tex: GradientTexture2D
 static var _smoke_tex: GradientTexture2D
 
 class WheelRig:
@@ -120,6 +127,10 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 		set_inside(true)
 	# remote cars always, and your own car when real spot lights are too expensive, get a projected light pool
 	_make_light_pool()
+	for n in _walk(self):
+		if n is GeometryInstance3D and n != _pool:
+			n.layers = VIS_OWN if local else VIS_CARS
+	_make_contact_shadow()
 
 ## Moves a wheel modelled into the cockpit's "body" mesh to a node of its own (InteriorLook.BAKED_WHEELS), which _rig then
 ## turns with the steering. A triangle goes when all its corners are inside the wheel's box.
@@ -459,6 +470,41 @@ func _make_light_pool() -> void:
 	_pool.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_pool.visible = false
 	add_child(_pool)
+
+## The soft dark patch on the ground under the car (the sky's light shut out by the floor, which the sun's shadow alone
+## does not give: in the shade, under cloud and at night the cars looked as if they floated). A decal on the track only.
+var contact_shadow: Decal = null
+
+func _make_contact_shadow() -> void:
+	if _blob_tex == null:
+		_blob_tex = GradientTexture2D.new()
+		var g := Gradient.new()
+		g.colors = PackedColorArray([Color(0, 0, 0, 0.82), Color(0, 0, 0, 0.62), Color(0, 0, 0, 0.0)])
+		g.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+		_blob_tex.gradient = g
+		_blob_tex.fill = GradientTexture2D.FILL_SQUARE
+		_blob_tex.fill_from = Vector2(0.5, 0.5)
+		_blob_tex.fill_to = Vector2(1.0, 0.5)
+		_blob_tex.width = 64
+		_blob_tex.height = 64
+	var d := Decal.new()
+	d.name = "contact_shadow"
+	var w := float(entry.get("dims", {}).get("width", 1.95))
+	var l := float(entry.get("dims", {}).get("length", 4.6))
+	# the width counts the mirrors; the length a little over the body: the soft edge is just outside it
+	d.size = Vector3(w + 0.15, 1.2, l + 0.35)
+	d.position = Vector3(0, 0.3, 0)
+	d.texture_albedo = _blob_tex
+	d.modulate = Color(1, 1, 1, 0.9)
+	d.albedo_mix = 1.0
+	d.upper_fade = 0.4
+	d.lower_fade = 0.4
+	d.cull_mask = 1
+	d.distance_fade_enabled = true
+	d.distance_fade_begin = 90.0
+	d.distance_fade_length = 30.0
+	add_child(d)
+	contact_shadow = d
 
 ## Your own car: the cockpit model while the camera is in it, LOD0 from outside (no-op without an outside model).
 ## Inside, the outside model still casts the car's shadow (shadows-only mode, invisible to the view camera).
