@@ -1175,4 +1175,5 @@ const ES: Record<string, string> = {
   laps: 'vueltas',
   'Water temperature': 'Temperatura del agua',
   'Oil temperature': 'Temperatura del aceite',
+  'Rejoining as a ghost until the road around you is clear': 'Te reincorporas como fantasma hasta que la pista a tu alrededor esté despejada',
 };

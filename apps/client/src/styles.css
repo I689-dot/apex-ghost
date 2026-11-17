@@ -8451,3 +8451,124 @@ select,
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+/* the driver's cluster see-through, as Le Mans Ultimate's: the road shows through the dial's face and the panels,
+ * a light blur keeps the numbers readable over a bright sky or a white kerb */
+.dial-face {
+  background: radial-gradient(circle at 50% 35%, rgba(24, 28, 36, 0.42), rgba(6, 8, 12, 0.5) 74%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.dial-track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+.dial-gear,
+.dial-speed,
+.dial-unit,
+.tw-row,
+.db-val {
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+.tyre-widget {
+  background: rgba(6, 9, 16, 0.38);
+  border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+.db-row {
+  background: rgba(6, 9, 16, 0.4);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+/* race control's flags (ui/hud.ts flagSvg): a small waving flag at the top, its words for a few seconds, then the
+ * flag alone; nothing across the road ahead */
+.hud-flag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 6px;
+  color: #fff;
+  background: rgba(6, 9, 16, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  animation: none;
+  transition:
+    padding 0.4s ease,
+    gap 0.4s ease;
+}
+.hud-flag.empty {
+  display: none;
+}
+.hud-flag.blue,
+.hud-flag.green,
+.hud-flag.dt {
+  background: rgba(6, 9, 16, 0.45);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.hud-flag.meatball {
+  padding-left: 6px;
+  background: rgba(6, 9, 16, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.hud-flag-icon {
+  display: grid;
+  place-items: center;
+}
+.hud-flag-icon:empty {
+  display: none;
+}
+.hud-flag-icon svg {
+  width: 40px;
+  height: 35px;
+  transform-origin: 18% 50%;
+  animation: flag-wave 1.6s ease-in-out infinite alternate;
+}
+@keyframes flag-wave {
+  to {
+    transform: skewY(-4deg) scaleX(0.94);
+  }
+}
+.hud-flag-text {
+  white-space: nowrap;
+  max-width: 420px;
+  overflow: hidden;
+  transition:
+    max-width 0.5s ease,
+    opacity 0.4s ease;
+}
+/* after its first seconds: the flag alone */
+.hud-flag.brief {
+  gap: 0;
+  padding-right: 6px;
+}
+.hud-flag.brief .hud-flag-text {
+  max-width: 0;
+  opacity: 0;
+}
+/* a flag that matters now blinks gently (the safety car, FCY, the blue flag) */
+.hud-flag.sc .hud-flag-icon svg,
+.hud-flag.fcy .hud-flag-icon svg,
+.hud-flag.blue .hud-flag-icon svg {
+  animation:
+    flag-wave 1.6s ease-in-out infinite alternate,
+    flag-pulse 1.2s ease-in-out infinite;
+}
+@keyframes flag-pulse {
+  50% {
+    filter: brightness(1.35) drop-shadow(0 0 6px rgba(255, 214, 10, 0.6));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-flag-icon svg {
+    animation: none !important;
+  }
+}
+.hud-flag.sc,
+.hud-flag.fcy {
+  animation: none;
+}

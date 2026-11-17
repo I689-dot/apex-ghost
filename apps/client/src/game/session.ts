@@ -110,6 +110,14 @@ import { t } from '../i18n';
 import { rumble } from '../input/gamepad';
 
 const FIXED_DT = 1 / PHYSICS_HZ;
+/**
+ * Rejoining after a reset, as the sims keep a car out of the way while it is not racing (iRacing's ghost driving,
+ * the F1 games' ghosted rejoin): a car that reset to the track passes through every other car for at least minMs,
+ * then until no car is within clearM of it (at most maxMs). Every client applies it to the cars it sees reset, so a
+ * car arriving from behind drives through the one standing at the checkpoint, and two cars that reset at the same
+ * place do not collide. Resets are also spread across the road and along it, onto a free spot.
+ */
+const REJOIN = { minMs: 3000, maxMs: 15000, clearM: 9 };
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
 const MAX_FRAME_DT = 0.1;
 /** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). 2.5 s kept the last of 11
@@ -170,6 +178,8 @@ interface Remote {
   setV: THREE.Vector3;
   /** The stand-in jumped and passes through cars until clear of them. */
   ghosted: boolean;
+  /** When it was last seen resetting to the track (performance.now(), 0: never): a rejoining car is a ghost. */
+  rejoinAt: number;
   /** Impulse it took from a car simulated here, not yet sent (N·s, world; yaw N·m·s), from whom, last sent. */
   bump: THREE.Vector3;
   bumpYaw: number;
@@ -188,6 +198,8 @@ interface LocalBot {
   pendingCount: number;
   seq: number;
   resetFlagSamples: number;
+  /** When it last reset itself to the track (performance.now(), 0: never). */
+  rejoinAt: number;
   limits: TrackLimits;
   hint: number;
   /** Seconds left before a pass manoeuvre is given up (traffic cleared). */
@@ -280,6 +292,8 @@ export class RaceSession {
   private pendingCount = 0;
   private relayScratch: CarState[] = [makeCarState(), makeCarState(), makeCarState(), makeCarState()];
   private resetFlagSamples = 0;
+  /** When I last reset to the track (performance.now(), 0: never): until clear I drive as a ghost (REJOIN). */
+  private myRejoinAt = 0;
   /** The session for the solo career (career.ts): distance, laps, clean ones, bests, incident points. */
   private career = { km: 0, laps: 0, cleanLaps: 0, pbs: 0, incidents: 0, lapIncidents: 0 };
 
@@ -605,6 +619,7 @@ export class RaceSession {
         collider: null,
         setV: new THREE.Vector3(),
         ghosted: false,
+        rejoinAt: 0,
         bump: new THREE.Vector3(),
         bumpYaw: 0,
         bumpFrom: '',
@@ -878,6 +893,7 @@ export class RaceSession {
         pendingCount: 0,
         seq: 0,
         resetFlagSamples: 0,
+        rejoinAt: 0,
         limits: new TrackLimits(),
         hint: -1,
         pit,
@@ -1122,13 +1138,29 @@ export class RaceSession {
     let yaw: number;
     if (tr && tr.passed >= 0) {
       const g = gates[(tr.nextGate - 1 + n) % n];
-      // a little before the gate, on the centreline
+      // just past the gate, in a lane of its own (by grid slot: two cars resetting together land apart), on the first
+      // spot no other car is near: along the road, then the other lanes
+      const slot = this.race.slots[this.me] ?? 0;
+      const lanes = [((slot % 3) - 1) * 2.6, ...[-2.6, 0, 2.6].filter((l) => l !== ((slot % 3) - 1) * 2.6)];
       const pt = { x: 0, y: 0, z: 0, yaw: 0 };
-      this.track.pointAt(g.s + 2, pt);
-      x = pt.x;
-      y = pt.y;
-      z = pt.z;
-      yaw = pt.yaw;
+      let best: { x: number; y: number; z: number; yaw: number } | null = null;
+      search: for (const along of [2, 16, 30]) {
+        this.track.pointAt(g.s + along, pt);
+        const ci = nearestCenterlineIndex(this.trackData, pt.x, pt.y, pt.z, -1, 40);
+        const wl = Math.max(0, (this.trackData.widthL[ci] ?? 5) - 1.6);
+        const wr = Math.max(0, (this.trackData.widthR[ci] ?? 5) - 1.6);
+        for (const lane of lanes) {
+          const off = Math.max(-wr, Math.min(wl, lane));
+          // the left of the road: forward (sin yaw, cos yaw) turned a quarter left
+          const cand = { x: pt.x + Math.cos(pt.yaw) * off, y: pt.y, z: pt.z - Math.sin(pt.yaw) * off, yaw: pt.yaw };
+          best ??= cand;
+          if (this.clearOfAll(this.me, cand.x, cand.z, REJOIN.clearM)) {
+            best = cand;
+            break search;
+          }
+        }
+      }
+      ({ x, y, z, yaw } = best ?? { ...pt });
     } else {
       const slot = this.race.slots[this.me] ?? 0;
       const gs = this.trackData.grid[slot];
@@ -1144,11 +1176,14 @@ export class RaceSession {
     this.freezeUntil = now + RESET_FREEZE_MS;
     this.vehicle.frozen = true;
     this.resetFlagSamples = 2; // make sure at least one packet carries the reset flag
+    // a ghost until clear of the others (REJOIN): nobody arriving from behind runs into the car standing here
+    this.myRejoinAt = performance.now();
     this.incident(4);
     this.track.resetHint();
     this.limits.reset();
     // the time penalty (if any) is announced by the lap logic's penalty event
-    if (this.myLaps === 0) this.flash(t('Reset to the track'));
+    if (this.contact) this.flash(t('Rejoining as a ghost until the road around you is clear'), 3500);
+    else if (this.myLaps === 0) this.flash(t('Reset to the track'));
   }
 
   private flash(msg: string, ms = 2500): void {
@@ -1318,7 +1353,10 @@ export class RaceSession {
     if (!dec) return;
     const r = this.remotes.get(dec.slot);
     if (!r) return;
-    for (let i = 0; i < dec.count; i++) r.buffer.push(this.relayScratch[i], (dec.seq * STATES_PER_PACKET + i) & 0xffff);
+    for (let i = 0; i < dec.count; i++) {
+      if (this.relayScratch[i].flags & FLAG_RESET && performance.now() - r.rejoinAt > 1500) r.rejoinAt = performance.now();
+      r.buffer.push(this.relayScratch[i], (dec.seq * STATES_PER_PACKET + i) & 0xffff);
+    }
   }
 
   private onVisibility = (): void => {
@@ -1613,16 +1651,20 @@ export class RaceSession {
     const ahead = -this.acc; // this step's time relative to the frame (s)
     // contact off in the pit area for every car with a body of its own (mine, the bots'); other players' proxies below
     const mp = this.vehicle.body.translation();
-    const solidMe = !this.inPitArea(mp.x, mp.z);
+    const ghostMe = this.rejoining(this.me, this.myRejoinAt, mp.x, mp.z);
+    if (!ghostMe && this.myRejoinAt && performance.now() - this.myRejoinAt > REJOIN.minMs) this.myRejoinAt = 0;
+    const solidMe = !this.inPitArea(mp.x, mp.z) && !ghostMe;
     if (solidMe !== this.myContactOn) {
       this.myContactOn = solidMe;
       this.vehicle.setContact(solidMe);
     }
     for (const r of this.remotes.values()) {
-      const bv = r.bot?.vehicle;
-      if (!bv) continue;
-      const bp = bv.body.translation();
-      bv.setContact(!this.inPitArea(bp.x, bp.z));
+      const b = r.bot;
+      if (!b) continue;
+      const bp = b.vehicle.body.translation();
+      const ghost = this.rejoining(r.id, b.rejoinAt, bp.x, bp.z);
+      if (!ghost && b.rejoinAt && performance.now() - b.rejoinAt > REJOIN.minMs) b.rejoinAt = 0;
+      b.vehicle.setContact(!this.inPitArea(bp.x, bp.z) && !ghost);
     }
     const move = (body: RAPIER.RigidBody, o: THREE.Object3D, vel: THREE.Vector3) => {
       body.setNextKinematicTranslation({ x: o.position.x + vel.x * ahead, y: o.position.y + vel.y * ahead, z: o.position.z + vel.z * ahead });
@@ -1641,7 +1683,9 @@ export class RaceSession {
       const ey = ty - p.y;
       const ez = tz - p.z;
       // a car in the pit area is a ghost (the same rule as mine), so it never stands solid in the lane or a box
-      const hidden = !o.visible || !r.buffer.hasData || this.inPitArea(o.position.x, o.position.z);
+      const rejoin = this.rejoining(r.id, r.rejoinAt, o.position.x, o.position.z);
+      if (!rejoin && r.rejoinAt && performance.now() - r.rejoinAt > REJOIN.minMs) r.rejoinAt = 0;
+      const hidden = !o.visible || !r.buffer.hasData || this.inPitArea(o.position.x, o.position.z) || rejoin;
       if (hidden || ex * ex + ey * ey + ez * ez > PROXY_SNAP_M * PROXY_SNAP_M) {
         body.setTranslation({ x: tx, y: ty, z: tz }, true);
         if (!r.ghosted) c.setEnabled(false);
@@ -1687,6 +1731,35 @@ export class RaceSession {
   private *simulated(): Generator<[string, Vehicle]> {
     if (!this.spectator) yield [this.me, this.vehicle];
     for (const r of this.remotes.values()) if (r.bot) yield [r.id, r.bot.vehicle];
+  }
+
+  /** Every car's position on this screen (mine, the bots, the others as drawn), with its id. */
+  private *allCars(): Generator<[string, number, number]> {
+    if (!this.spectator) {
+      const p = this.vehicle.body.translation();
+      yield [this.me, p.x, p.z];
+    }
+    for (const r of this.remotes.values()) {
+      if (r.bot) {
+        const p = r.bot.vehicle.body.translation();
+        yield [r.id, p.x, p.z];
+      } else if (r.buffer.hasData && r.visual.object.visible) yield [r.id, r.visual.object.position.x, r.visual.object.position.z];
+    }
+  }
+
+  /** No other car than `self` within d (m) of (x, z). */
+  private clearOfAll(self: string, x: number, z: number, d: number): boolean {
+    for (const [id, cx, cz] of this.allCars()) if (id !== self && (cx - x) ** 2 + (cz - z) ** 2 < d * d) return false;
+    return true;
+  }
+
+  /** A car that reset at `at` (performance.now()) still rejoining as a ghost (REJOIN). */
+  private rejoining(self: string, at: number, x: number, z: number): boolean {
+    if (!at) return false;
+    const age = performance.now() - at;
+    if (age < REJOIN.minMs) return true;
+    if (age > REJOIN.maxMs) return false;
+    return !this.clearOfAll(self, x, z, REJOIN.clearM);
   }
 
   /** No car simulated here within r (m) of (x, z). */
@@ -2227,6 +2300,12 @@ export class RaceSession {
       const gates = this.trackData.gates;
       const cp = tr && tr.passed >= 0 ? gates[(tr.nextGate - 1 + gates.length) % gates.length].s : undefined;
       const c = b.ai.update(FIXED_DT, started, b.vehicle.weatherGrip * b.vehicle.tyreGripAvg, cp, started ? this.followCap(r) : Infinity);
+      // the bot put itself back on the track: tell the others (the reset flag) and rejoin as a ghost
+      if (b.ai.resetRequested) {
+        b.ai.resetRequested = false;
+        b.resetFlagSamples = 2;
+        b.rejoinAt = performance.now();
+      }
       b.vehicle.step(FIXED_DT, c);
     });
   }
@@ -2541,7 +2620,7 @@ export class RaceSession {
     // ghost: fade out when very close to the camera so it never blocks the cockpit view
     const d = o.position.distanceTo(_camPos);
     const fade = this.cinematic || this.contact || (this.spectator && r.id === this.specTarget) ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1);
-    r.visual.setOpacity(s.staleMs > 5000 ? 0.35 : fade);
+    r.visual.setOpacity(s.staleMs > 5000 ? 0.35 : r.rejoinAt && this.contact ? 0.45 : fade);
     o.updateMatrixWorld();
   }
 
@@ -2559,7 +2638,7 @@ export class RaceSession {
     r.visual.setLights(v.pedals.brake > 0.1 && !v.reverse, this.headlightsOn, this.env.night);
     r.visual.updateSmoke(dt, 0, this.scene);
     const d = o.position.distanceTo(_camPos);
-    r.visual.setOpacity(this.cinematic || this.contact ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1));
+    r.visual.setOpacity(b.rejoinAt && this.contact ? 0.45 : this.cinematic || this.contact ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1));
     o.updateMatrixWorld();
   }
 
