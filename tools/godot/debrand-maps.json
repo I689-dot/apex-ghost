@@ -1159,5 +1159,316 @@
     }
    ]
   }
+ },
+ "silverstone/map_scenery.glb": {
+  "ADV_add": {
+   "size": [
+    512,
+    256
+   ],
+   "patches": [
+    {
+     "what": "eBay",
+     "rect": [
+      0,
+      52,
+      512,
+      100
+     ],
+     "bg": [
+      20,
+      70
+     ],
+     "label": "FULL THROTTLE",
+     "fg": "#1c1c1c"
+    },
+    {
+     "what": "Adrian Flux",
+     "rect": [
+      0,
+      154,
+      512,
+      204
+     ],
+     "bg": [
+      20,
+      170
+     ],
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "HotelLogo": {
+   "size": [
+    512,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Hilton Garden Inn",
+     "rect": [
+      0,
+      0,
+      512,
+      64
+     ],
+     "bg": "#2b2f36",
+     "label": "GRIDCORSA HOTEL",
+     "fg": "#d8d8d8"
+    }
+   ]
+  },
+  "flag1": {
+   "size": [
+    128,
+    512
+   ],
+   "patches": [
+    {
+     "what": "the model author's flag (021 Modelling)",
+     "rect": [
+      0,
+      0,
+      128,
+      512
+     ],
+     "bg": [
+      10,
+      10
+     ],
+     "label": "GRIDCORSA",
+     "fg": "#f4f4f4",
+     "rotate": -90
+    }
+   ]
+  },
+  "flag5": {
+   "size": [
+    512,
+    256
+   ],
+   "patches": [
+    {
+     "what": "BRDC crest",
+     "rect": [
+      106,
+      20,
+      402,
+      236
+     ],
+     "bg": [
+      60,
+      30
+     ],
+     "label": "GRIDCORSA",
+     "fg": "#1f2a5c"
+    }
+   ]
+  },
+  "misc1": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "BRDC crest",
+     "rect": [
+      74,
+      230,
+      160,
+      305
+     ],
+     "bg": "#f2f2f2"
+    },
+    {
+     "what": "BRDC crest (small)",
+     "rect": [
+      26,
+      400,
+      80,
+      448
+     ],
+     "bg": "#f2f2f2"
+    }
+   ]
+  },
+  "TV_Stuff_D": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "IBUZ (side)",
+     "rect": [
+      92,
+      236,
+      154,
+      297
+     ],
+     "bg": [
+      80,
+      330
+     ]
+    },
+    {
+     "what": "IBUZ (side)",
+     "rect": [
+      88,
+      424,
+      150,
+      485
+     ],
+     "bg": [
+      60,
+      400
+     ]
+    },
+    {
+     "what": "IBUZ (rear)",
+     "rect": [
+      302,
+      441,
+      348,
+      481
+     ],
+     "bg": [
+      290,
+      420
+     ]
+    }
+   ]
+  },
+  "amb": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "BRSCC (bonnet)",
+     "rect": [
+      274,
+      83,
+      364,
+      107
+     ],
+     "bg": "#ececee"
+    },
+    {
+     "what": "BRSCC (rear)",
+     "rect": [
+      400,
+      112,
+      492,
+      141
+     ],
+     "bg": [
+      395,
+      150
+     ]
+    },
+    {
+     "what": "BRSCC (side)",
+     "rect": [
+      262,
+      222,
+      366,
+      257
+     ],
+     "bg": [
+      380,
+      240
+     ]
+    },
+    {
+     "what": "BRSCC (side)",
+     "rect": [
+      32,
+      386,
+      128,
+      422
+     ],
+     "bg": "#ececee"
+    },
+    {
+     "what": "Mercedes star (grille)",
+     "rect": [
+      294,
+      116,
+      318,
+      140
+     ],
+     "bg": [
+      330,
+      128
+     ]
+    },
+    {
+     "what": "Mercedes star (wheel)",
+     "rect": [
+      40,
+      38,
+      58,
+      56
+     ],
+     "bg": [
+      36,
+      47
+     ]
+    },
+    {
+     "what": "Mercedes star (wheel)",
+     "rect": [
+      124,
+      36,
+      142,
+      54
+     ],
+     "bg": [
+      120,
+      45
+     ]
+    },
+    {
+     "what": "Sprinter script",
+     "rect": [
+      392,
+      177,
+      428,
+      189
+     ],
+     "bg": [
+      388,
+      183
+     ]
+    }
+   ]
+  }
+ },
+ "silverstone/map_track.glb": {
+  "asph-old_new_B": {
+   "size": [
+    4096,
+    4096
+   ],
+   "patches": [
+    {
+     "what": "sponsor artwork on the run-off (lion mark and lettering)",
+     "rect": [
+      3640,
+      0,
+      3992,
+      2310
+     ],
+     "bg": [
+      3662,
+      400
+     ]
+    }
+   ]
+  }
  }
 }

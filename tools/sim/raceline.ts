@@ -195,7 +195,9 @@ console.log(`  biggest moves from min curvature: ${shown.map((i) => `${Math.roun
 
 const cm = (a: Float32Array) => Array.from(a, (v) => Math.round(v * 100));
 const file: RacelineFile = { v: 1, id: track.id, n, length: Math.round(track.length * 100) / 100, opt: cm(best), alt: cm(alt), lo: cm(lo2), hi: cm(hi2) };
-mkdirSync(path.join(pub, 'racelines'), { recursive: true });
-const out = path.join(pub, 'racelines', `${track.id}.json`);
+// (RACELINE_OUT: another folder, the Godot app's godot/data/racelines)
+const outDir = process.env.RACELINE_OUT ? path.resolve(process.env.RACELINE_OUT) : path.join(pub, 'racelines');
+mkdirSync(outDir, { recursive: true });
+const out = path.join(outDir, `${track.id}.json`);
 writeFileSync(out, JSON.stringify(file));
 console.log(`  wrote ${path.relative(process.cwd(), out)}`);

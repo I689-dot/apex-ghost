@@ -20,14 +20,17 @@ from mathutils import Matrix
 argv = sys.argv[sys.argv.index("--") + 1:]
 GLB, TEX, OUT = Path(argv[0]), Path(argv[1]), Path(argv[2])
 OUT.mkdir(parents=True, exist_ok=True)
-CFG = json.loads((Path(__file__).parent / "config.json").read_text())
+# [<config>]: another circuit's (Silverstone: tools/asset-pipeline/silverstone/config.json, its "godot" key: toGameFrame,
+# renderNames, and the name patterns below)
+CFG = json.loads(Path(argv[3]).read_text())["godot"] if len(argv) > 3 else json.loads((Path(__file__).parent / "config.json").read_text())
 CELL = 320.0
-NAMES = CFG["renderNames"]
+NAMES = CFG.get("renderNames", {})
 # single trees (the forest plants models where they stand); the tree-line strips stay cards (a painted forest wall)
-TREE_RE = re.compile(r"^(trees_new_spa1|trees_new_spa2|bushes)", re.I)
-TERRAIN_RE = re.compile(r"^top2", re.I)
-TRACK_RE = re.compile(r"^(asph|curb|lines|grass|sand|gravel|grille|grail|galvanized|wall_|fence|astroturf|pavement|top2)", re.I)
-ALPHA_RE = re.compile(r"^(trees_|bushes|fence|grille|transp|flag|hedge|asph_spa_g|lines)", re.I)
+RE = CFG.get("renderRe", {})
+TREE_RE = re.compile(RE.get("tree", r"^(trees_new_spa1|trees_new_spa2|bushes)"), re.I)
+TERRAIN_RE = re.compile(RE.get("terrain", r"^top2"), re.I)
+TRACK_RE = re.compile(RE.get("track", r"^(asph|curb|lines|grass|sand|gravel|grille|grail|galvanized|wall_|fence|astroturf|pavement|top2)"), re.I)
+ALPHA_RE = re.compile(RE.get("alpha", r"^(trees_|bushes|fence|grille|transp|flag|hedge|asph_spa_g|lines)"), re.I)
 
 
 def log(*a):

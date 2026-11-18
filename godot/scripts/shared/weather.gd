@@ -34,6 +34,7 @@ const CLIMATE := {
 	"nurburgring": {"altitudeM": 620.0, "highLow": [[16, 7], [20, 11], [22, 12], [21, 13], [18, 10]]},
 	"zandvoort": {"altitudeM": 5.0, "highLow": [[14, 10], [18, 13], [20, 16], [20, 16], [18, 14]]},
 	"spa": {"altitudeM": 430.0, "highLow": [[17, 7], [20, 10], [22, 12], [21, 12], [18, 9]]},
+	"silverstone": {"altitudeM": 150.0, "highLow": [[17, 7], [20, 10], [22, 12], [22, 12], [19, 10]]},
 }
 
 static func _pick_weighted(rng: Prng, entries: Array) -> String:

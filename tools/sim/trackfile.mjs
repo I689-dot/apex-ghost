@@ -28,6 +28,15 @@ export function assetPath(url) {
  * @returns {{ track: any, collision: Buffer, file: string }}
  */
 export function loadTrack(id) {
+  // TRACK_FILE: a track JSON outside the web game (the Godot app's: godot/data/tracks/<id>.json), its asset paths
+  // under TRACK_ROOT (godot/)
+  if (process.env.TRACK_FILE) {
+    const file = path.resolve(process.env.TRACK_FILE);
+    const track = JSON.parse(readFileSync(file, 'utf8'));
+    const root = path.resolve(process.env.TRACK_ROOT ?? path.dirname(file));
+    const raw = readFileSync(path.join(root, track.collision.file.replace(/\?.*$/, '')));
+    return { track, collision: raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw, file };
+  }
   const index = JSON.parse(readFileSync(path.join(PUB, 'assets/tracks.json'), 'utf8')).tracks;
   const entry = id ? index.find((t) => t.id === id) : index.find((t) => t.default);
   if (!entry) throw new Error(`unknown track ${id}; known: ${index.map((t) => t.id).join(', ')}`);

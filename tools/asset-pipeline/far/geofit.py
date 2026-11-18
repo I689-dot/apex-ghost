@@ -2,8 +2,8 @@
 for the far terrain (build_far.py).
    python3 -I tools/asset-pipeline/far/geofit.py <track.json> <osm_raceway.json> <out.json> <lat0> <lon0> [skip regex]
 <skip regex>: raceway names left out (pit lanes, other layouts); default "Kart|Pit|Moto".
-Local metres around LAT0/LON0 (east, north); a rotation search then ICP (rotation + translation, scale fixed at 1:1, the
-model is in true metres)."""
+Local metres around LAT0/LON0 (east, north); a rotation (and with FIT_SCALE=1 a scale) search then ICP (rotation +
+translation, and scale with FIT_SCALE: a model not built at 1:1, e.g. Silverstone's source)."""
 import sys, json, re, numpy as np
 LAT0, LON0 = float(sys.argv[4]), float(sys.argv[5])
 SKIP = re.compile(sys.argv[6] if len(sys.argv) > 6 else 'Kart|Pit|Moto')
@@ -32,25 +32,30 @@ def chamfer(Q):
     d2 = ((Q[:, None, :] - Ps[None, :, :]) ** 2).sum(-1)
     return np.sqrt(d2.min(1)), d2.argmin(1)
 Q0 = cl[::8]
+import os
+FIT_SCALE = os.environ.get('FIT_SCALE') == '1'
 best = None
-for mirror in (1, -1):
-    for deg in range(0, 360, 2):
-        a = np.radians(deg); Rm = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
-        q = (Q0 * [1, mirror]) @ Rm.T; q = q - q.mean(0) + P.mean(0)
-        e = chamfer(q)[0].mean()
-        if best is None or e < best[0]: best = (e, mirror, deg)
+for sc in (np.arange(0.6, 1.41, 0.05) if FIT_SCALE else [1.0]):
+    for mirror in (1, -1):
+        for deg in range(0, 360, 2):
+            a = np.radians(deg); Rm = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
+            q = sc * (Q0 * [1, mirror]) @ Rm.T; q = q - q.mean(0) + P.mean(0)
+            e = chamfer(q)[0].mean()
+            if best is None or e < best[0]: best = (e, mirror, deg, sc)
 print('coarse', best)
-_, mirror, deg = best
+_, mirror, deg, s_fit = best
 a = np.radians(deg); Rm = np.array([[np.cos(a), -np.sin(a)], [np.sin(a), np.cos(a)]])
-Q = cl[::2] * [1, mirror]; t = P.mean(0) - (Q0 * [1, mirror]).mean(0) @ Rm.T
+Q = cl[::2] * [1, mirror]; t = P.mean(0) - s_fit * (Q0 * [1, mirror]).mean(0) @ Rm.T
 for it in range(30):
-    q = Q @ Rm.T + t
+    q = s_fit * Q @ Rm.T + t
     dist, idx = chamfer(q)
     keep = dist < np.percentile(dist, 90)
     A = Q[keep]; B = P[::3][idx[keep]]
     ma, mb = A.mean(0), B.mean(0); H = (A - ma).T @ (B - mb); U, S, Vt = np.linalg.svd(H); Rm = (U @ Vt).T
     if np.linalg.det(Rm) < 0: Vt[-1] *= -1; Rm = (U @ Vt).T
-    t = mb - ma @ Rm.T
-q = Q @ Rm.T + t; dist, _ = chamfer(q)
-print('fit: mirror', mirror, 'rot deg', np.degrees(np.arctan2(Rm[1, 0], Rm[0, 0])).round(3), 't', t.round(2), 'residual mean', dist.mean().round(2), 'p95', np.percentile(dist, 95).round(2), 'max', dist.max().round(1))
-json.dump({'lat0': LAT0, 'lon0': LON0, 'mirror_z': mirror, 'R': Rm.tolist(), 't': t.tolist(), 'note': 'east,north = R @ (x, mirror*z) + t'}, open(sys.argv[3], 'w'))
+    if FIT_SCALE:
+        s_fit = float(np.sum(((B - mb) @ Rm) * (A - ma)) / np.sum((A - ma) ** 2))
+    t = mb - s_fit * ma @ Rm.T
+q = s_fit * Q @ Rm.T + t; dist, _ = chamfer(q)
+print('fit: scale', round(s_fit, 4), 'mirror', mirror, 'rot deg', np.degrees(np.arctan2(Rm[1, 0], Rm[0, 0])).round(3), 't', t.round(2), 'residual mean', dist.mean().round(2), 'p95', np.percentile(dist, 95).round(2), 'max', dist.max().round(1))
+json.dump({'lat0': LAT0, 'lon0': LON0, 'mirror_z': mirror, 's': s_fit, 'R': Rm.tolist(), 't': t.tolist(), 'note': 'east,north = s * R @ (x, mirror*z) + t'}, open(sys.argv[3], 'w'))

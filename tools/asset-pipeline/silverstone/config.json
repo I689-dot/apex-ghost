@@ -1,0 +1,474 @@
+{
+ "id": "silverstone",
+ "name": "Silverstone Circuit",
+ "source": "(prepared by tools/asset-pipeline/silverstone/prep.py from RESOURCES/CIRCUIT-MODELS/silverstone-circuit-2024-layout.zip into ~/apex-ghost-sources/silverstone/silverstone.usdc)",
+ "out": "map_silverstone",
+ "assets": "maps/silverstone",
+ "default": false,
+ "tracks": {
+  "silverstone": {
+   "turns": 18
+  }
+ },
+ "fixPitEntry": false,
+ "fillGrass": "grass_ss",
+ "analysis": {
+  "id": "silverstone",
+  "name": "Silverstone Circuit",
+  "officialLengthM": 5779,
+  "unit": 2.0,
+  "scaleRange": [
+   0.99,
+   1.01
+  ],
+  "_materials": "An Assetto Corsa conversion like Spa's, in true metres (fitted onto OpenStreetMap: scale 1.00, 9 m mean over the racing surface's width). The asphalt is one material whose 4096 px atlas holds the two road strips (white edge lines painted along their sides) and the run-off: prep.py splits it by texture position (asph_ss_road / asph_ss_runoff) and makes the painted edge lines geometry (lines_ss). groove/groove2/groove3 are the rubbered layers (asph_ss_g1 the racing surface, a closed loop).",
+  "materials": {},
+  "surfaceRules": [
+   [
+    "^lines",
+    "asphalt"
+   ],
+   [
+    "^curb",
+    "curb"
+   ],
+   [
+    "^(asph|pavement)",
+    "asphalt"
+   ],
+   [
+    "^top2",
+    "grass"
+   ],
+   [
+    "^grass",
+    "grass"
+   ],
+   [
+    "^gravel",
+    "gravel"
+   ],
+   [
+    "^sand",
+    "sand"
+   ],
+   [
+    "^(wall_|grail|fence)",
+    "wall"
+   ]
+  ],
+  "road": [
+   "asph_ss_road",
+   "asph_ss_g1",
+   "asph_ss_g2",
+   "asph_ss_g3",
+   "asph_ss_pit"
+  ],
+  "traceRoad": [
+   "asph_ss_g1"
+  ],
+  "traceDilate": 0,
+  "edgeLines": "lines_ss",
+  "curbs": [
+   "curb_ss",
+   "curb_ss_new"
+  ],
+  "boundaryMaxAboveRoad": 1.5,
+  "widthDespike": 1.0,
+  "markings": {
+   "mode": "boxes",
+   "finishAt": {
+    "at": [
+     -349.6,
+     191.4
+    ],
+    "dir": [
+     0.586,
+     -0.811
+    ],
+    "len": 15
+   },
+   "raceTowards": [
+    -234,
+    32
+   ],
+   "gridBehindFinish": true,
+   "gridSynth": {
+    "behindM": 12,
+    "stepM": 8,
+    "latM": 2.8,
+    "poleSide": 1
+   }
+  },
+  "layouts": [],
+  "pitLane": {
+   "_note": "The Wing pit lane after OpenStreetMap (International pit lane, fitted onto the model by tools/asset-pipeline/far/geofit.py), as raw points: in before Club on the right, straight on inside Club, along Hamilton Straight past the garages, out after Abbey.",
+   "raw": [
+    [
+     -187.3,
+     713.76
+    ],
+    [
+     -208.48,
+     680.34
+    ],
+    [
+     -228.98,
+     647.56
+    ],
+    [
+     -286.16,
+     560.78
+    ],
+    [
+     -291.89,
+     552.11
+    ],
+    [
+     -295.52,
+     546.7
+    ],
+    [
+     -298.37,
+     542.53
+    ],
+    [
+     -302.35,
+     537.68
+    ],
+    [
+     -305.37,
+     534.45
+    ],
+    [
+     -394.01,
+     440.17
+    ],
+    [
+     -426.71,
+     406.61
+    ],
+    [
+     -429.37,
+     403.84
+    ],
+    [
+     -431.39,
+     400.95
+    ],
+    [
+     -433.15,
+     398.0
+    ],
+    [
+     -434.08,
+     396.33
+    ],
+    [
+     -435.28,
+     393.72
+    ],
+    [
+     -436.2,
+     391.13
+    ],
+    [
+     -437.12,
+     388.1
+    ],
+    [
+     -437.93,
+     384.09
+    ],
+    [
+     -438.39,
+     380.48
+    ],
+    [
+     -438.61,
+     377.04
+    ],
+    [
+     -438.56,
+     373.62
+    ],
+    [
+     -438.08,
+     369.66
+    ],
+    [
+     -437.07,
+     365.14
+    ],
+    [
+     -435.96,
+     361.45
+    ],
+    [
+     -434.42,
+     357.73
+    ],
+    [
+     -429.85,
+     349.94
+    ],
+    [
+     -427.51,
+     346.41
+    ],
+    [
+     -425.86,
+     343.69
+    ],
+    [
+     -415.57,
+     328.5
+    ],
+    [
+     -409.3,
+     319.07
+    ],
+    [
+     -403.33,
+     310.05
+    ],
+    [
+     -391.3,
+     292.28
+    ],
+    [
+     -379.43,
+     274.49
+    ],
+    [
+     -367.88,
+     256.93
+    ],
+    [
+     -355.57,
+     238.73
+    ],
+    [
+     -343.73,
+     220.99
+    ],
+    [
+     -331.88,
+     203.72
+    ],
+    [
+     -319.69,
+     185.52
+    ],
+    [
+     -301.67,
+     158.68
+    ],
+    [
+     -290.18,
+     141.38
+    ],
+    [
+     -277.22,
+     122.38
+    ],
+    [
+     -263.26,
+     101.18
+    ],
+    [
+     -251.3,
+     83.48
+    ],
+    [
+     -239.76,
+     66.1
+    ],
+    [
+     -230.11,
+     52.13
+    ],
+    [
+     -225.71,
+     46.58
+    ],
+    [
+     -222.69,
+     43.41
+    ],
+    [
+     -219.45,
+     40.87
+    ],
+    [
+     -215.97,
+     38.13
+    ],
+    [
+     -211.66,
+     35.31
+    ],
+    [
+     -206.85,
+     32.87
+    ],
+    [
+     -201.84,
+     30.6
+    ],
+    [
+     -197.48,
+     28.99
+    ],
+    [
+     -192.99,
+     27.79
+    ],
+    [
+     -186.93,
+     26.66
+    ],
+    [
+     -179.49,
+     25.67
+    ],
+    [
+     -151.33,
+     22.54
+    ],
+    [
+     -125.47,
+     19.69
+    ],
+    [
+     -46.14,
+     11.25
+    ],
+    [
+     -36.41,
+     10.18
+    ],
+    [
+     -24.62,
+     8.95
+    ],
+    [
+     -11.5,
+     7.57
+    ],
+    [
+     -0.68,
+     5.9
+    ],
+    [
+     7.71,
+     4.07
+    ],
+    [
+     15.12,
+     2.23
+    ],
+    [
+     22.2,
+     -0.04
+    ],
+    [
+     30.73,
+     -3.82
+    ],
+    [
+     38.19,
+     -7.6
+    ],
+    [
+     45.38,
+     -11.71
+    ],
+    [
+     52.38,
+     -16.05
+    ],
+    [
+     59.8,
+     -20.91
+    ],
+    [
+     66.35,
+     -30.64
+    ]
+   ],
+   "box": [
+    -230,
+    60
+   ],
+   "speedLimitKmh": 60,
+   "outS": 300
+  },
+  "_length": "The model is in true metres (geofit: scale 1.00): officialLengthM is the traced racing surface's raw length, so the scale comes out 1.0; the centreline after re-centring is ~5906 m (the real lap 5891 m)."
+ },
+ "godot": {
+  "_note": "The Godot build (collision, render, track file): game = s * glTF + t, from the track analysis (scale 1, its offset).",
+  "toGameFrame": {
+   "s": 1.0000193346149355,
+   "R": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     0,
+     1,
+     0
+    ],
+    [
+     0,
+     0,
+     1
+    ]
+   ],
+   "t": [
+    -22.09942626953125,
+    5.195777286182751,
+    4.08624267578125
+   ]
+  },
+  "overlay": "^(asph_ss_g|lines_ss)",
+  "surfaceRules": [
+   [
+    "^(asph_ss_g|lines_ss)",
+    null
+   ],
+   [
+    "^(asph|pavement)",
+    "asphalt"
+   ],
+   [
+    "^curb",
+    "curb"
+   ],
+   [
+    "^(grass|top2)",
+    "grass"
+   ],
+   [
+    "^sand_ss_border",
+    "gravel"
+   ],
+   [
+    "^sand",
+    "gravel"
+   ],
+   [
+    "^(wall_|grail|fence)",
+    "wall"
+   ]
+  ],
+  "renderRe": {
+   "tree": "^trees_ss",
+   "terrain": "^top2_ss",
+   "track": "^(asph|curb|lines|grass|sand|grail|wall_|fence|pavement|top2)",
+   "alpha": "^(trees_|fence|transp|Transparent|flag|asph_ss_g|lines|miscalpha|glass_transp)"
+  }
+ }
+}

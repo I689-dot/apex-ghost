@@ -285,10 +285,21 @@ if BOXES:
     for tris_ in by_line_.values():
         draw_line_boundary(tris_)
     # the line across the circuit (the same material also marks a line in the pit lane): nearest the hint
-    fm = merged(MARKINGS["finish"])
-    hint = np.array(MARKINGS["finishHint"])
-    fcomps = [shape(fm["v"][comp]) for comp in components(fm) if len(comp) >= 3]
-    finish = min(fcomps, key=lambda f: float(np.linalg.norm(f["c"][[0, 2]] - hint)))
+    if MARKINGS.get("finishAt"):
+        # a line painted into the road's texture (Silverstone): given as [x, z] and the race direction [dx, dz] (raw)
+        fa = MARKINGS["finishAt"]
+        fc = np.array([float(fa["at"][0]), 0.0, float(fa["at"][1])])
+        road_v = np.concatenate([m["v"] for m in meshes if m["mat"] in CFG["road"]])
+        near = road_v[np.argsort(np.hypot(road_v[:, 0] - fc[0], road_v[:, 2] - fc[2]))[:20]]
+        fc[1] = float(np.median(near[:, 1]))
+        rd = np.array(fa["dir"], float)
+        rd /= np.linalg.norm(rd)
+        finish = {"c": fc, "len": float(fa.get("len", 14.0)) * U / 2.0, "wid": 0.4, "dir": np.array([rd[1], -rd[0]]), "nv": 0}
+    else:
+        fm = merged(MARKINGS["finish"])
+        hint = np.array(MARKINGS["finishHint"])
+        fcomps = [shape(fm["v"][comp]) for comp in components(fm) if len(comp) >= 3]
+        finish = min(fcomps, key=lambda f: float(np.linalg.norm(f["c"][[0, 2]] - hint)))
     fdir_ = finish["dir"] / np.linalg.norm(finish["dir"])
     # (no grid material: the slots are painted into the asphalt texture; "gridSynth" places them)
     if MARKINGS.get("grid"):
@@ -1018,7 +1029,10 @@ def pit_from_raw(spec: dict) -> dict:
     pts_ = [to_game(x, sample_height(x, z), z) for x, z in xz_]
     lap_s = np.array([cumS[dist_to_main(q)[1]] for q in xz_])
     in_box = lambda v: (v >= spec["box"][0]) & (v <= spec["box"][1])  # noqa: E731
-    ks = np.nonzero(in_box(lap_s))[0]
+    # (boxes before the line given as negative lap distances, as pit_from_lap takes them: Silverstone's garages
+    # straddle the line)
+    lap_rel = np.where(lap_s > length / 2, lap_s - length, lap_s) if spec["box"][0] < 0 else lap_s
+    ks = np.nonzero(in_box(lap_rel))[0]
     box = [int(ks.min()), int(ks.max())] if len(ks) else [0, 0]
     plen = float(sum(np.linalg.norm(np.array(pts_[k + 1]) - np.array(pts_[k])) for k in range(len(pts_) - 1)))
     # the pit-out line ("outS", lap m): the speed limit ends there; the points after it are the exit road

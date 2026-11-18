@@ -31,6 +31,11 @@ COVER_HALF = 10000.0
 COVER_PX = 2048
 
 
+def ew(o):
+    """A tile name's longitude letter (west of Greenwich: Silverstone)."""
+    return 'W' if o < 0 else 'E'
+
+
 class Geo:
     def __init__(self, fit):
         f = json.load(open(fit))
@@ -235,7 +240,7 @@ def main():
     # (the tiles' longitude spacing is 1.5" between 50 and 60 degrees north)
     lats = range(int(np.floor(box[0])), int(np.floor(box[1])) + 1)
     lons = range(int(np.floor(box[2])), int(np.floor(box[3])) + 1)
-    dem_tiles = [(os.path.join(dl, f'Copernicus_DSM_COG_10_N{a:02d}_00_E{o:03d}_00_DEM.tif'), a + 1.0, float(o), 1 / 3600, 1.5 / 3600) for a in lats for o in lons]
+    dem_tiles = [(os.path.join(dl, f'Copernicus_DSM_COG_10_N{a:02d}_00_{ew(o)}{abs(o):03d}_00_DEM.tif'), a + 1.0, float(o), 1 / 3600, 1.5 / 3600) for a in lats for o in lons]
     dem = Raster([t for t in dem_tiles if os.path.exists(t[0])], box)
     # the real heights in the game frame (vertical scale as the horizontal: the game frame is the model at 1.0103)
     la, lo = G.latlon(cl[:, 0], cl[:, 2])
@@ -310,7 +315,7 @@ def main():
     cov_tiles = []
     for a in sorted({int(np.floor(v / 3) * 3) for v in (box[0], box[1])}):
         for o in sorted({int(np.floor(v / 3) * 3) for v in (box[2], box[3])}):
-            cov_tiles.append((os.path.join(dl, f'ESA_WorldCover_10m_2021_v200_N{a:02d}E{o:03d}_Map.tif'), a + 3.0, float(o), 1 / 12000, 1 / 12000))
+            cov_tiles.append((os.path.join(dl, f'ESA_WorldCover_10m_2021_v200_N{a:02d}{ew(o)}{abs(o):03d}_Map.tif'), a + 3.0, float(o), 1 / 12000, 1 / 12000))
     cov = Raster([t for t in cov_tiles if os.path.exists(t[0])], box, nearest=True)
     px = 2 * COVER_HALF / COVER_PX
     acc = np.zeros((COVER_PX, COVER_PX, 4), np.float32)

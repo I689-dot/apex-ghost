@@ -37,7 +37,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../../..');
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.includes(`--${k}`) ? args[args.indexOf(`--${k}`) + 1] : d);
-const CFG = JSON.parse(readFileSync(path.join(here, 'config.json'), 'utf8'));
+// --config: another circuit's (Silverstone: tools/asset-pipeline/silverstone/config.json, its "godot" key: toGameFrame,
+// surfaceRules)
+const cfgArg = opt('config', null);
+const CFG = cfgArg ? JSON.parse(readFileSync(cfgArg, 'utf8')).godot : JSON.parse(readFileSync(path.join(here, 'config.json'), 'utf8'));
 const glbFile = opt('glb', process.env.SPA_GLB ?? path.join(homedir(), 'apex-ghost-sources/spa/source/spa.glb'));
 const defaultOut = path.join(root, 'godot/assets/maps/spa/collision.apxc');
 const outFile = opt('out', defaultOut);

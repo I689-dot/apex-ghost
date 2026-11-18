@@ -28,6 +28,14 @@ PACKS = {
         'probe': 'res://assets/maps/spa_g/map_track.glb',
         'name': 'Spa-Francorchamps',
     },
+    # (its look shares Spa's scanned textures, trees and crowd: those come with Spa's pack, as for the Nürburgring GP;
+    # without it the circuit keeps the model's own road texture and tree cards)
+    'silverstone': {
+        'files': ['assets/maps/silverstone/*'],
+        'skip': ['*.import', '*.uid'],
+        'probe': 'res://assets/maps/silverstone/map_track.glb',
+        'name': 'Silverstone',
+    },
 }
 # per platform: its export platform, preset options and the files only the other platform's pack carries
 PLATFORMS = {

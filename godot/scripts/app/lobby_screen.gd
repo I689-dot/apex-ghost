@@ -7,11 +7,11 @@ extends RefCounted
 ## entry list); the screen's one big action (start / ready) stays at the bottom right on every tab. The briefing, where
 ## each driver chooses tyres, wing, brake balance, fuel and the deeper setup for the final conditions, follows.
 
-const MAP_COUNTRY := {"zandvoort": "NL", "spa": "BE"}
-const CIRCUIT_NAME := {"nurburgring": "Nürburgring", "zandvoort": "Circuit Zandvoort", "spa": "Circuit de Spa-Francorchamps"}
+const MAP_COUNTRY := {"zandvoort": "NL", "spa": "BE", "silverstone": "GB"}
+const CIRCUIT_NAME := {"nurburgring": "Nürburgring", "zandvoort": "Circuit Zandvoort", "spa": "Circuit de Spa-Francorchamps", "silverstone": "Silverstone Circuit"}
 ## Where each circuit is, and when the drawn layout first opened (the GP-Strecke 1984, the Nordschleife 1927).
-const LOCATION := {"nurburgring": "Nürburg, Germany", "nordschleife": "Nürburg, Germany", "spa": "Stavelot, Belgium", "zandvoort": "Zandvoort, Netherlands"}
-const OPENED := {"nurburgring": 1984, "nordschleife": 1927, "spa": 1921, "zandvoort": 1948}
+const LOCATION := {"nurburgring": "Nürburg, Germany", "nordschleife": "Nürburg, Germany", "spa": "Stavelot, Belgium", "zandvoort": "Zandvoort, Netherlands", "silverstone": "Silverstone, United Kingdom"}
+const OPENED := {"nurburgring": 1984, "nordschleife": 1927, "spa": 1921, "zandvoort": 1948, "silverstone": 1948}
 
 static var _room_code := ""
 static var _page := "hub"

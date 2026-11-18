@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# The menus' background photos (godot/assets/ui/photo_<kind>[_spa|_zandvoort].webp), shot in the Godot game itself:
+# The menus' background photos (godot/assets/ui/photo_<kind>[_spa|_zandvoort|_silverstone].webp), shot in the Godot game itself:
 # the brand-free cars and boards, the game's own name on them. Each opens a game window (on screen APEX_SCREEN, default
 # 1: the LG); ~1 min a photo, 15 photos.
-#   tools/godot/menu-photos.sh
+#   tools/godot/menu-photos.sh            (TRACKS="silverstone": only those circuits)
 set -euo pipefail
 here="$(cd "$(dirname "$0")/../.." && pwd)"
 godot="${GODOT:-$HOME/.local/opt/godot/godot}"
@@ -14,7 +14,7 @@ shot() { # name track secs env...
     timeout 300 "$godot" --path . --disable-vsync --resolution 1920x1080 res://tests/runner.tscn -- res://tests/session_test.gd "$secs" >/dev/null 2>&1 || true
   echo "$name $(test -f "$out/$name.png" && echo ok || echo MISSING)"
 }
-for t in nurburgring_short spa zandvoort; do
+for t in ${TRACKS:-nurburgring_short spa zandvoort silverstone}; do
   sfx=""; [ "$t" != nurburgring_short ] && sfx="_$t"
   shot "hero$sfx" "$t" 14 CHASE_YAW=145 CHASE_DIST=5.6 CHASE_H=0.95 CHASE_FOV=40 CHASE_AHEAD=0 CHASE_LOOKY=0.6
   shot "pole$sfx" "$t" 14 CHASE_YAW=190 CHASE_DIST=7.5 CHASE_H=0.7 CHASE_FOV=34 CHASE_AHEAD=0 CHASE_LOOKY=0.7

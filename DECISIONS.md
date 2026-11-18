@@ -1513,3 +1513,53 @@ assumes the old peak; retune AI_GRIP if needed).
   mean). No reference video: Spa's measured values stand in (same climate, same paint).
 - Ultra 1080p with 8 AI cars: 53.7 -> 47.2 fps. On a phone without the Spa pack the shared textures and trees are
   absent and the GP keeps its old surfaces and trees (each step checks its files).
+
+## Godot: the bots on the lap-time optimiser's racing lines (2026-11-18)
+
+- The user asked the bots to take the corners as real drivers do, for the best lap at each circuit. Sources:
+  - the racing-line basics: Wikipedia "Racing line", Trophi.ai, simracingcockpit.gg and Purpl (outside-inside-outside,
+    the late apex before a straight, sacrificing the corner that leads onto a short one);
+  - the physics of the minimum-time line: Linköping MSc thesis 08/EX/4074;
+  - the corner-by-corner guides: Track Titan and Coach Dave Academy for the Nürburgring GP and the 24h layout.
+- What those guides do by hand, the lap-time optimiser in tools/sim/raceline.ts already does: it moves the line point by
+  point until the simulated lap stops improving, and gives late apexes where a straight follows. ai.gd now reads its
+  file (data/racelines/<layout>.json: opt, alt, lo, hi in cm) before building a min-curvature line of its own.
+  - The line is kept 0.6 m inside the file's limits (LINE_MARGIN, at most a quarter of the width). On the bare optimum
+    the bots touched the grass every lap and were reset.
+  - Bots below skill 0.85 drive the cautious line (alt), blended towards the optimum up to skill 1.0.
+- New lines: Nürburgring GP (the optimiser's estimate 1:53.4 against 2:07.0 on the old line) and the 24h layout.
+  Zandvoort with its line: 1:46.86, no resets. A run of the real-time learning (ai_learn.gd) on the new line made it
+  no faster (1:47.02) and was not kept. A learned file is kept only when a bot lap with it beats one without.
+
+## Godot: Silverstone (2026-11-19)
+
+- The user added RESOURCES/CIRCUIT-MODELS/silverstone-circuit-2024-layout.zip (the 2024 GP layout, an Assetto Corsa
+  export like the Spa source) and asked for it in the game with the most realistic look.
+- The build, in order:
+  - tools/asset-pipeline/silverstone/prep.py (Blender) names the materials (asph_ss_*, curb_ss, ...), splits the run-off
+    from the racing surface and turns the edge lines painted in the road atlas into 12 cm strips (lines_ss). The strips
+    give the track limits and stay visible once the scanned asphalt covers the atlas.
+  - The track analysis, collision and render chunks run as for Spa: config.json is kept out of maps/, so the web game
+    does not build the circuit.
+  - track.mjs writes godot/data/tracks/silverstone.json (5906 m, 169 gates, 12 grid slots, the pit lane from
+    OpenStreetMap; the track limits 94 % on painted lines).
+- The look is SilverstoneLook.PROFILE, Spa's treatment:
+  - the scanned asphalt at Spa's albedo, the source's rubber decals blended, and the kerbs' paint repaint;
+  - the lawn, grain on concrete, metal and paint, and the catch fence;
+  - the scanned spectators on the gstands1 stands;
+  - an English summer sky: a little more haze and cloud than Spa's;
+  - targets for the source's white multi-layer base textures (the gravel borders, the concrete), which glared white;
+  - far terrain from Copernicus and WorldCover. Silverstone is west of Greenwich, so build_far.py names W tiles. The
+    land around is 41 % crops, 39 % grass and 16 % trees, and the geofit is 9.4 m mean on OpenStreetMap's GP ways.
+- Brands painted over (tools/godot/debrand-maps.json): eBay and Adrian Flux boards, Hilton Garden Inn on the hotel
+  (GRIDCORSA HOTEL), the model author's flags, the BRDC crests, the BRSCC and Mercedes marks on the ambulance, the
+  IBUZ vans and a sponsor's lion and lettering painted on the run-off. The circuit's own names stay (Silverstone,
+  Brooklands, Stowe).
+- The bots' line is from raceline.ts, which now reads a Godot track (TRACK_FILE and TRACK_ROOT, with RACELINE_OUT for
+  the output). The optimiser's estimate is 1:50.7 (2:13.6 on min curvature). A bot lap is 2:10.7 with no resets, 9 %
+  off the line's quasi-steady 1:59.6, as at Zandvoort.
+- Ultra at 1080p with 6 AI cars: 72.6 fps (GPU 6.5 ms).
+- It is a downloadable pack, as Spa is (200 MB: build-track-pack.py `silverstone`, out of the app's export). Its
+  scanned textures, trees and crowd come with Spa's pack; without that pack, the model's own surfaces are used.
+- Lobby: the GB flag, Silverstone, United Kingdom, 1948. Climate: 150 m. Menu photos shot with
+  `TRACKS=silverstone tools/godot/menu-photos.sh`.

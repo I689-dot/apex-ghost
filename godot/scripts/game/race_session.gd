@@ -643,12 +643,13 @@ func _load_forest(q: Dictionary) -> void:
 		track.forest = forest
 
 func _attach_world_extras(q: Dictionary) -> void:
-	# the scanned spectators where a circuit has its own look (Spa; the Nürburgring on its own stand materials)
+	# the scanned spectators where a circuit has its own look (Spa; the Nürburgring and Silverstone on their own stand
+	# materials: the profile's stand_re)
 	var crowd: MultiMeshInstance3D = null
 	if track_data.get("id", "") == "spa":
 		crowd = SpaCrowd.build(track, track_data, float(q.crowd))
 	elif SpaLook.use(track_data):
-		crowd = SpaCrowd.build(track, track_data, float(q.crowd), Crowd.STAND_MAT_RE)
+		crowd = SpaCrowd.build(track, track_data, float(q.crowd), SpaLook._p("stand_re", Crowd.STAND_MAT_RE))
 	else:
 		crowd = Crowd.build(track, track_data, float(q.crowd))
 	if crowd != null:
