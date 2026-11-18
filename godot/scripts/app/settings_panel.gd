@@ -395,6 +395,18 @@ static func _display(col: Control, changed: Callable) -> void:
 	_range(col, I18n.t("Brightness"), "", S, "brightness", 0.6, 1.5, 0.05, _pct, changed)
 	_range(col, I18n.t("Contrast"), "", d, "contrast", 0.8, 1.25, 0.01, _pct, changed)
 	_range(col, I18n.t("Colour saturation"), "", d, "saturation", 0.6, 1.4, 0.01, _pct, changed)
+	for k in [["eyeAdaptation", true], ["lensFlare", true], ["hdr", false]]:
+		if not d.has(k[0]):
+			d[k[0]] = k[1]
+	if not OS.has_feature("mobile"):
+		_toggle(col, I18n.t("Eye adaptation"), I18n.t("The exposure follows what you see, slowly, as your eyes do: out of the forest into the sun, into the dark under the trees, the night (from the next session)"), d, "eyeAdaptation", changed)
+		_toggle(col, I18n.t("Sun lens flare"), I18n.t("The sun's glare and flare when you look towards it"), d, "lensFlare", changed)
+		if Graphics.hdr_supported():
+			_toggle(col, I18n.t("HDR output"), I18n.t("On an HDR screen: the sun, headlights and floodlights as bright as they really are"), d, "hdr", func():
+				Graphics.apply_hdr()
+				changed.call())
+		else:
+			col.add_child(_row(I18n.t("HDR output"), UIW.switch(false, null), I18n.t("Needs an HDR screen with HDR on in the system (Windows, macOS, or Linux on Wayland)")))
 
 static func _view(col: Control, changed: Callable) -> void:
 	var S: Dictionary = Settings.data

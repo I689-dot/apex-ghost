@@ -32,6 +32,8 @@ var hide_rain := false
 var night := 0.0
 var sun_elevation := 0.0
 var sun_dir := Vector3(0, 1, 0)
+## How strong the sun's flare is now (0..1): LensFlare.
+var flare_strength := 0.0
 var _sky_acc := 100.0
 var _time := 0.0
 var _last_sun := Vector3(0, -2, 0)
@@ -147,6 +149,8 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	var day := _smoothstep(-0.1, 0.12, elevation)
 	night = 1.0 - _smoothstep(-0.2, 0.02, elevation)
 	var overcast: float = w.clouds
+	# the sun's glare and flare (LensFlare): full on a clear day, gone under cloud, in fog and rain, at night
+	flare_strength = day * pow(clampf(1.0 - overcast, 0.0, 1.0), 1.5) * clampf(1.0 - float(w.fog) * 2.5, 0.0, 1.0) * clampf(1.0 - float(w.rain) * 1.5, 0.0, 1.0)
 	# crisp blue on clear days, milky in haze and fog
 	var haze: float = 0.55 * float(look.get("haze", 1.0)) + overcast * 0.9 + w.fog * 4.0
 	_update_lut(sun_v, haze)
@@ -266,7 +270,23 @@ func _update_lut(sun_v: Vector3, haze: float, force: bool = false) -> void:
 func env_intensity() -> float:
 	return 0.25 + 0.75 * (1.0 - night)
 
+## The eye's adaptation (Display › Eye adaptation): the exposure follows what the camera sees, slowly, as an eye or a TV
+## camera does (out of the forest into the sun, into the dark under the trees, the pit building's shade, the night).
+## Kept within a narrow range round the exposure the game sets (time of day, the circuit's look), so the picture is
+## never pumped: from 0.6x in bright sun to 2.2x in the dark.
+var camera_attrs := CameraAttributesPractical.new()
+
+func _apply_eye(q: Dictionary) -> void:
+	var on: bool = bool(Settings.data.display.get("eyeAdaptation", true)) and not OS.has_feature("mobile")
+	camera_attrs.auto_exposure_enabled = on
+	camera_attrs.auto_exposure_speed = 0.55
+	camera_attrs.auto_exposure_scale = 0.4
+	camera_attrs.auto_exposure_min_sensitivity = 60.0
+	camera_attrs.auto_exposure_max_sensitivity = 220.0
+	world_env.camera_attributes = camera_attrs
+
 func _apply_post(q: Dictionary) -> void:
+	_apply_eye(q)
 	# bloom (only the sun, headlights and floodlights pass the threshold) and the filmic grade of High / Ultra
 	env.glow_enabled = bool(q.bloom)
 	env.glow_hdr_threshold = 4.0

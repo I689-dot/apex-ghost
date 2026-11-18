@@ -40,6 +40,7 @@ func _apply_display() -> void:
 	if OS.has_feature("mobile"):
 		return
 	apply_ui_size()
+	apply_hdr()
 	Settings.place_window()
 	var mode: DisplayServer.WindowMode = {
 		"windowed": DisplayServer.WINDOW_MODE_WINDOWED, "borderless": DisplayServer.WINDOW_MODE_FULLSCREEN,
@@ -63,6 +64,16 @@ static func apply_ui_size() -> void:
 	var w := (Engine.get_main_loop() as SceneTree).root
 	var k: String = str(Settings.data.display.get("uiSize", "medium"))
 	w.content_scale_size = UI_CANVAS.get(k, UI_CANVAS.medium)
+
+## HDR output (Display › HDR output, Godot 4.7): on an HDR screen the sun, headlights and floodlights are shown as
+## bright as the lighting makes them instead of being tone-mapped down to an ordinary screen's range. Windows, macOS
+## and Linux on Wayland; elsewhere the switch is off.
+static func hdr_supported() -> bool:
+	return not OS.has_feature("mobile") and DisplayServer.window_is_hdr_output_supported()
+
+static func apply_hdr() -> void:
+	var w := (Engine.get_main_loop() as SceneTree).root
+	w.hdr_output_requested = hdr_supported() and bool(Settings.data.display.get("hdr", false))
 
 ## FSR 2 needs the Forward+ renderer; FSR 1 works on both.
 static func upscalers() -> Array:

@@ -547,6 +547,14 @@ func start_loading(race: Dictionary, start_at) -> void:
 	var hud := s.hud_node()
 	if hud.get_parent() != null:
 		hud.get_parent().remove_child(hud)
+	# the sun's glare, under the HUD (drawn first in the same layer)
+	if not OS.has_feature("mobile"):
+		var flare := LensFlare.new()
+		var sref = s
+		flare.camera_of = func(): return get_viewport().get_camera_3d()
+		flare.sun_dir_of = func(): return sref.env.sun_dir if is_instance_valid(sref) and sref.env != null else Vector3.UP
+		flare.strength_of = func(): return sref.env.flare_strength if is_instance_valid(sref) and sref.env != null else 0.0
+		hud_layer.add_child(flare)
 	hud_layer.add_child(hud)
 	UIKit.full(hud)
 	if s.cinematic != null:

@@ -92,6 +92,12 @@ func _run() -> void:
 		var layer := CanvasLayer.new()
 		layer.layer = 5
 		add_child(layer)
+		# the sun's flare under it, as the app adds it
+		var flare := LensFlare.new()
+		flare.camera_of = func(): return get_viewport().get_camera_3d()
+		flare.sun_dir_of = func(): return session.env.sun_dir
+		flare.strength_of = func(): return session.env.flare_strength
+		layer.add_child(flare)
 		layer.add_child(session.hud)
 		UIKit.full(session.hud)
 	if OS.get_environment("SKIP_INTRO") != "" and session.cinematic != null:
