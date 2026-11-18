@@ -1449,3 +1449,19 @@ From the user's list (DECISIONS: the rest follows):
   Coca-Cola, TOTAL, Uniroyal, DHL, ALD, Classic 21, Silverstone, Assetto Corsa, alpinestars; MyLAPS, ADVAN, Kumho,
   Hörmann, McGregor, Formido...). Circuits' own names and signs stay. The menu photos are shot again in this game
   (brand-free cars and boards).
+
+## Godot + server: coins, codes, invites, ranking, room regions (2026-11-18)
+
+- The server keeps each account's coins (with a ledger), Driver Rating and race count (apps/server/src/economy.ts
+  for the rules, accounts.ts for the storage). Coins come from finished online races (25, +50 podium, +100 win,
+  +50 the first of the day: only the game server reports results, a client cannot award itself coins), promotional
+  codes (once per account; WELCOME500, CORSAGHOST, SPA2026 to start with) and invites (300 to the new driver, 500 to
+  the one who invited them after their third race; a code within the first week). The Driver Rating moves only in
+  races with at least two signed-in drivers (not alone against AI cars).
+- The game shows the server's balance, history, codes and invite when signed in; buying coins and spending them stay
+  a preview (everything on the Paint page stays free until the store opens). Career › Ranking lists drivers by
+  Driver Rating (everyone or friends). Sign-up takes an optional invite code.
+- Settings › Account › Online › Room server: a host can put a new room in a region (Cloudflare location hints) for
+  friends far away; by default it runs near the host.
+- APIs: GET /api/wallet, /api/invite, /api/ranking; POST /api/redeem, /api/invite/apply, /api/account/password;
+  POST /api/rooms takes {region}. Not deployed until the user says so.

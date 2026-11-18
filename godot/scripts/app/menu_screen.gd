@@ -153,6 +153,8 @@ static func build(app: App, error: String = "") -> Control:
 		frame.add_child(scr)
 		UIW.focus_first.call_deferred(body)
 	render.call()
+	# the coins beside the driver: the server's balance (refreshed now and then)
+	StoreScreen.refresh(func(): if is_instance_valid(frame) and app.screen == "menu": render.call())
 	UIKit.full(root)
 	return root
 

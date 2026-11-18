@@ -78,8 +78,12 @@ func probe_accounts() -> bool:
 	_accounts_on = r.status != 503
 	return _accounts_on
 
-func register(nick: String, password: String) -> Dictionary:
-	var r := await api("account/register", {"nick": nick, "password": password})
+## invite: a friend's invite code (optional; a wrong one does not stop the account, it is just not applied).
+func register(nick: String, password: String, invite: String = "") -> Dictionary:
+	var body := {"nick": nick, "password": password}
+	if invite.strip_edges() != "":
+		body.invite = invite.strip_edges()
+	var r := await api("account/register", body)
 	if r.ok:
 		_save(r.data)
 	return r
@@ -109,6 +113,27 @@ func save_profile(p: Dictionary) -> Dictionary:
 		a.user = r.data.user
 		_save(a)
 	return r
+
+# ---------------------------------------------------- coins, invites, ranking (the server's economy.ts) ---
+
+## {coins, rating, races, ledger: [{delta, reason, at}]}
+func wallet() -> Dictionary:
+	return await api("wallet")
+
+## A promotional code: {coins, added, what}, or the server's reason it did not work.
+func redeem(code: String) -> Dictionary:
+	return await api("redeem", {"code": code})
+
+## My invite code and how many friends joined with it and raced: {code, invited, racing, inviteRaces, rewards}.
+func invite() -> Dictionary:
+	return await api("invite")
+
+func apply_invite(code: String) -> Dictionary:
+	return await api("invite/apply", {"code": code})
+
+## The ranking by Driver Rating: {rows: [{nick, country, abbr, num, rating, races}], me: {rank, rating, races}}.
+func ranking(scope: String = "global") -> Dictionary:
+	return await api("ranking?scope=%s" % scope)
 
 ## A new password (the current one again first). The server signs out every other device.
 func change_password(old_pw: String, new_pw: String) -> Dictionary:

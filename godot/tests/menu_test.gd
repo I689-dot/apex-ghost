@@ -49,11 +49,11 @@ func _run() -> void:
 			app.show_menu()
 			await _frames()
 			_ok(_count(app.ui, UIW.TabButton) >= 4, "menu %s builds (%s)" % [t, lang])
-		for t in ["profile", "achievements", "ranks"]:
+		for t in ["profile", "achievements", "ranks", "ranking"]:
 			CareerScreen._tab = t
 			app.show_career()
 			await _frames()
-			_ok(app.ui.get_child_count() > 0 and _count(app.ui, UIW.TabButton) == 3, "career %s builds (%s)" % [t, lang])
+			_ok(app.ui.get_child_count() > 0 and _count(app.ui, UIW.TabButton) == 4, "career %s builds (%s)" % [t, lang])
 		for page in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller", "account", "presets"]:
 			SettingsPanel._tab = page
 			var panel := SettingsPanel.build(app, func(): pass)

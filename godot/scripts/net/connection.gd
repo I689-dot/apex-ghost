@@ -50,7 +50,12 @@ static func create_room() -> String:
 	var headers := PackedStringArray()
 	if token != null:
 		headers.append("Authorization: Bearer %s" % token)
-	if req.request("%s/api/rooms" % Config.SERVER_URL, headers, HTTPClient.METHOD_POST) != OK:
+	# where the room runs (Settings › Gameplay › Interface › Online): near the host ("auto"), or a region for friends
+	# far away (the server's location hints)
+	headers.append("Content-Type: application/json")
+	var region: String = str(Settings.data.get("online", {}).get("region", "auto"))
+	var req_body := JSON.stringify({"region": region} if region != "auto" else {})
+	if req.request("%s/api/rooms" % Config.SERVER_URL, headers, HTTPClient.METHOD_POST, req_body) != OK:
 		req.queue_free()
 		last_error = I18n.t("Cannot reach the game server. Check your connection.")
 		return ""

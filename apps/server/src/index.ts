@@ -4,7 +4,8 @@
  *   GET  /api/rooms          → public rooms (the room list before joining), from the DirectoryDO
  *   GET  /api/rooms/:code/ws → WebSocket into the room's Durable Object
  *   GET  /health
- *   /api/account/register|login|logout|delete|password|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats
+ *   /api/account/register|login|logout|delete|password|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats,
+ *   /api/wallet, /api/redeem, /api/invite[/apply], /api/ranking (economy.ts)
  *       → accounts.ts (AccountsDO, its own SQLite database); presence lives in the DirectoryDO
  * One Durable Object per room (idFromName(code)); WebSocket Hibernation API.
  */
@@ -45,6 +46,9 @@ const CORS: Record<string, string> = {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
 
+/** The regions a host can put a room in (Cloudflare's Durable Object location hints). */
+const ROOM_REGIONS: DurableObjectLocationHint[] = ['wnam', 'enam', 'sam', 'weur', 'eeur', 'apac', 'oc', 'afr', 'me'];
+
 const directory = (env: Env) => env.DIRECTORY.get(env.DIRECTORY.idFromName('directory'));
 
 const accounts = (env: Env) => env.ACCOUNTS.get(env.ACCOUNTS.idFromName('accounts'));
@@ -55,7 +59,7 @@ async function accountApi(req: Request, env: Env, path: string): Promise<Respons
   const op = path as AccountOp;
   const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
   const query = Object.fromEntries(new URL(req.url).searchParams);
-  const reads: AccountOp[] = ['me', 'friends', 'records', 'stats'];
+  const reads: AccountOp[] = ['me', 'friends', 'records', 'stats', 'wallet', 'invite', 'ranking'];
   if ((req.method === 'GET') !== reads.includes(op)) return json({ error: 'Not found' }, 404);
   if (op === 'presence' && !isPresence(body.presence)) return json({ error: 'Bad presence.' }, 400);
   const token = bearer(req);
@@ -112,7 +116,7 @@ export default {
       return out;
     }
     const am = url.pathname.match(
-      /^\/api\/(?:account\/)?(register|login|logout|delete|password|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats)$/,
+      /^\/api\/(?:account\/)?(register|login|logout|delete|password|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats|wallet|redeem|invite(?:\/apply)?|ranking)$/,
     );
     if (am) return accountApi(req, env, am[1]);
 
@@ -123,9 +127,13 @@ export default {
 
     if (url.pathname === '/api/rooms' && req.method === 'POST') {
       if (!(await mayPlayOnline(env, bearer(req)))) return json({ error: 'Sign in to play online.' }, 401);
+      // where the room runs: near the host by default (a Durable Object starts where it is first reached), or the
+      // region the host picks for drivers elsewhere ({region}: one of Cloudflare's location hints)
+      const body = (await req.json().catch(() => ({}))) as { region?: unknown };
+      const hint = typeof body.region === 'string' && ROOM_REGIONS.includes(body.region as DurableObjectLocationHint) ? (body.region as DurableObjectLocationHint) : undefined;
       for (let attempt = 0; attempt < 8; attempt++) {
         const code = generateRoomCode();
-        const stub = env.ROOMS.get(env.ROOMS.idFromName(code));
+        const stub = hint ? env.ROOMS.get(env.ROOMS.idFromName(code), { locationHint: hint }) : env.ROOMS.get(env.ROOMS.idFromName(code));
         const res = await stub.fetch(`https://room/init?code=${code}`, { method: 'POST' });
         if (res.status === 201) return json({ code }, 201);
       }

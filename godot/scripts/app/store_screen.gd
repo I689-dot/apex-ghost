@@ -55,6 +55,32 @@ static var _tab := "coins"
 static var preview_coins := 1250
 static var _owned := {}
 static var _redeemed := {}
+## Signed in: the server's wallet ({coins, rating, races, ledger}) and invite ({code, invited, racing}); coins from
+## online races, codes and invites are real (the server's economy.ts). Buying and spending stay a preview.
+static var _live := {}
+static var _live_invite := {}
+static var _fetched_at := -1000000
+
+static func signed_in() -> bool:
+	return Account.account() != null
+
+## The balance shown: the server's when signed in, the preview's otherwise.
+static func coins() -> int:
+	return int(_live.coins) if signed_in() and _live.has("coins") else preview_coins
+
+## Fetches the wallet and the invite (at most every 20 s unless forced) and redraws.
+static func refresh(rerender: Callable, force: bool = false) -> void:
+	if not signed_in() or (not force and Time.get_ticks_msec() - _fetched_at < 20000):
+		return
+	_fetched_at = Time.get_ticks_msec()
+	var w: Dictionary = await Account.wallet()
+	if w.ok:
+		_live = w.data
+	var i: Dictionary = await Account.invite()
+	if i.ok:
+		_live_invite = i.data
+	if (w.ok or i.ok) and rerender.is_valid():
+		rerender.call()
 
 ## The store's page (the menu's Store tab).
 static func build(app: App, rerender: Callable) -> Control:
@@ -64,6 +90,7 @@ static func build(app: App, rerender: Callable) -> Control:
 		["redeem", I18n.t("Redeem code")], ["invite", I18n.t("Invite friends")]], _tab, func(k): _tab = k; rerender.call(), true))
 	col.add_child(head)
 	col.add_child(_preview_banner())
+	refresh(rerender)
 	var body: Control
 	match _tab:
 		"items":
@@ -92,7 +119,7 @@ static func balance_chip(on: Callable) -> Control:
 	b.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.22), GOLD, 1, 4))
 	var row := UIW.hbox(8)
 	row.add_child(Coin.new(11))
-	row.add_child(UIKit.label(fmt(preview_coins), 20, UIKit.TEXT, true, 700))
+	row.add_child(UIKit.label(fmt(coins()), 20, UIKit.TEXT, true, 700))
 	var m := UIW.margins(row, 10, 4, 12, 4)
 	UIW.pass_mouse(m)
 	b.add_child(m)
@@ -109,7 +136,7 @@ static func _preview_banner() -> Control:
 	p.add_theme_stylebox_override("panel", UIKit.box(Color(GOLD, 0.12), Color(GOLD, 0.5), 1, 4, Vector2(14, 8)))
 	var row := UIW.hbox(10)
 	row.add_child(UIW.tag(I18n.t("Preview"), GOLD_DARK))
-	var l := UIKit.label(I18n.t("This is how the store will look. Payments are not switched on: nothing is charged, nothing is saved, and no card details go anywhere."), 15, UIKit.SOFT)
+	var l := UIKit.label(I18n.t("Buying coins is a preview: payments are not switched on, nothing is charged and no card details go anywhere. Coins from online races, codes and invites are real.") if signed_in() else I18n.t("This is how the store will look. Payments are not switched on: nothing is charged, nothing is saved, and no card details go anywhere."), 15, UIKit.SOFT)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(l)
@@ -145,6 +172,19 @@ static func _coins(app: App, rerender: Callable) -> Control:
 		earn.add_child(t)
 	col.add_child(earn)
 	col.add_child(UIW.muted(I18n.t("Coins buy paint, designs and parts for your car. They do not buy speed: every car races on the same terms.")))
+	# signed in: the latest changes to the balance (races, codes, invites)
+	var ledger: Array = _live.get("ledger", []) if signed_in() else []
+	if not ledger.is_empty():
+		col.add_child(UIW.section(I18n.t("Your coins"), fmt(coins())))
+		for e in ledger.slice(0, 8):
+			var r := UIW.hbox(10)
+			var when := Time.get_datetime_string_from_unix_time(int(float(e.at) / 1000.0)).replace("T", " ").substr(0, 16)
+			r.add_child(UIKit.label(when, 14, UIKit.DIM))
+			var why := UIKit.label(str(e.reason), 16, UIKit.TEXT)
+			why.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			r.add_child(why)
+			r.add_child(UIKit.label(("+" if int(e.delta) > 0 else "") + fmt(int(e.delta)), 17, GOLD if int(e.delta) > 0 else UIKit.BAD, true, 700))
+			col.add_child(r)
 	return col
 
 static func _pack_card(app: App, pack: Dictionary, tier: int, rerender: Callable) -> Control:
@@ -315,6 +355,16 @@ static func _spend(app: App, it: Dictionary, rerender: Callable) -> void:
 	var body: VBoxContainer = m.body
 	var close := func(): m.root.queue_free()
 	UIW.modal_head(body, I18n.t(it.name), close, I18n.t("Unlock"))
+	if signed_in():
+		# the real balance is not spent before the store opens: until then everything on the Paint page is free
+		var t := UIW.muted(I18n.t("Unlocking with coins opens with the store. Until then this, and everything else on the Paint page, is free: choose it there."))
+		t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.add_child(t)
+		var ok_row := UIW.hbox(10)
+		ok_row.alignment = BoxContainer.ALIGNMENT_END
+		ok_row.add_child(UIKit.button(I18n.t("OK"), close, true))
+		body.add_child(ok_row)
+		return
 	var after: int = preview_coins - int(it.price)
 	var rows := UIW.vbox(4)
 	for r in [[I18n.t("Your coins"), fmt(preview_coins)], [I18n.t("Price"), "−" + fmt(it.price)], [I18n.t("Left after"), fmt(after)]]:
@@ -408,6 +458,19 @@ static func _redeem(rerender: Callable) -> Control:
 		var code := le.text.strip_edges().replace(" ", "").to_upper()
 		if code == "":
 			return
+		if signed_in():
+			var r: Dictionary = await Account.redeem(code)
+			if not is_instance_valid(msg):
+				return
+			if r.ok:
+				_live.coins = r.data.coins
+				msg.text = I18n.t("Redeemed: {what}.", {"what": I18n.t(str(r.data.what))})
+				msg.add_theme_color_override("font_color", UIKit.GOOD)
+				refresh(rerender, true)
+			else:
+				msg.text = I18n.t(str(r.error))
+				msg.add_theme_color_override("font_color", UIKit.BAD)
+			return
 		if _redeemed.has(code):
 			msg.text = I18n.t("You have used this code already.")
 			msg.add_theme_color_override("font_color", UIKit.BAD)
@@ -424,7 +487,8 @@ static func _redeem(rerender: Callable) -> Control:
 	row.add_child(UIKit.button(I18n.t("Redeem"), go, true))
 	col.add_child(row)
 	col.add_child(msg)
-	col.add_child(UIW.muted(I18n.t("Try the preview's codes: WELCOME500, CORSAGHOST, SPA2026."), 14))
+	if not signed_in():
+		col.add_child(UIW.muted(I18n.t("Try the preview's codes: WELCOME500, CORSAGHOST, SPA2026."), 14))
 	return col
 
 # ---------------------------------------------------------------- invite ---
@@ -444,8 +508,11 @@ static func _invite() -> Control:
 	var row := HFlowContainer.new()
 	row.add_theme_constant_override("h_separation", 14)
 	row.add_theme_constant_override("v_separation", 14)
-	var code := invite_code()
+	var live := signed_in() and _live_invite.has("code")
+	var code: String = str(_live_invite.code) if live else invite_code()
 	var link := "https://corsaghost.com/invite/" + code
+	var racing: int = int(_live_invite.get("racing", 0)) if live else 0
+	var joined: int = int(_live_invite.get("invited", 0)) if live else 0
 	var a := UIW.vbox(10)
 	a.add_child(UIKit.label(I18n.t("Invite friends").to_upper(), 36, UIKit.TEXT, true, 700))
 	a.add_child(UIW.muted(I18n.t("They get coins to start with, you get coins when they race.")))
@@ -480,10 +547,10 @@ static func _invite() -> Control:
 		rr.add_child(UIKit.label(r[1], 16, GOLD, true, 700))
 		b.add_child(rr)
 		b.add_child(UIW.hair())
-	b.add_child(UIW.muted(I18n.t("Friends racing: {n} of 3", {"n": 0}), 15))
+	b.add_child(UIW.muted(I18n.t("Friends joined: {j} · racing: {n} of 3", {"j": joined, "n": racing}), 15))
 	var bar := ProgressBar.new()
 	bar.max_value = 3
-	bar.value = 0
+	bar.value = mini(racing, 3)
 	bar.show_percentage = false
 	bar.custom_minimum_size = Vector2(0, 10)
 	b.add_child(bar)

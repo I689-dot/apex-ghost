@@ -14,6 +14,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { NICK_MAX, NICK_MIN, PROFILE_RE, type AccountUser, type FriendEntry, type RecordRow, type UserStats } from '@apex/shared';
 import type { RecordEvent } from './room';
+import { COINS, INVITE_RACES, INVITE_WINDOW_MS, RATING_START, SEED_CODES, coinsForResult, dayOf, newInviteCode, normaliseCode, ratingDelta } from './economy';
 
 export type AccountOp =
   | 'register'
@@ -29,7 +30,12 @@ export type AccountOp =
   | 'friends/remove'
   | 'presence'
   | 'records'
-  | 'stats';
+  | 'stats'
+  | 'wallet'
+  | 'redeem'
+  | 'invite'
+  | 'invite/apply'
+  | 'ranking';
 
 /** An HTTP status and the JSON body (as text: RPC carries it unchanged). */
 export interface AccountReply {
@@ -135,6 +141,28 @@ create table if not exists results (
   created_at integer not null
 );
 create index if not exists results_user on results (user_id, created_at desc);
+create table if not exists coin_ledger (
+  id integer primary key autoincrement,
+  user_id text not null references users (id) on delete cascade,
+  delta integer not null,
+  reason text not null,
+  created_at integer not null
+);
+create index if not exists coin_ledger_user on coin_ledger (user_id, created_at desc);
+create table if not exists codes (
+  code text primary key,
+  coins integer not null check (coins >= 0),
+  what text not null,
+  max_uses integer,
+  uses integer not null default 0,
+  expires_at integer
+);
+create table if not exists code_uses (
+  code text not null references codes (code) on delete cascade,
+  user_id text not null references users (id) on delete cascade,
+  created_at integer not null,
+  primary key (code, user_id)
+);
 `;
 
 type Row = Record<string, SqlStorageValue>;
@@ -153,8 +181,20 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       ['num', 'integer'],
       ['abbr', 'text'],
       ['colour', 'text'],
+      // coins, the Driver Rating and invites (economy.ts)
+      ['coins', 'integer not null default 0'],
+      ['rating', `integer not null default ${RATING_START}`],
+      ['races', 'integer not null default 0'],
+      ['invite_code', 'text'],
+      ['invited_by', 'text'],
+      ['invite_paid', 'integer not null default 0'],
+      ['last_race_day', 'integer'],
     ])
       if (!cols.has(c)) this.sql.exec(`alter table users add column ${c} ${type}`);
+    this.sql.exec('create unique index if not exists users_invite on users (invite_code)');
+    this.sql.exec('create index if not exists users_rating on users (rating desc)');
+    for (const c of SEED_CODES)
+      this.sql.exec('insert or ignore into codes (code, coins, what, max_uses) values (?, ?, ?, ?)', c.code, c.coins, c.what, c.maxUses);
   }
 
   private rows<T = Row>(query: string, ...args: SqlStorageValue[]): T[] {
@@ -214,6 +254,16 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
           return { status: 200, body: { rows: this.records(token, query) } };
         case 'stats':
           return { status: 200, body: { stats: this.stats(token, query) } };
+        case 'wallet':
+          return { status: 200, body: this.wallet(token) };
+        case 'redeem':
+          return { status: 200, body: this.redeem(token, body) };
+        case 'invite':
+          return { status: 200, body: this.invite(token) };
+        case 'invite/apply':
+          return { status: 200, body: this.applyInvite(this.requireUser(token).id, body.code) };
+        case 'ranking':
+          return { status: 200, body: this.ranking(token, query) };
         default:
           return { status: 404, body: { error: 'Not found' } };
       }
@@ -268,9 +318,15 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
   /** The game server's records (signed-in drivers only: a token that matches nobody writes nothing). */
   writeRecords(events: RecordEvent[]): void {
     const now = Date.now();
+    // the signed-in drivers of each race in this batch (a race's results come together): the Driver Rating moves only
+    // when people raced each other, not a driver alone with AI cars
+    const people = new Map<string, number>();
+    for (const e of events)
+      if (e.kind === 'result' && e.session === 'race' && this.userOf(e.token)) people.set(e.trackId, (people.get(e.trackId) ?? 0) + 1);
     for (const e of events) {
       const u = this.userOf(e.token);
       if (!u) continue;
+      if (e.kind === 'result' && e.session === 'race' && e.totalMs !== null) this.payRace(u.id, e.position, e.entrants, (people.get(e.trackId) ?? 0) >= 2, now);
       if (e.kind === 'lap')
         this.sql.exec(
           'insert into laps (user_id, track_id, car_id, lap_ms, sectors, session, wet, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -330,7 +386,114 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       Date.now(),
       Date.now(),
     );
+    // an invite code given when signing up (a wrong one does not stop the account: it is just not applied)
+    if (body.invite) {
+      try {
+        this.applyInvite(id, body.invite);
+      } catch {
+        /* not applied */
+      }
+    }
     return { token: this.newToken(id), user: { id, nick } };
+  }
+
+  // ---------------------------------------------------------------- coins ---
+
+  /** Coins to (or from) a driver, kept in the ledger. */
+  private addCoins(userId: string, delta: number, reason: string): void {
+    if (delta === 0) return;
+    this.sql.exec('update users set coins = max(0, coins + ?) where id = ?', delta, userId);
+    this.sql.exec('insert into coin_ledger (user_id, delta, reason, created_at) values (?, ?, ?, ?)', userId, delta, reason, Date.now());
+  }
+
+  /** My coins, the latest changes and my Driver Rating. */
+  private wallet(token: string | null): { coins: number; rating: number; races: number; ledger: { delta: number; reason: string; at: number }[] } {
+    const me = this.requireUser(token);
+    const u = this.rows<{ coins: number; rating: number; races: number }>('select coins, rating, races from users where id = ?', me.id)[0];
+    const ledger = this.rows<{ delta: number; reason: string; at: number }>(
+      'select delta, reason, created_at as at from coin_ledger where user_id = ? order by id desc limit 20',
+      me.id,
+    );
+    return { coins: u.coins, rating: u.rating, races: u.races, ledger };
+  }
+
+  /** A promotional code: once per account, while it lasts. */
+  private redeem(token: string | null, body: Record<string, unknown>): { coins: number; added: number; what: string } {
+    const me = this.requireUser(token);
+    const code = normaliseCode(body.code);
+    const c = this.rows<{ code: string; coins: number; what: string; max_uses: number | null; uses: number; expires_at: number | null }>(
+      'select * from codes where code = ?',
+      code,
+    )[0];
+    if (!c || (c.expires_at !== null && c.expires_at < Date.now()) || (c.max_uses !== null && c.uses >= c.max_uses))
+      throw new HttpError(404, 'That code is not valid or has expired.');
+    if (this.rows('select 1 from code_uses where code = ? and user_id = ?', code, me.id).length) throw new HttpError(409, 'You have used this code already.');
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec('insert into code_uses (code, user_id, created_at) values (?, ?, ?)', code, me.id, Date.now());
+      this.sql.exec('update codes set uses = uses + 1 where code = ?', code);
+      this.addCoins(me.id, c.coins, `code ${code}`);
+    });
+    const coins = this.rows<{ coins: number }>('select coins from users where id = ?', me.id)[0].coins;
+    return { coins, added: c.coins, what: c.what };
+  }
+
+  // -------------------------------------------------------------- invites ---
+
+  /** My invite code (made the first time it is asked for) and how my invites are doing. */
+  private invite(token: string | null): { code: string; invited: number; racing: number; inviteRaces: number; rewards: typeof COINS } {
+    const me = this.requireUser(token);
+    let code = this.rows<{ invite_code: string | null }>('select invite_code from users where id = ?', me.id)[0].invite_code;
+    while (!code) {
+      const c = newInviteCode((n) => crypto.getRandomValues(new Uint8Array(n)));
+      if (!this.rows('select 1 from users where invite_code = ?', c).length) {
+        this.sql.exec('update users set invite_code = ? where id = ?', c, me.id);
+        code = c;
+      }
+    }
+    const invited = this.rows<{ n: number }>('select count(*) as n from users where invited_by = ?', me.id)[0].n;
+    const racing = this.rows<{ n: number }>('select count(*) as n from users where invited_by = ? and races >= ?', me.id, INVITE_RACES)[0].n;
+    return { code, invited, racing, inviteRaces: INVITE_RACES, rewards: COINS };
+  }
+
+  /** Someone's invite code for a driver: in their first week, once, not their own. They get their coins now, the one
+   * who invited them when they have raced INVITE_RACES times. */
+  private applyInvite(userId: string, v: unknown): { ok: true; added: number } {
+    const code = normaliseCode(v);
+    const me = this.rows<{ invited_by: string | null; created_at: number; invite_code: string | null }>(
+      'select invited_by, created_at, invite_code from users where id = ?',
+      userId,
+    )[0];
+    if (!me) throw new HttpError(401, 'Sign in first.');
+    if (me.invited_by) throw new HttpError(409, 'You have used an invite code already.');
+    if (Date.now() - me.created_at > INVITE_WINDOW_MS) throw new HttpError(409, 'Invite codes work in your first week only.');
+    const from = this.rows<{ id: string }>('select id from users where invite_code = ?', code)[0];
+    if (!from) throw new HttpError(404, 'That invite code is not valid.');
+    if (from.id === userId) throw new HttpError(400, 'That is your own code.');
+    this.sql.exec('update users set invited_by = ? where id = ?', from.id, userId);
+    this.addCoins(userId, COINS.invited, 'invited by a friend');
+    return { ok: true, added: COINS.invited };
+  }
+
+  // -------------------------------------------------------------- ranking ---
+
+  /** The ranking by Driver Rating: everyone, or me and my friends. My place in it either way. */
+  private ranking(token: string | null, query: Record<string, string>): { rows: unknown[]; me: { rank: number; rating: number; races: number } | null } {
+    const me = this.userOf(token);
+    const friendsOnly = query.scope === 'friends';
+    if (friendsOnly && !me) throw new HttpError(401, 'Sign in to see your friends.');
+    const ids = friendsOnly && me ? [me.id, ...this.friendIdsOf(token).friends] : null;
+    const where = ids ? `where id in (${ids.map(() => '?').join(',')})` : 'where races > 0';
+    const rows = this.rows(
+      `select nick, country, abbr, num, rating, races from users ${where} order by rating desc, races desc limit 100`,
+      ...((ids ?? []) as SqlStorageValue[]),
+    );
+    let mine = null;
+    if (me) {
+      const r = this.rows<{ rating: number; races: number }>('select rating, races from users where id = ?', me.id)[0];
+      const above = this.rows<{ n: number }>('select count(*) as n from users where races > 0 and rating > ?', r.rating)[0].n;
+      mine = { rank: above + 1, rating: r.rating, races: r.races };
+    }
+    return { rows, me: mine };
   }
 
   private async login(body: Record<string, unknown>): Promise<{ token: string; user: AccountUser }> {
@@ -372,8 +535,29 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       this.sql.exec('delete from friends where user_id = ?1 or friend_id = ?1', me.id);
       this.sql.exec('delete from laps where user_id = ?', me.id);
       this.sql.exec('delete from results where user_id = ?', me.id);
+      this.sql.exec('delete from coin_ledger where user_id = ?', me.id);
+      this.sql.exec('delete from code_uses where user_id = ?', me.id);
+      this.sql.exec('update users set invited_by = null where invited_by = ?', me.id);
       this.sql.exec('delete from users where id = ?', me.id);
     });
+  }
+
+  /** A finished online race: its coins, the Driver Rating, the race count, and the inviter's coins at the third race. */
+  private payRace(userId: string, position: number, entrants: number, rated: boolean, now: number): void {
+    const u = this.rows<{ last_race_day: number | null; races: number; invited_by: string | null; invite_paid: number }>(
+      'select last_race_day, races, invited_by, invite_paid from users where id = ?',
+      userId,
+    )[0];
+    if (!u) return;
+    const first = u.last_race_day !== dayOf(now);
+    const pay = coinsForResult(position, entrants, first);
+    this.addCoins(userId, pay.coins, `race: ${pay.reasons.join(', ')} (P${position} of ${entrants})`);
+    const d = rated ? ratingDelta(position, entrants) : 0;
+    this.sql.exec('update users set races = races + 1, last_race_day = ?, rating = max(0, rating + ?) where id = ?', dayOf(now), d, userId);
+    if (u.invited_by && !u.invite_paid && u.races + 1 >= INVITE_RACES) {
+      this.sql.exec('update users set invite_paid = 1 where id = ?', userId);
+      this.addCoins(u.invited_by, COINS.inviter, 'a friend you invited raced');
+    }
   }
 
   /** Friends and requests (presence filled in by the Worker, from the DirectoryDO). */

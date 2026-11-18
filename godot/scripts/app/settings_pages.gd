@@ -148,6 +148,7 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 			app.show_start(), true)])
 		return
 	var u: Dictionary = a.user
+	var S: Dictionary = Settings.data
 	var career := CareerData.load_career()
 	var lv: int = CareerData.level_of(career.xp).level
 	var rk := CareerData.rank_of(lv)
@@ -174,8 +175,14 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 		close.call()
 		await Account.logout()
 		app.show_start()), I18n.t("Back to the sign-in screen.")))
+	SettingsPanel._head(col, I18n.t("Online"))
+	if not S.has("online"):
+		S["online"] = {"region": "auto"}
+	SettingsPanel._select(col, I18n.t("Room server"), I18n.t("Where the rooms you create run. Automatic: near you. Pick the region in between when your friends are far away."), S.online, "region", [
+		["auto", I18n.t("Automatic (near you)")], ["weur", I18n.t("Western Europe")], ["eeur", I18n.t("Eastern Europe")], ["enam", I18n.t("North America, east")],
+		["wnam", I18n.t("North America, west")], ["sam", I18n.t("South America")], ["apac", I18n.t("Asia-Pacific")], ["oc", I18n.t("Oceania")],
+		["me", I18n.t("Middle East")], ["afr", I18n.t("Africa")]], changed)
 	SettingsPanel._head(col, I18n.t("Privacy"))
-	var S: Dictionary = Settings.data
 	if not S.has("privacy"):
 		S["privacy"] = {"showOnline": true}
 	SettingsPanel._toggle(col, I18n.t("Show friends where I am"), I18n.t("Off: you appear offline to your friends (menu, lobby or racing)."), S.privacy, "showOnline", changed)

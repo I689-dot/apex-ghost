@@ -66,18 +66,25 @@ static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, 
 	var tabs := UIW.tabs([["login", I18n.t("Sign in")], ["register", I18n.t("Create account")]], mode, func(k): ref.set_mode.call(k), true)
 	tabs.alignment = BoxContainer.ALIGNMENT_BEGIN
 	var pw_field := UIW.field(I18n.t("Password"), pw)
+	var invite := LineEdit.new()
+	invite.max_length = 12
+	invite.placeholder_text = "CG-XXXXX"
+	invite.text_changed.connect(func(t): invite.text = t.to_upper(); invite.caret_column = invite.text.length())
+	var invite_field := UIW.field(I18n.t("A friend's invite code (optional: you both get coins)"), invite)
 	var set_mode := func(md: String):
 		state.mode = md
 		for b in tabs.get_children():
 			b.set_active(b.get_meta("key") == md)
 		lead.text = I18n.t("Welcome back. Sign in to race.") if md == "login" else I18n.t("Just a nickname and a password. Your laps, results, licence and coins are kept, and friends can find you.")
 		submit.text = (I18n.t("Sign in") if md == "login" else I18n.t("Create account")).to_upper()
+		invite_field.visible = md == "register"
 		err.text = ""
 	ref.set_mode = set_mode
 	body.add_child(tabs)
 	body.add_child(lead)
 	body.add_child(UIW.field(I18n.t("Nickname"), nick))
 	body.add_child(pw_field)
+	body.add_child(invite_field)
 	body.add_child(show)
 	body.add_child(err)
 	var go := func():
@@ -85,7 +92,7 @@ static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, 
 		submit.disabled = true
 		var r: Dictionary
 		if state.mode == "register":
-			r = await Account.register(nick.text, pw.text)
+			r = await Account.register(nick.text, pw.text, invite.text)
 		else:
 			r = await Account.login(nick.text, pw.text)
 		if not is_instance_valid(submit):

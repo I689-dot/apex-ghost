@@ -109,7 +109,7 @@ static func default_settings() -> Dictionary:
 		"carSetup": {"tyre": "medium", "wing": "medium", "brakeBias": 0.6, "pressure": null, "ride": [0, 0], "arb": [4, 4], "bump": [4, 4], "rebound": [4, 4], "fuelL": 60,
 			"springs": [4, 4], "camber": [-3.2, -2.6], "toe": [-0.05, 0.15], "diffPreload": 110, "diffLock": 4, "diffCoast": 4,
 			"brakePressure": 1.0, "brakeDucts": 3, "finalDrive": 0, "engineMap": 1},
-		"savedSetups": {}, "profiles": {}, "privacy": {"showOnline": true}, "ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
+		"savedSetups": {}, "profiles": {}, "privacy": {"showOnline": true}, "online": {"region": "auto"}, "ghost": true, "bindings": DEFAULT_BINDINGS.duplicate(true),
 		# your car's paint (CarPaint, the car page of the lobby): colours, finish, design, race number, rims, calipers
 		"livery": {"base": "#c8102e", "accent": "#f2f2f2", "finish": "gloss", "design": "stripes", "aero": "carbon", "number": 7, "showNumber": true, "numberColor": "#ffffff", "rims": "#1c1c1e", "calipers": "#ffd60a"},
 		"wheel": {"mode": "auto", "rotationDeg": 900, "brakeCurve": 1.0},

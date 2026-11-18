@@ -2,7 +2,8 @@ class_name CareerScreen
 extends RefCounted
 ## The solo career at a glance (the driver profile of Forza, GT and iRacing), laid out as Le Mans Ultimate's profile:
 ## Profile (the driver's name with rank and level and the XP to the next, the licence and its Safety Rating towards
-## promotion, the Driver Rating, the record as big numbers and stat tiles), Achievements and Ranks.
+## promotion, the Driver Rating, the record as big numbers and stat tiles), Achievements, Ranks, and the online Ranking
+## (every driver by the server's Driver Rating, which online races move: the server's economy.ts).
 
 static var _tab := "profile"
 
@@ -14,11 +15,13 @@ static func build(app: App) -> Control:
 			body = _achievements(c)
 		"ranks":
 			body = _ranks(c)
+		"ranking":
+			body = _ranking(app)
 		_:
 			body = _profile(c)
 	var top := UIW.top_bar({
 		"title": I18n.t("Career"), "back": app.show_menu,
-		"tabs": [["profile", I18n.t("Profile")], ["achievements", I18n.t("Achievements")], ["ranks", I18n.t("Ranks")]],
+		"tabs": [["profile", I18n.t("Profile")], ["achievements", I18n.t("Achievements")], ["ranks", I18n.t("Ranks")], ["ranking", I18n.t("Ranking")]],
 		"tab": _tab, "on_tab": func(k): _tab = k; app.show_career(), "tabs_left": UIKit.touch(),
 		"right": [UIKit.button(I18n.t("Lap records"), func(): SocialUI.records_modal(app))],
 	})
@@ -238,6 +241,67 @@ static func _ranks(c: Dictionary) -> Control:
 		p.add_child(t)
 		grid.add_child(p)
 	col.add_child(grid)
+	return UIW.scroll(col)
+
+static var _scope := "global"
+
+## The online ranking: the drivers by Driver Rating (global or me and my friends), my place in it.
+static func _ranking(app: App) -> Control:
+	var col := UIW.vbox(12)
+	if Account.account() == null:
+		col.add_child(UIW.section(I18n.t("Ranking")))
+		col.add_child(UIW.muted(I18n.t("You are playing offline: the ranking needs the game server.")))
+		return col
+	var head := UIW.hbox(12)
+	head.add_child(UIW.chips(_scope, [["global", I18n.t("Everyone")], ["friends", I18n.t("Friends")]], func(v): _scope = v; app.show_career()))
+	head.add_child(UIW.spacer())
+	var mine := UIKit.label("", 22, UIKit.ACCENT_2, true, 700)
+	head.add_child(mine)
+	col.add_child(head)
+	col.add_child(UIW.muted(I18n.t("Online races move your Driver Rating: up for finishing ahead of the field's middle, down behind it, more in a bigger field. Races with other people only (not with AI cars alone)."), 14))
+	var table := UIW.vbox(0)
+	var note := UIW.muted(I18n.t("Loading…"))
+	table.add_child(note)
+	col.add_child(table)
+	var fill := func() -> void:
+		var r: Dictionary = await Account.ranking(_scope)
+		if not is_instance_valid(table):
+			return
+		note.queue_free()
+		if not r.ok:
+			table.add_child(UIW.muted(I18n.t(str(r.error))))
+			return
+		var me = r.data.get("me")
+		if me != null:
+			mine.text = "%s  #%d · DR %d · %s" % [I18n.t("You").to_upper(), int(me.rank), int(me.rating), I18n.t("{n} races", {"n": int(me.races)})]
+		var rows: Array = r.data.get("rows", [])
+		if rows.is_empty():
+			table.add_child(UIW.muted(I18n.t("Nobody has raced online yet: be the first.")))
+			return
+		var my_nick: String = str(Account.account().user.nick) if Account.account() != null else ""
+		var head_row := UIW.hbox(12)
+		for h in [["#", 50], [I18n.t("Driver"), 0], [I18n.t("Country"), 90], [I18n.t("Races"), 90], ["DR", 90]]:
+			var l := UIKit.label(String(h[0]).to_upper(), 14, UIKit.DIM, true, 600)
+			if int(h[1]) > 0:
+				l.custom_minimum_size = Vector2(h[1], 0)
+			else:
+				l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			head_row.add_child(l)
+		table.add_child(UIW.margins(head_row, 10, 0, 10, 4))
+		for i in rows.size():
+			var e: Dictionary = rows[i]
+			var me_row: bool = str(e.nick) == my_nick
+			var row := UIW.hbox(12)
+			var cells := [[str(i + 1), 50], [str(e.nick) + ("  · " + str(e.abbr) if e.get("abbr") else ""), 0], [str(e.get("country")) if e.get("country") else "—", 90], [str(int(e.races)), 90], [str(int(e.rating)), 90]]
+			for c in cells:
+				var l := UIKit.label(String(c[0]), 18, UIKit.ACCENT_2 if me_row else UIKit.TEXT, c[1] != 0, 600 if c[1] != 0 else 500)
+				if int(c[1]) > 0:
+					l.custom_minimum_size = Vector2(c[1], 0)
+				else:
+					l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				row.add_child(l)
+			table.add_child(UIW.row_line(row))
+	fill.call()
 	return UIW.scroll(col)
 
 static func _thousands(n: int) -> String:
