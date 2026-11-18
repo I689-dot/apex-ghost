@@ -39,6 +39,7 @@ func _apply_display() -> void:
 	Engine.max_fps = int(d.maxFps)
 	if OS.has_feature("mobile"):
 		return
+	apply_ui_size()
 	Settings.place_window()
 	var mode: DisplayServer.WindowMode = {
 		"windowed": DisplayServer.WINDOW_MODE_WINDOWED, "borderless": DisplayServer.WINDOW_MODE_FULLSCREEN,
@@ -49,6 +50,19 @@ func _apply_display() -> void:
 	if mode != cur and not (mode == DisplayServer.WINDOW_MODE_WINDOWED and cur == DisplayServer.WINDOW_MODE_MAXIMIZED):
 		DisplayServer.window_set_mode(mode)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if d.vsync else DisplayServer.VSYNC_DISABLED)
+
+## The menus' and HUD's size on a computer (Display › Interface size): the canvas they are laid out on. The game's
+## screens were drawn for 1280 x 720 (a phone), and blown up 1.5x on a 1080p screen, 2x on 1440p, they looked like a
+## rescaled phone menu (the user, 2026-11-18). On a PC they are laid out on a bigger canvas: text and controls at a
+## desktop's size, more room around them. The canvas keeps the window's shape (stretch aspect "expand").
+const UI_CANVAS := {"small": Vector2i(1920, 1080), "medium": Vector2i(1600, 900), "large": Vector2i(1280, 720)}
+
+static func apply_ui_size() -> void:
+	if OS.has_feature("mobile"):
+		return
+	var w := (Engine.get_main_loop() as SceneTree).root
+	var k: String = str(Settings.data.display.get("uiSize", "medium"))
+	w.content_scale_size = UI_CANVAS.get(k, UI_CANVAS.medium)
 
 ## FSR 2 needs the Forward+ renderer; FSR 1 works on both.
 static func upscalers() -> Array:

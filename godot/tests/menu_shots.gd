@@ -3,7 +3,7 @@ extends Node
 ## (frame times while the menu sits and while the pointer moves over it).
 ##   godot --path godot res://tests/runner.tscn -- res://tests/menu_shots.gd
 
-const SIZES := [Vector2i(1280, 720), Vector2i(1366, 768), Vector2i(1920, 1080), Vector2i(2560, 1440), Vector2i(3440, 1440)]
+const SIZES := [Vector2i(1920, 1080)]
 
 func _ready() -> void:
 	_run.call_deferred()
@@ -44,4 +44,23 @@ func _run() -> void:
 		print("menu %dx%d (viewport %s): still median %.1f ms worst %.1f, pointer moving median %.1f ms worst %.1f" % [s.x, s.y, get_viewport().get_visible_rect().size, still[30], still[59], moving[30], moving[59]])
 		if dir != "":
 			get_viewport().get_texture().get_image().save_png("%s/menu_%dx%d.png" % [dir, s.x, s.y])
+	# SCREENS=1: each of the menus once, at the window's size
+	if OS.get_environment("SCREENS") != "" and dir != "":
+		for t in ["play", "online", "friends", "store"]:
+			MenuScreen._tab = t
+			app.show_menu()
+			await get_tree().create_timer(1.0).timeout
+			get_viewport().get_texture().get_image().save_png("%s/screen_menu_%s.png" % [dir, t])
+		app.show_career()
+		await get_tree().create_timer(0.6).timeout
+		get_viewport().get_texture().get_image().save_png("%s/screen_career.png" % dir)
+		app.show_menu()
+		SettingsPanel._tab = "graphics"
+		var sp := SettingsPanel.build(app, func(): pass)
+		await get_tree().create_timer(0.8).timeout
+		get_viewport().get_texture().get_image().save_png("%s/screen_settings.png" % dir)
+		sp.queue_free()
+		await app.join(LocalRoom.create(), "Driver")
+		await get_tree().create_timer(3.0).timeout
+		get_viewport().get_texture().get_image().save_png("%s/screen_lobby.png" % dir)
 	get_tree().quit(0)

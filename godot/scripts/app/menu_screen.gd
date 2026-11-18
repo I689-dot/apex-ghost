@@ -193,8 +193,8 @@ static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Call
 	prof.pressed.connect(app.show_career)
 	out.append(prof)
 	if signed_in != null:
-		out.append(_icon_button("✎", I18n.t("Edit driver profile"), func(): SocialUI.profile_modal(app, func(): app.show_menu())))
-		out.append(UIKit.button(I18n.t("Sign out"), func(): await Account.logout(); app.show_start()))
+		# the profile, the password and signing out are in Settings › Account (the gear)
+		pass
 	else:
 		# offline (or a server without accounts): the nickname is this device's
 		out.append(_icon_button("✎", I18n.t("Your nickname"), edit_nick))
@@ -264,13 +264,13 @@ static func _play_tab(app: App, online: bool, err: Label, solo: Callable, create
 	var solo_card := _card("photo_hero_spa.webp", [[I18n.t("OFFLINE"), UIKit.SOFT]], I18n.t("Play solo"), I18n.t("Race the AI on any circuit. No account, no server."),
 		[[I18n.t("Circuits"), str(circuits.size())], [I18n.t("Cars"), str(CarsDb.selectable().size())]], solo, "")
 	cards.add_child(UIW.default_focus(solo_card))
-	cards.add_child(_card("photo_hero.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Create room"), I18n.t("Your own lobby: invite friends with the room code, add AI cars."),
+	cards.add_child(_card("photo_grid.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Create room"), I18n.t("Your own lobby: invite friends with the room code, add AI cars."),
 		[[I18n.t("Drivers"), str(Const.MAX_PLAYERS)], [I18n.t("AI cars"), "✓"]], create if online else sign_in, lock))
 	var champ_stats: Array = [[I18n.t("Round"), "%d/%d" % [champ.done + 1, champ.rounds.size()]], [I18n.t("Points"), "25 · 18 · 15"]] if champ != null else [[I18n.t("Rounds"), str(circuits.size())], [I18n.t("Points"), "25 · 18 · 15"]]
 	cards.add_child(_card("photo_aerial_spa.webp", [[I18n.t("OFFLINE"), UIKit.SOFT], [I18n.t("Season"), UIKit.ACCENT_2]],
 		I18n.t("Championship · round {n}/{m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("Championship"),
 		I18n.t("A season against the AI on every circuit, points as in F1."), champ_stats, func(): ChampionshipUI.open(app, read_nick), ""))
-	cards.add_child(_card("photo_hero_zandvoort.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Join friends"), I18n.t("A room code from a friend, or a live public session."),
+	cards.add_child(_card("photo_pole_zandvoort.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Join friends"), I18n.t("A room code from a friend, or a live public session."),
 		[[I18n.t("Room code"), "5"], [I18n.t("Watch"), I18n.t("Live")]], to_online if online else sign_in, lock))
 	col.add_child(cards)
 	col.add_child(err)
@@ -322,6 +322,17 @@ static func _card(photo: String, tags: Array, title: String, sub: String, stats:
 	b.add_child(hatch)
 	UIW.pass_mouse(content)
 	b.pressed.connect(on)
+	# it answers the pointer: a little lift on hover, a dip when pressed (a PC menu: the cards felt dead)
+	b.resized.connect(func(): b.pivot_offset = b.size * 0.5)
+	var to := func(k: float, t: float) -> void:
+		var tw := b.create_tween()
+		tw.tween_property(b, "scale", Vector2(k, k), t).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	b.mouse_entered.connect(func(): to.call(1.025, 0.12))
+	b.mouse_exited.connect(func(): to.call(1.0, 0.15))
+	b.focus_entered.connect(func(): to.call(1.025, 0.12))
+	b.focus_exited.connect(func(): to.call(1.0, 0.15))
+	b.button_down.connect(func(): to.call(0.99, 0.06))
+	b.button_up.connect(func(): to.call(1.025 if b.is_hovered() else 1.0, 0.1))
 	return b
 
 # ----------------------------------------------------------------- online ---

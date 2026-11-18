@@ -358,6 +358,11 @@ static func _display(col: Control, changed: Callable) -> void:
 	if not OS.has_feature("mobile"):
 		_head(col, I18n.t("Window"))
 		_select(col, I18n.t("Window mode"), "", d, "windowMode", [["windowed", I18n.t("Windowed")], ["borderless", I18n.t("Borderless full screen")], ["fullscreen", I18n.t("Exclusive full screen")]], changed)
+		if not d.has("uiSize"):
+			d["uiSize"] = "medium"
+		_select(col, I18n.t("Interface size"), I18n.t("The menus and the HUD: Small for a big screen seen from close, Large to read them from the sofa."), d, "uiSize", [["small", I18n.t("Small")], ["medium", I18n.t("Medium")], ["large", I18n.t("Large")]], func():
+			Graphics.apply_ui_size()
+			changed.call())
 		_toggle(col, I18n.t("Vertical sync"), I18n.t("No tearing; the frame rate stays at most the display's refresh rate"), d, "vsync", changed)
 		if DisplayServer.get_screen_count() > 1:
 			var screens: Array = [["-1", I18n.t("Automatic")]]
