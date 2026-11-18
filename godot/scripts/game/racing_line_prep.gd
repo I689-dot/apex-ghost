@@ -12,7 +12,9 @@ class Task:
 static func start(track: Dictionary) -> Task:
 	var t := Task.new()
 	t.thread.start(func():
-		t.result = AiDriver.build_racing_line(track)
+		# the layout's optimised line when it has one (data/racelines), else the minimum curvature one
+		var f := AiDriver.line_from_file(track)
+		t.result = f if not f.is_empty() else AiDriver.build_racing_line(track)
 		t.done = true)
 	return t
 

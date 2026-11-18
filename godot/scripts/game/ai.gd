@@ -69,6 +69,11 @@ static func build_racing_line(track: Dictionary, margin: float = 2.0, iterations
 				off[i] = o
 				x[i] = cx[i] + nx[i] * o
 				z[i] = cz[i] + nz[i] * o
+	return _shape(x, z, off)
+
+## A line's distances and curvature from its points (x, z) and offsets.
+static func _shape(x: PackedFloat32Array, z: PackedFloat32Array, off: PackedFloat32Array) -> Dictionary:
+	var n := x.size()
 	var ds := PackedFloat32Array()
 	ds.resize(n)
 	for i in n:
@@ -205,8 +210,95 @@ static func learned_grip(track: Dictionary) -> PackedFloat32Array:
 ## Racing lines are the same for every car: build once per track.
 static func racing_line_for(track: Dictionary) -> Dictionary:
 	if not _line_cache.has(track.id):
-		_line_cache[track.id] = build_racing_line(track)
+		var f := line_from_file(track)
+		_line_cache[track.id] = f if not f.is_empty() else build_racing_line(track)
 	return _line_cache[track.id]
+
+## The lap-time-optimised line of a layout (data/racelines/<layout>.json, made by tools/sim/raceline.ts as the teams'
+## lap-time simulations find it: the track's real drivable width from its collision, kerbs included; the minimum
+## curvature line; then the lap time of a GT3 minimised from there: late apexes onto the long straights, the
+## compromises through linked corners, the kerbs used). {x, z, offset, ds, curvature, lo, hi, alt}; {} when the
+## file is missing or made for another version of the layout. lo / hi: where the car's centre may go; alt: the cautious
+## line (minimum curvature 2 m inside the asphalt edges), which the slower bots lean towards.
+## How far the optimised line keeps from the drivable edge (m; LINE_MARGIN env in tests).
+static var LINE_MARGIN: float = float(OS.get_environment("LINE_MARGIN")) if OS.get_environment("LINE_MARGIN") != "" else 0.6
+
+static func line_from_file(track: Dictionary) -> Dictionary:
+	var path := "res://data/racelines/%s.json" % track.id
+	if not FileAccess.file_exists(path):
+		return {}
+	var d = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var cl: Array = track.centerline
+	var n := cl.size() / 3
+	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != 1 or int(d.get("n", 0)) != n or absf(float(d.get("length", 0)) - float(track.length)) > 1.0:
+		return {}
+	for k in ["opt", "alt", "lo", "hi"]:
+		if not (d.get(k) is Array) or (d[k] as Array).size() != n:
+			return {}
+	var off := PackedFloat32Array()
+	var x := PackedFloat32Array()
+	var z := PackedFloat32Array()
+	var lo := PackedFloat32Array()
+	var hi := PackedFloat32Array()
+	var alt := PackedFloat32Array()
+	for arr in [off, x, z, lo, hi, alt]:
+		arr.resize(n)
+	for i in n:
+		var a := ((i - 1 + n) % n) * 3
+		var b := ((i + 1) % n) * 3
+		var tx: float = cl[b] - cl[a]
+		var tz: float = cl[b + 2] - cl[a + 2]
+		var l := maxf(Vector2(tx, tz).length(), 1e-6)
+		var nx := tz / l
+		var nz := -tx / l
+		lo[i] = float(d.lo[i]) / 100.0
+		hi[i] = float(d.hi[i]) / 100.0
+		# a margin from the drivable edge (the bots track the line to within half a metre or so: on the edge itself, a
+		# small miss put a wheel on the grass and the car off)
+		var m := minf(LINE_MARGIN, maxf(0.0, (hi[i] - lo[i]) * 0.25))
+		off[i] = clampf(float(d.opt[i]) / 100.0, lo[i] + m, hi[i] - m)
+		alt[i] = clampf(float(d.alt[i]) / 100.0, lo[i] + m, hi[i] - m)
+		x[i] = float(cl[i * 3]) + nx * off[i]
+		z[i] = float(cl[i * 3 + 2]) + nz * off[i]
+	var line := _shape(x, z, off)
+	line.lo = lo
+	line.hi = hi
+	line.alt = alt
+	return line
+
+## A bot's own line: the optimised one for the best drivers, leaning towards the cautious one for the slower (skill 1:
+## all optimised, 0.85 and under: all cautious), as real drivers differ in how much kerb and how late an apex they dare.
+static func line_for_skill(track: Dictionary, base: Dictionary, skill_value: float) -> Dictionary:
+	if not base.has("alt"):
+		return base
+	var w := clampf((skill_value - 0.85) / 0.15, 0.0, 1.0)
+	if w >= 0.995:
+		return base
+	var cl: Array = track.centerline
+	var n := cl.size() / 3
+	var bo: PackedFloat32Array = base.offset
+	var ba: PackedFloat32Array = base.alt
+	var off := PackedFloat32Array()
+	var x := PackedFloat32Array()
+	var z := PackedFloat32Array()
+	off.resize(n); x.resize(n); z.resize(n)
+	var bx: PackedFloat32Array = base.x
+	var bz: PackedFloat32Array = base.z
+	for i in n:
+		off[i] = ba[i] + (bo[i] - ba[i]) * w
+		# move the line's point sideways by the change of offset (along the centreline's normal)
+		var a := ((i - 1 + n) % n) * 3
+		var b := ((i + 1) % n) * 3
+		var tx: float = cl[b] - cl[a]
+		var tz: float = cl[b + 2] - cl[a + 2]
+		var l := maxf(Vector2(tx, tz).length(), 1e-6)
+		x[i] = bx[i] + tz / l * (off[i] - bo[i])
+		z[i] = bz[i] - tx / l * (off[i] - bo[i])
+	var line := _shape(x, z, off)
+	line.lo = base.lo
+	line.hi = base.hi
+	line.alt = base.alt
+	return line
 
 ## Store a racing line built elsewhere (RacingLinePrep: in a thread while the session loads).
 static func prime_racing_line(track: Dictionary, line: Dictionary) -> void:
@@ -280,7 +372,7 @@ func _init(track_data: Dictionary, veh: Vehicle, skill_value: float, lane_offset
 	skill = skill_value
 	lane = lane_offset
 	controls.digital = false
-	_line = racing_line_for(track)
+	_line = line_for_skill(track, racing_line_for(track), skill)
 	_kahead = curvature_ahead(track, _line)
 	_limits = car_limits(veh.specs, skill, veh.air_density)
 	_profile = speed_profile(_line, _limits, 1.0, false, learned_grip(track))
@@ -434,7 +526,10 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 	var lane_target := lane * clampf(1.0 - k_max * 300.0, 0.0, 1.0)
 	var lane_step := 0.04 * maxf(speed, 5.0) * dt
 	_lane_now += clampf(lane_target - _lane_now, -lane_step, lane_step)
-	var extra := clampf(line_off + _lane_now + merge + _pass_off, -t.widthR[j] + 1.2, t.widthL[j] - 1.2) - line_off
+	# kept where the car fits: the line file's bounds (asphalt and flat kerbs), else 1.2 m inside the edges
+	var lo_j: float = (_line.lo as PackedFloat32Array)[j] if _line.has("lo") else -t.widthR[j] + 1.2
+	var hi_j: float = (_line.hi as PackedFloat32Array)[j] if _line.has("hi") else t.widthL[j] - 1.2
+	var extra := clampf(line_off + _lane_now + merge + _pass_off, minf(lo_j, line_off), maxf(hi_j, line_off)) - line_off
 	_roomy = 1.0 if t.widthL[j] - line_off > t.widthR[j] + line_off else -1.0
 	var px: float = lx_[j] + (lx_[j2] - lx_[j]) * f + tz * extra
 	var pz: float = lz_[j] + (lz_[j2] - lz_[j]) * f - tx * extra
