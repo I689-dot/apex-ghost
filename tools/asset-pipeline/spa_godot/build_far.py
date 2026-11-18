@@ -2,7 +2,11 @@
 """The Ardennes around Spa, which the source model lacks (its terrain stops 1.5-3.5 km out, then a flat horizon): a ring
 of real terrain from the model's edge out to 9.5 km, for the Godot app's Spa.
 
-   python3 -I tools/asset-pipeline/spa_godot/build_far.py <sources dir> godot/assets/maps/spa_g
+   python3 -I tools/asset-pipeline/spa_godot/build_far.py <sources dir> godot/assets/maps/spa_g [<track.json>]
+
+Any circuit (2026-11-18: the Nürburgring GP too: <sources dir> ~/apex-ghost-sources/terrain-nurburgring, out
+godot/assets/track, track godot/data/track.json; its geofit from tools/asset-pipeline/far/geofit.py). The tiles are the
+ones the ring and the cover reach (1 x 1 degree Copernicus, 3 x 3 degree WorldCover, named by their south-west corner).
 
 <sources dir> holds (downloads, never committed):
   geofit.json   the game frame on the map (east, north = s * R @ (x, mirror * z) + t, metres about lat0 / lon0): the
@@ -84,10 +88,35 @@ def glb_read(path):
         x = np.frombuffer(b, dt, a['count'] * k, off)
         return x.reshape(-1, k) if k > 1 else x
 
+    # each mesh where its nodes put it (translation, rotation, scale or a matrix, down the node tree): the Nürburgring
+    # model's meshes are stored in unit size, their nodes scale them up (Spa's nodes carry none)
+    def local(nd):
+        if 'matrix' in nd:
+            return np.array(nd['matrix'], float).reshape(4, 4).T
+        t = np.array(nd.get('translation', [0, 0, 0]), float)
+        x, y, z, w = nd.get('rotation', [0, 0, 0, 1])
+        r = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                      [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                      [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+        sc = np.array(nd.get('scale', [1, 1, 1]), float)
+        M = np.eye(4)
+        M[:3, :3] = r * sc
+        M[:3, 3] = t
+        return M
+
     P, T, base = [], [], 0
-    for m in j['meshes']:
-        for p in m['primitives']:
-            pos = acc(p['attributes']['POSITION'])
+    stack = [(i, np.eye(4)) for i in j['scenes'][j.get('scene', 0)]['nodes']]
+    while stack:
+        i, parent = stack.pop()
+        nd = j['nodes'][i]
+        M = parent @ local(nd)
+        for c in nd.get('children', []):
+            stack.append((c, M))
+        if 'mesh' not in nd:
+            continue
+        for p in j['meshes'][nd['mesh']]['primitives']:
+            pos = acc(p['attributes']['POSITION']).astype(np.float64)
+            pos = pos @ M[:3, :3].T + M[:3, 3]
             idx = acc(p['indices']).reshape(-1, 3) if 'indices' in p else np.arange(len(pos)).reshape(-1, 3)
             P.append(pos)
             T.append(idx.astype(np.int64) + base)
@@ -194,15 +223,20 @@ def normals(p, tri):
 def main():
     src, out = sys.argv[1], sys.argv[2]
     repo_godot = os.path.normpath(os.path.join(out, '..', '..', '..'))
+    track_json = sys.argv[3] if len(sys.argv) > 3 else os.path.join(repo_godot, 'data/tracks/spa.json')
     G = Geo(os.path.join(src, 'geofit.json'))
     dl = os.path.join(src, 'dl')
-    cl = np.array(json.load(open(os.path.join(repo_godot, 'data/tracks/spa.json')))['centerline'], float).reshape(-1, 3)
+    cl = np.array(json.load(open(track_json))['centerline'], float).reshape(-1, 3)
     cx, cz = cl[:, 0].mean(), cl[:, 2].mean()
     # every lat / lon the ring and the cover reach
     span = max(R1, COVER_HALF) * 1.5
     la_c, lo_c = G.latlon(np.array([cx - span, cx + span, cx - span, cx + span]), np.array([cz - span, cz - span, cz + span, cz + span]))
     box = (la_c.min(), la_c.max(), lo_c.min(), lo_c.max())
-    dem = Raster([(os.path.join(dl, f'Copernicus_DSM_COG_10_N50_00_E00{e}_00_DEM.tif'), 51.0, float(e), 1 / 3600, 1.5 / 3600) for e in (5, 6)], box)
+    # (the tiles' longitude spacing is 1.5" between 50 and 60 degrees north)
+    lats = range(int(np.floor(box[0])), int(np.floor(box[1])) + 1)
+    lons = range(int(np.floor(box[2])), int(np.floor(box[3])) + 1)
+    dem_tiles = [(os.path.join(dl, f'Copernicus_DSM_COG_10_N{a:02d}_00_E{o:03d}_00_DEM.tif'), a + 1.0, float(o), 1 / 3600, 1.5 / 3600) for a in lats for o in lons]
+    dem = Raster([t for t in dem_tiles if os.path.exists(t[0])], box)
     # the real heights in the game frame (vertical scale as the horizontal: the game frame is the model at 1.0103)
     la, lo = G.latlon(cl[:, 0], cl[:, 2])
     e0 = float(np.median(dem.sample(la, lo) - G.s * cl[:, 1]))
@@ -273,7 +307,11 @@ def main():
     glb_write(os.path.join(out, 'far_terrain.glb'), meshes)
 
     # land cover, 2x2 samples a texel
-    cov = Raster([(os.path.join(dl, f'ESA_WorldCover_10m_2021_v200_N48E00{e}_Map.tif'), 51.0, float(e), 1 / 12000, 1 / 12000) for e in (3, 6)], box, nearest=True)
+    cov_tiles = []
+    for a in sorted({int(np.floor(v / 3) * 3) for v in (box[0], box[1])}):
+        for o in sorted({int(np.floor(v / 3) * 3) for v in (box[2], box[3])}):
+            cov_tiles.append((os.path.join(dl, f'ESA_WorldCover_10m_2021_v200_N{a:02d}E{o:03d}_Map.tif'), a + 3.0, float(o), 1 / 12000, 1 / 12000))
+    cov = Raster([t for t in cov_tiles if os.path.exists(t[0])], box, nearest=True)
     px = 2 * COVER_HALF / COVER_PX
     acc = np.zeros((COVER_PX, COVER_PX, 4), np.float32)
     for oy in (0.25, 0.75):

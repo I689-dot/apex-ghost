@@ -9,6 +9,27 @@ extends RefCounted
 ## (groove3: black, alpha 50/255 on average): drawn opaque they painted the racing surface black. The base asphalt's alpha
 ## is a detail mask of Assetto Corsa's multi-layer shader, not transparency.
 
+## The same treatment for another circuit (the user, 2026-11-18: the Nürburgring as Spa): a profile overrides the
+## tables below by key (NurburgringLook.PROFILE); Spa's profile is empty, so Spa reads these constants as before.
+## use() picks the profile for a track (true: the circuit has a look of its own).
+static var profile: Dictionary = {}
+
+static func use(track_data: Dictionary) -> bool:
+	var id := str(track_data.get("id", ""))
+	var map := str(track_data.get("map", ""))
+	if id == "spa":
+		profile = {}
+		return true
+	if map == "nurburgring" or id.begins_with("nurburgring_gp") or id == "nurburgring_short":
+		profile = NurburgringLook.PROFILE
+		return true
+	profile = {}
+	return false
+
+## A profile's value, else Spa's.
+static func _p(key: String, spa: Variant) -> Variant:
+	return profile.get(key, spa)
+
 ## [material name pattern, how it draws]: "blend" (alpha-blended decal over the road), "scissor" (cut-out foliage, fences),
 ## "opaque" (alpha ignored). First match wins.
 const DRAW := [
@@ -46,7 +67,7 @@ const TINT := [
 
 ## Spa draws its own rubber (the source's layers): no generic RoadWear decal on top.
 static func own_wear(track_data: Dictionary) -> bool:
-	return track_data.get("id", "") == "spa"
+	return use(track_data) and bool(_p("own_wear", true))
 
 ## Red-channel mean of assets/textures/asphalt_detail.jpg (the ground detail pass's asphalt photo).
 const ASPHALT_DETAIL_MEAN := 0.5
@@ -96,7 +117,7 @@ static func _paint(m: StandardMaterial3D) -> void:
 		for y in img.get_height():
 			for x in img.get_width():
 				var c := img.get_pixel(x, y)
-				if c.g > c.r * 1.25 or c.b > c.r * 1.4:
+				if c.g > c.r * 1.25 or (c.b > c.r * 1.4 and bool(_p("paint_blue", true))):
 					var l := c.srgb_to_linear()
 					var lum := l.r * 0.2126 + l.g * 0.7152 + l.b * 0.0722
 					paint.append([x, y, lum])
@@ -107,7 +128,8 @@ static func _paint(m: StandardMaterial3D) -> void:
 			var mean := sum / paint.size()
 			for p in paint:
 				var k: float = clampf(p[2] / mean, 0.6, 1.4)
-				var c := Color(PAINT_GREEN.r * k, PAINT_GREEN.g * k, PAINT_GREEN.b * k).linear_to_srgb()
+				var pg: Color = _p("paint_green", PAINT_GREEN)
+				var c := Color(pg.r * k, pg.g * k, pg.b * k).linear_to_srgb()
 				c.a = img.get_pixel(p[0], p[1]).a
 				img.set_pixel(p[0], p[1], c)
 			img.generate_mipmaps()
@@ -213,7 +235,7 @@ static func _kerb(m: StandardMaterial3D) -> void:
 			continue
 		changed = true
 		var mean: float = sums[key] / g.size()
-		var want: Color = KERB_RED if key == "red" else KERB_YELLOW
+		var want: Color = _p("kerb_red", KERB_RED) if key == "red" else _p("kerb_yellow", KERB_YELLOW)
 		for p in g:
 			var k: float = clampf(p[2] / mean, 0.7, 1.3)
 			var c := Color(want.r * k, want.g * k, want.b * k).linear_to_srgb()
@@ -324,9 +346,9 @@ static func texture_mean(t: Texture2D) -> Color:
 
 ## ENV, with a test's SPA_LOOK (JSON) over it (look comparisons).
 static func env_look() -> Dictionary:
-	var l: Dictionary = ENV.duplicate()
+	var l: Dictionary = (_p("env", ENV) as Dictionary).duplicate()
 	if forward_plus():
-		l.merge(ENV_FP, true)
+		l.merge(_p("env_fp", ENV_FP), true)
 	var o = JSON.parse_string(OS.get_environment("SPA_LOOK")) if OS.get_environment("SPA_LOOK") != "" else null
 	if o is Dictionary:
 		l.merge(o, true)
@@ -338,7 +360,7 @@ static func forward_plus() -> bool:
 ## TINT, or a test's SPA_TINT (JSON: [[pattern, [r, g, b]], ...]).
 static func tints() -> Array:
 	var o = JSON.parse_string(OS.get_environment("SPA_TINT")) if OS.get_environment("SPA_TINT") != "" else null
-	return o if o is Array else TINT
+	return o if o is Array else _p("tint", TINT)
 
 ## Tints of what draws its own shared textures, not the circuit's materials: "@lawn" (the 3D grass shells and blades),
 ## "@forest" (the forest's trees and impostors).
@@ -350,7 +372,7 @@ static func global_tint(key: String) -> Vector3:
 
 static func apply(track: TrackScene) -> void:
 	var res := []
-	for d in DRAW:
+	for d in _p("draw", DRAW):
 		res.append([RegEx.create_from_string(d[0]), d[1]])
 	var tint_res := []
 	for t in tints():
@@ -358,8 +380,13 @@ static func apply(track: TrackScene) -> void:
 			continue
 		tint_res.append([RegEx.create_from_string(t[0]), Color(t[1][0], t[1][1], t[1][2], t[1][3] if t[1].size() > 3 else 1.0)])
 	var target_res := []
-	for t in TARGET:
+	for t in _p("target", TARGET):
 		target_res.append([RegEx.create_from_string(t[0]), Color(t[1][0], t[1][1], t[1][2])])
+	var road_re := RegEx.create_from_string(_p("road_re", ROAD_RE))
+	var lawn_re := RegEx.create_from_string(_p("lawn_re", LAWN_RE))
+	var paint_re := RegEx.create_from_string(_p("paint_re", PAINT_RE))
+	var kerb_re := RegEx.create_from_string(_p("kerb_re", KERB_RE))
+	var fence_re := RegEx.create_from_string(_p("fence_re", "^fence_spa$"))
 	var seen := {}
 	var counts := {}
 	var off: Array = []
@@ -399,15 +426,21 @@ static func apply(track: TrackScene) -> void:
 						(m.next_pass as ShaderMaterial).set_shader_parameter("asph_mean", ASPHALT_DETAIL_MEAN)
 			if how != "":
 				counts[how] = counts.get(how, 0) + 1
-			if RegEx.create_from_string(ROAD_RE).search(m.resource_name) != null:
+			if OS.get_environment("LOOK_ROLES") != "":
+				var roles := []
+				for pair in [["road", road_re], ["lawn", lawn_re], ["paint", paint_re], ["kerb", kerb_re], ["fence", fence_re]]:
+					if (pair[1] as RegEx).search(m.resource_name) != null:
+						roles.append(pair[0])
+				print("[look roles] %s draw=%s %s next=%s" % [m.resource_name, how, roles, m.next_pass != null])
+			if road_re.search(m.resource_name) != null:
 				_road_surface(m)
-			if RegEx.create_from_string(LAWN_RE).search(m.resource_name) != null:
+			if lawn_re.search(m.resource_name) != null:
 				_lawn(m)
-			if RegEx.create_from_string(PAINT_RE).search(m.resource_name) != null:
+			if paint_re.search(m.resource_name) != null:
 				_paint(m)
-			if m.resource_name == "fence_spa":
+			if fence_re.search(m.resource_name) != null:
 				_catch_fence(m)
-			if RegEx.create_from_string(KERB_RE).search(m.resource_name) != null:
+			if kerb_re.search(m.resource_name) != null:
 				_kerb(m)
 			for t in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
@@ -442,7 +475,7 @@ static func apply(track: TrackScene) -> void:
 	_painted.clear()
 	if Settings.data.quality == "high" or Settings.data.quality == "ultra":
 		var det_res := []
-		for d in DETAIL:
+		for d in _p("detail", DETAIL):
 			det_res.append([RegEx.create_from_string(d[0]), d[1], d[2]])
 		for mm in seen:
 			var sm := mm as StandardMaterial3D
@@ -459,7 +492,7 @@ static func apply(track: TrackScene) -> void:
 				for k in mi.mesh.get_surface_count():
 					if off.has(mi.mesh.surface_get_material(k)):
 						mi.set_surface_override_material(k, _hidden())
-	print("[spa look] materials: ", counts, ", layers off: ", off.size())
+	print("[%s look] materials: " % _p("name", "spa"), counts, ", layers off: ", off.size())
 
 static var _hidden_mat: StandardMaterial3D = null
 ## A material that draws nothing (a surface switched off without rebuilding the mesh).

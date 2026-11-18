@@ -4,8 +4,7 @@ extends Node3D
 ## (tools/asset-pipeline/spa_godot/build_far.py: Copernicus heights, ESA WorldCover land cover), coloured by
 ## shaders/far_terrain.gdshader. Two meshes: "far_hi" for High and Ultra, "far_lo" (3x coarser) below.
 
-const FILE := "assets/maps/spa_g/far_terrain.glb"
-const COVER := "res://assets/maps/spa_g/far_cover.png"
+## (the files are in the circuit's folder: assets/maps/spa_g for Spa, assets/track for the Nürburgring GP)
 ## The finer mesh from this scenery distance (the "view distance" group: High 1500 m, Ultra 4500 m).
 const HI_FROM := 1500.0
 
@@ -13,7 +12,9 @@ var _hi: MeshInstance3D
 var _lo: MeshInstance3D
 
 ## The far terrain, or null when it has not been built.
-static func build() -> SpaFar:
+static func build(dir: String = "assets/maps/spa_g") -> SpaFar:
+	var FILE := dir + "/far_terrain.glb"
+	var COVER := "res://" + dir + "/far_cover.png"
 	if not ResourceLoader.exists(Assets.path(FILE)):
 		return null
 	var packed := Assets.scene(FILE)

@@ -353,7 +353,7 @@ func load_session(progress: Callable) -> void:
 	await step.call(I18n.t("Setting up sky and weather"))
 	weather = Weather.weather_at(race.weather, 0.0)
 	env = GameEnvironment.new(race.weather, q)
-	if race.get("trackId", "") == "spa":
+	if SpaLook.use(track_data):
 		env.set_look(SpaLook.env_look())
 	add_child(env)
 	track.apply_quality(q)
@@ -643,7 +643,14 @@ func _load_forest(q: Dictionary) -> void:
 		track.forest = forest
 
 func _attach_world_extras(q: Dictionary) -> void:
-	var crowd := SpaCrowd.build(track, track_data, float(q.crowd)) if track_data.get("id", "") == "spa" else Crowd.build(track, track_data, float(q.crowd))
+	# the scanned spectators where a circuit has its own look (Spa; the Nürburgring on its own stand materials)
+	var crowd: MultiMeshInstance3D = null
+	if track_data.get("id", "") == "spa":
+		crowd = SpaCrowd.build(track, track_data, float(q.crowd))
+	elif SpaLook.use(track_data):
+		crowd = SpaCrowd.build(track, track_data, float(q.crowd), Crowd.STAND_MAT_RE)
+	else:
+		crowd = Crowd.build(track, track_data, float(q.crowd))
 	if crowd != null:
 		add_child(crowd)
 	Forest.ensure_globals()

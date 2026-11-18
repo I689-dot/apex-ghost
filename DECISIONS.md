@@ -1499,3 +1499,17 @@ assumes the old peak; retune AI_GRIP if needed).
   data moves once from the CorsaGhost (or Apex Ghost) folder. The boards that carried the game's name read GRIDCORSA
   (debrand-maps.json, rename-signage.mjs, Spa's props); the promotional code CORSAGHOST is GRIDCORSA (not deployed, so
   never used); the menus' photos are shot again (tools/godot/menu-photos.sh).
+
+## Godot: the Nürburgring GP with Spa's look (2026-11-18)
+
+- SpaLook takes a profile per circuit (SpaLook.use / _p): Spa's is empty (its constants, unchanged: the same 35 / 5 / 13
+  materials), the Nürburgring GP's is NurburgringLook.PROFILE (the web game's model, assets/track). It reuses what was
+  built for Spa: the clear-afternoon grade (AgX), the scanned road (Poly Haven asphalt_track 4K) at Spa's measured
+  albedo over every layer (the GP's layers were 0.07-0.23: bands of grey), the kerbs' paint repaint, the green paint,
+  the lawn photo (a deeper tint: the GP's lawns are open to the sky), concrete / metal / paint grain on High and Ultra,
+  the catch-fence wire, the scanned spruces and beech (trees_spa.glb, rebuilt by build_trees.py), the scanned
+  spectators on the GP's stands, and far hills from Copernicus heights and ESA WorldCover (build_far.py made general:
+  any circuit's track file and tiles; the GP fitted onto OpenStreetMap by tools/asset-pipeline/far/geofit.py, 5.2 m
+  mean). No reference video: Spa's measured values stand in (same climate, same paint).
+- Ultra 1080p with 8 AI cars: 53.7 -> 47.2 fps. On a phone without the Spa pack the shared textures and trees are
+  absent and the GP keeps its old surfaces and trees (each step checks its files).

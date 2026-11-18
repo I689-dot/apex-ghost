@@ -109,11 +109,12 @@ static func load_forest(host: Node, track: TrackScene, track_data: Dictionary, q
 	return f
 
 func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
-	if track_data.get("id", "") == "spa" and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
+	# the scanned spruces and beech (build_trees.py) where a circuit has its own look (Spa, the Nürburgring)
+	if SpaLook.use(track_data) and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
 		species_file = "res://assets/vegetation/trees_spa.glb"
-		near_scale = SpaLook.FOREST_NEAR_SCALE
-		hero_m = SpaLook.FOREST_HERO
-		shadow_m = SpaLook.FOREST_SHADOW
+		near_scale = SpaLook._p("forest_near_scale", SpaLook.FOREST_NEAR_SCALE)
+		hero_m = SpaLook._p("forest_hero", SpaLook.FOREST_HERO)
+		shadow_m = SpaLook._p("forest_shadow", SpaLook.FOREST_SHADOW)
 		# FOREST_NO_FADE: hard level changes (measuring what the blends cost)
 		fades = OS.get_environment("FOREST_NO_FADE") == ""
 	var ref = track_data.get("forest", null)

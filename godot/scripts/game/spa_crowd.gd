@@ -1,6 +1,6 @@
 class_name SpaCrowd
 extends RefCounted
-## Spa's spectators: scanned people (assets/maps/spa_g/crowd_atlas.png; tools/asset-pipeline/spa_godot/render_people.py
+## Spa's spectators (and the Nürburgring GP's: build's stand_re): scanned people (assets/maps/spa_g/crowd_atlas.png; tools/asset-pipeline/spa_godot/render_people.py
 ## and build_crowd.py) on the grandstands' seating (Crowd.seats_on_stands with Spa's stand materials) and on the banks and
 ## fences where the reference video has them (crowd_zones.bin). One instanced draw (shaders/spa_crowd.gdshader).
 
@@ -12,12 +12,14 @@ const ROWS := 3
 ## The sprite cell's size (m): the figures are 1.75 m in a 1.15 x 2.3 m frame, feet on the bottom edge.
 const CELL := Vector2(1.15, 2.3)
 
-static func build(root: Node3D, track: Dictionary, density: float) -> MultiMeshInstance3D:
+## Another circuit's stands (stand_re: its seating materials, Crowd.STAND_MAT_RE for the Nürburgring GP), the same scanned
+## people; the zones off the stands are Spa's only.
+static func build(root: Node3D, track: Dictionary, density: float, stand_re: String = STAND_MAT_RE) -> MultiMeshInstance3D:
 	if density <= 0.0 or not ResourceLoader.exists(ATLAS):
 		return null
 	var r := Crowd.Rng.new(98765)
-	var spots := Crowd.seats_on_stands(root, track, density, STAND_MAT_RE, r)
-	if FileAccess.file_exists(ZONES):
+	var spots := Crowd.seats_on_stands(root, track, density, stand_re, r)
+	if stand_re == STAND_MAT_RE and FileAccess.file_exists(ZONES):
 		var f := FileAccess.open(ZONES, FileAccess.READ)
 		var n := f.get_length() / 16
 		for i in n:
