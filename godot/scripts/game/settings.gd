@@ -43,15 +43,23 @@ func _ready() -> void:
 	_move_old_user_dir()
 	data = load_settings()
 
-## The game was called Apex Ghost until 2026-11-17, and Godot keeps a game's data (settings, career, track packs) in a
-## folder named after it: on the first start as CorsaGhost, what the old folder holds moves to the new one, so nothing
-## is lost. (The Android app has a new package id: a new install with its own data.)
+## The game was called Apex Ghost until 2026-11-17, then CorsaGhost, and is GridCorsa since 2026-11-18; Godot keeps a
+## game's data (settings, sign-in, career, track packs) in a folder named after it: on the first start under the new
+## name, what the newest old folder holds moves to the new one, so nothing is lost. (The Android app has a new package
+## id: a new install with its own data.)
 static func _move_old_user_dir() -> void:
 	if OS.has_feature("mobile") or OS.has_feature("web"):
 		return
 	var now := OS.get_user_data_dir()
-	var old := now.get_base_dir().path_join("Apex Ghost")
-	if now.get_file() == "Apex Ghost" or FileAccess.file_exists(now.path_join("settings.json")) or not DirAccess.dir_exists_absolute(old):
+	if FileAccess.file_exists(now.path_join("settings.json")):
+		return
+	var old := ""
+	for n in ["CorsaGhost", "Apex Ghost"]:
+		var d := now.get_base_dir().path_join(n)
+		if d != now and DirAccess.dir_exists_absolute(d) and FileAccess.file_exists(d.path_join("settings.json")):
+			old = d
+			break
+	if old == "":
 		return
 	DirAccess.make_dir_recursive_absolute(now)
 	var d := DirAccess.open(old)

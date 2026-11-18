@@ -23,7 +23,7 @@ export const INVITE_WINDOW_MS = 7 * 24 * 3600 * 1000;
 /** The promotional codes the server starts with (more can be added in the table): coins and what the player is told. */
 export const SEED_CODES: { code: string; coins: number; what: string; maxUses: number | null }[] = [
   { code: 'WELCOME500', coins: 500, what: '500 coins', maxUses: null },
-  { code: 'CORSAGHOST', coins: 1000, what: '1,000 coins: thanks for racing at launch', maxUses: null },
+  { code: 'GRIDCORSA', coins: 1000, what: '1,000 coins: thanks for racing at launch', maxUses: null },
   { code: 'SPA2026', coins: 250, what: '250 coins', maxUses: null },
 ];
 

@@ -40,7 +40,7 @@ const ITEMS := [
 ## Promotional codes the preview knows (the real ones live on the server, one use per account).
 const CODES := {
 	"WELCOME500": {"coins": 500, "what": "500 coins"},
-	"CORSAGHOST": {"coins": 1000, "what": "1,000 coins: thanks for racing at launch"},
+	"GRIDCORSA": {"coins": 1000, "what": "1,000 coins: thanks for racing at launch"},
 	"SPA2026": {"coins": 250, "what": "250 coins and the Spa Classic paint"},
 }
 
@@ -283,7 +283,7 @@ static func _checkout(app: App, title: String, lines: Array, price: float, _rere
 	pay.custom_minimum_size = Vector2(0, 54)
 	pay.tooltip_text = I18n.t("Payments are not switched on in this preview")
 	body.add_child(pay)
-	var fine := UIW.muted(I18n.t("Coins are a virtual currency for paint and parts in CorsaGhost. They have no cash value and cannot be exchanged, transferred or refunded, except where the law requires. By paying you ask for the coins at once and accept that the 14-day withdrawal right then ends (EU). Payments by Stripe on the PC and by Google Play in the Android app: CorsaGhost never sees your card."), 12)
+	var fine := UIW.muted(I18n.t("Coins are a virtual currency for paint and parts in GridCorsa. They have no cash value and cannot be exchanged, transferred or refunded, except where the law requires. By paying you ask for the coins at once and accept that the 14-day withdrawal right then ends (EU). Payments by Stripe on the PC and by Google Play in the Android app: GridCorsa never sees your card."), 12)
 	fine.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(fine)
 
@@ -488,7 +488,7 @@ static func _redeem(rerender: Callable) -> Control:
 	col.add_child(row)
 	col.add_child(msg)
 	if not signed_in():
-		col.add_child(UIW.muted(I18n.t("Try the preview's codes: WELCOME500, CORSAGHOST, SPA2026."), 14))
+		col.add_child(UIW.muted(I18n.t("Try the preview's codes: WELCOME500, GRIDCORSA, SPA2026."), 14))
 	return col
 
 # ---------------------------------------------------------------- invite ---
@@ -497,7 +497,7 @@ static func _redeem(rerender: Callable) -> Control:
 static func invite_code() -> String:
 	var who: String = Settings.data.get("nickname", "driver")
 	var alphabet := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	var h := absi(hash(who + "|corsaghost"))
+	var h := absi(hash(who + "|gridcorsa"))
 	var s := ""
 	for i in 5:
 		s += alphabet[h % alphabet.length()]
@@ -510,7 +510,7 @@ static func _invite() -> Control:
 	row.add_theme_constant_override("v_separation", 14)
 	var live := signed_in() and _live_invite.has("code")
 	var code: String = str(_live_invite.code) if live else invite_code()
-	var link := "https://corsaghost.com/invite/" + code
+	var link := "https://gridcorsa.com/invite/" + code
 	var racing: int = int(_live_invite.get("racing", 0)) if live else 0
 	var joined: int = int(_live_invite.get("invited", 0)) if live else 0
 	var a := UIW.vbox(10)

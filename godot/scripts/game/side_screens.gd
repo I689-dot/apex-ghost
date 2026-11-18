@@ -39,7 +39,7 @@ func _open(screen: int, side: int) -> void:
 	# hidden while it is set up: a native window can only be made so before it shows
 	w.visible = false
 	w.name = "side-%s" % ("left" if side < 0 else "right")
-	w.title = "CorsaGhost"
+	w.title = "GridCorsa"
 	w.force_native = true
 	w.borderless = true
 	w.unfocusable = true

@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 //   rect [x0, y0, x1, y1] px; bg: '#hex' or [x, y] (the colour of that pixel); label, fg, flip ('v'), rotate (deg)
 const cfg = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'debrand-maps.json'), 'utf8'));
 
+/** The names on the boards: 2 = GRIDCORSA (2026-11-18; CORSAGHOST before). */
+const LABELS_VERSION = 2;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
@@ -61,9 +63,11 @@ for (const [rel, PATCHES] of Object.entries(cfg)) {
   const done = [];
   for (const tex of doc.getRoot().listTextures()) {
     const spec = PATCHES[tex.getName()] ?? PATCHES[tex.getName().replace(/\.\d+$/, '')];
-    if (!spec || !tex.getImage() || tex.getExtras()?.debranded) continue;
+    // marked with the version of the names drawn: a texture painted with an older name is painted again (each
+    // patch fills its rectangle before its label, so the old label goes)
+    if (!spec || !tex.getImage() || tex.getExtras()?.debranded === LABELS_VERSION) continue;
     tex.setImage(await patch(tex.getImage(), spec)).setMimeType('image/png');
-    tex.setExtras({ ...tex.getExtras(), debranded: true });
+    tex.setExtras({ ...tex.getExtras(), debranded: LABELS_VERSION });
     done.push(tex.getName());
   }
   if (done.length) await io.write(file, doc);

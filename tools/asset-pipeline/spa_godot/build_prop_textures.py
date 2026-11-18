@@ -9,7 +9,7 @@ materials the props wear into <out dir>/tex/<id>_<color|rough|metal|normal>.jpg 
 draws balloon_normal.png (the envelope's 24 panels bulging between their seams). Writes balloon.png (the La Source balloon's envelope: red with the lettering three times round), podium.png (the black
 PODIUM board), flag.png (a feather flag's print), banner.png (the footbridge's banner).
 No real brands (the user, 2026-11-16): the boards keep the video's colours and layout with invented names, the game's
-own name (CORSAGHOST) or the circuit's."""
+own name (GRIDCORSA) or the circuit's."""
 import os
 import sys
 
@@ -46,14 +46,14 @@ for k in range(24):
     x = k * W / 24
     d.line([(x, 0), (x, H)], fill=(122, 6, 12), width=4)
 for k in range(3):
-    centred(d, (k * W / 3, H * 0.36, (k + 1) * W / 3, H * 0.6), 'CORSAGHOST', font(110), (245, 245, 245))
+    centred(d, (k * W / 3, H * 0.36, (k + 1) * W / 3, H * 0.6), 'GRIDCORSA', font(110), (245, 245, 245))
 d.rectangle([0, int(H * 0.88), W, H], fill=(60, 40, 30))
 img.save(os.path.join(out, 'balloon.png'))
 
 # the podium board: black, the game's name small above PODIUM in yellow, a thin yellow rule
 img = Image.new('RGB', (1024, 512), (14, 14, 16))
 d = ImageDraw.Draw(img)
-centred(d, (0, 40, 1024, 170), 'CORSAGHOST', font(96), (238, 238, 238))
+centred(d, (0, 40, 1024, 170), 'GRIDCORSA', font(96), (238, 238, 238))
 centred(d, (0, 180, 1024, 420), 'PODIUM', font(190), (246, 196, 40))
 d.rectangle([180, 440, 844, 452], fill=(246, 196, 40))
 img.save(os.path.join(out, 'podium.png'))

@@ -200,7 +200,7 @@
       4,
       70
      ],
-     "label": "CORSAGHOST",
+     "label": "GRIDCORSA",
      "fg": "#f4f4f4"
     },
     {
@@ -238,7 +238,7 @@
       2,
       128
      ],
-     "label": "CORSAGHOST",
+     "label": "GRIDCORSA",
      "fg": "#f4f4f4",
      "rotate": -90
     }
@@ -646,7 +646,7 @@
       64
      ],
      "bg": "#2a2b30",
-     "label": "CORSAGHOST",
+     "label": "GRIDCORSA",
      "fg": "#f4f4f4"
     }
    ]
@@ -1081,7 +1081,7 @@
       64
      ],
      "bg": "#2a2b30",
-     "label": "CORSAGHOST",
+     "label": "GRIDCORSA",
      "fg": "#f4f4f4"
     }
    ]

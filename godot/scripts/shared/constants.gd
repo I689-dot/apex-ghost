@@ -2,7 +2,7 @@ class_name Const
 extends RefCounted
 ## Shared game constants (port of packages/shared/src/constants.ts).
 
-const GAME_NAME := "CORSAGHOST"
+const GAME_NAME := "GRIDCORSA"
 const PROTOCOL_VERSION := 8
 
 const MAX_PLAYERS := 12

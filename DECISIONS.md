@@ -1490,3 +1490,12 @@ assumes the old peak; retune AI_GRIP if needed).
   friends far away; by default it runs near the host.
 - APIs: GET /api/wallet, /api/invite, /api/ranking; POST /api/redeem, /api/invite/apply, /api/account/password;
   POST /api/rooms takes {region}. Not deployed until the user says so.
+
+## Godot: the name is GridCorsa (2026-11-18)
+
+- The user chose GridCorsa, the web game's and website's name since 2026-11-17, over CorsaGhost: the Godot app's logo
+  (GRID white, CORSA crimson, as the website), icon (a slanted G over its grey ghost, tools/godot/icon.svg), window
+  and app name, package id app.gridcorsa.racing (a new install again on phones), APK build/gridcorsa.apk; the saved
+  data moves once from the CorsaGhost (or Apex Ghost) folder. The boards that carried the game's name read GRIDCORSA
+  (debrand-maps.json, rename-signage.mjs, Spa's props); the promotional code CORSAGHOST is GRIDCORSA (not deployed, so
+  never used); the menus' photos are shot again (tools/godot/menu-photos.sh).

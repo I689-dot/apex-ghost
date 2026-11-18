@@ -164,7 +164,7 @@ func _process(_dt: float) -> void:
 	if st == HTTPClient.STATUS_CONNECTING or st == HTTPClient.STATUS_RESOLVING or st == HTTPClient.STATUS_REQUESTING:
 		return
 	if st == HTTPClient.STATUS_CONNECTED and not j.requested:
-		var headers := PackedStringArray(["User-Agent: CorsaGhost"])
+		var headers := PackedStringArray(["User-Agent: GridCorsa"])
 		if int(j.done) > 0:
 			headers.append("Range: bytes=%d-" % int(j.done))
 		_http.request(HTTPClient.METHOD_GET, j.path, headers)

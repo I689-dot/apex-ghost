@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The game's own name on the circuits' invented boards, in the Godot app's copies of the maps (godot/assets/maps): the
- * game was Apex Ghost until 2026-11-17 and is CorsaGhost now. The sign rules of tools/asset-pipeline/maps/<map>.json
+ * game was Apex Ghost until 2026-11-17, CorsaGhost until 2026-11-18, and is GridCorsa now. The sign rules of tools/asset-pipeline/maps/<map>.json
  * that put the old name on a board are drawn again with it replaced (the boards' other invented sponsors stay as they
  * are). The web game's maps are not touched. (The Nürburgring GP circuit is godot/assets/track.)
  *
@@ -19,9 +19,9 @@ const root = path.join(here, '../..');
 const args = process.argv.slice(2);
 const preview = args.includes('--preview') ? args[args.indexOf('--preview') + 1] : null;
 const OLD = /APEX GHOST/g;
-// (a thin space each side: the sign tool sizes a label by its letters, and CORSAGHOST's are wider than APEX GHOST's;
+// (a thin space each side: the sign tool sizes a label by its letters, and GRIDCORSA's are wider than APEX GHOST's;
 // unpadded, its first letter went off the board)
-const NEW = '\u2009CORSAGHOST\u2009';
+const NEW = '\u2009GRIDCORSA\u2009';
 // map rules -> the Godot app's folder of that map
 const MAPS = { nurburgring: 'track' };
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);

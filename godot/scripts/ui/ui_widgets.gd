@@ -79,11 +79,12 @@ static func muted(text: String, size: int = 15) -> Label:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return l
 
-## The game's mark: APEX in white, GHOST in the livery's crimson, slanted like a car number.
+## The game's mark: GRID in white, CORSA in the livery's crimson, slanted like a car number (as the website's).
 static func logo(size: int = 34) -> Control:
-	var h := UIW.hbox(maxi(4, size / 6))
-	h.add_child(_logo_word("CORSA", size, Color.WHITE))
-	h.add_child(_logo_word("GHOST", size, UIKit.CRIMSON))
+	# one word, as the website's GRIDCORSA (the colours part it)
+	var h := UIW.hbox(maxi(1, size / 20))
+	h.add_child(_logo_word("GRID", size, Color.WHITE))
+	h.add_child(_logo_word("CORSA", size, UIKit.CRIMSON))
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return h
 
