@@ -392,9 +392,12 @@ func load_session(progress: Callable) -> void:
 	if bool(q.get("carProbe", false)) and not OS.has_feature("mobile"):
 		_add_car_probe(my_visual)
 	InputState.wheel.carLockDeg = float(SteeringLock.lock_deg(my_entry.id))
-	if bool(q.ownHeadlightSpots):
+	# a PC lights the road with real beams on every quality (two spot lights, shadows from High up); a phone keeps the
+	# projected light pool unless its preset has the spots
+	if bool(q.ownHeadlightSpots) or not OS.has_feature("mobile"):
 		my_visual.add_headlights(bool(q.ownHeadlightShadows))
-	else:
+	# (the presets without the spots also take the cockpit's cheaper glass)
+	if not bool(q.ownHeadlightSpots):
 		my_visual.simplify_for_cockpit()
 	_attach_my_car_extras(my_entry)
 	if spectator:
@@ -3486,5 +3489,8 @@ func _add_car_probe(v: CarVisual) -> void:
 	p.intensity = 1.0
 	p.blend_distance = 4.0
 	p.mesh_lod_threshold = 4.0
+	# reflections only: its ambient (the captured surroundings) replaced the environment's fill round the car, and at
+	# night the capture is nearly black (the cockpit and the road near you went black on High and Ultra)
+	p.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
 	v.add_child(p)
 	car_probe = p

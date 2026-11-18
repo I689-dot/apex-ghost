@@ -590,6 +590,10 @@ func simplify_for_cockpit() -> void:
 				if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and _is_glass(m.resource_name):
 					n.set_surface_override_material(s, tint)
 
+## The headlight beams' energy (two spot lights): bright enough to drive at night by them (6 before, 2026-11-18: the
+## road ahead was nearly black).
+const HEAD_BEAM := 12.0
+
 ## Real spot lights for the local car (shadows optional).
 func add_headlights(shadows: bool) -> void:
 	var z := float(entry.dims.length) / 2.0 - 0.3
@@ -597,7 +601,7 @@ func add_headlights(shadows: bool) -> void:
 		var l := SpotLight3D.new()
 		l.light_color = Color("fff3e0")
 		l.light_energy = 0.0
-		l.spot_range = 140.0
+		l.spot_range = 180.0
 		l.spot_angle = rad_to_deg(0.42)
 		l.spot_angle_attenuation = 0.55
 		l.position = Vector3(x, 0.65, z)
@@ -635,10 +639,13 @@ func set_lights(brake: bool, headlights_on: bool, night: float) -> void:
 	var tail := (TAIL_ON if headlights_on or night > 0.3 else 0.0) + (BRAKE_ADD if brake else 0.0)
 	for t in _tail_mats:
 		(t[0] as StandardMaterial3D).emission_energy_multiplier = tail * float(t[1])
+	# your own lamps seen from the seat do not glow (the driver never sees them: lit, through the bloom, they were
+	# white smears along the wings at night, the user 2026-11-18); their beams light the road all the same
+	var lamps_seen: bool = not (local and _inside == true)
 	for h in _head_mats:
-		(h[0] as StandardMaterial3D).emission_energy_multiplier = float(h[2] if headlights_on else h[1])
+		(h[0] as StandardMaterial3D).emission_energy_multiplier = float(h[2] if headlights_on and lamps_seen else (h[1] if lamps_seen else 0.0))
 	for l in headlights:
-		l.light_energy = 6.0 if headlights_on else 0.0
+		l.light_energy = HEAD_BEAM if headlights_on else 0.0
 	if _pool != null:
 		_pool.visible = headlights_on
 		(_pool.material_override as StandardMaterial3D).albedo_color = Color(1, 1, 1, 0.55 * minf(1.0, night + 0.3) if headlights_on else 0.0)

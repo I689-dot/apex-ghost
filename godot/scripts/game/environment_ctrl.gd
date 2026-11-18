@@ -179,8 +179,11 @@ func update(dt: float, w: Dictionary, camera: Camera3D, focus: Vector3, car_vel:
 	env.ambient_light_energy = (0.34 + 1.0 * day * (0.64 + overcast * 0.66)) * 0.62 * float(look.get("ambient", 1.0))
 	# the sky's light is blue, but what fills a shadow is also the light the ground and the stands bounce back
 	# (warm grey): part of the ambient is that neutral colour, so shadows are cool, not cyan
-	env.ambient_light_sky_contribution = 0.7
-	env.ambient_light_color = Color(0.78, 0.76, 0.72) * (0.35 + 0.65 * day)
+	env.ambient_light_sky_contribution = lerpf(0.7, 0.25, night)
+	# at night the sky is nearly black, so the fill was nearly nothing: shadows, trees and barriers went pitch black (the
+	# user, 2026-11-18). A cool moonlit fill of its own instead, at least so strong
+	env.ambient_light_color = (Color(0.78, 0.76, 0.72) * (0.35 + 0.65 * day)).lerp(Color(0.32, 0.40, 0.62), night)
+	env.ambient_light_energy = maxf(env.ambient_light_energy, 0.42 * night * float(look.get("ambient", 1.0)))
 
 	# fog: the horizon colours of the sky in the same direction (towards / away from the sun), grey under cloud
 	var heavy_fog := _smoothstep(0.0, 1.0, 1.0 - w.visibility / 900.0)
