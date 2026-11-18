@@ -144,8 +144,9 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 	input.placeholder_text = I18n.t("Add a friend by nickname")
 	input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var card := UIW.vbox(8)
-	var refresh := Callable()
-	refresh = func():
+	# (a lambda captures by value: it reaches itself through this dictionary, else it calls an empty Callable)
+	var _self := {}
+	_self.refresh = func():
 		var all: Array = await Account.friends()
 		if not is_instance_valid(list):
 			return
@@ -161,13 +162,13 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 		if all.is_empty():
 			list.add_child(UIW.muted(I18n.t("No friends yet: add them by their nickname.")))
 		for f in all:
-			list.add_child(UIW.row_line(_friend_row(app, f, join, watch, refresh, err)))
+			list.add_child(UIW.row_line(_friend_row(app, f, join, watch, _self.refresh, err)))
 	var add := func():
 		err.text = ""
 		var r: Dictionary = await Account.add_friend(input.text)
 		if r.ok:
 			input.text = ""
-			refresh.call()
+			_self.refresh.call()
 		else:
 			err.text = I18n.t(str(r.error))
 	input.text_submitted.connect(func(_t): add.call())
@@ -181,9 +182,9 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 	var timer := Timer.new()
 	timer.wait_time = 15.0
 	timer.autostart = true
-	timer.timeout.connect(func(): refresh.call())
+	timer.timeout.connect(func(): _self.refresh.call())
 	card.add_child(timer)
-	refresh.call.call_deferred()
+	_self.refresh.call.call_deferred()
 	return UIW.panel(card)
 
 static func _friend_row(app: App, f: Dictionary, join: Callable, watch: Callable, refresh: Callable, err: Label) -> Control:

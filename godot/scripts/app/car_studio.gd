@@ -11,18 +11,23 @@ static var _cache := {} # key -> ImageTexture
 static var _queue: Array = [] # [entry, livery, ImageTexture]
 static var _busy := false
 static var _studio: SubViewport
+## The car models loaded for the menus, kept (load_model_async).
+static var _held := {}
 
 ## The car in this livery, rendered 3/4 from the front. The texture is returned at once and filled in when its turn
 ## comes (a frame or two a car).
-static func picture(entry: Dictionary, livery: Dictionary) -> Texture2D:
-	var key := "%s|%s" % [entry.get("id", ""), JSON.stringify(livery)]
+## near: from the detailed near model (the big pictures); else the light far model (thumbnails: the strip, the
+## drivers' rows), which loads in a fraction of the time.
+static func picture(entry: Dictionary, livery: Dictionary, near: bool = false) -> Texture2D:
+	near = near and not OS.has_feature("mobile")
+	var key := "%s|%s|%s" % [entry.get("id", ""), JSON.stringify(livery), near]
 	if _cache.has(key):
 		return _cache[key]
 	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
 	var tex := ImageTexture.create_from_image(img)
 	_cache[key] = tex
-	_queue.append([entry, livery, tex])
+	_queue.append([entry, livery, tex, near])
 	if not _busy:
 		_render_queue()
 	return tex
@@ -30,7 +35,8 @@ static func picture(entry: Dictionary, livery: Dictionary) -> Texture2D:
 ## A TextureRect showing picture(), scaled to fit.
 static func picture_rect(entry: Dictionary, livery: Dictionary, size: Vector2) -> TextureRect:
 	var r := TextureRect.new()
-	r.texture = picture(entry, livery)
+	# a big picture (or one that takes its size from its place) from the near model
+	r.texture = picture(entry, livery, size.y >= 120.0 or size == Vector2.ZERO)
 	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	r.custom_minimum_size = size
@@ -40,6 +46,25 @@ static func picture_rect(entry: Dictionary, livery: Dictionary, size: Vector2) -
 ## The livery a car is shown in where no driver is attached: the player's own.
 static func my_livery() -> Dictionary:
 	return Settings.data.get("livery", {})
+
+## The file of the car's model level that _car(near) uses.
+static func model_file(entry: Dictionary, near: bool) -> String:
+	var lods: Array = entry.get("lods", [])
+	if lods.is_empty():
+		return ""
+	return str(lods[mini(1, lods.size() - 1) if near else lods.size() - 1])
+
+## Loads that file in a thread and waits for it (frames go on meanwhile); afterwards _car finds it loaded.
+static func load_model_async(entry: Dictionary, near: bool) -> void:
+	var f := model_file(entry, near)
+	if f == "" or ResourceLoader.has_cached(Assets.path(f)):
+		return
+	var tree := Engine.get_main_loop() as SceneTree
+	Assets.request(f)
+	while not Assets.scene_ready(f):
+		await tree.process_frame
+	# held: a resource nothing refers to is freed at once (and the next load reads it again, on the main thread)
+	_held[f] = Assets.scene_result(f)
 
 static func _render_queue() -> void:
 	_busy = true
@@ -51,7 +76,10 @@ static func _render_queue() -> void:
 	while not _queue.is_empty():
 		var job: Array = _queue.pop_front()
 		var entry: Dictionary = job[0]
-		var visual := _car(entry, job[1], not OS.has_feature("mobile"))
+		# the model's file read in a thread (a near model took 0.1-0.8 s on the main thread: the lobby froze while
+		# its pictures were made)
+		await load_model_async(entry, job[3])
+		var visual := _car(entry, job[1], job[3])
 		if visual == null:
 			continue
 		_studio.add_child(visual)
@@ -156,12 +184,22 @@ class Preview:
 		vp = CarStudio._make_studio(Vector2i(960, 540))
 		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		add_child(vp)
-		visual = CarStudio._car(car, livery)
+		_show.call_deferred(livery)
+
+	## The car when its model has loaded in the background (the page appears at once, the car a moment later).
+	var _livery: Dictionary
+	func _show(livery: Dictionary) -> void:
+		_livery = livery
+		await CarStudio.load_model_async(entry, true)
+		if not is_instance_valid(vp):
+			return
+		visual = CarStudio._car(entry, _livery)
 		if visual != null:
 			vp.add_child(visual)
-			CarPaint.apply(visual, livery)
+			CarPaint.apply(visual, _livery)
 
 	func set_livery(livery: Dictionary) -> void:
+		_livery = livery
 		if visual != null:
 			CarPaint.apply(visual, livery)
 

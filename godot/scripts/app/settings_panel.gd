@@ -110,8 +110,9 @@ static func build(app: App, on_change: Callable) -> Control:
 	help_col.add_child(devices)
 	# the bar is made after the page switcher: the switcher finds its tab row through this dictionary
 	var bar := {}
-	var show := Callable()
-	show = func(key: String):
+	# (a lambda captures by value: it reaches itself through this dictionary, else it calls an empty Callable)
+	var _self := {}
+	_self.show = func(key: String):
 		_tab = key
 		var grp := _group_of(key)
 		for b in (bar.tabs.get_children() if bar.has("tabs") and bar.tabs != null else []):
@@ -119,7 +120,7 @@ static func build(app: App, on_change: Callable) -> Control:
 		for c in sub_row.get_children():
 			c.queue_free()
 		if (grp[2] as Array).size() > 1:
-			sub_row.add_child(UIW.tabs((grp[2] as Array).map(func(k): return [k, page_label[k]]), key, func(k): show.call(k), true))
+			sub_row.add_child(UIW.tabs((grp[2] as Array).map(func(k): return [k, page_label[k]]), key, func(k): _self.show.call(k), true))
 		for c in holder.get_children():
 			c.queue_free()
 		_help_title.text = String(page_label[key]).to_upper()
@@ -136,13 +137,13 @@ static func build(app: App, on_change: Callable) -> Control:
 		var col := UIW.vbox(0)
 		match key:
 			"graphics":
-				_graphics(col, changed, show)
+				_graphics(col, changed, _self.show)
 			"display":
 				_display(col, changed)
 			"view":
 				_view(col, changed)
 			"driving":
-				_driving(col, changed, func(): show.call("driving"))
+				_driving(col, changed, func(): _self.show.call("driving"))
 			"interface":
 				_interface(col, changed, app)
 			"audio":
@@ -151,20 +152,20 @@ static func build(app: App, on_change: Callable) -> Control:
 				if is_touch:
 					_touch(col)
 				else:
-					_controls(col, changed, show)
+					_controls(col, changed, _self.show)
 			"controller":
 				_controller(col, changed, app)
 			"account":
-				SettingsPages.account(col, app, changed, func(): show.call("account"))
+				SettingsPages.account(col, app, changed, func(): _self.show.call("account"))
 			"presets":
-				SettingsPages.presets(col, app, changed, func(): show.call("presets"))
+				SettingsPages.presets(col, app, changed, func(): _self.show.call("presets"))
 		col.add_child(UIW.spacer(false))
 		var sc := UIW.scroll(UIW.margins(col, 0, 0, 14, 12))
 		holder.add_child(sc)
 	var on_group := func(g: String):
 		for grp in GROUPS:
 			if grp[0] == g:
-				show.call(grp[2][0])
+				_self.show.call(grp[2][0])
 				UIW.focus_first.call_deferred(holder)
 	var top := UIW.top_bar({
 		"title": I18n.t("Settings"), "back": close,
@@ -193,7 +194,7 @@ static func build(app: App, on_change: Callable) -> Control:
 	for g in GROUPS:
 		if (g[2] as Array).has(start):
 			ok = true
-	show.call(start if ok else "graphics")
+	_self.show.call(start if ok else "graphics")
 	app.overlay_layer.add_child(root)
 	root.modulate.a = 0.0
 	root.create_tween().tween_property(root, "modulate:a", 1.0, 0.15)

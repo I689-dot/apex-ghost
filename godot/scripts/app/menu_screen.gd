@@ -112,8 +112,9 @@ static func build(app: App, error: String = "") -> Control:
 	var frame := Control.new()
 	UIKit.full(frame)
 	root.add_child(frame)
-	var render := Callable()
-	render = func():
+	# (a lambda captures by value: it reaches itself through this dictionary, else it calls an empty Callable)
+	var _self := {}
+	_self.render = func():
 		# the error line, the code box and the nickname are shared by the tabs: detach them before the old tab is freed
 		for shared in [err, code, nick_label]:
 			if shared.get_parent() != null:
@@ -124,7 +125,7 @@ static func build(app: App, error: String = "") -> Control:
 		if _tab == "online":
 			body = _online_tab(app, online, code, err, join_it, create, sign_in, host)
 		elif _tab == "store":
-			body = StoreScreen.build(app, render)
+			body = StoreScreen.build(app, _self.render)
 		elif _tab == "friends":
 			body = SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("You are playing offline. Friends need the game server."), sign_in)
 			# a readable column in the middle, as the references' entry list
@@ -135,26 +136,26 @@ static func build(app: App, error: String = "") -> Control:
 			holder.add_child(body)
 			body = holder
 		else:
-			body = _play_tab(app, online, err, solo, create, read_nick, sign_in, func(): _tab = "online"; render.call())
+			body = _play_tab(app, online, err, solo, create, read_nick, sign_in, func(): _tab = "online"; _self.render.call())
 		var on_tab := func(k: String):
 			if k == "career":
 				app.show_career()
 				return
 			_tab = k
-			render.call()
+			_self.render.call()
 		var top := UIW.top_bar({
 			"tabs": [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")], ["career", I18n.t("Career")], ["store", I18n.t("Store")]],
 			"tab": _tab, "on_tab": on_tab, "tabs_left": UIKit.touch(),
 			# the coins (the store, a preview for now) beside the driver
-			"right": [StoreScreen.balance_chip(func(): _tab = "store"; render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick, sign_in),
+			"right": [StoreScreen.balance_chip(func(): _tab = "store"; _self.render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick, sign_in),
 		})
 		var scr := UIW.screen(top, body)
 		UIKit.full(scr)
 		frame.add_child(scr)
 		UIW.focus_first.call_deferred(body)
-	render.call()
+	_self.render.call()
 	# the coins beside the driver: the server's balance (refreshed now and then)
-	StoreScreen.refresh(func(): if is_instance_valid(frame) and app.screen == "menu": render.call())
+	StoreScreen.refresh(func(): if is_instance_valid(frame) and app.screen == "menu": _self.render.call())
 	UIKit.full(root)
 	return root
 
