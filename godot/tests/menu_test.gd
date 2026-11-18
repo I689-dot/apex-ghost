@@ -85,6 +85,9 @@ func _run() -> void:
 		if store_shot != "":
 			await get_tree().create_timer(2.5 if t == "items" else 0.6).timeout
 			get_viewport().get_texture().get_image().save_png("%s/store_%s.png" % [store_shot, t])
+	# the preview's own codes (signed out, in memory only: the saved sign-in file is not touched)
+	var signed_as = Account.current
+	Account.current = null
 	var before := StoreScreen.preview_coins
 	StoreScreen._tab = "redeem"
 	app.show_menu()
@@ -109,6 +112,7 @@ func _run() -> void:
 			c.queue_free()
 	StoreScreen.preview_coins = before
 	StoreScreen._redeemed.clear()
+	Account.current = signed_as
 	if OS.get_environment("STORE_SHOT") != "":
 		# the settings' driving page (assist levels) and the presets page, as pictures
 		for page in ["driving", "presets", "account"]:
