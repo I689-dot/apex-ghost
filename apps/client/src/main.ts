@@ -50,7 +50,7 @@ function playIntro(): void {
         move: 'car',
         car: heroUrl({ id: INTRO_CARS[Math.floor(Math.random() * INTRO_CARS.length)] } as Parameters<typeof heroUrl>[0]),
         kicker: 'GT3',
-        title: 'APEX GHOST',
+        title: 'GRIDCORSA',
       },
       { photo: 'photo_grid.webp', move: 'pan', kicker: t('ONLINE · SOLO'), title: t('Ready to race') },
     ],
@@ -58,7 +58,7 @@ function playIntro(): void {
   );
   intro.append(
     reel.el,
-    h('div.intro-logo', {}, h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' }))),
+    h('div.intro-logo', {}, h('div.logo', {}, h('span', { text: 'GRID' }), h('b', { text: 'CORSA' }))),
     h('div.intro-skip', { text: t('Click or press any key to skip') }),
   );
   intro.addEventListener('click', end);

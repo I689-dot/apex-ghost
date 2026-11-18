@@ -8,6 +8,7 @@ import { DamagePanel } from './damagePanel';
 import { Dial } from './dial';
 import { CircuitMap, type MapCar } from './circuitMap';
 import { flagImg } from './social';
+import { TyreWidget } from './tyreWidget';
 import type { DamageState } from '../physics/damage';
 import { LazyText, fmtDelta, fmtTime, h } from './dom';
 import { t } from '../i18n';
@@ -49,6 +50,9 @@ export interface HudState {
   tyreWear: number[];
   /** FL, FR, RL, RR brake disc °C */
   brakeTemps: number[];
+  /** Engine coolant and oil (°C). */
+  waterC: number;
+  oilC: number;
   /** Slipstream strength 0..1 */
   slipstream: number;
   resetHint: boolean;
@@ -91,11 +95,17 @@ export class Hud {
   private fin: LazyText;
   private pitBanner: LazyText;
   private flag: LazyText;
+  /** Race control's flag as the marshals show it: a small waving flag, its text for a few seconds, then the flag
+   * alone (it stays in sight without covering the road). */
+  private flagBox = h('div.hud-flag');
+  private flagIcon = h('span.hud-flag-icon');
+  private flagShownAt = 0;
   private flagKind = '';
   private draft: HTMLElement = h('div.hud-draft', { text: t('SLIPSTREAM') });
   private dial = new Dial();
   private wrong: HTMLElement;
   private status = new CarStatus();
+  private tyres = new TyreWidget();
   private overlays = new RaceOverlays();
   private damagePanel = new DamagePanel();
   private hudKey = '';
@@ -119,7 +129,8 @@ export class Hud {
     this.msg = new LazyText(h('div.hud-msg'));
     this.fin = new LazyText(h('div.hud-finish'));
     this.pitBanner = new LazyText(h('div.hud-pit'));
-    this.flag = new LazyText(h('div.hud-flag'));
+    this.flag = new LazyText(h('span.hud-flag-text'));
+    this.flagBox.append(this.flagIcon, this.flag.el);
     this.wrong = h('div.hud-wrong', { text: t('WRONG WAY') });
     this.resetEl = h('div.hud-reset', { text: t('Press R to reset to the track') });
     this.board = h('div.hud-board');
@@ -145,23 +156,19 @@ export class Hud {
         // the minimap under the lap times (the corner by the dial is the driver's)
         h('div.hud-br', {}, this.map, this.circuitMap.el),
       ),
-      h(
-        'div.hud-bc',
-        {},
-        this.dial.el,
-        this.overlays.inputs,
-      ),
+      // bottom right, together as Le Mans Ultimate's: the inputs, the tyres and engine temperatures, the dial
+      h('div.hud-bc', {}, this.overlays.inputs, this.tyres.el, this.dial.el),
       this.overlays.spotL,
       this.overlays.spotR,
       this.overlays.mirrorDelta,
       this.damagePanel.el,
       // bottom left, as in the sims: who is just ahead and behind, over the tyres
-      h('div.hud-bl', {}, this.overlays.relative, this.status.el),
+      h('div.hud-bl', {}, this.overlays.relative),
       this.wrong,
       this.msg.el,
       this.fin.el,
       this.pitBanner.el,
-      this.flag.el,
+      this.flagBox,
       this.draft,
       this.resetEl,
     );
@@ -309,6 +316,9 @@ export class Hud {
       engine: s.damageZones[4] ?? 0,
       fuel: s.fuel,
       fuelLow: s.fuelLow,
+      throttle: s.throttle,
+      brake: s.brake,
+      tyreLife: 1 - Math.max(...s.tyreWear),
     });
     this.lap.set(s.lapLabel);
     const tagKey = `${s.lapPenaltyMs}|${s.lapInvalid ? 1 : 0}`;
@@ -337,7 +347,7 @@ export class Hud {
       this.delta.el.className = `hud-delta ${d <= 0 ? 'good' : 'bad'}${s.lapPenaltyMs > 0 || s.lapInvalid ? ' void' : ''}`;
     }
     this.wrong.classList.toggle('show', s.wrongWay);
-    this.status.update(s.tyreTemps, s.damageZones, s.abs, s.tc, s.compound, s.tyreWear, s.brakeTemps);
+    this.tyres.update(s.tyreTemps, s.tyreWear, s.brakeTemps, s.compound, s.damageZones, s.waterC, s.oilC);
     this.draft.classList.toggle('show', s.slipstream > 0.25);
     this.msg.set(s.message);
     this.fin.set(s.sessionText);
@@ -346,8 +356,12 @@ export class Hud {
     this.flag.set(s.flagText);
     if (s.flag !== this.flagKind) {
       this.flagKind = s.flag;
-      this.flag.el.className = `hud-flag${s.flag ? ` ${s.flag}` : ''}`;
+      this.flagBox.className = `hud-flag${s.flag ? ` ${s.flag}` : ''}`;
+      this.flagIcon.innerHTML = s.flag ? flagSvg(s.flag) : '';
+      this.flagShownAt = performance.now();
     }
+    this.flagBox.classList.toggle('empty', !s.flag && !s.flagText);
+    this.flagBox.classList.toggle('brief', !!s.flag && performance.now() - this.flagShownAt > 4000);
     // the inputs widget shows the gear and speed: the old speedometer only without it
     this.el.classList.toggle('inputs-on', settings.overlays.inputs);
     // the player's HUD (Settings → General): size, opacity, the parts shown
@@ -531,4 +545,20 @@ export class Hud {
       ),
     );
   }
+}
+
+/** A marshal's flag, waving: the cloth by the flag's kind (the safety car and FCY as yellow boards with their letters). */
+export function flagSvg(kind: string): string {
+  const cloth = 'M7 5 C15 2 21 9 31 5 L31 21 C21 25 15 18 7 21 Z';
+  const fill: Record<string, string> = { yellow: '#ffd60a', sc: '#ffd60a', fcy: '#ffd60a', blue: '#1f6fff', green: '#19c15a', meatball: '#111', dt: '#111' };
+  const extra =
+    kind === 'meatball'
+      ? '<circle cx="19" cy="13" r="4.6" fill="#ff7a00"/>'
+      : kind === 'blue'
+        ? '<path d="M7 19 L31 7" stroke="#ffd60a" stroke-width="2.2"/>'
+        : kind === 'sc' || kind === 'fcy'
+          ? `<text x="19" y="16.5" text-anchor="middle" font-size="${kind === 'sc' ? 9 : 7}" font-weight="800" font-family="Barlow Condensed, Arial Narrow, sans-serif" fill="#111">${kind.toUpperCase()}</text>`
+          : '';
+  const edge = kind === 'dt' || kind === 'meatball' ? ' stroke="#fff" stroke-width="1.2"' : ' stroke="rgba(0,0,0,.35)" stroke-width="0.8"';
+  return `<svg viewBox="0 0 34 30" aria-hidden="true"><path d="M6 3 L6 29" stroke="#d9dce2" stroke-width="2" stroke-linecap="round"/><path d="${cloth}" fill="${fill[kind] ?? '#ffd60a'}"${edge}/>${extra}</svg>`;
 }

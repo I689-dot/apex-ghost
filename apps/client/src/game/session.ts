@@ -36,6 +36,7 @@ import {
   planWeather,
   temperatures,
   weatherAt,
+  DEFAULT_BOT_LEVEL,
   type CarEntry,
   type Temperatures,
   type CarState,
@@ -59,12 +60,15 @@ import { FUEL, PROXY_GROUPS, Vehicle, trackRubber } from '../physics/vehicle';
 import { CAMERA_MODES, saveSettings, settings } from '../settings';
 import { Hud } from '../ui/hud';
 import { loadCarModel, loadTrackFile, type Progress } from './assets';
-import { AiDriver, BOT_ASSISTS } from './ai';
+import { AiDriver, BOT_ASSISTS, botPersona, hashSeed } from './ai';
 import { Cinematic, type Entrant } from './cinematic';
 import { TvCameras } from './tvCameras';
 import type { GameAudio } from '../audio/audio';
 import { SessionAudio, type OtherCar } from '../audio/sessionAudio';
 import { LapDelta } from './lapDelta';
+import { LapTrace } from './lapTrace';
+import { account, uploadTrace } from '../net/account';
+import { isLocalCode } from '../net/localRoom';
 import { BestLapGhost, wakeStrength } from './ghost';
 import { applySetup, vehicleSetup } from './carSetup';
 import { PitLaneMonitor, type WallProbe } from './pitLane';
@@ -74,6 +78,7 @@ import { PitMenu } from '../ui/pitMenu';
 import { TimingScreen } from '../ui/timingScreen';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../physics/tyres';
 import { RacingLineFx } from './racingLineFx';
+import { trafficView, type TrafficCar } from './ai';
 import { RearMirror } from './mirror';
 import { GrassMask } from './grassMask';
 import { TrackLimits, beyondLimitsNow } from './trackLimits';
@@ -105,10 +110,16 @@ import { t } from '../i18n';
 import { rumble } from '../input/gamepad';
 
 const FIXED_DT = 1 / PHYSICS_HZ;
+/**
+ * Rejoining after a reset, as the sims keep a car out of the way while it is not racing (iRacing's ghost driving,
+ * the F1 games' ghosted rejoin): a car that reset to the track passes through every other car for at least minMs,
+ * then until no car is within clearM of it (at most maxMs). Every client applies it to the cars it sees reset, so a
+ * car arriving from behind drives through the one standing at the checkpoint, and two cars that reset at the same
+ * place do not collide. Resets are also spread across the road and along it, onto a free spot.
+ */
+const REJOIN = { minMs: 3000, maxMs: 15000, clearM: 9 };
 const STEPS_PER_SAMPLE = PHYSICS_HZ / STATE_HZ;
 const MAX_FRAME_DT = 0.1;
-/** How far a bot moves over to pass a slower car (m). */
-const PASS_OFFSET = 3.6;
 /** AI cars leave the grid one at a time, this far apart (qualifying: no rolling start). 2.5 s kept the last of 11
  * bots waiting 27 s, which looked like bots that would not start. */
 const BOT_RELEASE_MS = 1000;
@@ -167,6 +178,8 @@ interface Remote {
   setV: THREE.Vector3;
   /** The stand-in jumped and passes through cars until clear of them. */
   ghosted: boolean;
+  /** When it was last seen resetting to the track (performance.now(), 0: never): a rejoining car is a ghost. */
+  rejoinAt: number;
   /** Impulse it took from a car simulated here, not yet sent (N·s, world; yaw N·m·s), from whom, last sent. */
   bump: THREE.Vector3;
   bumpYaw: number;
@@ -185,10 +198,11 @@ interface LocalBot {
   pendingCount: number;
   seq: number;
   resetFlagSamples: number;
+  /** When it last reset itself to the track (performance.now(), 0: never). */
+  rejoinAt: number;
   limits: TrackLimits;
   hint: number;
   /** Seconds left before a pass manoeuvre is given up (traffic cleared). */
-  passHold: number;
   /** Its own pit-lane monitor (enter / exit for the lap logic), the lap it makes its mandatory stop on, and the
    * service in progress (ends at, performance.now() ms; 0 = none) with its timeline (pitCrew.stopTimeline). */
   pit: PitLaneMonitor | null;
@@ -203,6 +217,11 @@ interface LocalBot {
   exitAt: number;
   /** Told the server it is in the pit lane. */
   pitSent: boolean;
+  /** Towed to its box after a crash: the crew starts once the tow is over (performance.now() ms; 0 = no tow). */
+  towUntil: number;
+  /** The damage version last sent to the others, and when. */
+  damageSent: number;
+  damageSentAt: number;
 }
 
 export interface SessionCallbacks {
@@ -278,6 +297,8 @@ export class RaceSession {
   private pendingCount = 0;
   private relayScratch: CarState[] = [makeCarState(), makeCarState(), makeCarState(), makeCarState()];
   private resetFlagSamples = 0;
+  /** When I last reset to the track (performance.now(), 0: never): until clear I drive as a ghost (REJOIN). */
+  private myRejoinAt = 0;
   /** The session for the solo career (career.ts): distance, laps, clean ones, bests, incident points. */
   private career = { km: 0, laps: 0, cleanLaps: 0, pbs: 0, incidents: 0, lapIncidents: 0 };
 
@@ -314,6 +335,9 @@ export class RaceSession {
   /** All four wheels beyond the limits (held): reported to the lap logic, which adds a time penalty. */
   private limits = new TrackLimits();
   private lapDelta: LapDelta | null = null;
+  /** This lap's telemetry, and the last finished valid lap's (sent with a personal best set online). */
+  private lapTrace: LapTrace | null = null;
+  private lastTrace: string | null = null;
   private liveDelta: number | null = null;
   private trackerEvents: RaceEvent[] = [];
   private racingLine: RacingLineFx | null = null;
@@ -388,6 +412,8 @@ export class RaceSession {
     /** Its body collides (on track, and placed where no car was). */
     solid: boolean;
   } | null = null;
+  /** The bots this host simulates, by their body's collider (their hits on walls damage them). */
+  private botByCollider = new Map<number, Remote>();
   /** Colliders of other cars (contact rule), for damage. */
   private carColliders = new Set<number>();
   /** Contact rule: when two cars were last seen touching in this world ("victim|other" → performance.now()). */
@@ -600,6 +626,7 @@ export class RaceSession {
         collider: null,
         setV: new THREE.Vector3(),
         ghosted: false,
+        rejoinAt: 0,
         bump: new THREE.Vector3(),
         bumpYaw: 0,
         bumpFrom: '',
@@ -854,9 +881,12 @@ export class RaceSession {
       if (this.race.rules?.fuel) vehicle.setFuel(this.race.kind === 'race' ? Math.min(FUEL.tankL, this.raceLaps * perLap * 1.05 + 2) : 40);
       const pit = this.trackData.pitLane ? new PitLaneMonitor(this.trackData) : null;
       const win = pitWindowLaps(this.raceLaps);
-      // skill and racing line differ per bot so they spread out (deterministic per slot)
-      // the player's AI difficulty (Settings → Driving) scales every bot's pace
-      const skill = (0.88 + ((r.slot * 37) % 10) / 100) * settings.ai.difficulty;
+      // each bot is its own driver (botPersona, seeded by its id: the same driver every session): its line, braking,
+      // throttle, racecraft, consistency and wet skill. The host's bot level (race rules) sets the pace, each bot
+      // somewhere in a 5 % spread under it (95.5–101 %): the field strings out, some are clearly slower than others
+      const seed = hashSeed(r.id);
+      const persona = botPersona(seed);
+      const skill = ((this.race.rules?.botLevel ?? DEFAULT_BOT_LEVEL) / 100) * (0.955 + 0.055 * persona.pace);
       const lane = (((r.slot * 7) % 5) - 2) * 0.45;
       const t = vehicle.body.translation();
       const q = vehicle.body.rotation();
@@ -864,7 +894,7 @@ export class RaceSession {
       const rot = new THREE.Quaternion(q.x, q.y, q.z, q.w);
       r.bot = {
         vehicle,
-        ai: new AiDriver(this.trackData, vehicle, skill, lane),
+        ai: new AiDriver(this.trackData, vehicle, skill, lane, persona, seed),
         prevPos: pos.clone(),
         currPos: pos,
         prevRot: rot.clone(),
@@ -873,9 +903,9 @@ export class RaceSession {
         pendingCount: 0,
         seq: 0,
         resetFlagSamples: 0,
+        rejoinAt: 0,
         limits: new TrackLimits(),
         hint: -1,
-        passHold: 0,
         pit,
         // spread over the window so they don't all stop on the same lap
         stopLap: win.open + (r.slot % (win.close - win.open + 1)),
@@ -887,7 +917,11 @@ export class RaceSession {
         lift: 0,
         exitAt: 0,
         pitSent: false,
+        towUntil: 0,
+        damageSent: 0,
+        damageSentAt: 0,
       };
+      this.botByCollider.set(vehicle.collider.handle, r);
       if (pit) {
         pit.measureBoxes(this.wallProbe);
         const [a, b] = pit.boxes()[pit.boxOf(r.slot)];
@@ -1118,13 +1152,29 @@ export class RaceSession {
     let yaw: number;
     if (tr && tr.passed >= 0) {
       const g = gates[(tr.nextGate - 1 + n) % n];
-      // a little before the gate, on the centreline
+      // just past the gate, in a lane of its own (by grid slot: two cars resetting together land apart), on the first
+      // spot no other car is near: along the road, then the other lanes
+      const slot = this.race.slots[this.me] ?? 0;
+      const lanes = [((slot % 3) - 1) * 2.6, ...[-2.6, 0, 2.6].filter((l) => l !== ((slot % 3) - 1) * 2.6)];
       const pt = { x: 0, y: 0, z: 0, yaw: 0 };
-      this.track.pointAt(g.s + 2, pt);
-      x = pt.x;
-      y = pt.y;
-      z = pt.z;
-      yaw = pt.yaw;
+      let best: { x: number; y: number; z: number; yaw: number } | null = null;
+      search: for (const along of [2, 16, 30]) {
+        this.track.pointAt(g.s + along, pt);
+        const ci = nearestCenterlineIndex(this.trackData, pt.x, pt.y, pt.z, -1, 40);
+        const wl = Math.max(0, (this.trackData.widthL[ci] ?? 5) - 1.6);
+        const wr = Math.max(0, (this.trackData.widthR[ci] ?? 5) - 1.6);
+        for (const lane of lanes) {
+          const off = Math.max(-wr, Math.min(wl, lane));
+          // the left of the road: forward (sin yaw, cos yaw) turned a quarter left
+          const cand = { x: pt.x + Math.cos(pt.yaw) * off, y: pt.y, z: pt.z - Math.sin(pt.yaw) * off, yaw: pt.yaw };
+          best ??= cand;
+          if (this.clearOfAll(this.me, cand.x, cand.z, REJOIN.clearM)) {
+            best = cand;
+            break search;
+          }
+        }
+      }
+      ({ x, y, z, yaw } = best ?? { ...pt });
     } else {
       const slot = this.race.slots[this.me] ?? 0;
       const gs = this.trackData.grid[slot];
@@ -1140,11 +1190,14 @@ export class RaceSession {
     this.freezeUntil = now + RESET_FREEZE_MS;
     this.vehicle.frozen = true;
     this.resetFlagSamples = 2; // make sure at least one packet carries the reset flag
+    // a ghost until clear of the others (REJOIN): nobody arriving from behind runs into the car standing here
+    this.myRejoinAt = performance.now();
     this.incident(4);
     this.track.resetHint();
     this.limits.reset();
     // the time penalty (if any) is announced by the lap logic's penalty event
-    if (this.myLaps === 0) this.flash(t('Reset to the track'));
+    if (this.contact) this.flash(t('Rejoining as a ghost until the road around you is clear'), 3500);
+    else if (this.myLaps === 0) this.flash(t('Reset to the track'));
   }
 
   private flash(msg: string, ms = 2500): void {
@@ -1188,6 +1241,11 @@ export class RaceSession {
           if (m.best) {
             this.bestLap = m.lapMs;
             this.bestSectors = m.sectors.slice();
+          }
+          // a personal best online: its telemetry to the website (the server keeps it for a lap it recorded)
+          if (m.best && m.valid && this.lastTrace && account() && !isLocalCode(this.conn.code) && !this.spectator) {
+            void uploadTrace({ track: this.race.trackId, lapMs: m.lapMs, bin: this.lapTrace?.bin ?? 5, data: this.lastTrace });
+            this.lastTrace = null;
           }
           const sessionBest = this.standings.every((s) => s.id === this.me || s.bestLapMs === null || s.bestLapMs > m.lapMs);
           const tag = !m.valid ? t('  ·  INVALID') : m.best ? (sessionBest ? t('  ·  FASTEST LAP') : t('  ·  personal best')) : '';
@@ -1309,7 +1367,10 @@ export class RaceSession {
     if (!dec) return;
     const r = this.remotes.get(dec.slot);
     if (!r) return;
-    for (let i = 0; i < dec.count; i++) r.buffer.push(this.relayScratch[i], (dec.seq * STATES_PER_PACKET + i) & 0xffff);
+    for (let i = 0; i < dec.count; i++) {
+      if (this.relayScratch[i].flags & FLAG_RESET && performance.now() - r.rejoinAt > 1500) r.rejoinAt = performance.now();
+      r.buffer.push(this.relayScratch[i], (dec.seq * STATES_PER_PACKET + i) & 0xffff);
+    }
   }
 
   private onVisibility = (): void => {
@@ -1395,7 +1456,7 @@ export class RaceSession {
       this.prevPos.copy(this.currPos);
       this.prevRot.copy(this.currRot);
       this.vehicle.step(FIXED_DT, controls);
-      this.stepBots(raceT);
+      this.stepBots(raceT, serverNow);
       if (this.contact) this.moveKinematics();
       this.world.step(this.events);
       if (this.contact) this.afterContacts();
@@ -1604,16 +1665,20 @@ export class RaceSession {
     const ahead = -this.acc; // this step's time relative to the frame (s)
     // contact off in the pit area for every car with a body of its own (mine, the bots'); other players' proxies below
     const mp = this.vehicle.body.translation();
-    const solidMe = !this.inPitArea(mp.x, mp.z);
+    const ghostMe = this.rejoining(this.me, this.myRejoinAt, mp.x, mp.z);
+    if (!ghostMe && this.myRejoinAt && performance.now() - this.myRejoinAt > REJOIN.minMs) this.myRejoinAt = 0;
+    const solidMe = !this.inPitArea(mp.x, mp.z) && !ghostMe;
     if (solidMe !== this.myContactOn) {
       this.myContactOn = solidMe;
       this.vehicle.setContact(solidMe);
     }
     for (const r of this.remotes.values()) {
-      const bv = r.bot?.vehicle;
-      if (!bv) continue;
-      const bp = bv.body.translation();
-      bv.setContact(!this.inPitArea(bp.x, bp.z));
+      const b = r.bot;
+      if (!b) continue;
+      const bp = b.vehicle.body.translation();
+      const ghost = this.rejoining(r.id, b.rejoinAt, bp.x, bp.z);
+      if (!ghost && b.rejoinAt && performance.now() - b.rejoinAt > REJOIN.minMs) b.rejoinAt = 0;
+      b.vehicle.setContact(!this.inPitArea(bp.x, bp.z) && !ghost);
     }
     const move = (body: RAPIER.RigidBody, o: THREE.Object3D, vel: THREE.Vector3) => {
       body.setNextKinematicTranslation({ x: o.position.x + vel.x * ahead, y: o.position.y + vel.y * ahead, z: o.position.z + vel.z * ahead });
@@ -1632,7 +1697,9 @@ export class RaceSession {
       const ey = ty - p.y;
       const ez = tz - p.z;
       // a car in the pit area is a ghost (the same rule as mine), so it never stands solid in the lane or a box
-      const hidden = !o.visible || !r.buffer.hasData || this.inPitArea(o.position.x, o.position.z);
+      const rejoin = this.rejoining(r.id, r.rejoinAt, o.position.x, o.position.z);
+      if (!rejoin && r.rejoinAt && performance.now() - r.rejoinAt > REJOIN.minMs) r.rejoinAt = 0;
+      const hidden = !o.visible || !r.buffer.hasData || this.inPitArea(o.position.x, o.position.z) || rejoin;
       if (hidden || ex * ex + ey * ey + ez * ez > PROXY_SNAP_M * PROXY_SNAP_M) {
         body.setTranslation({ x: tx, y: ty, z: tz }, true);
         if (!r.ghosted) c.setEnabled(false);
@@ -1678,6 +1745,35 @@ export class RaceSession {
   private *simulated(): Generator<[string, Vehicle]> {
     if (!this.spectator) yield [this.me, this.vehicle];
     for (const r of this.remotes.values()) if (r.bot) yield [r.id, r.bot.vehicle];
+  }
+
+  /** Every car's position on this screen (mine, the bots, the others as drawn), with its id. */
+  private *allCars(): Generator<[string, number, number]> {
+    if (!this.spectator) {
+      const p = this.vehicle.body.translation();
+      yield [this.me, p.x, p.z];
+    }
+    for (const r of this.remotes.values()) {
+      if (r.bot) {
+        const p = r.bot.vehicle.body.translation();
+        yield [r.id, p.x, p.z];
+      } else if (r.buffer.hasData && r.visual.object.visible) yield [r.id, r.visual.object.position.x, r.visual.object.position.z];
+    }
+  }
+
+  /** No other car than `self` within d (m) of (x, z). */
+  private clearOfAll(self: string, x: number, z: number, d: number): boolean {
+    for (const [id, cx, cz] of this.allCars()) if (id !== self && (cx - x) ** 2 + (cz - z) ** 2 < d * d) return false;
+    return true;
+  }
+
+  /** A car that reset at `at` (performance.now()) still rejoining as a ghost (REJOIN). */
+  private rejoining(self: string, at: number, x: number, z: number): boolean {
+    if (!at) return false;
+    const age = performance.now() - at;
+    if (age < REJOIN.minMs) return true;
+    if (age > REJOIN.maxMs) return false;
+    return !this.clearOfAll(self, x, z, REJOIN.clearM);
   }
 
   /** No car simulated here within r (m) of (x, z). */
@@ -1962,7 +2058,14 @@ export class RaceSession {
         this.localTracker?.pitOut(r.id, this.trackData.pitLane?.exitS ?? 0, serverNow);
         b.exitAt = now;
       }
-      if (this.race.kind !== 'race' || tr.finishedMs !== null || tr.dnf) continue;
+      // its damage to the others (dents and smoke on their screens; race control's view of it), at most once a second
+      if (r.damage.version !== b.damageSent && now - b.damageSentAt > 1000) {
+        b.damageSent = r.damage.version;
+        b.damageSentAt = now;
+        this.conn.sendJson({ t: 'damage', id: r.id, zones: Array.from(r.damage.zones, (z) => Math.round(z * 100) / 100) });
+      }
+      if (tr.finishedMs !== null || tr.dnf) continue;
+      const isRace = this.race.kind === 'race';
       const lap = tr.laps + 1;
       const st = this.standings.find((s) => s.id === r.id);
       const lapsLeft = this.raceLaps - tr.laps;
@@ -1971,23 +2074,29 @@ export class RaceSession {
       const inWindow = wt
         ? serverNow >= wt.open + ((r.slot % 5) / 6) * (wt.close - wt.open) && serverNow < wt.close - 8000
         : lap >= b.stopLap && lap <= win.close;
-      const mustStop = !!rules?.pitWindow && !st?.stopDone && inWindow;
-      const needFuel = v.fuelL !== null && v.fuelL < perLap * 1.3 && v.fuelL < lapsLeft * perLap;
+      const mustStop = isRace && !!rules?.pitWindow && !st?.stopDone && inWindow;
+      const needFuel = isRace && v.fuelL !== null && v.fuelL < perLap * 1.3 && v.fuelL < lapsLeft * perLap;
+      // damage worth a stop (in any session): a puncture, a bent corner, a broken wing or splitter, a damaged engine
+      const z = r.damage.zones;
+      const needRepair = r.damage.punctured.some(Boolean) || z[5] > 0.25 || Math.max(z[0], z[1]) > 0.3 || Math.max(z[2], z[3]) > 0.45 || z[4] > 0.35;
       if (!b.ai.pitRequest && !b.ai.inPitLane && now - b.exitAt > 5000) {
-        if (mustStop || needFuel) b.ai.pitRequest = 'stop';
-        else if ((st?.driveThroughs ?? 0) > 0) b.ai.pitRequest = 'through';
+        if (mustStop || needFuel || needRepair) b.ai.pitRequest = 'stop';
+        else if (isRace && (st?.driveThroughs ?? 0) > 0) b.ai.pitRequest = 'through';
       }
-      // in the box: the crew's work, timed like a player's stop
-      if (b.ai.atBox && b.serviceEnd === 0) {
+      // in the box: the crew's work, timed like a player's stop (after a tow, once the car is there)
+      if (b.ai.atBox && b.serviceEnd === 0 && now >= b.towUntil) {
+        b.towUntil = 0;
         const wear = v.wheels.reduce((a, w) => a + w.wear, 0) / 4;
         const plan = defaultPlan(
           r.damage.zones,
           wear,
           v.compound.id,
           this.weather.wetness,
-          v.fuelL === null ? 0 : Math.ceil(Math.min(FUEL.tankL - v.fuelL, Math.max(0, (lapsLeft + 1) * perLap - v.fuelL))),
-          !!rules?.pitWindow && !st?.stopDone && (wt ? tr.pitInMs >= wt.open && tr.pitInMs < wt.close : lap >= win.open && lap <= win.close),
+          !isRace || v.fuelL === null ? 0 : Math.ceil(Math.min(FUEL.tankL - v.fuelL, Math.max(0, (lapsLeft + 1) * perLap - v.fuelL))),
+          isRace && !!rules?.pitWindow && !st?.stopDone && (wt ? tr.pitInMs >= wt.open && tr.pitInMs < wt.close : lap >= win.open && lap <= win.close),
         );
+        // a puncture: new tyres whatever their wear
+        if (r.damage.punctured.some(Boolean) && !plan.tyres) plan.tyres = v.compound.id;
         b.servicePlan = plan;
         b.serviceEnd = now + Math.max(1, serviceTime(plan, r.damage.zones).total) * 1000;
         b.serviceStart = now;
@@ -2005,9 +2114,13 @@ export class RaceSession {
         const plan = b.servicePlan;
         if (plan?.tyres) {
           v.fitTyres(COMPOUNDS[plan.tyres], v.ambientC + 12);
+          r.damage.tyresChanged();
           v.weatherGrip = compoundGrip(v.compound, this.weather.wetness, this.weather.rain);
         }
         if (plan && plan.fuelL > 0 && v.fuelL !== null) v.setFuel(v.fuelL + plan.fuelL);
+        // the repairs (dents are visual: gone with any bodywork repair)
+        if (plan?.body) r.visual.resetDamage();
+        if (plan && r.damage.repair({ body: plan.body, suspension: plan.suspension, engine: plan.engine })) v.drivetrain.powerScale = r.damage.powerScale;
         b.serviceEnd = 0;
         b.servicePlan = null;
         b.serviceEvents = null;
@@ -2016,6 +2129,33 @@ export class RaceSession {
         b.ai.pitServed();
       }
     }
+  }
+
+  /**
+   * A bot that put itself back on the track wrecked (a puncture, a broken corner, heavy damage): towed to its box
+   * instead, as iRacing does, where its crew repairs it. The tow takes the time to cover the rest of the way to the
+   * pits at 108 km/h (never quicker than driving there), at least 30 s, before the crew starts.
+   */
+  private towBot(r: Remote, serverNow: number): boolean {
+    const b = r.bot;
+    const lane = this.trackData.pitLane;
+    if (!b || !lane || !b.pit || b.ai.inPitLane || !this.startAt || serverNow < this.startAt) return false;
+    const tr = this.localTracker?.players.get(r.id);
+    if (!tr || tr.finishedMs !== null || tr.dnf) return false;
+    const z = r.damage.zones;
+    const wrecked = r.damage.punctured.some(Boolean) || z[5] > 0.45 || Math.max(...z) > 0.6;
+    if (!wrecked) return false;
+    const p = b.vehicle.body.translation();
+    const s = progressAt(this.trackData, nearestCenterlineIndex(this.trackData, p.x, p.y, p.z, b.hint, 60), p.x, p.z);
+    const L = this.trackData.length;
+    const toEntry = (((lane.entryS - s) % L) + L) % L;
+    if (!b.ai.towToBox()) return false;
+    b.towUntil = performance.now() + Math.max(30, (toEntry + (b.ai.pitBox * lane.length) / Math.max(1, lane.points.length - 1)) / 30) * 1000;
+    b.pitSent = true;
+    this.conn.sendJson({ t: 'pit', in: true, id: r.id, tow: true });
+    this.localTracker?.tow(r.id, serverNow);
+    this.flash(t('{name} is towed to the pits', { name: this.names.get(r.id) ?? t('A driver') }), 3000);
+    return true;
   }
 
   /** Race control's flag for me (the light panel on the HUD) and the fuel readout. */
@@ -2206,7 +2346,7 @@ export class RaceSession {
    * apart, in grid order) instead of all launching side by side onto the same line, and they keep their distance
    * behind a car directly ahead (cars pass through each other here, so without this they drove through it).
    */
-  private stepBots(raceT: number): void {
+  private stepBots(raceT: number, serverNow: number): void {
     const bots = [...this.remotes.values()].filter((r) => r.bot).sort((a, b) => a.slot - b.slot);
     bots.forEach((r, order) => {
       const b = r.bot;
@@ -2218,6 +2358,14 @@ export class RaceSession {
       const gates = this.trackData.gates;
       const cp = tr && tr.passed >= 0 ? gates[(tr.nextGate - 1 + gates.length) % gates.length].s : undefined;
       const c = b.ai.update(FIXED_DT, started, b.vehicle.weatherGrip * b.vehicle.tyreGripAvg, cp, started ? this.followCap(r) : Infinity);
+      // the bot put itself back on the track: tell the others (the reset flag) and rejoin as a ghost
+      if (b.ai.resetRequested) {
+        b.ai.resetRequested = false;
+        b.resetFlagSamples = 2;
+        b.rejoinAt = performance.now();
+        // too badly damaged to go on: towed to its box instead
+        if (!b.ai.inPitLane) this.towBot(r, serverNow);
+      }
       b.vehicle.step(FIXED_DT, c);
     });
   }
@@ -2234,42 +2382,24 @@ export class RaceSession {
     const v = b.vehicle;
     const p = v.body.translation();
     const q = v.body.rotation();
-    const fx = 2 * (q.x * q.z + q.y * q.w);
-    const fz = 1 - 2 * (q.x * q.x + q.y * q.y);
-    const mySpeed = v.telemetry.speed;
-    let cap = Infinity;
-    let block: { along: number; lat: number } | null = null;
-    let beside = false;
-    const check = (ox: number, oy: number, oz: number, speed: number, ofx: number, ofz: number) => {
-      // not the same piece of road: a car on the other leg of a hairpin (driving the other way) or on a bridge /
-      // underpass looked like a car ahead, and the bots braked for nothing; a stopped car is avoided whichever way
-      if (Math.abs(oy - p.y) > 2.5 || (speed > 5 && ofx * fx + ofz * fz < 0.3)) return;
-      const dx = ox - p.x;
-      const dz = oz - p.z;
-      const along = dx * fx + dz * fz;
-      const lat = dx * fz - dz * fx; // + = left of the bot
-      // alongside on the side we moved to: hold that side until it is behind us
-      if (along > -6 && along <= 3 && Math.abs(lat) < 3.4) beside = true;
-      if (along <= 0 || along > 40 || Math.abs(lat) > 2.6) return;
-      // in our path (narrower once we are pulling out): keep about 10 m, back off if closer
-      if (Math.abs(lat) < (b.ai.passTarget !== 0 ? 1.6 : 2.2)) cap = Math.min(cap, Math.max(0, speed + (along - 10) * 0.7));
-      if (along <= 3 || (speed > mySpeed - 1.5 && along > 14)) return; // as fast as us and not close: just follow
-      if (!block || along < block.along) block = { along, lat };
-    };
     const fwd = (qx: number, qy: number, qz: number, qw: number): [number, number] => [2 * (qx * qz + qy * qw), 1 - 2 * (qx * qx + qy * qy)];
+    const [fx, fz] = fwd(q.x, q.y, q.z, q.w);
+    const others: TrafficCar[] = [];
     for (const o of this.remotes.values()) {
       if (o === r) continue;
       const op = o.bot ? o.bot.vehicle.body.translation() : o.visual.object.position;
       const oq = o.bot ? o.bot.vehicle.body.rotation() : o.visual.object.quaternion;
       const [ofx, ofz] = fwd(oq.x, oq.y, oq.z, oq.w);
-      check(op.x, op.y, op.z, o.vel.length(), ofx, ofz);
+      others.push({ x: op.x, y: op.y, z: op.z, speed: o.vel.length(), fx: ofx, fz: ofz });
     }
     if (!this.spectator) {
       const me = this.vehicle.body.translation();
       const mq = this.vehicle.body.rotation();
       const [mfx, mfz] = fwd(mq.x, mq.y, mq.z, mq.w);
-      check(me.x, me.y, me.z, this.vehicle.telemetry.speed, mfx, mfz);
+      others.push({ x: me.x, y: me.y, z: me.z, speed: this.vehicle.telemetry.speed, fx: mfx, fz: mfz });
     }
+    const view = trafficView({ x: p.x, y: p.y, z: p.z, fx, fz, speed: v.telemetry.speed }, b.ai.passTarget !== 0, others);
+    let cap = view.cap;
     // the safety car: queue behind it, seen from far enough to stop behind it (the 40 m of a car ahead were too
     // short from 250 km/h to its 150, and the bots ran into it)
     const sc = this.sc;
@@ -2281,13 +2411,7 @@ export class RaceSession {
     }
     // no overtaking under a caution (FCY, safety car, a yellow flag here): follow instead
     const caution = this.rc.course !== 'green' || this.inYellow(this.localTracker?.players.get(r.id)?.progressS ?? -1e9);
-    const found = caution ? null : (block as { along: number; lat: number } | null);
-    if (found && (b.ai.passTarget !== 0 || b.ai.canPass())) {
-      // pass on the side away from it (it is left of us → go right), else keep the side already chosen
-      if (b.ai.passTarget === 0) b.ai.passTarget = found.lat > 0.3 ? -PASS_OFFSET : found.lat < -0.3 ? PASS_OFFSET : b.ai.roomySide() * PASS_OFFSET;
-      b.passHold = 1;
-    } else if (beside && b.ai.passTarget !== 0) b.passHold = 1;
-    else if ((b.passHold -= FIXED_DT) <= 0) b.ai.passTarget = 0;
+    b.ai.applyTraffic(view, caution, FIXED_DT);
     return cap;
   }
 
@@ -2361,6 +2485,17 @@ export class RaceSession {
   private drainContacts(): void {
     const myHandle = this.vehicle.collider.handle;
     this.events.drainContactForceEvents((e) => {
+      // a bot of mine against a wall: its damage, as for my car (it then pits for repairs: updateBotPits)
+      const bot = this.botByCollider.get(e.collider1()) ?? this.botByCollider.get(e.collider2());
+      if (bot?.bot) {
+        const own = bot.bot.vehicle.collider.handle;
+        const other = e.collider1() === own ? e.collider2() : e.collider1();
+        if (this.track.surfaceOf(other) === 'wall') {
+          const dir = e.maxForceDirection();
+          const sign = e.collider1() === own ? -1 : 1;
+          this.botImpact(bot, e.totalForceMagnitude() * FIXED_DT, dir.x * sign, dir.y * sign, dir.z * sign);
+        }
+      }
       if (e.collider1() !== myHandle && e.collider2() !== myHandle) return;
       // only walls and barriers damage the car; touching the road or grass never does
       const other = e.collider1() === myHandle ? e.collider2() : e.collider1();
@@ -2375,6 +2510,19 @@ export class RaceSession {
       const sign = e.collider1() === myHandle ? -1 : 1;
       this.impactDamage(impulse, dir.x * sign, dir.y * sign, dir.z * sign, car);
     });
+  }
+
+  /** A hit on a bot of mine: damage (the same model as mine), dents, less power with a damaged engine. */
+  private botImpact(r: Remote, impulse: number, fx: number, fy: number, fz: number): void {
+    const b = r.bot;
+    if (!b) return;
+    const q = b.vehicle.body.rotation();
+    _q1.set(q.x, q.y, q.z, q.w).invert();
+    _v1.set(fx, fy, fz).applyQuaternion(_q1);
+    const res = r.damage.impact(impulse, -_v1.x, -_v1.z, b.vehicle.mass);
+    if (!res) return;
+    b.vehicle.drivetrain.powerScale = r.damage.powerScale;
+    if (res.zone < 4) r.visual.dent(zonePoint(res.zone, r.entry, _v1), zoneDir(res.zone, _v2), res.amount * 2);
   }
 
   /** A hit on my car: `impulse` (N·s) pushing it along (fx, fy, fz) (world, unit). Damage, dents, sound, rumble. */
@@ -2462,9 +2610,13 @@ export class RaceSession {
     const tr = this.localTracker?.players.get(this.me);
     if (!tr) return;
     this.lapDelta ??= new LapDelta(this.trackData.length);
+    this.lapTrace ??= new LapTrace(this.trackData.length);
     const d = this.lapDelta;
+    const trace = this.lapTrace;
     for (const e of ev) {
       if (e.type === 'lap') {
+        this.lastTrace = e.valid && !e.outLap ? trace.encode() : null;
+        trace.start();
         if (e.valid && e.best) d.commitBest();
         this.ghost.lapEnded(e.valid && e.best);
         if (e.valid && e.best) this.ensureGhostVisual();
@@ -2514,8 +2666,21 @@ export class RaceSession {
     }
     const lapDist = tr.raceDist - tr.laps * this.trackData.length;
     const lapMs = nowMs - tr.lapStartMs;
-    if (!tr.outLap && !tr.inPit) this.ghost.record(lapMs, this.currPos, this.currRot);
-    else this.ghost.abortLap();
+    if (!tr.outLap && !tr.inPit) {
+      this.ghost.record(lapMs, this.currPos, this.currRot);
+      const v = this.vehicle;
+      trace.record(
+        lapDist,
+        lapMs,
+        this.currPos.x,
+        this.currPos.z,
+        v.telemetry.speed,
+        v.pedals.throttle,
+        v.pedals.brake,
+        v.steerAngle / v.maxSteer,
+        v.telemetry.gear,
+      );
+    } else this.ghost.abortLap();
     d.record(lapDist, lapMs);
     this.liveDelta = d.delta(lapDist, lapMs);
   }
@@ -2539,7 +2704,7 @@ export class RaceSession {
     // ghost: fade out when very close to the camera so it never blocks the cockpit view
     const d = o.position.distanceTo(_camPos);
     const fade = this.cinematic || this.contact || (this.spectator && r.id === this.specTarget) ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1);
-    r.visual.setOpacity(s.staleMs > 5000 ? 0.35 : fade);
+    r.visual.setOpacity(s.staleMs > 5000 ? 0.35 : r.rejoinAt && this.contact ? 0.45 : fade);
     o.updateMatrixWorld();
   }
 
@@ -2557,7 +2722,7 @@ export class RaceSession {
     r.visual.setLights(v.pedals.brake > 0.1 && !v.reverse, this.headlightsOn, this.env.night);
     r.visual.updateSmoke(dt, 0, this.scene);
     const d = o.position.distanceTo(_camPos);
-    r.visual.setOpacity(this.cinematic || this.contact ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1));
+    r.visual.setOpacity(b.rejoinAt && this.contact ? 0.45 : this.cinematic || this.contact ? 1 : THREE.MathUtils.clamp((d - 2.5) / 6, 0.15, 1));
     o.updateMatrixWorld();
   }
 
@@ -3255,6 +3420,8 @@ export class RaceSession {
       compound: 'medium',
       tyreWear: [0, 0, 0, 0],
       brakeTemps: [0, 0, 0, 0],
+      waterC: 0,
+      oilC: 0,
       slipstream: 0,
       resetHint: false,
       tyreTemps: [0, 0, 0, 0],
@@ -3341,6 +3508,8 @@ export class RaceSession {
       compound: this.vehicle.compound.id,
       tyreWear: v.wheels.map((w) => w.wear),
       brakeTemps: v.wheels.map((w) => w.brakeTemp),
+      waterC: v.waterC,
+      oilC: v.oilC,
       slipstream: v.wake.strength,
       resetHint: this.stuckTime > 3,
       tyreTemps: v.wheels.map((w) => w.temp),

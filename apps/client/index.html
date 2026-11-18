@@ -2,8 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      // the game's files are relative to its folder: /play without the slash would look for them at the site's root
+      if (/\/play$/.test(location.pathname)) location.replace(location.pathname + '/' + location.search + location.hash);
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>APEX GHOST · Online sim racing</title>
+    <title>GRIDCORSA · GT3 sim racing in your browser</title>
     <meta name="description" content="Online multiplayer sim racing for friends, in your browser." />
     <meta name="theme-color" content="#0d0e11" />
     <link
@@ -83,11 +87,11 @@
   </head>
   <body>
     <div id="boot">
-      <div class="boot-logo">APEX<b>GHOST</b></div>
+      <div class="boot-logo">GRID<b>CORSA</b></div>
       <div class="boot-bar"></div>
     </div>
     <div id="app"></div>
-    <noscript>APEX GHOST needs JavaScript and WebGL 2.</noscript>
+    <noscript>GRIDCORSA needs JavaScript and WebGL 2.</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

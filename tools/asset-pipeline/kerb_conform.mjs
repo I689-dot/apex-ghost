@@ -215,7 +215,11 @@ export function kerbSkirts(asphaltParts, kerbParts, groundParts, width = 0.45) {
     // free edges: used by one triangle only
     const use = new Map();
     for (let t = 0; t < p.idx.length; t += 3)
-      for (const [a, b] of [[p.idx[t], p.idx[t + 1]], [p.idx[t + 1], p.idx[t + 2]], [p.idx[t + 2], p.idx[t]]]) {
+      for (const [a, b] of [
+        [p.idx[t], p.idx[t + 1]],
+        [p.idx[t + 1], p.idx[t + 2]],
+        [p.idx[t + 2], p.idx[t]],
+      ]) {
         const k = a < b ? `${a},${b}` : `${b},${a}`;
         const e = use.get(k);
         if (e) e.n++;
@@ -223,14 +227,20 @@ export function kerbSkirts(asphaltParts, kerbParts, groundParts, width = 0.45) {
       }
     for (const { a, b, n } of use.values()) {
       if (n !== 1) continue;
-      const ax = p.pos[a * 3], ay = p.pos[a * 3 + 1], az = p.pos[a * 3 + 2];
-      const bx = p.pos[b * 3], by = p.pos[b * 3 + 1], bz = p.pos[b * 3 + 2];
+      const ax = p.pos[a * 3],
+        ay = p.pos[a * 3 + 1],
+        az = p.pos[a * 3 + 2];
+      const bx = p.pos[b * 3],
+        by = p.pos[b * 3 + 1],
+        bz = p.pos[b * 3 + 2];
       const len = Math.hypot(bx - ax, bz - az);
       if (len < 1e-4) continue;
       // the side away from the road (the kerb's back); an edge with road on both sides or neither is skipped
       let nx = -(bz - az) / len;
       let nz = (bx - ax) / len;
-      const mx = (ax + bx) / 2, mz = (az + bz) / 2, my = (ay + by) / 2;
+      const mx = (ax + bx) / 2,
+        mz = (az + bz) / 2,
+        my = (ay + by) / 2;
       const roadL = road(mx + nx * 0.3, mz + nz * 0.3, my) > -Infinity;
       const roadR = road(mx - nx * 0.3, mz - nz * 0.3, my) > -Infinity;
       if (roadL === roadR) continue;
@@ -239,7 +249,8 @@ export function kerbSkirts(asphaltParts, kerbParts, groundParts, width = 0.45) {
         nz = -nz;
       }
       const out = (x, y, z) => {
-        const ox = x + nx * width, oz = z + nz * width;
+        const ox = x + nx * width,
+          oz = z + nz * width;
         const g = ground(ox, oz, y);
         return [ox, g > -Infinity ? g : y - 0.06, oz];
       };
@@ -383,7 +394,12 @@ export function lowerStrayRoad(asphaltParts, zones, LOW = 0.04, HIGH = 0.5) {
         const h = at(tris[m].g, x, z);
         if (h !== null && y - h > LOW && y - h < HIGH) low = Math.max(low, h);
       }
-      if (low > -Infinity) moves.set(`${tris.indexOf(tr) >= 0 ? '' : ''}${tr.p.si}:${tr.p.idx[tr.t + k]}:${tr.p.pos.buffer.byteLength}`, { p: tr.p, vi: tr.p.idx[tr.t + k], y: low + 0.004 });
+      if (low > -Infinity)
+        moves.set(`${tris.indexOf(tr) >= 0 ? '' : ''}${tr.p.si}:${tr.p.idx[tr.t + k]}:${tr.p.pos.buffer.byteLength}`, {
+          p: tr.p,
+          vi: tr.p.idx[tr.t + k],
+          y: low + 0.004,
+        });
     }
   for (const { p, vi, y } of moves.values()) p.pos[vi * 3 + 1] = y;
   return moves.size;
@@ -423,7 +439,7 @@ export function lowerRoadSpikes(asphaltParts, zones, SPIKE = 0.12) {
     return u * ay + v * by + (1 - u - v) * cy;
   };
   const moves = new Map();
-  tris.forEach((tr, n) => {
+  tris.forEach((tr) => {
     for (let k = 0; k < 3; k++) {
       const x = tr.g[k * 3];
       const y = tr.g[k * 3 + 1];

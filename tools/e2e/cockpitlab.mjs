@@ -46,9 +46,10 @@ for (const i of list) {
   try {
     await page.goto(URL);
     await page.click('button:has-text("Create room")');
+    await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
     await page.waitForSelector('.lb-steps');
     await page.click('.lb-step >> nth=4');
-    await page.click(`.car-card >> nth=${i}`);
+    await page.dblclick(`.gr-row >> nth=${i}`);
     await page.waitForTimeout(600);
     await page.click('.lobby-actions button:has-text("Ready")');
     await page.waitForTimeout(400);

@@ -21,6 +21,7 @@ await page.goto(URL);
 await page.waitForSelector('.menu');
 await page.waitForTimeout(2500);
 await page.click(args.includes('--online') ? 'button:has-text("Create room")' : 'button.solo');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['weather', 'clear']);
 await page.evaluate((laps) => {
@@ -29,7 +30,7 @@ await page.evaluate((laps) => {
   c.sendJson({ t: 'setRaceLaps', laps });
 }, LAPS);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');
   await page.waitForTimeout(250);

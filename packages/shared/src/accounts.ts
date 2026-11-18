@@ -9,10 +9,12 @@ export interface AccountUser {
   num?: number | null;
   abbr?: string | null;
   colour?: string | null;
+  /** The avatar: one of the helmet designs (h0…h15) and its second colour (AVATAR_RE), drawn in `colour`. */
+  avatar?: string | null;
 }
 
 /** A profile field check shared by the server and the profile form. */
-export const PROFILE_RE = { country: /^[A-Z]{2}$/, abbr: /^[A-Z]{3}$/, colour: /^#[0-9a-fA-F]{6}$/ };
+export const PROFILE_RE = { country: /^[A-Z]{2}$/, abbr: /^[A-Z]{3}$/, colour: /^#[0-9a-fA-F]{6}$/, avatar: /^h(?:[0-9]|1[0-5]):#[0-9a-fA-F]{6}$/ };
 
 /** Where a signed-in player is right now (heartbeats, ~45 s; gone after 90 s without one). */
 export interface Presence {
@@ -33,6 +35,9 @@ export interface FriendEntry {
   /** Friends only, and only while online. */
   presence: Presence | null;
   lastSeen: number | null;
+  /** Their avatar and helmet colour (profile), when set. */
+  avatar?: string | null;
+  colour?: string | null;
 }
 
 export interface RecordRow {

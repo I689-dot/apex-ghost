@@ -107,7 +107,7 @@ const settingsInit = () => {
     await page.waitForSelector('.lb-steps', { timeout: 60_000 });
     await page.waitForTimeout(2000);
     await page.screenshot({ path: path.join(out, 'mobile-06-app-lobby.png') });
-    await page.tap('.car-card >> nth=0');
+    await page.dblclick('.gr-row >> nth=0');
     await page.waitForTimeout(800);
     await page.locator('.lobby-actions button:has-text("Ready")').tap();
     await page.waitForTimeout(600);

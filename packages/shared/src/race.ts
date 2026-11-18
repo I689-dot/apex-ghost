@@ -324,6 +324,23 @@ export class RaceTracker {
     // only where the lane leaves the track (pit in / out anywhere else would be free laps: each pass of the lane
     // completes a race lap)
     if (!this.near(p, this.track.pitEntryS, -60, 450)) return out;
+    return this.enterPit(p, t, out);
+  }
+
+  /**
+   * A tow to the pits (iRacing's, after a wreck): the car is put in its box from wherever it was, as a pit in. Its
+   * lap ends at the pit exit as for any stop; whoever tows holds it in the box for the time the tow takes (at least
+   * the time to drive there), so it gains nothing.
+   */
+  tow(id: string, t: number, out: RaceEvent[] = []): RaceEvent[] {
+    const p = this.players.get(id);
+    if (!p || p.dnf || p.finishedMs !== null || p.inPit) return out;
+    // it is somewhere else now: found again by a full search (not near where it was)
+    p.hasPos = false;
+    return this.enterPit(p, t, out);
+  }
+
+  private enterPit(p: PlayerRaceState, t: number, out: RaceEvent[]): RaceEvent[] {
     p.inPit = true;
     p.rolling = false;
     p.pitStops++;

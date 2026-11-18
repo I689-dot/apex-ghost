@@ -10,7 +10,7 @@ import {
   type ServerMsg,
 } from '@apex/shared';
 import { SERVER_URL } from '../config';
-import { getSession, setSession } from '../settings';
+import { getSession, setSession, settings } from '../settings';
 import { LocalSocket, isLocalCode } from './localRoom';
 import { P2pSocket, isKnownP2p } from './p2p';
 import { account } from './account';
@@ -68,6 +68,9 @@ export class Connection {
   private stateListeners = new Set<(s: ConnState) => void>();
   private samples: ClockSample[] = [];
   private offset = 0;
+  /** The estimate the clock moves towards (pongs), and when it last moved (performance.now()). */
+  private targetOffset = 0;
+  private slewAt = 0;
   rtt = 0;
   private pingTimer: number | null = null;
   private kaTimer: number | null = null;
@@ -144,8 +147,9 @@ export class Connection {
         spectate: this.spectate,
         ...(token ? { account: token } : {}),
         // the driver profile for the timing screens (offline too: it is the player's own)
-        ...(account()?.user.country ? { country: account()?.user.country ?? undefined } : {}),
-        ...(account()?.user.num ? { num: account()?.user.num ?? undefined } : {}),
+        // the account's profile, or the one kept in this browser (Profile page) for solo and LAN races
+        ...((account()?.user.country ?? settings.profile.country) ? { country: (account()?.user.country ?? settings.profile.country) || undefined } : {}),
+        ...((account()?.user.num ?? settings.profile.num) ? { num: (account()?.user.num ?? settings.profile.num) || undefined } : {}),
       });
     };
     ws.onmessage = (e) => {
@@ -183,7 +187,8 @@ export class Connection {
       if (!this.spectate) setSession(this.code, msg.session);
       this.flushBacklog();
       // first estimate (no round trip yet); kept relative to performance.now() like the pong estimates
-      this.offset = msg.serverTime - performance.now();
+      this.offset = this.targetOffset = msg.serverTime - performance.now();
+      this.slewAt = performance.now();
       this.samples = [];
       this.setState('open');
       this.startTimers();
@@ -193,7 +198,10 @@ export class Connection {
       this.samples.push(makeSample(msg.c, msg.s, now));
       if (this.samples.length > 16) this.samples.shift();
       const est = estimateOffset(this.samples);
-      this.offset = est.offset;
+      // the clock is eased onto the new estimate (serverNow): a sudden step of a few ms moved every remote car,
+      // drawn in the present at 250 km/h, by a metre or more at once
+      this.targetOffset = est.offset;
+      if (Math.abs(this.targetOffset - this.offset) > 250) this.offset = this.targetOffset;
       this.rtt = est.rtt;
       return;
     } else if (msg.t === 'error' && msg.fatal) {
@@ -260,7 +268,15 @@ export class Connection {
     // `offset` is always relative to performance.now(): it used to be Date-based until the first pong, so clearing
     // the samples on a tab switch put the clock ~55 years ahead until the next pong; the packets stamped in that
     // window locked the remote cars' buffers (every later packet looked older), and the other cars froze
-    return performance.now() + this.offset;
+    const now = performance.now();
+    const d = this.targetOffset - this.offset;
+    if (d !== 0) {
+      // at most 3 ms per 100 ms of real time: never backwards, never a visible step
+      const step = Math.max(0, now - this.slewAt) * 0.03;
+      this.offset += Math.abs(d) <= step ? d : Math.sign(d) * step;
+    }
+    this.slewAt = now;
+    return now + this.offset;
   }
 
   on(l: Listener): () => void {

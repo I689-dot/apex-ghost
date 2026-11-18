@@ -19,7 +19,7 @@ function betaLink(): HTMLElement {
       h('b', { text: t('Try the beta') }),
     ),
     h('p.muted', {
-      text: t('The newest changes before everyone else. Installs next to the normal app as “APEX GHOST Beta”.'),
+      text: t('The newest changes before everyone else. Installs next to the normal app as “GRIDCORSA Beta”.'),
     }),
   );
 }
@@ -30,10 +30,10 @@ export function installScreen(): HTMLElement {
   const page = h(
     'div.desktop-only.install-page',
     {},
-    h('div.logo', {}, h('span', { text: 'APEX' }), h('b', { text: 'GHOST' })),
+    h('div.logo', {}, h('span', { text: 'GRID' }), h('b', { text: 'CORSA' })),
     h('h2', { text: t('Desktop only') }),
     h('p', {
-      text: t('The website is made for a keyboard. On your phone, race with the APEX GHOST app: touch or tilt steering, the same rooms as your friends.'),
+      text: t('The website is made for a keyboard. On your phone, race with the GRIDCORSA app: touch or tilt steering, the same rooms as your friends.'),
     }),
     h(
       'a.install-btn',
@@ -67,7 +67,7 @@ async function openGetApp(): Promise<void> {
     h(
       'div.modal-card.get-app-card',
       {},
-      h('header', {}, h('h2', { text: t('APEX GHOST on your phone') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: close })),
+      h('header', {}, h('h2', { text: t('GRIDCORSA on your phone') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: close })),
       h(
         'div.get-app-body',
         {},

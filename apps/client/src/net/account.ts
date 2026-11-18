@@ -119,7 +119,7 @@ export async function refreshProfile(): Promise<void> {
 }
 
 /** Saves the driver profile (country, number, three-letter code, helmet colour; null clears a field). */
-export async function saveProfile(p: Pick<AccountUser, 'country' | 'num' | 'abbr' | 'colour'>): Promise<void> {
+export async function saveProfile(p: Pick<AccountUser, 'country' | 'num' | 'abbr' | 'colour' | 'avatar'>): Promise<void> {
   const { user } = await api<{ user: AccountUser }>('account/profile', p);
   if (current) save({ ...current, user });
 }
@@ -139,6 +139,22 @@ export async function friends(): Promise<FriendEntry[]> {
 export const addFriend = (nick: string) => api('friends/add', { nick });
 export const acceptFriend = (id: string) => api('friends/accept', { id });
 export const removeFriend = (id: string) => api('friends/remove', { id });
+
+/**
+ * A personal best's telemetry for the website (game/lapTrace.ts). The server takes it only for a lap it has just
+ * recorded for this driver; the lap's record can arrive a moment after the lap message, so a 404 is tried again.
+ */
+export async function uploadTrace(body: { track: string; lapMs: number; bin: number; data: string }): Promise<void> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await api('trace', body);
+      return;
+    } catch (e) {
+      if (!(e instanceof AccountError) || e.status !== 404) return;
+      await new Promise((r) => setTimeout(r, 2500));
+    }
+  }
+}
 
 export async function records(q: { track: string; car?: string; scope: 'global' | 'friends'; wet?: boolean }): Promise<RecordRow[]> {
   const p = new URLSearchParams({ track: q.track, scope: q.scope, ...(q.car ? { car: q.car } : {}), ...(q.wet ? { wet: '1' } : {}) });

@@ -28,15 +28,22 @@ export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 export const NICK_MIN = 2;
 export const NICK_MAX = 16;
 
-/** Car state sampling rate (Hz) and how many samples are packed per network message. */
+/**
+ * Car state sampling rate (Hz) and how many samples are packed per network message. One sample a message (20 a
+ * second): with two a message the others learned where a car was only every 100 ms, and drawing it in the present
+ * meant predicting 150-250 ms ahead at 250 km/h, so the cars jumped as each late correction came in. Twice the
+ * incoming messages (DECISIONS.md, "Budget per race").
+ */
 export const STATE_HZ = 20;
-export const STATES_PER_PACKET = 2;
+export const STATES_PER_PACKET = 1;
 export const PACKET_HZ = STATE_HZ / STATES_PER_PACKET;
 
 /** Remote-car interpolation delay. Must exceed one packet interval plus jitter. */
 export const INTERP_DELAY_MS = 150;
 export const MAX_EXTRAPOLATION_MS = 250;
 export const SNAP_DISTANCE_M = 12;
+/** A car drawn in the present is snapped only when its correction exceeds this many seconds of its own speed. */
+export const SNAP_SECONDS = 0.6;
 
 export const RECONNECT_GRACE_MS = 30_000;
 export const LOAD_TIMEOUT_MS = 45_000;

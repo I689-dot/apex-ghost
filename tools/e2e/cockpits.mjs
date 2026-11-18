@@ -35,9 +35,10 @@ for (let i = from; i <= to; i++) {
   try {
     await page.goto(URL);
     await page.click('button:has-text("Create room")');
+    await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
     await page.waitForSelector('.lb-steps');
     await page.click('.lb-step >> nth=4');
-    await page.click(`.car-card[title="${cars[i].name}"]`);
+    await page.dblclick(`.gr-row:has-text("${cars[i].name}")`);
     await page.waitForTimeout(600);
     await page.click('.lobby-actions button:has-text("Ready")');
     await page.waitForTimeout(400);

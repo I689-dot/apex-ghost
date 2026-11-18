@@ -1,10 +1,14 @@
-import { INTERP_DELAY_MS, MAX_EXTRAPOLATION_MS, SNAP_DISTANCE_M, copyCarState, makeCarState, type CarState } from '@apex/shared';
+import { INTERP_DELAY_MS, MAX_EXTRAPOLATION_MS, SNAP_DISTANCE_M, SNAP_SECONDS, copyCarState, makeCarState, type CarState } from '@apex/shared';
 
 const BUF = 32;
 /** A stamp this far off the stream is a clock jump, not a late packet. */
 const RESYNC_MS = 3000;
-/** Drawn in the present (a driver's view): predicted at most this far past the newest sample (ms), then held. */
-const PREDICT_MAX_MS = 500;
+/** Drawn in the present (a driver's view): predicted at most this far past the newest sample (ms), then held. A hold
+ * of a car at 250 km/h that then jumped tens of metres when the connection caught up read as a teleport: a late
+ * stream is predicted for longer, its turn and its braking fading out so the guess stays on the road. */
+const PREDICT_MAX_MS = 1200;
+/** The acceleration is measured over about this long (ms): from two samples 50 ms apart it was mostly noise. */
+const ACC_WINDOW_MS = 150;
 /** Prediction steps over that span (the path is integrated, not a straight line). */
 const PREDICT_STEPS = 8;
 
@@ -114,17 +118,29 @@ export class RemoteCarBuffer {
       if (ahead > 0) {
         // acceleration along the path, from the last two samples (braking from 250 km/h is ~2.5 g: 0.5 m in 200 ms)
         let acc = 0;
+        let wy = base.wy;
         if (base === newest && this.count > 1) {
-          const prev = this.states[(this.head - 1 + BUF) % BUF];
+          // the sample about ACC_WINDOW_MS older than the newest
+          let prev = this.states[(this.head - 1 + BUF) % BUF];
+          for (let k = 1; k < this.count; k++) {
+            const s = this.states[(this.head - k + BUF) % BUF];
+            prev = s;
+            if (newest.t - s.t >= ACC_WINDOW_MS) break;
+          }
           const span = (newest.t - prev.t) / 1000;
-          if (span > 0.01 && span < 0.3) acc = (Math.hypot(newest.vx, newest.vz) - Math.hypot(prev.vx, prev.vz)) / span;
+          if (span > 0.02 && span < 0.5) acc = (Math.hypot(newest.vx, newest.vz) - Math.hypot(prev.vx, prev.vz)) / span;
+          // the yaw rate a little smoothed (one sample's is noisy over a kerb)
+          wy = newest.wy * 0.7 + prev.wy * 0.3;
         }
-        predict(o, base, ahead, Math.max(-35, Math.min(15, acc)) * 0.8);
+        predict(o, base, ahead, Math.max(-35, Math.min(15, acc)) * 0.8, wy);
       }
       o.t = t;
     }
 
-    // smooth out discontinuities: compare with where we would be if we continued last frame
+    // smooth out discontinuities: compare with where we would be if we continued last frame. A car drawn in the
+    // present is snapped only when it is off by more than SNAP_SECONDS of its own speed (a fixed 12 m was under a
+    // fifth of a second at 250 km/h: fast cars teleported on every late packet)
+    const snap = delayMs === 0 ? Math.max(SNAP_DISTANCE_M, Math.hypot(o.vx, o.vz) * SNAP_SECONDS) : SNAP_DISTANCE_M;
     if (this.hasLast) {
       const px = this.lastX + o.vx * dt;
       const py = this.lastY + o.vy * dt;
@@ -136,7 +152,7 @@ export class RemoteCarBuffer {
       const tx = this.errX + ex;
       const ty = this.errY + ey;
       const tz = this.errZ + ez;
-      if (tx * tx + ty * ty + tz * tz > SNAP_DISTANCE_M * SNAP_DISTANCE_M || d2 > SNAP_DISTANCE_M * SNAP_DISTANCE_M) {
+      if (tx * tx + ty * ty + tz * tz > snap * snap || d2 > snap * snap) {
         this.errX = this.errY = this.errZ = 0; // too far: snap
       } else if (d2 > 0.0004) {
         this.errX = tx;
@@ -144,8 +160,10 @@ export class RemoteCarBuffer {
         this.errZ = tz;
       }
     }
-    // a prediction is corrected over a little longer: its errors are larger and a quick snap reads as a twitch
-    const decay = Math.exp(-dt / (delayMs === 0 ? 0.18 : 0.12));
+    // a prediction is corrected over a little longer: its errors are larger and a quick snap reads as a twitch; a
+    // big error a little faster (a car drifting metres beside where it is hides where it is going)
+    const err = Math.hypot(this.errX, this.errY, this.errZ);
+    const decay = Math.exp(-dt / (delayMs === 0 ? (err > 2 ? 0.12 : 0.2) : 0.12));
     this.errX *= decay;
     this.errY *= decay;
     this.errZ *= decay;
@@ -171,8 +189,10 @@ export class RemoteCarBuffer {
  * its tangent: 0.6 m off at 200 ms in a 100 m corner at 200 km/h) and its speed changes at `acc` (m/s², along the
  * path, never through zero). Height follows the vertical speed; the orientation integrates the angular velocity.
  */
-function predict(o: CarState, b: CarState, ahead: number, acc: number): void {
+function predict(o: CarState, b: CarState, ahead: number, acc: number, wy = b.wy): void {
   const h = ahead / PREDICT_STEPS;
+  // past ~0.3 s the turn and the speed change are guesses: they fade out (a car keeps its line, not its arc forever)
+  const fade = (tm: number) => (tm < 0.3 ? 1 : Math.max(0, 1 - (tm - 0.3) / 0.6));
   const speed = Math.hypot(b.vx, b.vz);
   let x = 0;
   let z = 0;
@@ -180,8 +200,9 @@ function predict(o: CarState, b: CarState, ahead: number, acc: number): void {
   let vz = b.vz;
   for (let i = 0; i < PREDICT_STEPS; i++) {
     const tm = (i + 0.5) * h;
-    const a = b.wy * tm;
-    const k = speed > 0.5 ? Math.max(0, 1 + (acc * tm) / speed) : 1;
+    const tf = tm < 0.3 ? tm : 0.3 + (tm - 0.3) * fade(tm) * 0.5;
+    const a = wy * tf;
+    const k = speed > 0.5 ? Math.max(0, 1 + (acc * tf) / speed) : 1;
     const c = Math.cos(a);
     const s = Math.sin(a);
     // rotation about +Y by a: (x, z) → (x cos a + z sin a, −x sin a + z cos a)
@@ -195,7 +216,9 @@ function predict(o: CarState, b: CarState, ahead: number, acc: number): void {
   o.pz = b.pz + z;
   o.vx = vx;
   o.vz = vz;
-  integrateRotation(o, b.wx * ahead, b.wy * ahead, b.wz * ahead);
+  // the heading follows the predicted path (the velocity's turn), so the car points where it moves
+  const turn = Math.atan2(b.vx * vz - b.vz * vx, b.vx * vx + b.vz * vz);
+  integrateRotation(o, 0, speed > 2 ? -turn : wy * Math.min(ahead, 0.3), 0);
 }
 
 function hermite(o: CarState, a: CarState, b: CarState, u: number, span: number): void {

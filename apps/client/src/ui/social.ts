@@ -3,6 +3,7 @@ import { h } from './dom';
 import { getLang, t } from '../i18n';
 import * as acc from '../net/account';
 import { ICONS } from './icons';
+import { avatarEl } from './avatar';
 
 /**
  * The menu's account parts: sign in / create an account (nickname + password), the friends list with where each
@@ -80,7 +81,7 @@ export function signInModal(onDone: () => void, mode: 'login' | 'register' = 'lo
     h(
       'header.auth-head',
       {},
-      h('div', {}, h('span.auth-kicker', { text: 'APEX GHOST' }), h('h2', { text: t('Your account') })),
+      h('div', {}, h('span.auth-kicker', { text: 'GRIDCORSA' }), h('h2', { text: t('Your account') })),
       h('button.auth-close', { type: 'button', html: ICONS.close, title: t('Close'), 'aria-label': t('Close'), onclick: close }),
     ),
     h('div.auth-tabs', {}, tabLogin, tabRegister),
@@ -138,13 +139,14 @@ export function friendsPanel(tracks: () => TrackChoice[], join: (code: string) =
   const list = h('div.friends-list');
   const err = h('div.form-error');
   const input = h('input', { type: 'text', maxlength: 16, placeholder: t('Add a friend by nickname'), spellcheck: 'false' });
+  const count = h('span.fr-count');
   const card = h(
     'div.menu-card.friends',
     {},
-    h('h3', { text: t('Friends') }),
-    list,
-    h('div.join-row', {}, input, h('button', { text: t('Add'), onclick: () => void add() })),
+    h('header.fr-head', {}, h('h3', { text: t('Friends') }), count),
+    h('div.fr-add', {}, input, h('button.primary', { text: t('Add friend'), onclick: () => void add() })),
     err,
+    list,
   );
   const add = async () => {
     err.textContent = '';
@@ -192,7 +194,9 @@ export function friendsPanel(tracks: () => TrackChoice[], join: (code: string) =
     return h(
       `div.friend${p ? '.online' : ''}${p?.state === 'racing' ? '.racing' : ''}`,
       {},
-      h('span.friend-dot'),
+      f.avatar
+        ? h('span.fr-avatar.has-av', {}, avatarEl({ avatar: f.avatar, colour: f.colour }, 40), h('span.friend-dot'))
+        : h('span.fr-avatar', { text: f.nick.slice(0, 2).toUpperCase() }, h('span.friend-dot')),
       h('div.friend-name', {}, h('b', { text: f.nick }), h('small', { text: status })),
       h(
         'div.friend-actions',
@@ -211,7 +215,21 @@ export function friendsPanel(tracks: () => TrackChoice[], join: (code: string) =
       // requests first, then online friends (racing first), then the rest by name
       const rank = (f: FriendEntry) => (f.status === 'incoming' ? 0 : f.presence ? (f.presence.state === 'racing' ? 1 : 2) : f.status === 'outgoing' ? 4 : 3);
       all.sort((a, b) => rank(a) - rank(b) || a.nick.localeCompare(b.nick));
-      list.replaceChildren(...(all.length ? all.map(row) : [h('p.muted', { text: t('No friends yet: add them by their nickname.') })]));
+      // in groups, as the consoles' friend lists: requests, online, offline, sent
+      const groups: [string, FriendEntry[]][] = [
+        [t('Requests'), all.filter((f) => f.status === 'incoming')],
+        [t('Online'), all.filter((f) => f.status === 'friend' && f.presence)],
+        [t('Offline'), all.filter((f) => f.status === 'friend' && !f.presence)],
+        [t('Sent'), all.filter((f) => f.status === 'outgoing')],
+      ];
+      const online = groups[1][1].length;
+      const friendsN = all.filter((f) => f.status === 'friend').length;
+      count.textContent = friendsN ? t('{n} online of {m}', { n: online, m: friendsN }) : '';
+      list.replaceChildren(
+        ...(all.length
+          ? groups.filter(([, g]) => g.length).flatMap(([label, g]) => [h('h4.fr-group', {}, label, h('span', { text: String(g.length) })), ...g.map(row)])
+          : [h('p.muted.fr-empty', { text: t('No friends yet: add them by their nickname.') })]),
+      );
     } catch (e) {
       list.replaceChildren(h('p.muted', { text: t((e as Error).message) }));
     }
@@ -241,8 +259,7 @@ export function fmtLap(ms: number): string {
  * Records: the best lap of every driver on a layout (everyone or friends; any car or one; dry or wet), and your
  * career (sessions, wins, podiums, poles, laps, your best lap everywhere).
  */
-export function recordsModal(tracks: TrackChoice[], cars: CarEntry[], startTrack: string): HTMLElement {
-  const close = () => modal.remove();
+export function recordsPage(tracks: TrackChoice[], cars: CarEntry[], startTrack: string): HTMLElement {
   const carName = (id: string) => cars.find((c) => c.id === id)?.name ?? id;
   const trackName = (id: string) => tracks.find((x) => x.id === id)?.name ?? id;
   const state = {
@@ -356,20 +373,19 @@ export function recordsModal(tracks: TrackChoice[], cars: CarEntry[], startTrack
       career.replaceChildren(h('p.form-error', { text: t((e as Error).message) }));
     }
   };
-  const card = h(
-    'div.modal-card.records',
+  // a page of the main menu (its own tab), not a pop-up
+  const page = h(
+    'div.records-page',
     {},
-    h('header', {}, h('h2', { text: t('Records') }), h('button.icon', { html: ICONS.close, title: t('Close'), onclick: close })),
-    h('div.records-grid', {}, h('section', {}, h('h3', { text: t('Lap records') }), filters, body), h('section', {}, career)),
+    h('div.records-grid', {}, h('section.rec-panel', {}, h('h3', { text: t('Lap records') }), filters, body), h('section.rec-panel', {}, career)),
   );
-  const modal: HTMLElement = h('div.modal', { onclick: (e: Event) => e.target === modal && close() }, card);
   void load();
   void loadCareer();
-  return modal;
+  return page;
 }
 
 /** Countries for the driver profile (ISO 3166 alpha-2): the motorsport nations first, then the rest A-Z by code. */
-const COUNTRIES = (
+export const COUNTRIES = (
   'GB DE FR IT ES NL BE AT CH PT DK SE NO FI PL CZ HU MC US CA MX BR AR CL CO JP CN KR AU NZ ZA AE SA QA BH IN TH MY SG ID ' +
   'IE IS LU LT LV EE SK SI HR RS RO BG GR TR UA RU UY PE VE EC PY BO CR PA GT CU DO PR MA DZ TN EG NG KE IL PH VN TW HK'
 ).split(' ');

@@ -15,12 +15,13 @@ import { TYRE_TEMP, Vehicle, type GroundHit, type GroundQuery } from '../../apps
 import { DamageState } from '../../apps/client/src/physics/damage.ts';
 import type { Controls } from '../../apps/client/src/physics/input.ts';
 import { AI_GRIP, AiDriver, BOT_ASSISTS, carLimits, profileLapTime, racingLineFor, speedProfile } from '../../apps/client/src/game/ai.ts';
+import * as aiMod from '../../apps/client/src/game/ai.ts';
 import { nearestCenterlineIndex } from '../../packages/shared/src/index.ts';
 import { TrackLimits, beyondLimitsNow } from '../../apps/client/src/game/trackLimits.ts';
 import { cutWallsAcrossLine } from '../../apps/client/src/game/wallCut.ts';
 import { RoadPatches } from '../../apps/client/src/game/roadPatches.ts';
 import { RaceTracker } from '../../packages/shared/src/race.ts';
-import { collisionParts, loadTrack, readCollisionFile, trackArg } from './trackfile.mjs';
+import { collisionParts, loadTrack, primeShippedLine, readCollisionFile, trackArg } from './trackfile.mjs';
 import { COMPOUNDS, compoundForWeather, compoundGrip } from '../../apps/client/src/physics/tyres.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -131,7 +132,8 @@ function step(s: ReturnType<typeof setup>, c: Controls) {
   s.world.step(s.events);
 }
 
-console.log(`▶ AI lap: ${entry.name} on ${(loaded.track as TrackData).name}`);
+const shipped = primeShippedLine(loaded.track, aiMod);
+console.log(`▶ AI lap: ${entry.name} on ${(loaded.track as TrackData).name}${shipped ? ' (shipped racing line)' : ' (minimum-curvature line)'}`);
 const track = loaded.track as TrackData;
 let failed = false;
 {
@@ -262,7 +264,7 @@ for (const skill of skills) {
           heaveMax = heave;
           heaveMaxAt = sNow;
         }
-        if (heave > 15 && process.env.VERBOSE) {
+        if (heave > Number(process.env.HEAVE ?? 15) && process.env.VERBOSE) {
           const pp = s.v.body.translation();
           const cl = track.centerline;
           const j = (hint + 1) % (cl.length / 3);
@@ -272,7 +274,7 @@ for (const skill of skills) {
           const ws = s.v.wheels.map((w) => (w.contact ? `${w.surface[0]}${(w.compression * 100).toFixed(0)}` : '-')).join(' ');
           console.log(`    heave ${heave.toFixed(0)} m/s² at ${sNow.toFixed(0)} m lateral ${lat.toFixed(1)} ${(sp * 3.6).toFixed(0)} km/h wheels ${ws}`);
         }
-        if (heave > 15) bumpy[Math.floor(sNow / 100) * 100] = (bumpy[Math.floor(sNow / 100) * 100] ?? 0) + 1;
+        if (heave > Number(process.env.HEAVE ?? 15)) bumpy[Math.floor(sNow / 100) * 100] = (bumpy[Math.floor(sNow / 100) * 100] ?? 0) + 1;
         s.v.wheels.forEach((w, k) => {
           if (prevContact[k] && !w.contact) flicker++;
           prevContact[k] = w.contact;

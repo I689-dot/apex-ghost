@@ -9,7 +9,7 @@
  * other). Screenshots go to tools/e2e/out/botrace/.
  *
  *   node tools/e2e/botrace.mjs [--url http://127.0.0.1:5173] [--bots 7] [--minutes 3] [--weather heavy_rain]
- *       [--gpu] [--quality medium] [--drive]   (--drive: hold throttle instead of staying parked)
+ *       [--gpu] [--quality medium] [--drive] [--solo]   (--drive: hold throttle instead of staying parked; --solo: offline room)
  */
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -51,7 +51,9 @@ await page.addInitScript((q) => {
 const shot = (name) => page.screenshot({ path: path.join(out, `${name}.png`), timeout: 120_000 });
 
 await page.goto(URL);
-await page.click('button:has-text("Create room")');
+// --solo: the offline room (no server needed); otherwise an online room on the local server
+await page.click(args.includes('--solo') ? 'button.solo' : 'button:has-text("Create room")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (WEATHER) {
@@ -59,7 +61,7 @@ if (WEATHER) {
   await page.waitForTimeout(500);
 }
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=16');
+await page.dblclick('.gr-row >> nth=16');
 await page.waitForTimeout(800);
 for (let i = 0; i < BOTS; i++) {
   await page.click('button.add-bot');
@@ -168,14 +170,19 @@ await page.evaluate(() => {
 });
 
 // wait for the green light, then watch
-await page.waitForFunction(
-  () => {
-    const s = window.__apex.session;
-    return s.startAt !== null && s.conn.serverNow() > s.startAt;
-  },
-  null,
-  { timeout: 120_000, polling: 250 },
-);
+await page
+  .waitForFunction(
+    () => {
+      const s = window.__apex.session;
+      return s.startAt !== null && s.conn.serverNow() > s.startAt;
+    },
+    null,
+    { timeout: 420_000, polling: 250 },
+  )
+  .catch(async (e) => {
+    await shot('no-start');
+    throw e;
+  });
 if (DRIVE) await page.keyboard.down('KeyW');
 for (const [ms, name] of [
   [1500, '01-green'],

@@ -53,40 +53,17 @@ function makeRoom(cars = ['car_a', 'car_b', 'car_c'], autoBrief = true) {
   return { room, join, send, advance: (ms: number) => (now += ms), persisted, reports, conns, scheduled };
 }
 
-describe('car lock (atomic, server-side)', () => {
-  it('never gives the same car to two players, even when requests arrive back to back', () => {
+describe('car choice (server-side)', () => {
+  it('lets two players race the same car', () => {
     const { room, join, send } = makeRoom();
     const a = join('Ana');
     const b = join('Ben');
-    // both "click" at the same moment: the room processes them one at a time
     send(a.conn, { t: 'selectCar', carId: 'car_a' });
     send(b.conn, { t: 'selectCar', carId: 'car_a' });
     expect(a.conn.last('carLock')).toMatchObject({ ok: true, carId: 'car_a' });
-    expect(b.conn.last('carLock')).toMatchObject({ ok: false, carId: 'car_a', owner: a.id });
-    expect(room.carLocks.get('car_a')).toBe(a.id);
+    expect(b.conn.last('carLock')).toMatchObject({ ok: true, carId: 'car_a' });
     const owners = [...room.players.values()].filter((p) => p.carId === 'car_a');
-    expect(owners).toHaveLength(1);
-  });
-
-  it('stays exclusive under many concurrent (shuffled, async) requests', async () => {
-    for (let trial = 0; trial < 50; trial++) {
-      const { room, join, send } = makeRoom(['x', 'y']);
-      const players = Array.from({ length: 12 }, (_, i) => join(`P${i}`));
-      const rand = mulberry32(trial + 1);
-      const reqs = players.flatMap((p) => [
-        () => send(p.conn, { t: 'selectCar', carId: rand() < 0.5 ? 'x' : 'y' }),
-        () => send(p.conn, { t: 'selectCar', carId: rand() < 0.5 ? 'x' : 'y' }),
-      ]);
-      // deliver in random order with random microtask delays
-      await Promise.all(reqs.map((r) => new Promise<void>((res) => setTimeout(() => (r(), res()), Math.floor(rand() * 5)))));
-      for (const car of ['x', 'y']) {
-        const holders = [...room.players.values()].filter((p) => p.carId === car);
-        expect(holders.length).toBeLessThanOrEqual(1);
-        if (holders.length) expect(room.carLocks.get(car)).toBe(holders[0].id);
-      }
-      // locks map is consistent with players
-      for (const [car, pid] of room.carLocks) expect(room.players.get(pid)?.carId).toBe(car);
-    }
+    expect(owners).toHaveLength(2);
   });
 
   it('releases the previous lock when changing car, and on disconnect timeout', () => {
@@ -112,6 +89,21 @@ describe('car lock (atomic, server-side)', () => {
     const a = join('Ana');
     send(a.conn, { t: 'selectCar', carId: 'nope' });
     expect(a.conn.last('carLock')?.ok).toBe(false);
+  });
+});
+
+describe('chat', () => {
+  it('relays a line to everyone in the room, at most one every 700 ms per driver', () => {
+    const { join, send, advance } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    send(a.conn, { t: 'chat', text: 'hello' });
+    expect(b.conn.last('chat')).toMatchObject({ nick: 'Ana', text: 'hello', from: a.id });
+    send(a.conn, { t: 'chat', text: 'spam' });
+    expect(b.conn.last('chat')).toMatchObject({ text: 'hello' });
+    advance(800);
+    send(a.conn, { t: 'chat', text: 'again' });
+    expect(b.conn.last('chat')).toMatchObject({ text: 'again' });
   });
 });
 
@@ -255,7 +247,7 @@ describe('race state packets', () => {
 });
 
 describe('bots', () => {
-  it('only the host adds and removes bots; they take a free car and are ready', () => {
+  it('only the host adds and removes bots; they take a car nobody has yet and are ready', () => {
     const { room, join, send } = makeRoom();
     const a = join('Ana');
     const b = join('Ben');
@@ -270,10 +262,11 @@ describe('bots', () => {
     expect(room.carLocks.get(bot?.carId as string)).toBe(bot?.id);
     const snap = b.conn.last('room')?.room.players.find((p) => p.id === bot?.id);
     expect(snap).toMatchObject({ bot: true, connected: true, ready: true });
-    // a bot never takes a locked car: with all cars taken, adding fails
+    // with every car on the grid already, a bot still joins: it shares a model
     send(b.conn, { t: 'selectCar', carId: [...['car_a', 'car_b', 'car_c']].find((c) => !room.carLocks.has(c)) });
     send(a.conn, { t: 'addBot' });
-    expect(a.conn.last('error')?.code).toBe('car_taken');
+    expect([...room.players.values()].filter((p) => p.bot)).toHaveLength(2);
+    send(a.conn, { t: 'removeBot', id: [...room.players.values()].filter((p) => p.bot)[1].id });
     // only the host removes, and the car is released
     send(b.conn, { t: 'removeBot', id: bot?.id });
     expect(room.players.has(bot?.id as string)).toBe(true);

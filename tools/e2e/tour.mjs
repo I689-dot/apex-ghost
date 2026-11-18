@@ -34,6 +34,7 @@ await page.addInitScript(() => {
 await page.goto(URL);
 await page.waitForSelector('.menu', { timeout: 30_000 });
 await page.click('button:has-text("Create room")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps', { timeout: 30_000 });
 await page.waitForTimeout(1500);
 if (TRACK) await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['trackId', TRACK]);
@@ -41,7 +42,7 @@ await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions',
 await page.evaluate(([k, v]) => window.__app.conn.sendJson({ t: 'setConditions', [k]: v }), ['time', 'afternoon']);
 await page.waitForTimeout(400);
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 await page.waitForTimeout(600);
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(400);

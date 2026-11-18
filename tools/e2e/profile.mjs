@@ -39,6 +39,7 @@ await page.addInitScript((q) => {
 await page.goto(APP ? `${URL}/?app=1` : URL);
 await page.waitForSelector('.menu');
 await page.click('button:has-text("Create room")');
+await page.click('.garage-modal .gr-cta', { timeout: 8000 }).catch(() => {}); // the car, chosen before the session
 await page.waitForSelector('.lb-steps');
 const TIME = opt('time', '');
 const WEATHER = opt('weather', '');
@@ -51,7 +52,7 @@ if (TIME) {
   await page.waitForTimeout(600);
 }
 await page.click('.lb-step >> nth=4');
-await page.click('.car-card >> nth=0');
+await page.dblclick('.gr-row >> nth=0');
 await page.waitForTimeout(800);
 await page.click('.lobby-actions button:has-text("Ready")');
 await page.waitForTimeout(500);

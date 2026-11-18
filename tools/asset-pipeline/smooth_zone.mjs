@@ -147,13 +147,31 @@ for (let s = sA; s <= sB; s += STEP) {
   }
   // the camber curve: least squares quadratic, once more without the points far from it (stray pieces)
   const fit = (pts) => {
-    let s0 = 0, s1 = 0, s2 = 0, s3 = 0, s4 = 0, t0 = 0, t1 = 0, t2 = 0;
+    let s0 = 0,
+      s1 = 0,
+      s2 = 0,
+      s3 = 0,
+      s4 = 0,
+      t0 = 0,
+      t1 = 0,
+      t2 = 0;
     for (const [x, y] of pts) {
       const x2 = x * x;
-      s0++; s1 += x; s2 += x2; s3 += x2 * x; s4 += x2 * x2; t0 += y; t1 += x * y; t2 += x2 * y;
+      s0++;
+      s1 += x;
+      s2 += x2;
+      s3 += x2 * x;
+      s4 += x2 * x2;
+      t0 += y;
+      t1 += x * y;
+      t2 += x2 * y;
     }
     // solve [[s0 s1 s2][s1 s2 s3][s2 s3 s4]] [a b c] = [t0 t1 t2]
-    const M = [[s0, s1, s2, t0], [s1, s2, s3, t1], [s2, s3, s4, t2]];
+    const M = [
+      [s0, s1, s2, t0],
+      [s1, s2, s3, t1],
+      [s2, s3, s4, t2],
+    ];
     for (let c = 0; c < 3; c++) {
       let p = c;
       for (let r = c + 1; r < 3; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
@@ -193,8 +211,13 @@ const box = (arr, half) =>
 // --filter=N: the box's half width in metres (2: a 5 m box, it takes out the 5 m slices; 5: an 11 m box, the longer
 // waves too, a real road's vertical curves being hundreds of metres in radius)
 const HALF = Number(opts.filter ?? 2);
-const smooth = box(box(rows.map((r) => [r.q[0] + r.f.y, r.q[1], r.q[2]]), HALF), HALF);
-
+const smooth = box(
+  box(
+    rows.map((r) => [r.q[0] + r.f.y, r.q[1], r.q[2]]),
+    HALF,
+  ),
+  HALF,
+);
 
 if (opts.debug) {
   const [d0, d1] = opts.debug.split(':').map(Number);
@@ -228,10 +251,17 @@ function locate(x, z) {
   // project on the segment after (or before) the nearest point
   let s = null;
   let lat = 0;
-  for (const [a, b] of [[bi, bi + 1], [bi - 1, bi]]) {
+  for (const [a, b] of [
+    [bi, bi + 1],
+    [bi - 1, bi],
+  ]) {
     if (a < 0 || b >= N) continue;
-    const ax = cl[a * 3], az = cl[a * 3 + 2], bx = cl[b * 3], bz = cl[b * 3 + 2];
-    const dx = bx - ax, dz = bz - az;
+    const ax = cl[a * 3],
+      az = cl[a * 3 + 2],
+      bx = cl[b * 3],
+      bz = cl[b * 3 + 2];
+    const dx = bx - ax,
+      dz = bz - az;
     const L2 = dx * dx + dz * dz || 1;
     const t = ((x - ax) * dx + (z - az) * dz) / L2;
     if (t >= -0.01 && t <= 1.01) {
@@ -310,7 +340,9 @@ for (const p of col.parts) {
     bucket(Math.abs(y - p.pos[i + 1]));
     if (opts.report && Math.abs(y - p.pos[i + 1]) > 0.2 && (globalThis.__rep = (globalThis.__rep ?? 0) + 1) <= 25) {
       const L = locate(p.pos[i], p.pos[i + 2]);
-      console.log(`big move ${SURFACES[p.si]} s=${L.s.toFixed(1)} lat=${L.lat.toFixed(2)} y=${p.pos[i + 1].toFixed(2)} -> ${y.toFixed(2)} raw=${roadTop(p.pos[i], p.pos[i + 2], p.pos[i + 1])?.toFixed(2)}`);
+      console.log(
+        `big move ${SURFACES[p.si]} s=${L.s.toFixed(1)} lat=${L.lat.toFixed(2)} y=${p.pos[i + 1].toFixed(2)} -> ${y.toFixed(2)} raw=${roadTop(p.pos[i], p.pos[i + 2], p.pos[i + 1])?.toFixed(2)}`,
+      );
     }
     // the collision moves after every height has been read (raw surface from the original)
     p.next ??= new Map();

@@ -1,4 +1,5 @@
 import { h } from './dom';
+import { t } from '../i18n';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -28,6 +29,11 @@ export interface DialState {
   /** Fuel: 0…1 of the tank, litres and laps left; null without the fuel rule. */
   fuel: { frac: number; litres: number; laps: number } | null;
   fuelLow: boolean;
+  /** Pedals 0…1: the inner arcs (throttle green on the left, brake red on the right, as Le Mans Ultimate's dial). */
+  throttle: number;
+  brake: number;
+  /** Tread left on the four tyres (0…1, the most worn one), for the bar under the dial. */
+  tyreLife: number;
 }
 
 /** The arc covers 270° from the bottom left, over the top, to the bottom right (a fraction of the full circle). */
@@ -52,26 +58,48 @@ export class Dial {
   private lampTc = h('i.dial-lamp.tc', { text: 'TC' });
   private lampAbs = h('i.dial-lamp.abs', { text: 'ABS' });
   private lampEngine = h('i.dial-lamp.engine');
-  private fuelBar = h('div.dial-fuel');
-  private fuelFill = h('div.dial-fuel-fill');
-  private fuelText = h('span');
-  private last = { pct: -1, speed: '', gear: '', unit: '', zones: '', fuel: '', flags: '' };
+  /** The bars under the dial (LMU's fuel / energy rows): fuel, and the tread left. */
+  private bars = h('div.dial-bars');
+  private fuelRow = h('div.db-row.fuel');
+  private fuelTag = h('span.db-tag');
+  private fuelVal = h('span.db-val');
+  private tyreRow = h('div.db-row.tyre');
+  private tyreTag = h('span.db-tag');
+  private tyreVal = h('span.db-val');
+  private thr = this.inner('dial-in dial-thr', false);
+  private brk = this.inner('dial-in dial-brk', true);
+  private last = { pct: -1, speed: '', gear: '', unit: '', zones: '', fuel: '', flags: '', ped: '', tyre: '' };
 
   constructor() {
     const ring = svg('svg', { class: 'dial-ring', viewBox: '0 0 200 200' });
     // the track of the ring and its two coloured zones near the limiter (their ends are set by update)
-    ring.append(this.arc('dial-arc dial-track', 0, 100), ...this.zones, this.white, this.amber, this.blue);
-    this.fuelBar.append(this.fuelFill, this.fuelText);
+    ring.append(
+      this.arc('dial-arc dial-track', 0, 100),
+      ...this.zones,
+      this.white,
+      this.amber,
+      this.blue,
+      this.inner('dial-in dial-in-track', false, 1),
+      this.inner('dial-in dial-in-track', true, 1),
+      this.thr,
+      this.brk,
+    );
+    const fuelIcon =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 20h12M15 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3"/><path d="M7 7h6v4H7z"/></svg>';
+    this.fuelTag.innerHTML = `<i></i>${fuelIcon}`;
+    this.tyreTag.innerHTML = '<i></i><b>TYR</b>';
+    this.fuelRow.append(this.fuelTag, this.fuelVal);
+    this.tyreRow.append(this.tyreTag, this.tyreVal);
+    this.bars.append(this.fuelRow, this.tyreRow);
     this.lampLights.innerHTML =
       '<svg viewBox="0 0 24 24"><path d="M11 5C6.5 5 3 8 3 12s3.5 7 8 7c1.2 0 2-.4 2-1.2V6.2C13 5.4 12.200 5 11 5z"/><path d="M16.500 7l4.500-1.500M16.500 12H21M16.500 17l4.500 1.500"/></svg>';
-    this.lampEngine.innerHTML =
-      '<svg viewBox="0 0 24 24"><path d="M3 10h3l1-2h3V6h4v2h2l2 2h3v6h-3l-2 2H9l-2-2H3z"/></svg>';
+    this.lampEngine.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 10h3l1-2h3V6h4v2h2l2 2h3v6h-3l-2 2H9l-2-2H3z"/></svg>';
     this.el.append(
       ring,
       h('div.dial-face', {}, h('div.dial-lamps', {}, this.lampLights, this.lampTc, this.lampAbs, this.lampEngine), this.gear, this.speed, this.unit),
-      this.fuelBar,
+      this.bars,
     );
-    this.fuelBar.hidden = true;
+    this.fuelRow.hidden = true;
   }
 
   /** A circle that draws only the part of the ring between two percentages of the arc (set with setArc). */
@@ -79,6 +107,24 @@ export class Dial {
     const c = svg('circle', { class: cls, cx: 100, cy: 100, r: 92, pathLength: 100, transform: 'rotate(135 100 100)' });
     this.setArc(c, from, to);
     return c;
+  }
+
+  /** An inner arc up one side of the face (35 % of the ring, from the bottom up): `mirror` for the right side. */
+  private inner(cls: string, mirror: boolean, fill = 0): SVGElement {
+    const c = svg('circle', {
+      class: cls,
+      cx: 100,
+      cy: 100,
+      r: 80,
+      pathLength: 100,
+      transform: mirror ? 'translate(200 0) scale(-1 1) rotate(135 100 100)' : 'rotate(135 100 100)',
+    });
+    this.setInner(c, fill);
+    return c;
+  }
+
+  private setInner(c: SVGElement, f: number): void {
+    c.style.strokeDasharray = `${Math.max(0, Math.min(1, f)) * 35 * SWEEP} 100`;
   }
 
   private setArc(c: SVGElement, from: number, to: number): void {
@@ -132,15 +178,28 @@ export class Dial {
       this.lampAbs.classList.toggle('on', s.abs);
       this.lampEngine.className = `dial-lamp engine${s.engine > 0.7 ? ' bad' : s.engine > 0.25 ? ' warn' : ''}`;
     }
-    this.fuelBar.hidden = !s.fuel;
+    const ped = `${Math.round(s.throttle * 50)}|${Math.round(s.brake * 50)}`;
+    if (ped !== this.last.ped) {
+      this.last.ped = ped;
+      this.setInner(this.thr, s.throttle);
+      this.setInner(this.brk, s.brake);
+    }
+    this.fuelRow.hidden = !s.fuel;
     if (s.fuel) {
       const fk = `${s.fuel.litres.toFixed(1)}|${s.fuel.laps.toFixed(1)}|${s.fuelLow ? 1 : 0}`;
       if (fk !== this.last.fuel) {
         this.last.fuel = fk;
-        this.fuelFill.style.transform = `scaleX(${Math.max(0, Math.min(1, s.fuel.frac))})`;
-        this.fuelText.textContent = `${s.fuel.litres.toFixed(1)} L (${s.fuel.laps.toFixed(1)} laps)`;
-        this.fuelBar.classList.toggle('low', s.fuelLow);
+        this.fuelTag.style.setProperty('--f', String(Math.max(0, Math.min(1, s.fuel.frac))));
+        this.fuelVal.textContent = `${s.fuel.litres.toFixed(1)}L (${s.fuel.laps.toFixed(1)} ${t('laps')})`;
+        this.fuelRow.classList.toggle('low', s.fuelLow);
       }
+    }
+    const tk = (s.tyreLife * 100).toFixed(1);
+    if (tk !== this.last.tyre) {
+      this.last.tyre = tk;
+      this.tyreTag.style.setProperty('--f', String(Math.max(0, Math.min(1, s.tyreLife))));
+      this.tyreVal.textContent = `${tk}% ${t('tread')}`;
+      this.tyreRow.classList.toggle('low', s.tyreLife < 0.25);
     }
   }
 }

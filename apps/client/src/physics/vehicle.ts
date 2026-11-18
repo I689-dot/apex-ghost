@@ -159,6 +159,36 @@ export const CHASSIS = {
    */
   diffPreload: 110,
   diffCoast: 0.55,
+  /**
+   * Rear-axle ABS: a racing ABS (Bosch M5 in every GT3) does not brake the rears at the tyre's peak slip as it does
+   * the fronts: it holds them lower, and lower still as the car turns, so the rear keeps the side grip that holds the
+   * car straight on the brakes (the stability half of its tuning). Target slip × kappaPeak, and the share removed at
+   * the tyre's peak slip angle.
+   */
+  absRear: 0.7,
+  absRearTurn: 0.45,
+  /**
+   * Unsprung mass and the tyre's own spring (the vertical model of the sims: rFactor's, iRacing's): each corner's
+   * wheel, upright and brake (~45 kg on a GT3) is a mass between the suspension spring above and the tyre below, a
+   * stiff spring (~300 kN/m for a racing slick) with a little damping. The tyre's load is what that spring carries,
+   * so over a kerb or a bump the load rises and falls with the wheel (wheel hop, a tyre skipping on a sausage kerb)
+   * instead of the body taking the step straight through its damper. Integrated in WHEEL_SUB steps a physics step.
+   */
+  unsprungKg: 45,
+  tyreRateN: 300_000,
+  tyreDampNs: 450,
+  /**
+   * Anti-dive and anti-squat: the wishbones' side-view geometry carries part of the braking and driving force into
+   * the body without going through the springs, so the car pitches less (a GT3's aero platform depends on it).
+   * The share of the longitudinal force applied at the centre of mass height instead of the roll-centre height:
+   * front on the brakes (anti-dive), rear on the brakes (anti-lift), rear on the power (anti-squat).
+   */
+  antiDive: 0.3,
+  antiLift: 0.15,
+  antiSquat: 0.4,
+  /** GT3 rear slicks are wider than the fronts (e.g. 325/705 against 300/680 R18): more rubber on the road, more grip
+   * per newton of load at the rear (×). It is what makes the cars stable at the limit, as the real ones are. */
+  rearGrip: 1.05,
 };
 
 /**
@@ -339,6 +369,17 @@ export class Wheel {
   coldPsi = 22.5;
   setC = 32;
   pressure = 22.5;
+  /** Unsprung mass state: the wheel centre's distance below the hardpoint (m), its velocity along the body's up
+   * axis (m/s, world), the ground's distance below the hardpoint this step (m), the suspension's force on the body (N),
+   * the spring's static compression (m), and this step's hardpoint (world). */
+  hub = 0;
+  vw = 0;
+  groundD = Infinity;
+  fs = 0;
+  staticComp = 0;
+  hpx = 0;
+  hpy = 0;
+  hpz = 0;
 
   constructor(
     readonly key: WheelKey,
@@ -356,15 +397,20 @@ export class Wheel {
     this.cBump = this.cBump0 = crit * 0.32;
     this.cRebound = this.cRebound0 = crit * 0.55;
     this.fz0 = staticLoad;
+    // the spring carries the corner's load (the body holds the whole car's weight); the tyre is squashed a little
     const staticComp = staticLoad / this.k;
+    const tyreDefl = staticLoad / CHASSIS.tyreRateN;
+    this.staticComp = staticComp;
     this.restLen = this.restLen0 = this.travel * 0.55 + staticComp;
     this.travel0 = this.travel;
-    // hardpoint so that at static compression the wheel sits where the model has it
+    // hardpoint so that at static compression the body stands as high over the road as the model has it (the
+    // wheel sits the tyre's static deflection lower: the loaded radius)
     this.hx = geom.position[0];
-    this.hy = geom.position[1] + (this.restLen - staticComp);
+    this.hy = geom.position[1] + (this.restLen - staticComp) - tyreDefl;
     this.hz = geom.position[2];
     this.inertia = 1.1 + 2.2 * this.radius * this.radius; // tyre + rim ≈ 1.35 kg·m²
     this.springLen = this.restLen - staticComp;
+    this.hub = this.springLen;
   }
 }
 
@@ -383,10 +429,15 @@ export interface VehicleTelemetry {
 }
 
 const tmpF = new Float64Array(2);
+/** Unsprung-mass sub-steps per physics step (CHASSIS.unsprungKg: the wheel on its tyre rings at ~13 Hz). */
+const WHEEL_SUB = 4;
+/** Where the tyre's footprint is sampled along the car (m from the wheel centre): the enveloping in step(). */
+const ENVELOPE_X = [-0.18, -0.09, 0.09, 0.18];
 
 export class Vehicle {
   readonly body: RAPIER.RigidBody;
   readonly collider: RAPIER.Collider;
+  private readonly vhScratch = new Float64Array(4);
   readonly wheels: Wheel[];
   readonly drivetrain: Drivetrain;
   readonly tire = new TireModel(SLICK);
@@ -425,6 +476,15 @@ export class Vehicle {
   setup: VehicleSetup = NEUTRAL_SETUP;
   /** Air temperature (°C), for the tyres and brakes. */
   ambientC = 20;
+  /**
+   * Engine coolant and oil (°C), for the dash (LMU's and ACC's water / oil readouts). A racing engine's water sits at
+   * ~80-95 °C (the thermostat holds it up, the radiator's airflow keeps it down): hotter under load and standing still
+   * (no air through the radiator: a car idling in the pits creeps towards 100 °C), a little hotter on a hot day; the
+   * oil follows the water ~10 °C above it and more slowly (it has more mass and its own cooler). Cars leave the pits
+   * warmed up.
+   */
+  waterC = 78;
+  oilC = 86;
   /** Track surface temperature (°C): tyres in contact take heat from it or give heat to it. */
   trackC = 25;
   /** Air density (kg/m³): drag, downforce and engine power follow it (setAir). */
@@ -445,6 +505,8 @@ export class Vehicle {
     latAccel: 0,
   };
   private hit: GroundHit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' };
+  /** The tyre footprint's extra samples (the main hit keeps the contact point and surface). */
+  private hit2: GroundHit = { dist: 0, px: 0, py: 0, pz: 0, nx: 0, ny: 1, nz: 0, surface: 'asphalt' };
   private reverseTimer = 0;
   private tcCut = 0;
   private prevVel = { x: 0, y: 0, z: 0 };
@@ -512,6 +574,9 @@ export class Vehicle {
     const iy = (m / 12) * (W * W + L * L) * 0.8;
     const iz = (m / 12) * (W * W + H * H) * 0.7;
     this.baseInertia = { x: ix, y: iy, z: iz };
+    // the body keeps the whole car's mass: its wheels move with it along the road (a body of only the sprung mass
+    // accelerated, braked and cornered ~12 % harder), and their mass only adds inertia to their own up-and-down
+    // motion (CHASSIS.unsprungKg), carried by the springs and tyres with the rest of the car's weight
     this.body.setAdditionalMassProperties(m, { x: 0, y: this.comY, z: this.comZ }, { x: ix, y: iy, z: iz }, { x: 0, y: 0, z: 0, w: 1 }, true);
 
     const frontLoad = (m * G * s.weightFront) / 2;
@@ -701,7 +766,11 @@ export class Vehicle {
     this.body.setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, true);
     this.body.setLinvel({ x: v.x, y: 0, z: v.z }, true);
     this.body.setAngvel({ x: 0, y: this.body.angvel().y, z: 0 }, true);
-    for (const w of this.wheels) w.compression = w.prevCompression = w.fz0 / w.k;
+    for (const w of this.wheels) {
+      w.compression = w.prevCompression = w.staticComp;
+      w.hub = w.restLen - w.staticComp;
+      w.vw = 0;
+    }
     return true;
   }
 
@@ -717,7 +786,9 @@ export class Vehicle {
     this.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
     for (const w of this.wheels) {
       w.omega = 0;
-      w.compression = w.prevCompression = w.fz0 / w.k;
+      w.compression = w.prevCompression = w.staticComp;
+      w.hub = w.restLen - w.staticComp;
+      w.vw = 0;
       w.alphaRelax = 0;
     }
     this.kbd.reset();
@@ -812,7 +883,7 @@ export class Vehicle {
       m.b = this.comZ - this.car.wheels.RL.position[2];
       m.wheelbase = this.wheelbase;
       m.maxLockRad = this.maxSteer;
-      m.alphaPeak = this.tire.p.alphaPeak;
+      m.alphaPeak = this.peakSlip(true);
       this.kbd.step(dt, c, m);
       throttleIn = this.kbd.throttle;
       brakeIn = this.kbd.brake;
@@ -887,14 +958,29 @@ export class Vehicle {
       const hpx = p.x + w.hx * this.lx + w.hy * this.ux + w.hz * this.fx;
       const hpy = p.y + w.hx * this.ly + w.hy * this.uy + w.hz * this.fy;
       const hpz = p.z + w.hx * this.lz + w.hy * this.uz + w.hz * this.fz;
-      const maxD = w.restLen + w.radius + dmg.rideDrop(w.key);
+      const maxD = w.restLen + w.radius + dmg.rideDrop(w.key) + 0.05;
       const h = g.cast(hpx, hpy, hpz, -this.ux, -this.uy, -this.uz, maxD, hit);
       w.prevCompression = w.compression;
+      w.hpx = hpx;
+      w.hpy = hpy;
+      w.hpz = hpz;
+      // a damaged corner hangs lower: its wheel's full extension with it
+      let gd = h ? h.dist : Infinity;
       if (h) {
-        w.contact = true;
-        contacts++;
-        w.springLen = h.dist - w.radius;
-        w.compression = Math.max(0, w.restLen - w.springLen);
+        // the tyre wraps over what is under it (a rigid ring of its radius, as the tyre models' enveloping): the road
+        // a little ahead and behind lifts the wheel by its height less the ring's drop there, so a kerb's sharp edge
+        // is met as a rounded rise over ~20 cm instead of a step in one point (that kicked the wheel off the road)
+        const R = w.radius;
+        for (const x of ENVELOPE_X) {
+          const ox = hpx + this.fx * x;
+          const oy = hpy + this.fy * x;
+          const oz = hpz + this.fz * x;
+          const e = g.cast(ox, oy, oz, -this.ux, -this.uy, -this.uz, maxD, this.hit2);
+          if (e && e.surface !== 'wall') gd = Math.min(gd, e.dist + (R - Math.sqrt(R * R - x * x)));
+        }
+      }
+      w.groundD = h ? gd - dmg.rideDrop(w.key) : Infinity;
+      if (h) {
         w.cpx = h.px;
         w.cpy = h.py;
         w.cpz = h.pz;
@@ -903,42 +989,72 @@ export class Vehicle {
         w.nz = h.nz;
         w.surface = h.surface;
         rumble = Math.max(rumble, SURFACE_PROPS[h.surface].bumpy);
-      } else {
-        w.contact = false;
-        w.springLen = w.restLen;
-        w.compression = 0;
       }
     }
-    tel.airborne = contacts === 0 ? tel.airborne + dt : 0;
     // a flat-spotted tyre shakes the car (the cockpit's vibration, the pad's rumble) at speed
     let flat = 0;
     for (const w of this.wheels) flat = Math.max(flat, w.flatSpot);
     tel.surfaceRumble = Math.max(rumble, flat * 0.6 * Math.min(1, speed / 30));
 
-    // spring + damper + anti-roll
+    // spring + damper + anti-roll between the body and each wheel; the tyre's spring between the wheel and the road
+    // (CHASSIS.unsprungKg). The hardpoints' speed along the body's up axis is held through the step.
     const arbF = s.antiRollFront;
     const arbR = s.antiRollRear;
+    const C = CHASSIS;
+    const vh = this.vhScratch;
     for (let i = 0; i < 4; i++) {
       const w = this.wheels[i];
-      if (!w.contact) {
-        w.fz = 0;
-        continue;
-      }
-      const vel = (w.compression - w.prevCompression) / dt;
-      // digressive: steep to the knee, gentle beyond it (CHASSIS)
-      const av = Math.abs(vel);
-      const C = CHASSIS;
-      const dv = av <= C.damperKnee ? av * C.damperLow : C.damperKnee * C.damperLow + (av - C.damperKnee) * C.damperHigh;
-      const damp = (vel > 0 ? w.cBump : w.cRebound) * Math.sign(vel) * dv * dmg.damperScale(w.key);
-      let f = w.k * w.compression + damp;
-      const other = this.wheels[i ^ 1];
-      const arb = w.front ? arbF : arbR;
-      f += arb * (w.compression - other.compression);
-      if (w.compression > w.travel) f += 350000 * (w.compression - w.travel); // bump stop
-      // a flat spot: a short push each revolution, where the flat part meets the road
-      if (w.flatSpot > 0.01) f += w.flatSpot * 2600 * Math.min(1, speed / 25) * Math.max(0, Math.cos(w.angle)) ** 16;
-      w.fz = Math.max(0, f);
+      const rx = w.hpx - com.x;
+      const ry = w.hpy - com.y;
+      const rz = w.hpz - com.z;
+      vh[i] = (v.x + av.y * rz - av.z * ry) * this.ux + (v.y + av.z * rx - av.x * rz) * this.uy + (v.z + av.x * ry - av.y * rx) * this.uz;
+      w.fs = 0;
+      w.fz = 0;
     }
+    const hs = dt / WHEEL_SUB;
+    for (let sub = 0; sub < WHEEL_SUB; sub++) {
+      const tau = sub * hs;
+      for (let i = 0; i < 4; i++) {
+        const w = this.wheels[i];
+        const other = this.wheels[i ^ 1];
+        const comp = w.restLen - w.hub;
+        const rate = w.vw - vh[i]; // + = compressing
+        // digressive damper: steep to the knee, gentle beyond it
+        const ar = Math.abs(rate);
+        const dv = ar <= C.damperKnee ? ar * C.damperLow : C.damperKnee * C.damperLow + (ar - C.damperKnee) * C.damperHigh;
+        let fs = w.k * comp + (rate > 0 ? w.cBump : w.cRebound) * Math.sign(rate) * dv * dmg.damperScale(w.key);
+        fs += (w.front ? arbF : arbR) * (comp - (other.restLen - other.hub));
+        if (comp > w.travel) fs += 350000 * (comp - w.travel); // bump stop
+        // the tyre: squashed by how far the wheel's bottom reaches past the road (the road held where it was)
+        const gd = w.groundD + vh[i] * tau;
+        const defl = w.hub + w.radius - gd;
+        let fa = defl > 0 ? Math.max(0, C.tyreRateN * defl - C.tyreDampNs * w.vw) : 0;
+        // a flat spot: a short push each revolution, where the flat part meets the road
+        if (fa > 0 && w.flatSpot > 0.01) fa += w.flatSpot * 2600 * Math.min(1, speed / 25) * Math.max(0, Math.cos(w.angle)) ** 16;
+        w.vw += ((fa - fs) / C.unsprungKg) * hs;
+        w.hub += (vh[i] - w.vw) * hs;
+        // full extension: the wheel hangs from the body
+        if (w.hub > w.restLen) {
+          w.hub = w.restLen;
+          if (w.vw < vh[i]) w.vw = vh[i];
+        }
+        w.fs += fs / WHEEL_SUB;
+        w.fz += fa / WHEEL_SUB;
+      }
+    }
+    contacts = 0;
+    for (const w of this.wheels) {
+      w.compression = Math.max(0, w.restLen - w.hub);
+      w.springLen = w.hub;
+      w.contact = w.fz > 1 && w.groundD < Infinity;
+      if (w.contact) {
+        contacts++;
+        // the load across the road's surface (the tyre's spring acts along the suspension's axis)
+        const nu = w.nx * this.ux + w.ny * this.uy + w.nz * this.uz;
+        w.fz /= Math.max(0.5, nu);
+      } else w.fz = 0;
+    }
+    tel.airborne = contacts === 0 ? tel.airborne + dt : 0;
 
     /* ---------------------------------------------------- drivetrain -- */
     let drivenOmega = 0;
@@ -964,6 +1080,14 @@ export class Vehicle {
     }
     tel.rpm = dt2.rpm;
     tel.gear = dt2.gear;
+    if (!this.frozen) {
+      const load = Math.min(1.2, (Math.max(0, dt2.engineTorque) * dt2.rpm * RPM_TO_RADS) / Math.max(1, s.powerKw * 1000));
+      const airflow = Math.min(1, speed / 45);
+      const waterTarget = 80 + 12 * load + 14 * (1 - airflow) + 0.45 * (this.ambientC - 20);
+      const oilTarget = waterTarget + 6 + 10 * load;
+      this.waterC += (waterTarget - this.waterC) * Math.min(1, dt / 30);
+      this.oilC += (oilTarget - this.oilC) * Math.min(1, dt / 70);
+    }
     const front = s.drivetrain === 'AWD' ? s.frontTorqueSplit : s.drivetrain === 'FWD' ? 1 : 0;
     this.splitAxle(0, 1, axleTorque * front);
     this.splitAxle(2, 3, axleTorque * (1 - front));
@@ -978,7 +1102,8 @@ export class Vehicle {
       // whenever slip passed 13 %, so the wheels cycled through the peak and braked ~1.6 g where the tyres held 2+.
       // Released fast in proportion to the overshoot, reapplied more slowly (a modern Bosch M5 does both in ms).
       if (this.assists.abs && bt > 0 && w.contact && Math.abs(vF) > 3) {
-        const target = this.tire.p.kappaPeak * 0.95;
+        const turn = Math.min(1, Math.abs(w.slipAngle) / this.tire.p.alphaPeak);
+        const target = this.tire.p.kappaPeak * (w.front ? 0.95 : CHASSIS.absRear * (1 - CHASSIS.absRearTurn * turn));
         const over = (-w.slipRatio - target) / target;
         if (over > 0) w.abs = Math.max(0.1, w.abs - dt * (12 + 80 * over));
         else w.abs = Math.min(1, w.abs + dt * (4 - 6 * over));
@@ -1025,6 +1150,8 @@ export class Vehicle {
       const wlz = nx * wfy - ny * wfx;
 
       if (!w.contact) {
+        // in the air the spring and damper still push on the body, at the hardpoint
+        if (w.fs !== 0) body.addForceAtPoint({ x: this.ux * w.fs, y: this.uy * w.fs, z: this.uz * w.fs }, { x: w.hpx, y: w.hpy, z: w.hpz }, true);
         // free wheel: driven torque spins it, brakes stop it
         w.omega += (w.driveTorque / w.inertia) * dt;
         const bd = (w.brakeTorque / w.inertia) * dt;
@@ -1064,6 +1191,7 @@ export class Vehicle {
         wearGrip(w.wear) *
         pressureGrip(w.pressure) *
         camberGrip *
+        (w.front ? 1 : CHASSIS.rearGrip) *
         (1 - 0.06 * w.flatSpot);
       const fz = w.fz;
       const R = w.radius;
@@ -1127,12 +1255,22 @@ export class Vehicle {
       // locked under braking at speed: the tread scrubs flat where it touches (a second at 150 km/h: a clear thump)
       if (w.contact && brakeIn > 0.25 && Math.abs(vF) > 12 && w.slipRatio < -0.75)
         w.flatSpot = Math.min(1, w.flatSpot + dt * 0.11 * Math.min(2, Math.abs(vF) / 40));
-      // force at the contact patch, raised towards a roll centre to tame roll-over
-      const fwx = wfx * fxT + wlx * fyT + nx * fz;
-      const fwy = wfy * fxT + wly * fyT + ny * fz;
-      const fwz = wfz * fxT + wlz * fyT + nz * fz;
+      // the forces on the body: the tyre's grip and the part of the road's push across the suspension's axis (the
+      // links carry it), at the contact patch raised towards a roll centre; the suspension's own force along its
+      // axis; a share of the longitudinal force at the centre of mass's height (anti-dive / anti-lift / anti-squat)
+      const nu = nx * this.ux + ny * this.uy + nz * this.uz;
+      const anti = fxT < 0 ? (w.front ? CHASSIS.antiDive : CHASSIS.antiLift) : w.front ? 0 : CHASSIS.antiSquat;
+      const fxLink = fxT * (1 - anti);
+      const fwx = wfx * fxLink + wlx * fyT + (nx - nu * this.ux) * fz + this.ux * w.fs;
+      const fwy = wfy * fxLink + wly * fyT + (ny - nu * this.uy) * fz + this.uy * w.fs;
+      const fwz = wfz * fxLink + wlz * fyT + (nz - nu * this.uz) * fz + this.uz * w.fs;
       const lift = 0.12;
       body.addForceAtPoint({ x: fwx, y: fwy, z: fwz }, { x: w.cpx + this.ux * lift, y: w.cpy + this.uy * lift, z: w.cpz + this.uz * lift }, true);
+      if (anti > 0 && fxT !== 0) {
+        const fa = fxT * anti;
+        const hgt = this.comY;
+        body.addForceAtPoint({ x: wfx * fa, y: wfy * fa, z: wfz * fa }, { x: w.cpx + this.ux * hgt, y: w.cpy + this.uy * hgt, z: w.cpz + this.uz * hgt }, true);
+      }
     }
 
     /* ---------------------------------------------------- aero -------- */
@@ -1144,14 +1282,12 @@ export class Vehicle {
     const fd = 0.5 * this.airDensity * dragArea * speed;
     body.addForce({ x: -fd * v.x, y: -fd * v.y, z: -fd * v.z }, true);
     const W0 = this.wheels;
-    const heaveMm =
-      ((W0[0].compression + W0[1].compression - (2 * W0[0].fz0) / W0[0].k + W0[2].compression + W0[3].compression - (2 * W0[2].fz0) / W0[2].k) / 4) * 1000;
+    const heaveMm = ((W0[0].compression + W0[1].compression - 2 * W0[0].staticComp + W0[2].compression + W0[3].compression - 2 * W0[2].staticComp) / 4) * 1000;
     const heave = Math.max(1 - CHASSIS.heaveMax, Math.min(1 + CHASSIS.heaveMax, 1 + CHASSIS.heavePerMm * heaveMm));
     const df = 0.5 * this.airDensity * s.downforceArea * this.wake.downforce * vF * vF * yawKeep * heave;
     // pitch: the nose down (front springs more compressed than static, the rear less) moves the balance forward
     const W = this.wheels;
-    const pitchMm =
-      (((W[0].compression + W[1].compression) / 2 - W[0].fz0 / W[0].k - ((W[2].compression + W[3].compression) / 2 - W[2].fz0 / W[2].k)) * 1000) | 0;
+    const pitchMm = (((W[0].compression + W[1].compression) / 2 - W[0].staticComp - ((W[2].compression + W[3].compression) / 2 - W[2].staticComp)) * 1000) | 0;
     const shift = Math.max(-CHASSIS.balanceMax, Math.min(CHASSIS.balanceMax, pitchMm * CHASSIS.balancePerMm)) + CHASSIS.yawRear * (1 - yawKeep);
     // damage: the front and the rear lose their own downforce (a broken splitter understeers, a broken wing oversteers)
     const dfF0 = df * Math.max(0.2, Math.min(0.7, s.aeroBalanceFront + shift));
@@ -1195,6 +1331,15 @@ export class Vehicle {
 
   shift(dir: 1 | -1): void {
     this.drivetrain.requestShift(dir);
+  }
+
+  /** An axle's peak slip angle now (rad): later under load (TireModel.force), from its wheels' loads. */
+  peakSlip(front: boolean): number {
+    const a = front ? 0 : 2;
+    const w0 = this.wheels[a];
+    const w1 = this.wheels[a + 1];
+    const r = Math.min(2.5, Math.max(0.3, (w0.fz + w1.fz) / Math.max(1, w0.fz0 + w1.fz0)));
+    return this.tire.p.alphaPeak * Math.pow(r, 0.25);
   }
 
   get rpmRatio(): number {

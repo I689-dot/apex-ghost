@@ -690,6 +690,8 @@ The windscreen rain was flat grey discs over the whole view. Now the drops are s
 
 **Budget per race.** State is sampled at **20 Hz** and **two samples go in each packet (10 messages/s)**. That halves the billable request count without lowering the sample rate the interpolation uses.
 
+**Update 2026-11-17: one sample a packet (20 messages/s).** Drivers see the other cars in the present (dead reckoning), and with a packet every 100 ms the prediction ran 150-250 ms ahead at 250 km/h: the cars jumped on each correction ("they teleport"). Now a packet every 50 ms, the clock estimate eased instead of stepped (a few ms step moved every predicted car a metre), the acceleration measured over 150 ms, the prediction kept up for 1.2 s with its turn and braking fading (it used to hold after 0.5 s and then jump), and the snap distance scaled with speed (0.6 s of it; 12 m was a fifth of a second at 250 km/h). `tools/sim/netsmooth.ts`: a 0.7 s hitch from the other driver at 250 km/h jumped 9.2 m in one frame before, 0.06 m after; the mean error 0.33 → 0.17 m. Cost: twice the incoming messages, so about 30 full 12-player races a day on the free plan instead of 60.
+
 - Messages: 12 players × ~10/s for a ~4–6 minute race ≈ 33–43k incoming messages.
 - Races per day: **measured ≈1,645 requests per full 12-player race, so ≈60 races a day** on the free plan (`pnpm loadtest`). A friend group plays far fewer.
 - Duration: well under 1% of the daily allowance.
@@ -1449,6 +1451,29 @@ From the user's list (DECISIONS: the rest follows):
   Coca-Cola, TOTAL, Uniroyal, DHL, ALD, Classic 21, Silverstone, Assetto Corsa, alpinestars; MyLAPS, ADVAN, Kumho,
   Hörmann, McGregor, Formido...). Circuits' own names and signs stay. The menu photos are shot again in this game
   (brand-free cars and boards).
+
+## Physics pass, 2026-11-17: unsprung mass, tyre enveloping, anti-geometry, load-dependent peak slip
+
+What the sims model and the web car did not (researched: Jolt's VehicleConstraint / WheeledVehicleController, the
+Godot driving projects AdvancedVehicle and VitaVehicle, kerb-impact and tyre-model papers):
+
+- **Unsprung mass and the tyre's spring** (`CHASSIS.unsprungKg` 45 kg a corner, `tyreRateN` 300 kN/m, `tyreDampNs`):
+  each wheel is a mass between the suspension spring and the tyre, integrated in 4 sub-steps a physics step. The
+  tyre's load is what its spring carries, so over bumps and kerbs it rises and falls with the wheel (wheel hop). The
+  body keeps the whole car's mass (a body of only the sprung mass accelerated, braked and cornered ~12 % harder); the
+  wheels' mass only adds inertia to their vertical motion. The road's push across the suspension axis goes through the
+  links (straight to the body), the spring's along it.
+- **Tyre enveloping:** the road is sampled under the tyre at ±9 and ±18 cm and the wheel rolls over it as a ring of
+  its radius, so a kerb's edge is a rounded rise, not a step in one point.
+- **Anti-dive 30 %, anti-lift 15 %, anti-squat 40 %:** that share of the longitudinal force goes into the body at the
+  centre of mass's height. `tools/sim/platform.ts`: nose dive from 200 km/h 1.17 → 0.80°, squat 0.32 → 0.19°.
+- **Peak slip later under load** (the Godot port's tyre, racing tyre data): peak slip angle × (Fz/Fz0)^0.25, slip ratio
+  × ^0.1; a more progressive slide (85 / 84 % past the peak). The AI and the keyboard filter use the axle's current
+  peak (`Vehicle.peakSlip`).
+
+Results: braking and cornering grip unchanged (200→0 km/h 85 m); trail-braking slide ~2.5° (was ~4–5°); Spa AI lap:
+no spins or resets, ride heave rms 1.33 → 1.17 m/s², worst jolt 14 → 8 m/s², ~1 s slower (the AI's speed plan still
+assumes the old peak; retune AI_GRIP if needed).
 
 ## Godot + server: coins, codes, invites, ranking, room regions (2026-11-18)
 

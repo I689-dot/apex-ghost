@@ -59,7 +59,7 @@ export class RaceOverlays {
    * Every frame: pedals 0…1, steering −1 (right) … +1 (left) of full lock, delta to the best lap (ms) or null,
    * gear (−1 R, 0 N), speed in the player's units with its label.
    */
-  update(throttle: number, brake: number, steer: number, deltaMs: number | null, gear = 0, speed = 0, unit = 'km/h', dt = 1 / 60): void {
+  update(throttle: number, brake: number, steer: number, deltaMs: number | null, _gear = 0, _speed = 0, _unit = 'km/h', dt = 1 / 60): void {
     const o = settings.overlays;
     this.inputs.hidden = !o.inputs;
     if (o.inputs) {

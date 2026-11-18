@@ -5,15 +5,18 @@ import { carLimits, racingLineFor, speedProfile } from './ai';
 
 export type RacingLineMode = 'off' | 'corners' | 'full';
 
-const WIDTH = 1.1;
+/** Width of the strip the chevrons are drawn in (m), as F1 25's: a chevron spans most of a car's track. */
+const WIDTH = 1.7;
+/** Chevron spacing along the line and each chevron's depth (m): F1 25 lays them a few metres apart. */
+const CHEVRON_M = 4.2;
+const CHEVRON_DEPTH = 1.05;
 const LIFT = 0.03;
-/** Chevron spacing along the line (m). */
-const CHEVRON_M = 2.4;
 /** The dynamic colours are judged from the car's speed this far ahead (m); beyond it the static colours show. */
 const LOOKAHEAD_M = 320;
 
 /**
- * Racing-line assist after the F1 games' dynamic line: a ribbon of soft chevrons pointing the way, coloured from
+ * Racing-line assist after F1 25's dynamic line (and iRacing's, Mavil's for Assetto Corsa): flat chevrons laid on the
+ * road a few metres apart, solid colour with crisp edges, lime / yellow / orange / red, coloured from
  * what *your* car needs now. Ahead of the car the colour comes from the deceleration needed to get from your current
  * speed down to the line's target speed there (green: keep going, amber: lift / light braking, red: brake hard now),
  * so a braking zone turns red only when you arrive too fast, and stays green when you are already slow enough.
@@ -92,7 +95,7 @@ export class RacingLineFx {
         uLength: { value: this.length },
         // the car's mechanical braking (m/s²); aero adds more at speed, so the colours stay on the safe side
         uBrake: { value: limits.muBrake * 9.81 },
-        uOpacity: { value: 0.82 },
+        uOpacity: { value: 0.94 },
       },
       vertexShader: /* glsl */ `
         attribute float aTarget;
@@ -119,9 +122,11 @@ export class RacingLineFx {
         varying float vTarget;
         varying float vPlan;
         varying float vDepth;
-        const vec3 GO = vec3(0.10, 0.85, 0.30);
-        const vec3 LIFT = vec3(1.0, 0.72, 0.05);
-        const vec3 BRAKE = vec3(1.0, 0.10, 0.12);
+        // F1 25's palette: lime to go, yellow to lift, orange to red to brake
+        const vec3 GO = vec3(0.62, 1.0, 0.08);
+        const vec3 LIFT = vec3(1.0, 0.86, 0.05);
+        const vec3 ORANGE = vec3(1.0, 0.45, 0.02);
+        const vec3 BRAKE = vec3(0.98, 0.06, 0.08);
         void main() {
           // distance ahead of the car along the line (wraps at the line)
           float ahead = mod(vUv.y - uCarS + uLength, uLength);
@@ -134,20 +139,23 @@ export class RacingLineFx {
             // blend into the plan at the end of the look-ahead
             k = mix(dyn, vPlan, smoothstep(${(LOOKAHEAD_M * 0.7).toFixed(1)}, ${LOOKAHEAD_M.toFixed(1)}, ahead));
           }
-          vec3 col = k < 1.0 ? mix(GO, LIFT, k) : mix(LIFT, BRAKE, k - 1.0);
-          // chevrons pointing along the line: a V across the ribbon, repeated every ${CHEVRON_M} m
-          float x = abs(vUv.x - 0.5) * 2.0;
-          float p = fract((vUv.y + x * 0.9) / ${CHEVRON_M.toFixed(1)});
-          float w = fwidth(p) * 1.5 + 0.02;
-          float band = smoothstep(0.0, w, p) * (1.0 - smoothstep(0.34 - w, 0.34, p));
-          // soft edges across the ribbon
-          float edge = 1.0 - smoothstep(0.78, 1.0, x);
-          // a faint body between the chevrons keeps the line readable far away, where the chevrons blur
-          float far = smoothstep(60.0, 160.0, vDepth);
-          float a = mix(band * 0.95 + 0.12, 0.55, far) * edge;
+          vec3 col = k < 1.0 ? mix(GO, LIFT, k) : k < 1.5 ? mix(LIFT, ORANGE, (k - 1.0) * 2.0) : mix(ORANGE, BRAKE, (k - 1.5) * 2.0);
+          // a flat chevron pointing along the line, one every ${CHEVRON_M} m (the F1 games' dynamic line): its leading
+          // edge swept back by 0.8 m per metre out from the middle, ${CHEVRON_DEPTH} m deep, crisp edges
+          float xm = abs(vUv.x - 0.5) * ${WIDTH.toFixed(2)};
+          float p = mod(vUv.y + xm * 0.8, ${CHEVRON_M.toFixed(2)});
+          float aa = max(fwidth(p), 1e-3) * 1.2;
+          float chevron = smoothstep(0.0, aa, p) * (1.0 - smoothstep(${CHEVRON_DEPTH.toFixed(2)} - aa, ${CHEVRON_DEPTH.toFixed(2)}, p));
+          // the outer tips cut square, a little in from the strip's edge
+          float edge = 1.0 - smoothstep(${(WIDTH / 2 - 0.08).toFixed(2)} - fwidth(xm), ${(WIDTH / 2 - 0.08).toFixed(2)}, xm);
+          // far away the chevrons are smaller than a pixel: one even strip there instead of flicker
+          float far = smoothstep(0.35, 0.9, aa);
+          float a = mix(chevron, 0.42, far) * edge;
+          // a light gradient front to back, as a painted marking catches the sun
+          vec3 rgb = col * (1.05 + 0.15 * (1.0 - p / ${CHEVRON_DEPTH.toFixed(2)}));
           // not under the car's nose, and fading into the distance
-          a *= smoothstep(2.5, 9.0, ahead < uLength - 30.0 ? ahead : 99.0) * (1.0 - smoothstep(260.0, 420.0, vDepth));
-          gl_FragColor = vec4(col * 1.15, a * uOpacity);
+          a *= smoothstep(3.0, 9.0, ahead < uLength - 30.0 ? ahead : 99.0) * (1.0 - smoothstep(240.0, 400.0, vDepth));
+          gl_FragColor = vec4(rgb, a * uOpacity);
           #include <colorspace_fragment>
         }`,
       transparent: true,

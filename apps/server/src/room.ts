@@ -137,6 +137,8 @@ interface Player extends PersistedPlayer {
   /** Bumps relayed in the current 1 s window (contact rule), and when that window started. */
   bumps?: number;
   bumpWindow?: number;
+  /** Chat: when the last line was relayed (a line every 700 ms at most). */
+  lastChatAt?: number;
 }
 
 const ID_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';
@@ -537,11 +539,14 @@ export class RoomCore {
         }
         return;
       case 'damage': {
+        // a bot's damage is reported by the host, who simulates it
+        const who = msg.id !== undefined ? (p.id === this.hostId ? this.players.get(msg.id) : undefined) : p;
+        if (!who || (msg.id !== undefined && !who.bot)) return;
         const now = this.env.now();
-        if (now - p.lastDamageAt < 400) return;
-        p.lastDamageAt = now;
-        this.rc?.setDamage(p.id, Math.max(...msg.zones));
-        return this.broadcast({ t: 'damage', playerId: p.id, zones: msg.zones }, p.id);
+        if (now - who.lastDamageAt < 400) return;
+        who.lastDamageAt = now;
+        this.rc?.setDamage(who.id, Math.max(...msg.zones));
+        return this.broadcast({ t: 'damage', playerId: who.id, zones: msg.zones }, p.id);
       }
       case 'leave':
         this.removePlayer(p.id);
@@ -575,6 +580,14 @@ export class RoomCore {
         this.persist();
         this.broadcastRoom();
         return;
+      case 'chat': {
+        // to everyone in the room (drivers and spectators), a line every 700 ms at most per driver
+        const now = this.env.now();
+        if (now - (p.lastChatAt ?? 0) < 700) return;
+        p.lastChatAt = now;
+        this.broadcast({ t: 'chat', from: p.id, nick: p.nick, text: msg.text, at: now });
+        return;
+      }
       case 'setPublic':
         if (p.id !== this.hostId) return;
         this.isPublic = msg.isPublic;
@@ -617,7 +630,9 @@ export class RoomCore {
         const ev = this.events;
         ev.length = 0;
         const now = this.env.now();
-        if (msg.in) this.tracker.pitIn(who.id, now, ev);
+        // a tow (a wrecked bot put in its box: the host holds it there for the tow's time)
+        if (msg.in && msg.tow && msg.id !== undefined) this.tracker.tow(who.id, now, ev);
+        else if (msg.in) this.tracker.pitIn(who.id, now, ev);
         else this.tracker.pitOut(who.id, this.tracker.track.pitExitS ?? 0, now, ev);
         this.broadcast({ t: 'pit', playerId: who.id, in: msg.in });
         this.handleRaceEvents(ev, who, now);
@@ -662,20 +677,23 @@ export class RoomCore {
     for (const b of this.players.values()) if (b.bot) b.tyre = tyre;
   }
 
-  /** Host adds an AI driver with a random free car (respects the car locks). */
+  /** Host adds an AI driver with a random car (one not on the grid yet when there is one). */
   private addBot(host: Player): void {
     if (host.id !== this.hostId || this.phase !== 'lobby') return;
     if (this.players.size >= MAX_PLAYERS) {
       this.send(host, { t: 'error', code: 'room_full', message: `Room is full (${MAX_PLAYERS} players).`, fatal: false });
       return;
     }
-    const free = [...(this.env.carIds ?? [])].filter((c) => !this.carLocks.has(c));
-    if (free.length === 0) {
-      this.send(host, { t: 'error', code: 'car_taken', message: 'No free car left for a bot.', fatal: false });
+    // any car (two drivers may race the same model, as on a real grid): one nobody has yet when there is one
+    const all = [...(this.env.carIds ?? [])];
+    const unused = all.filter((c) => ![...this.players.values()].some((x) => x.carId === c));
+    const pool = unused.length ? unused : all;
+    if (pool.length === 0) {
+      this.send(host, { t: 'error', code: 'car_taken', message: 'No car for a bot.', fatal: false });
       return;
     }
     // the car first (as it always was drawn), then the name and number
-    const carId = free[Math.floor(this.env.random() * free.length)];
+    const carId = pool[Math.floor(this.env.random() * pool.length)];
     const used = new Set([...this.players.values()].map((x) => x.nick));
     const free_ = BOT_DRIVERS.filter(([n]) => !used.has(n));
     const [nick, country] = free_.length ? free_[Math.floor(this.env.random() * free_.length)] : [`AI ${this.rid(3).toUpperCase()}`, undefined];
@@ -706,7 +724,7 @@ export class RoomCore {
     this.broadcastRoom();
   }
 
-  /** Atomic car lock: grant only when nobody else holds the car. */
+  /** A driver's car: any car in the list, shared or not. */
   selectCar(p: Player, carId: string | null): void {
     if (this.phase !== 'lobby' && !p.waiting) {
       this.send(p, { t: 'carLock', ok: false, carId, owner: null });
@@ -716,13 +734,7 @@ export class RoomCore {
       this.send(p, { t: 'carLock', ok: false, carId, owner: null });
       return;
     }
-    if (carId !== null) {
-      const owner = this.carLocks.get(carId);
-      if (owner !== undefined && owner !== p.id) {
-        this.send(p, { t: 'carLock', ok: false, carId, owner });
-        return;
-      }
-    }
+    // no exclusive cars: several drivers may pick the same model (carLocks only remembers who chose it last)
     if (p.carId && this.carLocks.get(p.carId) === p.id) this.carLocks.delete(p.carId);
     p.carId = carId;
     if (carId) this.carLocks.set(carId, p.id);

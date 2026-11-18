@@ -18,7 +18,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.resolve(here, '../../apps/client/public/assets');
 const cars = JSON.parse(readFileSync(path.join(pub, 'cars.json'), 'utf8')) as CarsFile;
 const args = process.argv.slice(2);
-const carId = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--track') ?? '2022_mercedes_amg_project_one';
+const carId = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--track') ?? 'mercedes_amg_gt3_evo';
 const loaded = loadTrack(trackArg(args));
 const useTrack = true;
 const entry = cars.cars.find((c) => c.id === carId) ?? cars.cars[0];

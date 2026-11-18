@@ -31,7 +31,7 @@ function engineAt(id: string): 'front' | 'mid' | 'rear' {
 const TYRE_COLOURS = { cold: '#3a86ff', warm: '#5ec8ff', ok: '#30d158', hot: '#ff453a' };
 /** Around the compound's own window (Medium 85 °C: blue below 65, green 77–103; wets 60 °C), not fixed numbers:
  * wets at their best showed blue, and Hards green while still short of theirs. */
-function tyreColour(t: number, optimumC: number): string {
+export function tyreColour(t: number, optimumC: number): string {
   return t < optimumC - 20 ? TYRE_COLOURS.cold : t < optimumC - 8 ? TYRE_COLOURS.warm : t <= optimumC + 18 ? TYRE_COLOURS.ok : TYRE_COLOURS.hot;
 }
 /** The line drawing's colours: the damage report's scale (ui/carLines.ts). */
