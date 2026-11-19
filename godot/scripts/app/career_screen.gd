@@ -2,7 +2,8 @@ class_name CareerScreen
 extends RefCounted
 ## The solo career at a glance (the driver profile of Forza, GT and iRacing), laid out as Le Mans Ultimate's profile:
 ## Profile (the driver's name with rank and level and the XP to the next, the licence and its Safety Rating towards
-## promotion, the Driver Rating, the record as big numbers and stat tiles), Achievements, Ranks, and the online Ranking
+## promotion, the Driver Rating, the record as big numbers and stat tiles; signed in, the online licence too),
+## Achievements, Ranks, and the online Ranking
 ## (every driver by the server's Driver Rating, which online races move: the server's economy.ts).
 
 static var _tab := "profile"
@@ -19,6 +20,8 @@ static func build(app: App) -> Control:
 			body = _ranking(app)
 		_:
 			body = _profile(c)
+			# the online licence: the server's wallet (fetched at most every 20 s), shown once it is in
+			StoreScreen.refresh(func(): if app.screen == "career" and _tab == "profile": app.show_career())
 	var top := UIW.top_bar({
 		"title": I18n.t("Career"), "back": app.show_menu,
 		"tabs": [["profile", I18n.t("Profile")], ["achievements", I18n.t("Achievements")], ["ranks", I18n.t("Ranks")], ["ranking", I18n.t("Ranking")]],
@@ -97,6 +100,19 @@ static func _profile(c: Dictionary) -> Control:
 	col.add_child(row)
 	if lic != "P":
 		col.add_child(UIW.muted(I18n.t("Promotion at {sr} SR: drive clean, every corner without an incident counts", {"sr": "%.2f" % target}), 14))
+	# the online licence (signed in: the server's, from online races and qualifying, judged by the game server)
+	var on := StoreScreen.online_licence()
+	if not on.is_empty():
+		col.add_child(UIW.section(I18n.t("Online licence")))
+		var olic: String = on.licence
+		var otarget := 3.0 if olic == "R" else 4.0
+		var orow := UIW.hbox(18 if touch else 28)
+		orow.add_child(_rank_tile(I18n.t("Licence"), olic, clampf(float(on.sr) / otarget, 0.0, 1.0), I18n.t(CareerData.LICENCE_NAME[olic]), Color(CareerData.LICENCE_COLOUR[olic])))
+		var last = on.get("srLast")
+		orow.add_child(_rank_tile(I18n.t("Safety Rating"), "%.2f" % float(on.sr), clampf(float(on.sr) / otarget, 0.0, 1.0),
+			(I18n.t("Last session {d}", {"d": "%+.2f" % float(last)}) if last != null else I18n.t("Promotion at {sr}", {"sr": "%.2f" % otarget})), Color("dfe7f2")))
+		col.add_child(orow)
+		col.add_child(UIW.muted(I18n.t("Online races and qualifying, judged by the game server: off the track 1 point, contact 4, a reset 4."), 14))
 
 	# the rest of the record as tiles
 	col.add_child(UIW.section(I18n.t("Overall stats")))
@@ -280,7 +296,7 @@ static func _ranking(app: App) -> Control:
 			return
 		var my_nick: String = str(Account.account().user.nick) if Account.account() != null else ""
 		var head_row := UIW.hbox(12)
-		for h in [["#", 50], [I18n.t("Driver"), 0], [I18n.t("Country"), 90], [I18n.t("Races"), 90], ["DR", 90]]:
+		for h in [["#", 50], [I18n.t("Driver"), 0], [I18n.t("Country"), 90], [I18n.t("Licence"), 110], [I18n.t("Races"), 90], ["DR", 90]]:
 			var l := UIKit.label(String(h[0]).to_upper(), 14, UIKit.DIM, true, 600)
 			if int(h[1]) > 0:
 				l.custom_minimum_size = Vector2(h[1], 0)
@@ -292,7 +308,8 @@ static func _ranking(app: App) -> Control:
 			var e: Dictionary = rows[i]
 			var me_row: bool = str(e.nick) == my_nick
 			var row := UIW.hbox(12)
-			var cells := [[str(i + 1), 50], [str(e.nick) + ("  · " + str(e.abbr) if e.get("abbr") else ""), 0], [str(e.get("country")) if e.get("country") else "—", 90], [str(int(e.races)), 90], [str(int(e.rating)), 90]]
+			var lic_txt := ("%s %.2f" % [str(e.licence), float(e.get("sr", CareerData.SR_START))]) if e.get("licence") else "—"
+			var cells := [[str(i + 1), 50], [str(e.nick) + ("  · " + str(e.abbr) if e.get("abbr") else ""), 0], [str(e.get("country")) if e.get("country") else "—", 90], [lic_txt, 110], [str(int(e.races)), 90], [str(int(e.rating)), 90]]
 			for c in cells:
 				var l := UIKit.label(String(c[0]), 18, UIKit.ACCENT_2 if me_row else UIKit.TEXT, c[1] != 0, 600 if c[1] != 0 else 500)
 				if int(c[1]) > 0:

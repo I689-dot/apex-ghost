@@ -14,7 +14,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { NICK_MAX, NICK_MIN, PROFILE_RE, type AccountUser, type FriendEntry, type RecordRow, type UserStats } from '@apex/shared';
 import type { RecordEvent } from './room';
-import { COINS, INVITE_RACES, INVITE_WINDOW_MS, RATING_START, SEED_CODES, coinsForResult, dayOf, newInviteCode, normaliseCode, ratingDelta } from './economy';
+import { COINS, INVITE_RACES, INVITE_WINDOW_MS, RATING_START, SEED_CODES, SR_START, coinsForResult, dayOf, licenceAfter, newInviteCode, normaliseCode, ratingDelta } from './economy';
 
 export type AccountOp =
   | 'register'
@@ -208,6 +208,10 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       ['invited_by', 'text'],
       ['invite_paid', 'integer not null default 0'],
       ['last_race_day', 'integer'],
+      // the online licence and Safety Rating (economy.ts licenceAfter), and the last session's change
+      ['licence', "text not null default 'R'"],
+      ['sr', `real not null default ${SR_START}`],
+      ['sr_last', 'real'],
     ])
       if (!cols.has(c)) this.sql.exec(`alter table users add column ${c} ${type}`);
     this.sql.exec('create unique index if not exists users_invite on users (invite_code)');
@@ -445,6 +449,7 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       const u = this.userOf(e.token);
       if (!u) continue;
       if (e.kind === 'result' && e.session === 'race' && e.totalMs !== null) this.payRace(u.id, e.position, e.entrants, (people.get(e.trackId) ?? 0) >= 2, now);
+      if (e.kind === 'result' && (e.session === 'race' || e.session === 'qualifying') && (e.corners ?? 0) > 0) this.rateSafety(u.id, e.corners, e.incidents ?? 0);
       if (e.kind === 'lap')
         this.sql.exec(
           'insert into laps (user_id, track_id, car_id, lap_ms, sectors, session, wet, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -524,15 +529,26 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     this.sql.exec('insert into coin_ledger (user_id, delta, reason, created_at) values (?, ?, ?, ?)', userId, delta, reason, Date.now());
   }
 
-  /** My coins, the latest changes and my Driver Rating. */
-  private wallet(token: string | null): { coins: number; rating: number; races: number; ledger: { delta: number; reason: string; at: number }[] } {
+  /** My coins, the latest changes, my Driver Rating and my licence with its Safety Rating (the last session's change). */
+  private wallet(token: string | null): {
+    coins: number;
+    rating: number;
+    races: number;
+    licence: string;
+    sr: number;
+    srLast: number | null;
+    ledger: { delta: number; reason: string; at: number }[];
+  } {
     const me = this.requireUser(token);
-    const u = this.rows<{ coins: number; rating: number; races: number }>('select coins, rating, races from users where id = ?', me.id)[0];
+    const u = this.rows<{ coins: number; rating: number; races: number; licence: string; sr: number; sr_last: number | null }>(
+      'select coins, rating, races, licence, sr, sr_last from users where id = ?',
+      me.id,
+    )[0];
     const ledger = this.rows<{ delta: number; reason: string; at: number }>(
       'select delta, reason, created_at as at from coin_ledger where user_id = ? order by id desc limit 20',
       me.id,
     );
-    return { coins: u.coins, rating: u.rating, races: u.races, ledger };
+    return { coins: u.coins, rating: u.rating, races: u.races, licence: u.licence, sr: u.sr, srLast: u.sr_last, ledger };
   }
 
   /** A promotional code: once per account, while it lasts. */
@@ -602,7 +618,7 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     const ids = friendsOnly && me ? [me.id, ...this.friendIdsOf(token).friends] : null;
     const where = ids ? `where id in (${ids.map(() => '?').join(',')})` : 'where races > 0';
     const rows = this.rows(
-      `select nick, country, abbr, num, rating, races from users ${where} order by rating desc, races desc limit 100`,
+      `select nick, country, abbr, num, rating, races, licence, sr from users ${where} order by rating desc, races desc limit 100`,
       ...((ids ?? []) as SqlStorageValue[]),
     );
     let mine = null;
@@ -677,6 +693,15 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       this.sql.exec('update users set invite_paid = 1 where id = ?', userId);
       this.addCoins(u.invited_by, COINS.inviter, 'a friend you invited raced');
     }
+  }
+
+  /** A session's corners and incident points (judged by the game server): the licence and Safety Rating. */
+  private rateSafety(userId: string, corners: number, incidents: number): void {
+    const u = this.rows<{ licence: string; sr: number }>('select licence, sr from users where id = ?', userId)[0];
+    if (!u) return;
+    const next = licenceAfter(u.licence, u.sr, corners, incidents);
+    const change = next.licence === u.licence ? next.sr - u.sr : null;
+    this.sql.exec('update users set licence = ?, sr = ?, sr_last = ? where id = ?', next.licence, next.sr, change, userId);
   }
 
   /** Friends and requests (presence filled in by the Worker, from the DirectoryDO). */

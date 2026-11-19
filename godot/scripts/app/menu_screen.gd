@@ -175,7 +175,10 @@ static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Call
 	prof.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.12), Color(1, 1, 1, 0.5), 1, 4))
 	prof.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.22), Color.WHITE, 1, 4))
 	var pr := UIW.hbox(8)
-	var badge := UIW.tag("%s %.2f" % [lic, career.sr], Color(CareerData.LICENCE_COLOUR[lic]))
+	# signed in: the online licence (the server's); else the career's
+	var on := StoreScreen.online_licence()
+	var badge := UIW.tag("%s %.2f" % [on.licence, on.sr], Color(CareerData.LICENCE_COLOUR[on.licence])) if not on.is_empty() else UIW.tag("%s %.2f" % [lic, career.sr], Color(CareerData.LICENCE_COLOUR[lic]))
+	badge.tooltip_text = I18n.t("Online licence") if not on.is_empty() else I18n.t("Career licence")
 	pr.add_child(badge)
 	var rcol := UIW.vbox(-4)
 	if nick_label.get_parent() != null:

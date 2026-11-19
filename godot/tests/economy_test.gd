@@ -1,7 +1,7 @@
 extends Node
 ## Coins, codes, invites and the ranking from the game against a server (APEX_SERVER=http://127.0.0.1:8799 with
 ## `wrangler dev` in apps/server; never the live one): a driver's invite code signs a second one up with coins, a code
-## adds its coins once, the store shows the server's balance, the ranking answers. The signed-in account from before
+## adds its coins once, the store shows the server's balance, the ranking answers, the online licence starts at R 2.50. The signed-in account from before
 ## the test is put back.
 ##   APEX_SERVER=http://127.0.0.1:8799 tools/godot/gd.sh tests/economy_test.gd
 
@@ -42,6 +42,18 @@ func _run() -> void:
 	_ok(rk.ok and rk.data.me != null and int(rk.data.me.rating) == 1500, "the ranking answers with my place (%s)" % str(rk.data.get("me")))
 	var rf: Dictionary = await Account.ranking("friends")
 	_ok(rf.ok, "the friends ranking answers")
+	# the online licence: a new driver is a Rookie at 2.50, the app reads it, the career shows it
+	var on := StoreScreen.online_licence()
+	_ok(on.get("licence") == "R" and is_equal_approx(float(on.get("sr", 0)), 2.5) and on.get("srLast") == null, "a new driver's online licence: R 2.50 (%s)" % str(on))
+	var app = load("res://scripts/app/app.gd").new()
+	add_child(app)
+	await get_tree().process_frame
+	CareerScreen._tab = "profile"
+	var page: Control = CareerScreen.build(app)
+	var texts := page.find_children("*", "Label", true, false).map(func(l): return (l as Label).text)
+	_ok(texts.has(I18n.t("Online licence").to_upper()) or texts.has(I18n.t("Online licence")), "the career shows the online licence")
+	page.free()
+	app.queue_free()
 	# the account from before the test back (none: signed out)
 	Account._save(before)
 	StoreScreen._live = {}

@@ -55,7 +55,7 @@ static var _tab := "coins"
 static var preview_coins := 1250
 static var _owned := {}
 static var _redeemed := {}
-## Signed in: the server's wallet ({coins, rating, races, ledger}) and invite ({code, invited, racing}); coins from
+## Signed in: the server's wallet ({coins, rating, races, licence, sr, srLast, ledger}) and invite ({code, invited, racing}); coins from
 ## online races, codes and invites are real (the server's economy.ts). Buying and spending stay a preview.
 static var _live := {}
 static var _live_invite := {}
@@ -63,6 +63,12 @@ static var _fetched_at := -1000000
 
 static func signed_in() -> bool:
 	return Account.account() != null
+
+## The online licence ({licence, sr, srLast}) from the last wallet fetched; empty when not signed in or not fetched.
+static func online_licence() -> Dictionary:
+	if not signed_in() or not _live.has("licence"):
+		return {}
+	return {"licence": str(_live.licence) if CareerData.LICENCES.has(str(_live.licence)) else "R", "sr": float(_live.get("sr", CareerData.SR_START)), "srLast": _live.get("srLast")}
 
 ## The balance shown: the server's when signed in, the preview's otherwise.
 static func coins() -> int:

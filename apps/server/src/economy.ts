@@ -73,3 +73,39 @@ export function normaliseCode(v: unknown): string {
 
 /** The start of the UTC day of a time (first race of the day). */
 export const dayOf = (t: number) => Math.floor(t / 86_400_000);
+
+/**
+ * The online licence and Safety Rating (2026-11-19): the offline career's rules (godot/scripts/game/career.gd, after
+ * iRacing), judged by the game server. Incident points: off the track 1, contact 4, a reset 4 (the server sees no wall
+ * hits: those are in the car's physics, on the driver's own machine). Race and qualifying sessions count.
+ */
+export const LICENCES = ['R', 'D', 'C', 'B', 'A', 'P'] as const;
+export type Licence = (typeof LICENCES)[number];
+export const SR_START = 2.5;
+export const INCIDENT_POINTS = { offTrack: 1, contact: 4, reset: 4 } as const;
+/** Contact between two cars counts once in this long (a scrape is one incident, not one a packet). */
+export const CONTACT_WINDOW_MS = 2000;
+/** Contact counts only when the server has the two cars this close (a client cannot hand others incidents from afar). */
+export const CONTACT_NEAR_M = 10;
+
+/** A session's Safety Rating change: ~100 corners an incident point is neutral; clean corners raise it slowly. */
+export function srDelta(corners: number, incidents: number): number {
+  if (corners <= 0) return 0;
+  const cpi = corners / Math.max(0.5, incidents);
+  const target = Math.min(0.12, Math.max(-0.3, (Math.log(cpi / 100) / Math.log(2)) * 0.06));
+  return target * Math.min(1, corners / 120);
+}
+
+/** The licence and Safety Rating after a session: promoted at 3.00 from Rookie and 4.00 above (it costs 1.00), down a class below 1.00. */
+export function licenceAfter(licence: string, sr: number, corners: number, incidents: number): { licence: Licence; sr: number } {
+  let i = Math.max(0, LICENCES.indexOf(licence as Licence));
+  let s = Math.max(0, Math.min(4.99, sr + srDelta(corners, incidents)));
+  if (i < LICENCES.length - 1 && s >= (i === 0 ? 3 : 4)) {
+    i++;
+    s -= 1;
+  } else if (i > 0 && s < 1) {
+    i--;
+    s = SR_START;
+  }
+  return { licence: LICENCES[i], sr: Math.round(s * 100) / 100 };
+}

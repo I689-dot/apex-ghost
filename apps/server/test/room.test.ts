@@ -589,6 +589,45 @@ describe('race rules', () => {
   });
 });
 
+describe('online Safety Rating', () => {
+  it('counts a contact only when the server has the two cars together, once in its window', () => {
+    const { room, join, send, advance } = makeRoom();
+    const a = join('Ana');
+    const b = join('Ben');
+    send(a.conn, { t: 'setRules', rules: { contact: true } });
+    for (const [p, car] of [
+      [a, 'car_a'],
+      [b, 'car_b'],
+    ] as const) {
+      send(p.conn, { t: 'selectCar', carId: car });
+      send(p.conn, { t: 'ready', ready: true });
+    }
+    send(a.conn, { t: 'start' });
+    send(a.conn, { t: 'loaded', raceId: room.raceId });
+    send(b.conn, { t: 'loaded', raceId: room.raceId });
+    advance((room.startAt as number) - 1_000_000 + 1000);
+    room.tick();
+    const tr = room.tracker!;
+    const incidents = (room as unknown as { incidents: Map<string, number> }).incidents;
+    const hit = { ix: 800, iy: 0, iz: -300, ty: 120 };
+    const t = room.startAt as number;
+    // 60 m apart: a reported bump is not believed
+    tr.ingest(a.id, t + 100, 0, 0, 0, false);
+    tr.ingest(b.id, t + 100, 60, 0, 0, false);
+    send(b.conn, { t: 'bump', to: a.id, ...hit });
+    expect(incidents.get(a.id) ?? 0).toBe(0);
+    // side by side: 4 points each, and a scrape is one incident
+    tr.ingest(b.id, t + 200, 3, 0, 0, false);
+    send(b.conn, { t: 'bump', to: a.id, ...hit });
+    send(b.conn, { t: 'bump', to: a.id, ...hit });
+    expect(incidents.get(a.id)).toBe(4);
+    expect(incidents.get(b.id)).toBe(4);
+    advance(2500);
+    send(a.conn, { t: 'bump', to: b.id, ...hit });
+    expect(incidents.get(b.id)).toBe(8);
+  });
+});
+
 describe('public rooms and spectators', () => {
   it('only public rooms are listed; spectators watch without taking a car or a slot', () => {
     const { room, join, send, reports } = makeRoom();

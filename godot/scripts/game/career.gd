@@ -18,6 +18,8 @@ const RANKS := [
 ]
 ## The Driver Rating (iRacing's iRating): an Elo against the field; every new driver starts here.
 const RATING_START := 1350
+## The Safety Rating a licence starts at (and comes back to after a demotion).
+const SR_START := 2.5
 ## Achievements: [id, name, what it takes, XP]. Checked after every session (_achieved).
 const ACHIEVEMENTS := [
 	["first_race", "Lights out", "Finish your first race", 100],

@@ -1618,3 +1618,24 @@ assumes the old peak; retune AI_GRIP if needed).
   134, Zandvoort 133, Silverstone 130.
 - Silverstone: the light concrete row of the road atlas (the run-off's pale strips) is darkened by 0.55 with its grain
   kept (debrand-maps "mul"). The colour fit had lifted it to near white.
+
+## Godot + server: the online licence and Safety Rating (2026-11-19)
+
+- The backlog's licences, online: the offline career's licence (Rookie, D, C, B, A, Pro) and Safety Rating (start 2.50,
+  ~100 corners an incident point is neutral, promoted at 3.00 from Rookie and 4.00 above, a promotion costs 1.00,
+  below 1.00 a class down) now also exist per account, moved by online race and qualifying sessions
+  (apps/server/src/economy.ts licenceAfter).
+- The game server judges the incidents, not the driver's game:
+  - off the track 1 point: one per track-limits excursion or shortcut the lap tracker sees, none when a hit forced
+    the car off;
+  - a reset 4;
+  - contact 4 for each car, only while the contact rule is on, only when the server has the two cars within 10 m (a
+    client cannot hand anyone incidents from afar), at most once in 2 s (a scrape is one incident).
+  - Wall hits are in the car's physics on the driver's own machine, so the server cannot see them and they do not
+    count online.
+- The corners are the laps times the circuit's turns (else one every 400 m).
+- Shown: the menu's driver chip (the online licence when signed in), Career › Profile (an Online licence row: licence,
+  Safety Rating, the last session's change) and the Ranking (a licence column).
+- The wallet API returns licence, sr and srLast. Tests: apps/server economy and room tests (the rules; a contact
+  believed only side by side, once in its window), godot/tests/economy_test.gd against a local server.
+- Not deployed until the user says so.

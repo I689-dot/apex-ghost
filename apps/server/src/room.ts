@@ -90,6 +90,9 @@ export type RecordEvent =
       entrants: number;
       bestLapMs: number | null;
       totalMs: number | null;
+      /** The session's incident points as the server saw them (economy.ts INCIDENT_POINTS) and the corners driven. */
+      incidents: number;
+      corners: number;
     };
 
 export interface PersistedPlayer {
@@ -174,6 +177,8 @@ const BOT_DRIVERS: [string, string][] = [
   ['Kenta Morishita', 'JP'],
 ];
 
+import { CONTACT_NEAR_M, CONTACT_WINDOW_MS, INCIDENT_POINTS } from './economy';
+
 export class RoomCore {
   code = '';
   created = false;
@@ -185,6 +190,9 @@ export class RoomCore {
   readonly carLocks = new Map<string, string>();
   private readonly connPlayer = new Map<string, string>();
   race: RaceSetup | null = null;
+  /** This session's incident points per driver (the online Safety Rating), and when each last had a contact counted. */
+  private incidents = new Map<string, number>();
+  private contactAt = new Map<string, number>();
   /** Briefing phase end (server time). */
   briefingUntil = 0;
   tracker: RaceTracker | null = null;
@@ -652,6 +660,7 @@ export class RoomCore {
           p.bumps = 0;
         }
         if ((p.bumps = (p.bumps ?? 0) + 1) > 30) return;
+        this.countContact(from.id, to.id, now);
         const dest = to.bot ? this.players.get(this.hostId ?? '') : to;
         if (!dest || dest.id === p.id) return;
         return this.send(dest, { t: 'bump', from: from.id, to: to.id, ix: msg.ix, iy: msg.iy, iz: msg.iz, ty: msg.ty });
@@ -664,6 +673,22 @@ export class RoomCore {
       default:
         return;
     }
+  }
+
+  private addIncident(id: string, points: number): void {
+    this.incidents.set(id, (this.incidents.get(id) ?? 0) + points);
+  }
+
+  /** A contact the clients reported, if the server has the two cars together: 4 points each, once in CONTACT_WINDOW_MS. */
+  private countContact(a: string, b: string, now: number): void {
+    const pa = this.tracker?.players.get(a);
+    const pb = this.tracker?.players.get(b);
+    if (!pa?.hasPos || !pb?.hasPos || Math.hypot(pa.lx - pb.lx, pa.lz - pb.lz) > CONTACT_NEAR_M) return;
+    for (const id of [a, b])
+      if (now - (this.contactAt.get(id) ?? -1e12) >= CONTACT_WINDOW_MS) {
+        this.contactAt.set(id, now);
+        this.addIncident(id, INCIDENT_POINTS.contact);
+      }
   }
 
   private newSeed(): number {
@@ -851,6 +876,8 @@ export class RoomCore {
         : { sessionMs: this.race.sessionMs },
     );
     for (const id of this.race.grid) this.tracker.addPlayer(id);
+    this.incidents.clear();
+    this.contactAt.clear();
     // race control: flags in qualifying, the full procedures (FCY, safety car, penalties) in the race
     this.rc = this.race.rules.raceControl ? new RaceControl(this.tracker, true) : null;
     this.rcSent = -1;
@@ -924,6 +951,8 @@ export class RoomCore {
       // race control's events can be about any car, not just the one whose packet was processed
       const p = this.players.get(e.type === 'flag' ? sender.id : e.playerId) ?? sender;
       if (e.type === 'lap' || e.type === 'penalty') this.lastStandingsAt = 0; // the timing screen updates at once
+      // the Safety Rating's off-track points (one an excursion or deleted lap; forced off by a hit: the contact counts)
+      if (e.type === 'penalty' && (e.reason === 'track-limits' || e.reason === 'shortcut') && !e.contact) this.addIncident(e.playerId, INCIDENT_POINTS.offTrack);
       // a signed-in driver's valid timed lap: their records (practice and qualifying laps too, the race's as well)
       if (e.type === 'lap' && e.valid && !e.outLap && p.account && p.carId && this.race && this.env.record) {
         const wet = weatherAt(this.race.weather, Math.max(0, (now - (this.startAt ?? now)) / 1000)).wetness > 0.3;
@@ -1015,6 +1044,9 @@ export class RoomCore {
       };
     });
     // signed-in drivers' results (a driver who set no time in a timed session has no result)
+    const tr = this.tracker.track;
+    // (the full track data has its turn count; else a corner every 400 m)
+    const turns = (tr as { turns?: number | null }).turns ?? Math.max(4, Math.round(tr.length / 400));
     if (this.env.record)
       for (const s of st) {
         const pl = this.players.get(s.id);
@@ -1029,6 +1061,8 @@ export class RoomCore {
           entrants: st.length,
           bestLapMs: s.bestLapMs,
           totalMs: s.finishedMs,
+          incidents: (this.incidents.get(s.id) ?? 0) + INCIDENT_POINTS.reset * (this.tracker.players.get(s.id)?.resets ?? 0),
+          corners: s.laps * turns,
         });
       }
     // after qualifying, the race: grid in qualifying order (drivers without a time at the back)
