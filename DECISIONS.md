@@ -1646,3 +1646,19 @@ assumes the old peak; retune AI_GRIP if needed).
   The server's tracks test lists the app-only layouts and times a lap on each.
 - Career: "Flat through Maggotts" (win at Silverstone); "Globetrotter" now asks for Silverstone too (once earned it
   stays).
+
+## Godot: the bots learn Silverstone and Zandvoort on the new lines (2026-11-19)
+
+- Found in a full Silverstone weekend (tests/race_test.gd, 12 cars, every one classified, 41 fps on High): the bots
+  collected 5-55 s of track-limits penalties. tests/ailap.gd now counts a bot's excursions as a race judges them
+  (TrackLimits; OFFLIST=1 where). At the race skills (0.88-0.97):
+  - Silverstone: off 7 times a race at 0.9, at Becketts-Chapel, with 2 resets;
+  - Zandvoort: off 6 times, at Scheivlak;
+  - Nürburgring and Spa: none at 0.9 (some at 1.0).
+  The line itself keeps 0.6 m inside the white lines; a wider margin stopped the excursions but cost 4 s a lap (0.9 m).
+- tests/ai_learn.gd (real time, 6 laps) taught both circuits on the optimised lines. The learned grip (data/ai_learned)
+  takes the speed off only where the car slid or went off:
+  - Silverstone: 0.9 2:14.4 / 7 off / 2 resets -> 2:09.4 / 0 off; 1.0 2:10.5 / 2 off -> 2:10.4 / 0 off.
+  - Zandvoort: 0.9 1:46.8 / 6 off -> 1:45.6 / 0 off; 0.95 1:46.6 / 6 -> 1:46.1 / 0; 1.0 1:46.9 / 3 -> 1:47.1 / 0.
+- This morning's judgement (keep a learned file only if it is faster) is corrected: a learned file is judged on the lap
+  and the excursions together, since in a race each excursion past the warnings costs 5 s.
