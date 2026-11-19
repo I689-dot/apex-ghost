@@ -3,7 +3,9 @@
  * Silverstone's track file for the Godot app (godot/data/tracks/silverstone.json) and its entry in godot/data/tracks.json:
  * the track analysis's track_base.json (centreline, widths, gates, sectors, grid, pit lane; the analysis run on the
  * prepared model, prep.py), the track limits from the edge lines (track_limits.mjs on the render's lines_ss), the
- * render chunks (spa_godot/build_render.py's chunks.json) and the collision (spa_godot/collision.mjs --config).
+ * render chunks (spa_godot/build_render.py's chunks.json) and the collision (spa_godot/collision.mjs --config); and the
+ * game server's entry for it (packages/shared/src/generated/tracks-race.json: the gates, sectors and pit distances that
+ * time online laps; the web game does not list Silverstone, so optimize.mjs never writes it).
  *
  *   node tools/asset-pipeline/silverstone/track.mjs <analysis out dir>
  */
@@ -24,6 +26,8 @@ const ver = (f) => `?v=${Math.round(statSync(path.join(godot, f)).mtimeMs).toStr
 
 const doc = await new NodeIO().registerExtensions(ALL_EXTENSIONS).read(path.join(godot, dir, 'map_track.glb'));
 const lim = trackLimitsFromLines(doc, base);
+// the 2024 GP layout's 18 corners (the Safety Rating's corners a lap)
+base.turns = 18;
 base.limitL = lim.limitL;
 base.limitR = lim.limitR;
 console.log(`[ss track] track limits from the edge lines: ${Math.round((lim.painted / (2 * lim.limitL.length)) * 100)} % painted`);
@@ -51,3 +55,23 @@ const entry = { id: 'silverstone', name: 'Silverstone Circuit', length: Math.rou
 idx.tracks = idx.tracks.filter((t) => t.id !== 'silverstone').concat([entry]);
 writeFileSync(idxFile, JSON.stringify(idx));
 console.log('[ss track] godot/data/tracks.json: Silverstone added');
+
+const racesFile = path.join(root, 'packages/shared/src/generated/tracks-race.json');
+const races = JSON.parse(readFileSync(racesFile, 'utf8'));
+races.silverstone = {
+  id: base.id,
+  name: base.name,
+  length: base.length,
+  centerline: base.centerline,
+  cumS: base.cumS,
+  gates: base.gates,
+  sectorGates: base.sectorGates,
+  firstGate: base.firstGate,
+  minLapMs: base.minLapMs,
+  pitExitS: base.pitLane ? base.pitLane.exitS : null,
+  pitEntryS: base.pitLane ? base.pitLane.entryS : null,
+  pitLaneM: base.pitLane ? Math.round(base.pitLane.length * 10) / 10 : null,
+  turns: base.turns,
+};
+writeFileSync(racesFile, JSON.stringify(races));
+console.log('[ss track] the game server\'s entry: packages/shared/src/generated/tracks-race.json');

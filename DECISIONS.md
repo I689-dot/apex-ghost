@@ -1639,3 +1639,10 @@ assumes the old peak; retune AI_GRIP if needed).
 - The wallet API returns licence, sr and srLast. Tests: apps/server economy and room tests (the rules; a contact
   believed only side by side, once in its window), godot/tests/economy_test.gd against a local server.
 - Not deployed until the user says so.
+- Silverstone online (found while adding the licences): the room server times online laps on its own copy of each
+  layout (packages/shared/src/generated/tracks-race.json, written by the web game's optimize.mjs). Silverstone, the
+  app's only, was missing, so an online session there was timed on the default circuit's gates.
+  tools/asset-pipeline/silverstone/track.mjs now writes its entry too (the gates, sectors and pit distances, 18 turns).
+  The server's tracks test lists the app-only layouts and times a lap on each.
+- Career: "Flat through Maggotts" (win at Silverstone); "Globetrotter" now asks for Silverstone too (once earned it
+  stays).

@@ -4,6 +4,8 @@ import { RaceTracker, type TrackRaceData } from '@apex/shared';
 import tracksRace from '@apex/shared/generated/tracks-race.json';
 
 const TRACKS = tracksRace as unknown as Record<string, TrackRaceData>;
+/** Layouts only the Godot app has (their entries from tools/asset-pipeline/<circuit>/track.mjs). */
+const GODOT_ONLY = ['silverstone'];
 const index = JSON.parse(readFileSync(new URL('../../client/public/assets/tracks.json', import.meta.url), 'utf8')).tracks as { id: string }[];
 
 /** Position on the centreline at lap distance s (wraps). */
@@ -21,8 +23,8 @@ function at(track: TrackRaceData, s: number): [number, number, number] {
 }
 
 describe('track validation data', () => {
-  it('lists every layout of the index, Zandvoort included', () => {
-    expect(Object.keys(TRACKS).sort()).toEqual(index.map((t) => t.id).sort());
+  it('lists every layout of the index, Zandvoort included, and the Godot app\'s own (Silverstone)', () => {
+    expect(Object.keys(TRACKS).sort()).toEqual([...index.map((t) => t.id), ...GODOT_ONLY].sort());
     expect(TRACKS.zandvoort?.name).toBe('Circuit Zandvoort');
   });
 
