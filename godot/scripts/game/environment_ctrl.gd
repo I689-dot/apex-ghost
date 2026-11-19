@@ -273,7 +273,9 @@ func env_intensity() -> float:
 ## The eye's adaptation (Display › Eye adaptation): the exposure follows what the camera sees, slowly, as an eye or a TV
 ## camera does (out of the forest into the sun, into the dark under the trees, the pit building's shade, the night).
 ## Kept within a narrow range round the exposure the game sets (time of day, the circuit's look), so the picture is
-## never pumped: from 0.6x in bright sun to 2.2x in the dark.
+## never pumped: from 0.6x in bright sun to 1.4x in the dark (2.2x before 2026-11-19: in Zandvoort's open views, dark
+## lawn and dunes, it lifted the road from 115 to 200 / 255 on some stretches, a washed-out grey; the night has its own
+## exposure, tonemap_exposure).
 var camera_attrs := CameraAttributesPractical.new()
 
 func _apply_eye(q: Dictionary) -> void:
@@ -281,8 +283,8 @@ func _apply_eye(q: Dictionary) -> void:
 	camera_attrs.auto_exposure_enabled = on
 	camera_attrs.auto_exposure_speed = 0.55
 	camera_attrs.auto_exposure_scale = 0.4
-	camera_attrs.auto_exposure_min_sensitivity = 60.0
-	camera_attrs.auto_exposure_max_sensitivity = 220.0
+	camera_attrs.auto_exposure_min_sensitivity = 120.0
+	camera_attrs.auto_exposure_max_sensitivity = 200.0
 	world_env.camera_attributes = camera_attrs
 
 func _apply_post(q: Dictionary) -> void:

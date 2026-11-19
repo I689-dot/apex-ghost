@@ -18,7 +18,8 @@ Writes far_terrain.glb (meshes "far_hi" and "far_lo": radial grids about the cir
 and 150 m at 9 km on hi, 3x coarser on lo; triangles under the model's terrain dropped, the ring's inner edge on the
 model's own heights and the real heights blended in over 500 m, so no step where they meet; UV = far_cover.png) and
 far_cover.png (land cover around the circuit, 20 km square, ~10 m a texel: R tree cover, G grass and shrub, B crops,
-A built-up, bare and water, as fractions; the shader colours them)."""
+A built-up, bare and water, as fractions; the shader colours them) and far_cover2.png (the same texels: R water, G bare
+ground and sand, the parts of A that are not built-up: the North Sea and the dunes at Zandvoort)."""
 import json, os, struct, sys
 import numpy as np
 from PIL import Image
@@ -319,6 +320,8 @@ def main():
     cov = Raster([t for t in cov_tiles if os.path.exists(t[0])], box, nearest=True)
     px = 2 * COVER_HALF / COVER_PX
     acc = np.zeros((COVER_PX, COVER_PX, 4), np.float32)
+    # the part of A that is water and bare ground (the sea and the dunes by Zandvoort): far_cover2.png
+    acc2 = np.zeros((COVER_PX, COVER_PX, 3), np.float32)
     for oy in (0.25, 0.75):
         for ox in (0.25, 0.75):
             jj, ii = np.meshgrid(np.arange(COVER_PX), np.arange(COVER_PX), indexing='ij')
@@ -330,10 +333,15 @@ def main():
             acc[..., 1] += (k == 20) | (k == 30) | (k == 90) | (k == 100)
             acc[..., 2] += k == 40
             acc[..., 3] += (k == 50) | (k == 60) | (k == 80) | np.isnan(k)
+            acc2[..., 0] += k == 80
+            acc2[..., 1] += k == 60
     acc /= 4
+    acc2 /= 4
+    Image.fromarray((acc2 * 255 + 0.5).astype(np.uint8), 'RGB').save(os.path.join(out, 'far_cover2.png'), optimize=True)
     Image.fromarray((acc * 255 + 0.5).astype(np.uint8), 'RGBA').save(os.path.join(out, 'far_cover.png'), optimize=True)
     share = acc.reshape(-1, 4).mean(0)
-    print(f'[far] cover: trees {share[0]:.0%}, grass {share[1]:.0%}, crops {share[2]:.0%}, built / bare / water {share[3]:.0%}')
+    print(f'[far] cover: trees {share[0]:.0%}, grass {share[1]:.0%}, crops {share[2]:.0%}, built / bare / water {share[3]:.0%}'
+          f' (water {acc2[..., 0].mean():.0%}, bare {acc2[..., 1].mean():.0%})')
     json.dump({'centre': [cx, cz], 'cover_half': COVER_HALF, 'e0': e0}, open(os.path.join(out, 'far_terrain.json'), 'w'))
 
 

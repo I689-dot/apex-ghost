@@ -19,20 +19,27 @@ const PROFILE := {
 		["(?i)^(asph|curb|lines|grass|gravel|sand|astroturf|pavement|top2|wall|grail|galvanized|conc_|travert_0|tiles|terrain_fill)", "opaque"],
 	],
 	# every racing layer and the pit lane: one scanned asphalt (Poly Haven asphalt_track, 4K) at Spa's albedo; the
-	# run-off asphalt a shade lighter (older, dustier)
-	"road_re": "^asph_(new|mid|old|003|ext_new)",
+	# run-off asphalt a shade lighter (older, dustier). The wide run-off aprons are "travert" (the source's name for its
+	# run-off asphalt, 3,700 triangles): left out before, they kept the model's pale flat texture beside a dark road
+	# (2026-11-19, the user: "important color issues on the road")
+	"road_re": "^(asph_(new|mid|old|003|ext_new)|travert_0)",
 	"target": [
-		["^asph_ext_new", [0.215, 0.212, 0.21]],
+		["^(asph_ext_new|travert_0)", [0.215, 0.212, 0.21]],
 		["^asph_(new|mid|old|003)", [0.19, 0.19, 0.195]],
 		["^pavement_brick", [0.15, 0.135, 0.11]],
 		# the painted concrete strips: Spa's green paint, the kerbs' red
 		["^conc_green", [0.006, 0.22, 0.075]],
 		["^conc_red", [0.5, 0.085, 0.07]],
+		# the artificial turf on the run-off (Mercedes-Arena, the chicane): a turf green, not Spa's green paint (repainted
+		# to that it showed as a pale mint beside the lawn)
+		["^astroturf", [0.03, 0.085, 0.035]],
 		# the terrain under the forest and on the banks: a dark meadow and forest floor, not black
 		["^(top2|terrain_fill)", [0.05, 0.068, 0.026]],
 		["^gravel_ext", [0.3, 0.24, 0.17]],
 		["^(sand_0|sandbrd)", [0.32, 0.25, 0.16]],
 	],
+	# the gravel traps: the scanned gravel in world space (SpaLook._scan_surface), at its target above
+	"scans": [["^(gravel_ext|sand_0)", "gravel_floor", 1.5]],
 	"tint": [
 		# the GP's lawns are open to the sky (Spa's mostly stand by the forest): Spa's tint came out pale yellow-green
 		# (183, 191, 130 on screen against Spa's 114, 127, 85); this one 129, 145, 61, a mown lawn in sun
@@ -41,7 +48,7 @@ const PROFILE := {
 		["^(trees|pines|tree[0-9])", [0.57, 0.54, 0.38]],
 	],
 	"lawn_re": "^(grass_0|grassbrd_gp|grass_fill)",
-	"paint_re": "^astroturf",
+	"paint_re": "^$",
 	"paint_blue": false,
 	# painted run-off and strips keep their own texture and grow no 3D grass
 	"own_re": "^(astroturf|conc_green|conc_red|travert_grass)",

@@ -10,6 +10,7 @@ game: some licences below (CC-BY-NC, Fab Standard) allow that use only.
 |---|---|---|---|---|
 | Circuit model "circuit de spa francorchamps 2022 layout" | supplied by the user (`RESOURCES/CIRCUIT-MODELS`) | | user's own | the circuit (`tools/asset-pipeline/spa_godot`) |
 | asphalt_track (diffuse, normal, ARM, 4K) | [Poly Haven](https://polyhaven.com/a/asphalt_track) | Poly Haven | CC0 | the road surface (`SpaLook.ROAD_TEX`) |
+| gravel_floor (diffuse, normal, 2K / 4K) | [Poly Haven](https://polyhaven.com/a/gravel_floor) | Poly Haven | CC0 | the gravel traps (`SpaLook._scan_surface`) |
 | Realistic HD Norway spruce (13/43) | [Sketchfab](https://sketchfab.com/3d-models/realistic-hd-norway-spruce-1343-8bbf8b718c58458dbc8d78d6c6694be6) | PlantCatalog | CC-BY 4.0 | forest, spruce_0 (`build_trees.py`) |
 | Realistic HD Norway spruce (28/43) | [Sketchfab](https://sketchfab.com/3d-models/realistic-hd-norway-spruce-2843-03dfd6ca5d624753bbf2ef9f78371db3) | PlantCatalog | CC-BY 4.0 | forest, spruce_1 |
 | Realistic HD Norway spruce (10/43) | [Sketchfab](https://sketchfab.com/3d-models/realistic-hd-norway-spruce-1043-dcc2eae5908d44e39eecc1e90bc54f0c) | PlantCatalog | CC-BY 4.0 | forest, spruce_2 |

@@ -1563,3 +1563,38 @@ assumes the old peak; retune AI_GRIP if needed).
   scanned textures, trees and crowd come with Spa's pack; without that pack, the model's own surfaces are used.
 - Lobby: the GB flag, Silverstone, United Kingdom, 1948. Climate: 150 m. Menu photos shot with
   `TRACKS=silverstone tools/godot/menu-photos.sh`.
+
+## Godot: the road colours at Zandvoort and the Nürburgring, Zandvoort with Spa's look (2026-11-19)
+
+- The user reported important colour problems on the road at Zandvoort and the Nürburgring, and asked for an ultra
+  realistic Zandvoort.
+- Zandvoort before the fix:
+  - Its racing surface texture (asph_zv42, 128 x 64 px) averages 0.055 linear, and the other asphalt (asph_zv96: the
+    run-off, the pit apron and the racing line in places) 0.24. On screen that was a near-black road with blurred bands,
+    in a grey apron.
+  - It had no look of its own, so its sky and scene were overexposed.
+- ZandvoortLook.PROFILE gives it Spa's treatment:
+  - the road: both asphalts on the scanned asphalt at Spa's albedo (one value: asph_zv96 is road too), the rubber band
+    at half strength, the skid marks blended;
+  - the trackside: the kerb repaint, the lawn (grass_zv97), and grain on concrete and metal;
+  - the dunes (sand, marram grass, the aerial-photo scrub) keep their own textures and grow no mown 3D grass;
+  - a coastal haze;
+  - 1,850 scanned spectators on the single seats of the stands. Crowd.seats_on_stands has a single-seat mode for these:
+    profile seat_m, one person per seat pan.
+- The Nürburgring before the fix:
+  - its wide run-off aprons (travert, which the model textures as grass-paver blocks) kept their pale, flat texture
+    beside the dark road;
+  - its artificial turf was repainted to Spa's green paint and came out a pale mint.
+  - Both are fixed: the aprons are on the scanned asphalt at the run-off's shade, and the turf is a turf green.
+- The gravel traps of all four circuits are a scanned gravel (Poly Haven gravel_floor, CC0) in world space
+  (SpaLook._scan_surface, profile "scans"). Zandvoort's 128 px gravel was a blurred, tiled orange.
+- Far terrain for Zandvoort:
+  - Copernicus and WorldCover, with the geofit 2.5 m mean on OpenStreetMap's Zandvoort ways;
+  - the far shader now draws water and bare sand from a second cover texture (far_cover2.png, which build_far.py
+    writes). The North Sea is 47 % of the ring: a dark grey-green with swell and chop that reflects the sky.
+- Eye adaptation: its light measurement is clamped to sensitivity 120-200 (was 60-220).
+  - With the wider range, Zandvoort's open views (dark lawn, dunes, much road in frame) lifted the road from 115 to
+    200-230 on some stretches. Now the lap's road reads 120-169 (p10-p90), against 115 with adaptation off.
+  - Spa, the Nürburgring and Zandvoort without adaptation read 117 / 75 / 114 on the same test (the chase camera at
+    midday). The adaptation evens them out, and now pumps less.
+- Ultra at 1080p with 4 AI cars: Zandvoort 80.7 fps, the Nürburgring 77.5. New menu photos for both.

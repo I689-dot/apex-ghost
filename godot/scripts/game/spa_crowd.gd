@@ -14,11 +14,11 @@ const CELL := Vector2(1.15, 2.3)
 
 ## Another circuit's stands (stand_re: its seating materials, Crowd.STAND_MAT_RE for the Nürburgring GP), the same scanned
 ## people; the zones off the stands are Spa's only.
-static func build(root: Node3D, track: Dictionary, density: float, stand_re: String = STAND_MAT_RE) -> MultiMeshInstance3D:
+static func build(root: Node3D, track: Dictionary, density: float, stand_re: String = STAND_MAT_RE, seat_m: float = 0.0) -> MultiMeshInstance3D:
 	if density <= 0.0 or not ResourceLoader.exists(ATLAS):
 		return null
 	var r := Crowd.Rng.new(98765)
-	var spots := Crowd.seats_on_stands(root, track, density, stand_re, r)
+	var spots := Crowd.seats_on_stands(root, track, density, stand_re, r, seat_m)
 	if stand_re == STAND_MAT_RE and FileAccess.file_exists(ZONES):
 		var f := FileAccess.open(ZONES, FileAccess.READ)
 		var n := f.get_length() / 16

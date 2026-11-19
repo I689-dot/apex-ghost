@@ -649,7 +649,8 @@ func _attach_world_extras(q: Dictionary) -> void:
 	if track_data.get("id", "") == "spa":
 		crowd = SpaCrowd.build(track, track_data, float(q.crowd))
 	elif SpaLook.use(track_data):
-		crowd = SpaCrowd.build(track, track_data, float(q.crowd), SpaLook._p("stand_re", Crowd.STAND_MAT_RE))
+		crowd = SpaCrowd.build(track, track_data, float(q.crowd), SpaLook._p("stand_re", Crowd.STAND_MAT_RE), float(SpaLook._p("seat_m", 0.0)))
+		print("[crowd] ", crowd.multimesh.instance_count if crowd != null else 0, " spectators")
 	else:
 		crowd = Crowd.build(track, track_data, float(q.crowd))
 	if crowd != null:

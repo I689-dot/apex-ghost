@@ -10,7 +10,7 @@ extends RefCounted
 ## is a detail mask of Assetto Corsa's multi-layer shader, not transparency.
 
 ## The same treatment for another circuit (the user, 2026-11-18: the Nürburgring as Spa): a profile overrides the
-## tables below by key (NurburgringLook.PROFILE, SilverstoneLook.PROFILE); Spa's profile is empty, so Spa reads these constants as before.
+## tables below by key (NurburgringLook.PROFILE, SilverstoneLook.PROFILE, ZandvoortLook.PROFILE); Spa's profile is empty, so Spa reads these constants as before.
 ## use() picks the profile for a track (true: the circuit has a look of its own).
 static var profile: Dictionary = {}
 
@@ -25,6 +25,9 @@ static func use(track_data: Dictionary) -> bool:
 		return true
 	if map == "silverstone":
 		profile = SilverstoneLook.PROFILE
+		return true
+	if map == "zandvoort":
+		profile = ZandvoortLook.PROFILE
 		return true
 	profile = {}
 	return false
@@ -319,6 +322,37 @@ static func _road_surface(m: StandardMaterial3D) -> void:
 		m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
 		m.roughness = 1.0
 
+## Other scanned surfaces laid in world space as the road is (a profile's "scans": [material pattern, scan, metres a
+## repeat covers]): the gravel traps (Poly Haven "gravel_floor", CC0: godot/assets_credits.md) in place of the models'
+## 128 px gravel, which showed as a blurred, tiled orange. Same 2K / 4K choice as the road.
+const SCAN_MEAN := {"gravel_floor": Color(0.376, 0.2505, 0.1432)}
+
+static func _scan_file(scan: String, map: String) -> String:
+	for res in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
+		var p := "res://assets/textures/spa/%s_%s_%s.jpg" % [scan, map, res]
+		if ResourceLoader.exists(p):
+			return p
+	return ""
+
+static func _scan_surface(m: StandardMaterial3D, scan: String, tile: float) -> bool:
+	var tex := _scan_file(scan, "diff")
+	if tex == "":
+		return false
+	m.albedo_texture = load(tex)
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	m.uv1_scale = Vector3.ONE / tile
+	m.uv1_offset = Vector3.ZERO
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var nor := _scan_file(scan, "nor_gl")
+	if nor != "":
+		m.normal_enabled = true
+		m.normal_texture = load(nor)
+		m.normal_scale = 1.0
+	m.roughness = 1.0
+	m.metallic_specular = 0.3
+	return true
+
 ## Linear to sRGB encoding, also above 1 (a factor brightening a dark texture).
 static func _enc(x: float) -> float:
 	return x * 12.92 if x <= 0.0031308 else 1.055 * pow(x, 1.0 / 2.4) - 0.055
@@ -390,6 +424,9 @@ static func apply(track: TrackScene) -> void:
 	var paint_re := RegEx.create_from_string(_p("paint_re", PAINT_RE))
 	var kerb_re := RegEx.create_from_string(_p("kerb_re", KERB_RE))
 	var fence_re := RegEx.create_from_string(_p("fence_re", "^fence_spa$"))
+	var scan_res := []
+	for sc in _p("scans", []):
+		scan_res.append([RegEx.create_from_string(sc[0]), sc[1], float(sc[2])])
 	var seen := {}
 	var counts := {}
 	var off: Array = []
@@ -445,9 +482,16 @@ static func apply(track: TrackScene) -> void:
 				_catch_fence(m)
 			if kerb_re.search(m.resource_name) != null:
 				_kerb(m)
+			var scanned := ""
+			for sc in scan_res:
+				if (sc[0] as RegEx).search(m.resource_name) != null and _scan_surface(m, sc[1], sc[2]):
+					scanned = sc[1]
+					break
 			for t in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
 					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path.begins_with("res://assets/textures/spa/asphalt_track_diff") else texture_mean(m.albedo_texture)
+					if scanned != "":
+						mean = SCAN_MEAN[scanned]
 					var want: Color = t[1]
 					if OS.get_environment("SPA_DEBUG") != "":
 						print("[spa look] ", m.resource_name, " tex ", m.albedo_texture.resource_path if m.albedo_texture else "-", " ", m.albedo_texture.get_size() if m.albedo_texture else "", " mean ", mean, " albedo_color before ", m.albedo_color, " metal ", m.metallic, " rough ", m.roughness, " spec ", m.metallic_specular)

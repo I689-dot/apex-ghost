@@ -27,6 +27,11 @@ static func build(dir: String = "assets/maps/spa_g") -> SpaFar:
 	mat.shader = load("res://shaders/far_terrain.gdshader")
 	if ResourceLoader.exists(COVER):
 		mat.set_shader_parameter("cover", load(COVER))
+	# the water and bare ground in the cover (the sea and dunes at Zandvoort)
+	var COVER2 := "res://" + dir + "/far_cover2.png"
+	if ResourceLoader.exists(COVER2):
+		mat.set_shader_parameter("cover2", load(COVER2))
+		mat.set_shader_parameter("has_cover2", true)
 	for n in CarVisual._walk(scene):
 		if n is MeshInstance3D:
 			var mi := n as MeshInstance3D

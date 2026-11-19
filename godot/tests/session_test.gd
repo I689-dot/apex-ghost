@@ -16,6 +16,9 @@ func _run() -> void:
 	var seconds := float(args[1]) if args.size() > 1 else 8.0
 	if OS.get_environment("LINE") != "":
 		Settings.data.racingLine = OS.get_environment("LINE")
+	# DISPLAY_SET='{"eyeAdaptation": false}': display settings for the run
+	if OS.get_environment("DISPLAY_SET") != "":
+		Settings.data.display.merge(JSON.parse_string(OS.get_environment("DISPLAY_SET")), true)
 	if OS.get_environment("QUALITY") != "":
 		Settings.data.quality = OS.get_environment("QUALITY")
 		Settings.data.graphics = {}

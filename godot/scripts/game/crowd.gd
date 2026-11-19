@@ -67,8 +67,11 @@ static func build(root: Node3D, track: Dictionary, density: float) -> MultiMeshI
 	return _instances(seats, r)
 
 ## [position, yaw to the track] for each spectator on the sloped faces of the stand_re materials.
-static func seats_on_stands(root: Node3D, track: Dictionary, density: float, stand_re: String, r: Rng) -> Array:
+## seat_m > 0: the stand material is single seats (Zandvoort's: 0.045 m2 faces, none big enough for the stepped-face
+## rule below): one person on each seat pan (the flat faces), on a grid of seat_m, facing the track.
+static func seats_on_stands(root: Node3D, track: Dictionary, density: float, stand_re: String, r: Rng, seat_m: float = 0.0) -> Array:
 	var re := RegEx.create_from_string(stand_re)
+	var taken := {}
 	# the lap line every ~10 m: which way the track is from a seat
 	var cl: Array = track.centerline
 	var npts := cl.size() / 3
@@ -99,16 +102,24 @@ static func seats_on_stands(root: Node3D, track: Dictionary, density: float, sta
 				var c := xf * verts[ic]
 				var n := (b - a).cross(c - a)
 				var area := n.length() / 2.0
-				if area < 0.5:
+				if area < (0.005 if seat_m > 0.0 else 0.5):
 					continue
 				n = n.normalized()
 				if n.y < 0.0:
 					n = -n
-				# seating rises away from the track: a sloped face, up and towards the track
-				if n.y < 0.2 or n.y > 0.92:
-					continue
 				var mx := (a.x + b.x + c.x) / 3.0
 				var mz := (a.z + b.z + c.z) / 3.0
+				var cell := Vector3i.ZERO
+				if seat_m > 0.0:
+					# a seat pan, one person a grid cell
+					if n.y < 0.85:
+						continue
+					cell = Vector3i(floori(mx / seat_m), floori((a.y + b.y + c.y) / 3.0 / 0.4), floori(mz / seat_m))
+					if taken.has(cell):
+						continue
+				# seating rises away from the track: a sloped face, up and towards the track
+				elif n.y < 0.2 or n.y > 0.92:
+					continue
 				var best := INF
 				var tx := 0.0
 				var tz := 0.0
@@ -121,10 +132,15 @@ static func seats_on_stands(root: Node3D, track: Dictionary, density: float, sta
 				var dist := sqrt(best)
 				if dist > 220.0:
 					continue
+				var yaw := atan2(tx, tz)
+				if seat_m > 0.0:
+					taken[cell] = true
+					if r.next() < OCCUPANCY * density:
+						seats.append([(a + b + c) / 3.0 + Vector3(0, 0.02, 0), yaw + (r.next() - 0.5) * 0.3])
+					continue
 				var hl := maxf(1e-6, Vector2(n.x, n.z).length())
 				if (n.x * tx + n.z * tz) / (hl * (dist if dist > 0.0 else 1.0)) < 0.2:
 					continue
-				var yaw := atan2(tx, tz)
 				var people := int(floorf((area * OCCUPANCY * density) / (SEAT_M * SEAT_M) + r.next()))
 				for p in people:
 					var u := r.next()

@@ -37,6 +37,8 @@ const PROFILE := {
 		# the farmland round the circuit's own terrain: summer grass and crop, not the source's grey-olive
 		["^top2_ss", [0.06, 0.075, 0.03]],
 	],
+	# the gravel traps: the scanned gravel in world space (SpaLook._scan_surface), at its target above
+	"scans": [["^sand_ss$", "gravel_floor", 1.5]],
 	"tint": [
 		# the rubber: the groove at 60 % (it covered the racing line in one dark band), the braking marks in full
 		["^asph_ss_g1", [1.0, 1.0, 1.0, 0.6]],
