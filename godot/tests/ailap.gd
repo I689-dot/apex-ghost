@@ -1,6 +1,7 @@
 extends SceneTree
 ## Bot AI check (port of tools/sim/ailap.ts, trimmed): one lap of a real track from the grid with the real Vehicle
-## and AiDriver. godot --headless --path godot --fixed-fps 120 -s tests/ailap.gd -- <layoutIndex> <skill> [carId]
+## and AiDriver, and how often it leaves the track (TrackLimits as in a race; OFFLIST=1: where).
+## godot --headless --path godot --fixed-fps 120 -s tests/ailap.gd -- <layoutIndex> <skill> [carId]
 
 var HZ := int(OS.get_environment("HZ")) if OS.get_environment("HZ") != "" else 120
 var DT := 1.0 / HZ
@@ -57,6 +58,11 @@ func _run() -> void:
 	var resets := 0
 	var lap_ms := -1.0
 	var max_v := 0.0
+	# track limits judged as in a race (RaceSession: TrackLimits at the state rate): excursions and where
+	var limits := TrackLimits.new()
+	var hint := 0
+	var offs: Array = []
+	var was_off := false
 	var steps := int(maxf(120.0, track.length / 40.0) * 2.0 * HZ)
 	for i in steps:
 		var pr: RaceTracker.PlayerRaceState = tr.players["ai"]
@@ -78,6 +84,11 @@ func _run() -> void:
 		max_v = maxf(max_v, v.telemetry.speed)
 		if i % (HZ / 20) == 0:
 			var p2 := v.global_position
+			hint = TrackMath.nearest_centerline_index(track, p2.x, p2.y, p2.z, hint, 30)
+			var off := limits.update(1.0 / 20.0, TrackLimits.beyond_limits_now(v, track, hint, _lateral(track, hint, p2.x, p2.z)))
+			if off and not was_off:
+				offs.append(roundi(track.cumS[hint]))
+			was_off = off
 			var ev := tr.ingest("ai", t * 1000.0, p2.x, p2.y, p2.z, false)
 			for e in ev:
 				if e.type == "lap":
@@ -87,5 +98,15 @@ func _run() -> void:
 			break
 		if i % (HZ * 20) == 0:
 			print("    t=%3.0f s  lap distance %5.0f m  %3.0f km/h" % [t, tr.players["ai"].race_dist, v.telemetry.speed * 3.6])
-	print("skill %.2f: lap %s, resets %d, top %.0f km/h, finished=%s" % [skill, _fmt(lap_ms) if lap_ms > 0 else "—", resets, max_v * 3.6, str(tr.players["ai"].finished_ms != null)])
+	print("skill %.2f: lap %s, resets %d, top %.0f km/h, finished=%s, off the track %d times%s" % [skill, _fmt(lap_ms) if lap_ms > 0 else "—", resets, max_v * 3.6, str(tr.players["ai"].finished_ms != null), offs.size(),
+		(" (at lap metre %s)" % ", ".join(offs.map(func(o): return str(o)))) if OS.get_environment("OFFLIST") != "" else ""])
 	quit()
+
+## The car's offset from the centreline at point i (RaceSession.lateral_at: that script needs the app's autoloads).
+static func _lateral(t: Dictionary, i: int, x: float, z: float) -> float:
+	var cl: Array = t.centerline
+	var j := (i + 1) % (cl.size() / 3)
+	var tx: float = cl[j * 3] - cl[i * 3]
+	var tz: float = cl[j * 3 + 2] - cl[i * 3 + 2]
+	var l := maxf(1e-6, Vector2(tx, tz).length())
+	return ((x - cl[i * 3]) * tz - (z - cl[i * 3 + 2]) * tx) / l
