@@ -17,7 +17,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // per texture (by name): the size the rectangles are written for, and the patches:
-//   rect [x0, y0, x1, y1] px; bg: '#hex' or [x, y] (the colour of that pixel); label, fg, flip ('v'), rotate (deg)
+//   rect [x0, y0, x1, y1] px; bg: '#hex' or [x, y] (the colour of that pixel); label, fg, flip ('v'), rotate (deg);
+//   or mul: a factor that darkens the area and keeps its grain
 const cfg = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'debrand-maps.json'), 'utf8'));
 
 /** The names on the boards: 2 = GRIDCORSA (2026-11-18; CORSAGHOST before). */
@@ -35,6 +36,13 @@ async function patch(bytes, spec) {
     const [x0, y0, x1, y1] = [Math.round(p.rect[0] * sx), Math.round(p.rect[1] * sy), Math.round(p.rect[2] * sx), Math.round(p.rect[3] * sy)];
     const w = Math.max(1, x1 - x0);
     const h = Math.max(1, y1 - y0);
+    // mul: no paint, the area darkened by this factor, its grain kept (a near-white strip of an atlas that the game's
+    // colour fit lifts to white)
+    if (p.mul !== undefined) {
+      const g = Math.round(p.mul * 255);
+      layers.push({ input: await sharp({ create: { width: w, height: h, channels: 3, background: { r: g, g, b: g } } }).png().toBuffer(), left: x0, top: y0, blend: 'multiply' });
+      continue;
+    }
     let bg = p.bg;
     if (Array.isArray(bg)) {
       const o = (Math.min(info.height - 1, Math.round(bg[1] * sy)) * info.width + Math.min(info.width - 1, Math.round(bg[0] * sx))) * 4;

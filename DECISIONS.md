@@ -1598,3 +1598,23 @@ assumes the old peak; retune AI_GRIP if needed).
   - Spa, the Nürburgring and Zandvoort without adaptation read 117 / 75 / 114 on the same test (the chase camera at
     midday). The adaptation evens them out, and now pumps less.
 - Ultra at 1080p with 4 AI cars: Zandvoort 80.7 fps, the Nürburgring 77.5. New menu photos for both.
+
+## Godot: the Nordschleife with the GP's look, the rubber decal neutral, one exposure for every circuit (2026-11-19)
+
+- The 24h layout (map "nordschleife") had no look at all, the GP stretch included. NordschleifeLook.profile() is the
+  Nürburgring's profile with the Nordschleife model's few generated materials added:
+  - the asphalt on the scanned road, the lawn, the kerb repaint, metal grain on the barriers;
+  - Spa's forest limits;
+  - its far terrain about the whole lap (build_far.py FAR_MODEL_DIRS=godot/assets/track, so the GP's model is counted;
+    the model's terrain already covers 144 km2 and meets the real heights within 0.4 m).
+  - Ultra 1080p with no AI: 87-116 fps.
+- The generic rubber decal (RoadWear, drawn where a circuit has no rubber of its own: the Nürburgring GP, the
+  Nordschleife) halves whatever it covers on purpose, as every multiply pass does (mul_gain). Without its own look, a
+  circuit was tuned with that halving; the looked circuits' road colours are fitted without the decal. So the decal
+  halved the GP's whole road: 75 / 255 on screen against 123 without it. On a looked circuit it is now neutral except
+  for the rubber (unit_gain 2).
+- Eye adaptation scale 0.3 (0.4). On average it brightened every circuit's fitted exposure by about a third. The
+  road's median on the midday chase-camera lap is now Spa 141 (its value fitted to the video: 140), the Nürburgring
+  134, Zandvoort 133, Silverstone 130.
+- Silverstone: the light concrete row of the road atlas (the run-off's pale strips) is darkened by 0.55 with its grain
+  kept (debrand-maps "mul"). The colour fit had lifted it to near white.

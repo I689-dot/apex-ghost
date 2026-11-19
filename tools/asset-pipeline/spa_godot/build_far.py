@@ -245,7 +245,7 @@ def main():
     dem = Raster([t for t in dem_tiles if os.path.exists(t[0])], box)
     # the real heights in the game frame (vertical scale as the horizontal: the game frame is the model at 1.0103)
     la, lo = G.latlon(cl[:, 0], cl[:, 2])
-    e0 = float(np.median(dem.sample(la, lo) - G.s * cl[:, 1]))
+    e0 = float(np.nanmedian(dem.sample(la, lo) - G.s * cl[:, 1]))
     print(f'[far] centre ({cx:.0f}, {cz:.0f}), elevation of game y 0: {e0:.1f} m')
 
     # the model's ground (its terrain and the track model's grass, run-off and roads around the circuit): height grid,
@@ -255,8 +255,13 @@ def main():
     gx0, gz0 = cx - 6000, cz - 6000
     gn = int(12000 / cell) + 1
     Hm = np.full((gn, gn), np.nan)
-    for f in ('map_terrain.glb', 'map_track.glb'):
-        P, T = glb_read(os.path.join(out, f))
+    # (FAR_MODEL_DIRS: more model folders, ':'-separated: the 24h layout's GP model, godot/assets/track, beside the
+    # Nordschleife's)
+    dirs = [out] + [d for d in os.environ.get('FAR_MODEL_DIRS', '').split(':') if d]
+    for f in [os.path.join(d, n) for d in dirs for n in ('map_terrain.glb', 'map_track.glb')]:
+        if not os.path.exists(f):
+            continue
+        P, T = glb_read(f)
         h = rasterize(P, T, gx0, gz0, cell, gn)
         Hm = np.where(np.isnan(Hm), h, np.where(np.isnan(h), Hm, np.maximum(Hm, h)))
     # close pinholes between pieces (one cell)

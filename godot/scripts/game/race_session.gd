@@ -691,6 +691,7 @@ func _attach_line_extras(tuned: Dictionary) -> void:
 	# Spa's source model has its own rubber layers (SpaLook): the generic wear decal would darken the road twice
 	if not SpaLook.own_wear(track_data):
 		road_wear = RoadWear.new(track_data, tuned.specs, track.ground_query, air.airDensity)
+		road_wear.set_neutral(SpaLook.use(track_data))
 		add_child(road_wear)
 
 func _build_cinematic(entries: Dictionary) -> void:

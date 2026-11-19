@@ -7,6 +7,9 @@ global uniform float mul_gain;
 uniform float strength = 1.0;
 uniform float fade_dist = 260.0;
 uniform float wet = 0.0;
+// 2.0 on a circuit with its own look (SpaLook): its road's colour was fitted without this pass, and every multiply pass
+// halves what it covers (mul_gain on the PC, the Mobile renderer's buffer on phones), so only the rubber darkens
+uniform float unit_gain = 1.0;
 
 varying float v_dist;
 
@@ -51,6 +54,6 @@ void fragment() {
 	dark += in_patch * patch_tone;
 	float fade = 1.0 - smoothstep(fade_dist * 0.55, fade_dist, v_dist);
 	float k = clamp(dark * strength * fade * (1.0 - 0.35 * wet), -0.2, 0.6);
-	ALBEDO = vec3(1.0 - k) * mul_gain;
+	ALBEDO = vec3(1.0 - k) * mul_gain * unit_gain;
 	ALPHA = 1.0;
 }

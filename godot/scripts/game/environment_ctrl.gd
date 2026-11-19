@@ -275,14 +275,15 @@ func env_intensity() -> float:
 ## Kept within a narrow range round the exposure the game sets (time of day, the circuit's look), so the picture is
 ## never pumped: from 0.6x in bright sun to 1.4x in the dark (2.2x before 2026-11-19: in Zandvoort's open views, dark
 ## lawn and dunes, it lifted the road from 115 to 200 / 255 on some stretches, a washed-out grey; the night has its own
-## exposure, tonemap_exposure).
+## exposure, tonemap_exposure). Scale 0.3 (0.4 before): on average it brightened every circuit's fitted exposure by
+## about a third (the road's median at midday 145-170 / 255 against 114-123 without it).
 var camera_attrs := CameraAttributesPractical.new()
 
 func _apply_eye(q: Dictionary) -> void:
 	var on: bool = bool(Settings.data.display.get("eyeAdaptation", true)) and not OS.has_feature("mobile")
 	camera_attrs.auto_exposure_enabled = on
 	camera_attrs.auto_exposure_speed = 0.55
-	camera_attrs.auto_exposure_scale = 0.4
+	camera_attrs.auto_exposure_scale = 0.3
 	camera_attrs.auto_exposure_min_sensitivity = 120.0
 	camera_attrs.auto_exposure_max_sensitivity = 200.0
 	world_env.camera_attributes = camera_attrs

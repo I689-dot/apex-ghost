@@ -98,6 +98,11 @@ static func _smooth(a: PackedFloat32Array, rad: int, n: int) -> PackedFloat32Arr
 		o[i] = s / (2 * rad + 1)
 	return o
 
+## Only the rubber darkens (a circuit with its own look, SpaLook, whose road colour is fitted without this pass): before
+## 2026-11-19 the pass halved the Nürburgring GP's whole road (75 / 255 on screen against 123 without it).
+func set_neutral(on: bool) -> void:
+	_mat.set_shader_parameter("unit_gain", 2.0 if on else 1.0)
+
 ## Rain washes the contrast out (the whole road darkens instead).
 func set_wetness(w: float) -> void:
 	_mat.set_shader_parameter("wet", w)

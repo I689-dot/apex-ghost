@@ -1467,6 +1467,16 @@
       3662,
       400
      ]
+    },
+    {
+     "what": "the light concrete row (the run-off's pale strips: lifted to white by the colour fit)",
+     "rect": [
+      2775,
+      2345,
+      4096,
+      2515
+     ],
+     "mul": 0.55
     }
    ]
   }
