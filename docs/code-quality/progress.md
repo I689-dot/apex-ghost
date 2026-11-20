@@ -73,8 +73,12 @@ All outputs are in `docs/code-quality/baseline/`, one file per test.
 
   simtest, Porsche: 0-100 km/h in 4.14 s, 0-200 km/h in 11.56 s, top speed 274 km/h in 45 s, braking 200→0 in
   86.1 m and 3.29 s. Every car's numbers are in `simtest_*.txt`.
-- **Not run yet:** the rendered baseline. `session_test` fps and 1 % low, `menu_test` rendered and `features_test`
-  open a window, so they wait for the user's go-ahead.
+- **Rendered baseline** (2026-11-20, the LG monitor, RX 7600 XT, files `baseline/rendered_*.txt`):
+  - `session_test`, Spa, Ultra, 1600x900, 40 s, `SKIP_INTRO=1 AUTODRIVE=1`, `--disable-vsync`: run 1 was 91.4 fps
+    average with a 63.5 fps 1 % low; run 2 was 85.6 / 51.6.
+  - The same run varies by about 7 % on the average and 20 % on the 1 % low. A later run counts as worse only
+    outside that range: compare the best of two runs.
+  - `features_test` (640x360) and rendered `menu_test` (1600x900): 0 failures.
 - **Still to write:** the characterization tests for the areas phase 3 will touch that have no test yet, each
   committed on its own before its batch:
   - lobby and briefing flow;

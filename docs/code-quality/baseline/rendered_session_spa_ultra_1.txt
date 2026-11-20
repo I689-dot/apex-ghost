@@ -1,0 +1,71 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Vulkan 1.4.335 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7600 XT (RADV NAVI33)
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+load Starting physics
+load Building the world
+[spa look] materials: { "opaque": 35, "blend": 5, "scissor": 13 }, layers off: 3
+load Planting the forest
+load Building the circuit physics
+load Setting up sky and weather
+load Placing the cars on the grid
+load Bringing out the other drivers
+load Drawing the racing line
+load Preparing the TV intro
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready(). 
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_ui (res://scripts/game/cinematic.gd:75)
+         [1] _init (res://scripts/game/cinematic.gd:66)
+         [2] _build_cinematic (res://scripts/game/race_session.gd:726)
+         [3] load_session (res://scripts/game/race_session.gd:461)
+         [4] <anonymous lambda> (res://scripts/game/race_session.gd:343)
+load Compiling shaders
+loaded in 15.448 s
+stand-in wheel built: false
+countdown: 
+countdown: 
+countdown: 3
+countdown: 2
+countdown: 1
+countdown: GO
+countdown: 
+phase msgs: ["standings", "standings", "standings", "standings", "standings", "standings", "standings", "standings", "standings", "standings", "standings", "standings"]
+dash screens: 1
+shells: 1454 visible: 8 crowd/forest: true
+visible cells: 8 cell0 -660.509887695312 922.660339355469 cam (11.02401, -19.74167, -701.8806) car (16.26079, -22.14563, -696.2778) vis true n 20
+avg process ms: 12.6441010928962 physics ms/frame: 2.79841803278689 fps 85.0 draws 2917.0
+gpu ms main: 4.90288961194252
+gpu ms mirror: 1.21924098453235
+gpu ms sky_lut: 0.0
+avg fps 91.4, 1% low 63.5, worst frame 17.5 ms (1830 frames)
+  frame          slowest 1%:  15.74   all:  10.94
+  process        slowest 1%:  13.29   all:  12.64
+  physics        slowest 1%:   2.99   all:   2.80
+  render cpu     slowest 1%:   2.35   all:   1.54
+  gpu            slowest 1%:   5.95   all:   4.90
+  physics steps  slowest 1%:   1.83   all:   1.31
+  slowest frames at s: 34.2, 37.7, 36.9, 25.6, 34.2, 28.1, 36.8, 37.8, 34.5, 36.9, 34.5, 37.0, 36.8, 29.1, 36.9, 37.0, 37.0, 33.2
+3D rendered at 1600 x 900 (window 1600 x 900, 3D scale 1.000)
+visible pass: 1293 objects, 7.1 M primitives, 1289 draw calls
+shadow pass: 568 objects, 1.8 M primitives, 568 draw calls
+forest near trees: 395
+tris 12730912.0 draws 2917.0 quality ultra
+speed=62.8251457214355 pos=(16.26079, -22.14563, -696.2778)
+wetness=0.0 rain=0.0 puddles=38 level=0.0 sprays=0
+WARNING: 37 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+WARNING: 23 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+ERROR: 9 RID allocations of type 'N10RendererRD14TextureStorage7TextureE' were leaked at exit.
+ERROR: 1 RID allocations of type 'N17RendererSceneCull6CameraE' were leaked at exit.
+ERROR: 66 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.
+ERROR: 4 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+WARNING: 178 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 5 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit=0

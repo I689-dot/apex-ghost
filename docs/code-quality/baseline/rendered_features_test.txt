@@ -1,0 +1,70 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+Vulkan 1.4.335 - Forward+ - Using Device #0: AMD - AMD Radeon RX 7600 XT (RADV NAVI33)
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+WARNING: Adding 'chunk_scenery_m2_0' as child to 'ground_pieces' will make owner 'map_scenery' inconsistent. Consider unsetting the owner beforehand.
+     at: add_child (scene/main/node.cpp:1728)
+     GDScript backtrace (most recent call first):
+         [0] _pull_ground_pieces (res://scripts/game/track_scene.gd:125)
+         [1] load_scene (res://scripts/game/track_scene.gd:92)
+         [2] load_session (res://scripts/game/race_session.gd:345)
+         [3] <anonymous lambda> (res://scripts/game/race_session.gd:343)
+[nurburgring look] materials: { "scissor": 10, "opaque": 34 }, layers off: 0
+[crowd] 11916 spectators
+WARNING: Nodes with non-equal opposite anchors will have their size overridden after _ready(). 
+If you want to set size, change the anchors or consider using set_deferred().
+     at: _set_size (scene/gui/control.cpp:1519)
+     GDScript backtrace (most recent call first):
+         [0] _build_ui (res://scripts/game/cinematic.gd:75)
+         [1] _init (res://scripts/game/cinematic.gd:66)
+         [2] _build_cinematic (res://scripts/game/race_session.gd:726)
+         [3] load_session (res://scripts/game/race_session.gd:461)
+         [4] <anonymous lambda> (res://scripts/game/race_session.gd:343)
+ok   brake bias moves 0.5 % forward (0.600 -> 0.605)
+ok   brake bias stops at 66 % (0.660)
+ok   and at 54 % (0.540)
+ok   TC cycles and is kept in the settings
+ok   three presses are a full cycle
+ok   ABS toggles
+ok   the delta key stays on 'best' while there is no optimal lap yet
+ok   the chat panel exists in a local room
+ok   chat opens
+ok   chat closed
+ok   the chat line came back from the room
+ok   the /rc line too, marked for the host
+ok   both are in the panel (3 children: the input and two lines)
+replay samples: 260 cars: 3 duration 12.953 s
+ok   the replay recorded 20 Hz samples (260 in 10 s)
+ok   all three cars are recorded
+replay toggle true
+ok   the replay opens and hides the HUD
+ok   my car is drawn where the replay has it
+ok   slow motion advances (0 -> 3 ms)
+ok   pause holds the time
+ok   one frame back
+ok   a jump back stays inside the recording
+ok   next car: Lukas Brenner
+ok   camera 'TV cameras' is current
+ok   camera 'Front camera' is current
+ok   camera 'Chase camera' is current
+ok   rewinding is clamped to the start
+replay toggle false
+ok   the replay closes and the HUD returns
+ok   my car's visual is back where the live car has it
+ok   recording goes on after the replay
+failures: 0
+WARNING: 37 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+WARNING: 22 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:8900)
+ERROR: 22 RID allocations of type 'N10RendererRD14TextureStorage7TextureE' were leaked at exit.
+ERROR: 1 RID allocations of type 'N17RendererSceneCull6CameraE' were leaked at exit.
+ERROR: 64 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.
+ERROR: 4 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+WARNING: 212 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 5 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit=0
