@@ -391,6 +391,9 @@ func load_session(progress: Callable) -> void:
 	CarPaint.apply(my_visual, Settings.data.livery)
 	if bool(q.get("carProbe", false)) and not OS.has_feature("mobile"):
 		_add_car_probe(my_visual)
+	# every car's paint mirrors the circuit round it (Medium up on a PC): probes along the lap, captured once
+	if not OS.has_feature("mobile") and Settings.data.quality != "low":
+		_add_track_probes(not bool(q.get("carProbe", false)))
 	InputState.wheel.carLockDeg = float(SteeringLock.lock_deg(my_entry.id))
 	# a PC lights the road with real beams on every quality (two spot lights, shadows from High up); a phone keeps the
 	# projected light pool unless its preset has the spots
@@ -421,7 +424,8 @@ func load_session(progress: Callable) -> void:
 		if pl == null or pl.carId == null or not entries.has(pl.carId):
 			continue
 		var entry: Dictionary = entries[pl.carId]
-		var model := Assets.load_car_model(entry, 3, false, 1)
+		# (Graphics › Full-resolution cars: the full model, LOD0, at every distance)
+		var model := Assets.load_car_model(entry, 1, false, 0) if bool(Settings.data.get("carsFullDetail", false)) else Assets.load_car_model(entry, 3, false, 1)
 		var rem := Remote.new()
 		rem.id = r.id
 		rem.slot = race.slots[r.id]
@@ -1942,6 +1946,7 @@ func _input(e: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _process(dt: float) -> void:
+	_refresh_track_probes()
 	if not running or vehicle == null:
 		return
 	Prof.frame()
@@ -3481,6 +3486,66 @@ func dispose() -> void:
 	if hud != null:
 		hud.queue_free()
 	queue_free()
+
+## Reflection probes along the lap for every car's paint, glass and rims (2026-11-21, the user: the cars looked like
+## plastic, the same from every side): without them the other cars (and yours below High) reflected the sky alone, so
+## a panel looked the same wherever the car was. Every ~170 m (at most 40 a lap: the reflection atlas holds 64), a
+## 230 x 60 m probe over the centreline, captured once with the circuit, the forest and the stands (not the cars), and
+## given to the cars only (reflection_mask: the track's own materials keep the sky's and SSR). Captured again, a few a
+## second, when the sun has moved on (the time of day runs in a race).
+var track_probes: Array[ReflectionProbe] = []
+var _probes_sun := Vector3.ZERO
+var _probe_redo := -1
+
+func _add_track_probes(own_too: bool) -> void:
+	var cl: Array = track_data.centerline
+	var n := cl.size() / 3
+	var length := float(track_data.length)
+	var step_m := maxf(170.0, length / 40.0)
+	var cum: Array = track_data.cumS
+	var next_s := 0.0
+	var holder := Node3D.new()
+	holder.name = "track_probes"
+	add_child(holder)
+	for i in n:
+		if float(cum[i]) < next_s:
+			continue
+		next_s = float(cum[i]) + step_m
+		var p := ReflectionProbe.new()
+		p.update_mode = ReflectionProbe.UPDATE_ONCE
+		p.size = Vector3(230, 60, 230)
+		p.position = Vector3(cl[i * 3], float(cl[i * 3 + 1]) + 2.0, cl[i * 3 + 2])
+		p.max_distance = 700.0
+		p.cull_mask = 1 | 2
+		p.reflection_mask = CarVisual.VIS_CARS | (CarVisual.VIS_OWN if own_too else 0)
+		p.enable_shadows = true
+		p.box_projection = false
+		p.intensity = 1.0
+		p.blend_distance = 30.0
+		p.mesh_lod_threshold = 2.0
+		p.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+		holder.add_child(p)
+		track_probes.append(p)
+	if env != null:
+		_probes_sun = env.sun_dir
+
+## The probes again when the sun has moved more than ~6 degrees since they were captured: one every few frames.
+func _refresh_track_probes() -> void:
+	if track_probes.is_empty() or env == null:
+		return
+	if _probe_redo < 0:
+		if env.sun_dir.dot(_probes_sun) > 0.9945:
+			return
+		_probes_sun = env.sun_dir
+		_probe_redo = 0
+	if Engine.get_process_frames() % 6 != 0:
+		return
+	var p := track_probes[_probe_redo]
+	# (a once probe captures again when anything about it changes)
+	p.position.y += 0.001 if _probe_redo % 2 == 0 else -0.001
+	_probe_redo += 1
+	if _probe_redo >= track_probes.size():
+		_probe_redo = -1
 
 ## A reflection probe riding with your car (High / Ultra): the paint, glass and rims reflect the track, the barriers,
 ## the pit buildings and the cars round you, not only the sky. Your own car is left out of it (it would reflect its

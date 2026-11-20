@@ -350,6 +350,10 @@ static func _graphics(col: Control, changed: Callable, show: Callable) -> void:
 				[["", I18n.t("Preset")], ["1", I18n.t("Off")], ["1.25", "1.25×"], ["1.5", "1.5×"], ["2", I18n.t("2× (4 × the pixels)")]], func(v): return float(v), on_change)
 		if sec[0] == "Your car":
 			_toggle(col, I18n.t("Rear-view mirror"), I18n.t("What is behind you, at the top of the screen"), S, "mirror", changed)
+		if sec[0] == "Other cars":
+			if not S.has("carsFullDetail"):
+				S["carsFullDetail"] = false
+			_toggle(col, I18n.t("Full-resolution cars"), I18n.t("Every car with its full model at any distance (up to 2.5 million triangles each): the most detail, a big cost with a full grid (from the next session)"), S, "carsFullDetail", changed)
 
 static func _display(col: Control, changed: Callable) -> void:
 	var S: Dictionary = Settings.data

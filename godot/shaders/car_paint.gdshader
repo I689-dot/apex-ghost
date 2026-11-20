@@ -39,6 +39,12 @@ uniform float trim_height = 0.11;
 // metallic flakes (a finish's sparkle under the clear coat): their strength and size (m)
 uniform float flakes = 0.0;
 uniform float flake_size = 0.0009;
+// (2026-11-21, the user: the cars looked like plastic, the same from every side) the colour as a painter's: the AgX
+// grade takes the purity out of saturated colours (a racing red came out pastel), so the pigment is mixed that much
+// purer; and the metallic flop: a metallic paint is bright face-on and dark at a grazing angle (the flakes lie
+// parallel to the panel and send the light back towards the viewer only face-on), so each panel changes with the view
+uniform float paint_purity = 1.0;
+uniform float flop = 0.0;
 
 varying vec3 cpos;
 
@@ -105,6 +111,8 @@ void fragment() {
 		a = smoothstep(0.56 - fwidth(zf), 0.56 + fwidth(zf), zf);
 	}
 	c = mix(c, accent_color, a);
+	float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+	c = max(mix(vec3(luma), c, paint_purity), vec3(0.0));
 	// carbon: the wing, and the lowest band of the body (sills, splitter, diffuser)
 	float trim = trim_all ? 1.0 : 1.0 - smoothstep(trim_height - 0.012, trim_height + 0.012, yf);
 	trim *= step(0.001, trim_height) + (trim_all ? 1.0 : 0.0);
@@ -129,6 +137,10 @@ void fragment() {
 				c = mix(c, n.rgb, n.a);
 			}
 		}
+	}
+	float nv = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	if (flop > 0.0) {
+		c *= mix(1.0, mix(0.35, 1.18, pow(nv, 0.55)), flop);
 	}
 	if (pearl > 0.0) {
 		float fr = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
@@ -170,9 +182,12 @@ void fragment() {
 			c *= 1.0 + (rnd.x - 0.5) * 0.12 * flakes * near_f;
 		}
 	}
-	ALBEDO = c * mix(0.88, 1.0, ao);
+	ALBEDO = c;
 	METALLIC = mix(metallic_v, 0.25, carbon);
 	ROUGHNESS = rough;
+	// a lacquered panel reflects more than the bare dielectric's 4 % (the clear coat over a base that is itself glossy):
+	// racing games raise it so the surroundings read on the bodywork (0.5 is Godot's 4 %)
+	SPECULAR = mix(0.8, 0.5, carbon);
 	CLEARCOAT = mix(clearcoat_v, 0.6, carbon);
 	CLEARCOAT_ROUGHNESS = mix(0.06, 0.25, carbon);
 	if (has_normal) {

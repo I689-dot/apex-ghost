@@ -11,11 +11,14 @@ const SHADER := preload("res://shaders/car_paint.gdshader")
 const DESIGNS := ["plain", "stripes", "twotone", "fade", "side", "hoop", "center", "chevron", "pinstripe", "split"]
 ## The wing, splitter, sills and diffuser: bare carbon, the body's colour, or the second colour.
 const AERO := ["carbon", "body", "accent"]
+## A paint as its layers (2026-11-21: "looks like plastic"): the base coat (the pigment: a broad, soft sheen, roughness
+## 0.4-0.5, its own metallic share and flop) under a mirror-sharp clear coat. Plastic is one glossy layer all through;
+## paint is a matte-ish colour seen through a glass-smooth lacquer, which is what carries the sharp reflections.
 const FINISHES := {
-	"gloss": {"metallic": 0.0, "roughness": 0.28, "clearcoat": 1.0, "pearl": 0.0, "flakes": 0.0},
-	"metallic": {"metallic": 0.65, "roughness": 0.32, "clearcoat": 1.0, "pearl": 0.0, "flakes": 1.0},
-	"matte": {"metallic": 0.0, "roughness": 0.62, "clearcoat": 0.0, "pearl": 0.0, "flakes": 0.0},
-	"pearl": {"metallic": 0.35, "roughness": 0.3, "clearcoat": 1.0, "pearl": 0.6, "flakes": 0.6},
+	"gloss": {"metallic": 0.0, "roughness": 0.3, "clearcoat": 1.0, "pearl": 0.0, "flakes": 0.0, "flop": 0.0},
+	"metallic": {"metallic": 0.7, "roughness": 0.3, "clearcoat": 1.0, "pearl": 0.0, "flakes": 1.0, "flop": 0.75},
+	"matte": {"metallic": 0.0, "roughness": 0.62, "clearcoat": 0.0, "pearl": 0.0, "flakes": 0.0, "flop": 0.0},
+	"pearl": {"metallic": 0.35, "roughness": 0.3, "clearcoat": 1.0, "pearl": 0.6, "flakes": 0.6, "flop": 0.4},
 }
 ## The colours bots and other drivers get (by their id): racing colours that read well against the circuits.
 const PALETTE := ["#c8102e", "#0a3d91", "#f2f2f2", "#111214", "#ffb000", "#00843d", "#ff5f00", "#5b2c83", "#00a3e0", "#9a9fa5", "#7a0019", "#e4002b", "#1d428a", "#ffd60a", "#2e7d32", "#ff6fae"]
@@ -128,6 +131,7 @@ static func _set_paint(pm: ShaderMaterial, livery: Dictionary, fin: Dictionary, 
 	pm.set_shader_parameter("clearcoat_v", fin.clearcoat)
 	pm.set_shader_parameter("pearl", fin.pearl)
 	pm.set_shader_parameter("flakes", fin.get("flakes", 0.0))
+	pm.set_shader_parameter("flop", fin.get("flop", 0.0))
 	# the aero (the livery's "aero"): the wing all of it, the lowest band of the body too; carbon, or painted in
 	# the second colour; "body": no trim
 	var aero: String = livery.get("aero", "carbon")

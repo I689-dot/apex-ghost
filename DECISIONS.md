@@ -1740,3 +1740,25 @@ assumes the old peak; retune AI_GRIP if needed).
 - Tests: tests/progression_test.gd (22 checks, dry: nothing saved), tests/mobile_shots.gd (every screen at 20:9).
 - Also: Shanghai's learned grip (skill 0.95: 2:07.6 with 2 excursions -> 2:07.3 with none; 0.9: 2:06.4 -> 2:08.1, no
   excursions either way). Kept: an excursion costs more in a race.
+
+## Godot: car paint, first pass against the plastic look; full-resolution cars (2026-11-21)
+
+- The user said the cars' colour looked like plastic, the same from every side, and asked for more detail or a
+  full-resolution setting.
+- Found: only your own car had live reflections (its probe, High and Ultra). Every other car, and yours below High,
+  reflected the sky alone.
+  - A mirror test (base roughness 0.06, probe and SSR on or off, Medium and Ultra) showed no sky on the bonnet in any
+    case: at a panel's 4 % reflectance the sky is invisible against sunlit paint. That is what makes it read as
+    plastic.
+- Changes:
+  - Reflection probes along the lap (RaceSession._add_track_probes): every ~170 m (40 a lap at most), 230 x 60 m,
+    captured once with the circuit, forest and stands, given to the cars only, captured again as the sun moves.
+  - The paint's reflectance raised from 4 % to about 6.4 % (SPECULAR 0.8), as racing games do so the surroundings
+    read on the bodywork.
+  - A metallic flop: metallic and pearl paints darken at grazing angles.
+  - The fake occlusion no longer darkens the colour itself.
+  - Finishes as a soft base under the sharp clear coat.
+  - A purity boost against AgX's desaturation was tried and dropped: it looked toy-like.
+- Graphics › Other cars › Full-resolution cars: every car with its LOD0 (the unsimplified source model, 300k-2.5M
+  triangles) at every distance. LOD0 already was the source model, for your car and for others within 30 m x the
+  preset's scale.
