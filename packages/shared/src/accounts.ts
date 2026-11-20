@@ -11,6 +11,10 @@ export interface AccountUser {
   colour?: string | null;
   /** The avatar: one of the helmet designs (h0…h15) and its second colour (AVATAR_RE), drawn in `colour`. */
   avatar?: string | null;
+  /** How the account signs in: 'guest' (a device key the game keeps), 'playGames', 'password' (the first accounts). */
+  kind?: 'guest' | 'playGames' | 'password';
+  /** Linked to a Google Play Games player (signs in with it on any device). */
+  playGames?: boolean;
 }
 
 /** A profile field check shared by the server and the profile form. */

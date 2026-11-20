@@ -1,9 +1,12 @@
 /**
  * Accounts, friends and records, in a Durable Object of their own with its built-in SQLite database (AccountsDO,
  * one instance): nothing outside Cloudflare to configure or keep awake, and on the free plan.
- *  - A nickname and a password, nothing else (no e-mail, no verification). Passwords are PBKDF2-SHA256 hashes with a
- *    random salt (WebCrypto; the iteration count fits the free plan's CPU budget per request). Signing in returns a
- *    random token, sent back as `Authorization: Bearer …`.
+ *  - No e-mail, no verification (the user, 2026-11-20: "login with google play games or playing as guests, not real
+ *    accounts"): a guest account is a driver name and a random device key the game keeps (guest, resume); a Google
+ *    Play Games one is found by the player id Google gives the Worker for the game's auth code (playGames, which the
+ *    Worker calls after the exchange: never a client). The older nickname-and-password accounts still sign in.
+ *    Keys and passwords are PBKDF2-SHA256 hashes with a random salt (WebCrypto; the iteration count fits the free
+ *    plan's CPU budget per request). Signing in returns a random token, sent back as `Authorization: Bearer …`.
  *  - Friends: a request is a pending row from the asker; accepting adds the reverse row. Presence (online, in a
  *    lobby, racing, watching, and in which room) is live state, not data: it lives in the DirectoryDO's memory and
  *    expires 90 s after the last heartbeat (the Worker adds it to the friends list).
@@ -19,6 +22,9 @@ import { COINS, INVITE_RACES, INVITE_WINDOW_MS, RATING_START, SEED_CODES, SR_STA
 export type AccountOp =
   | 'register'
   | 'login'
+  | 'guest'
+  | 'resume'
+  | 'nick'
   | 'logout'
   | 'delete'
   | 'password'
@@ -212,10 +218,15 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       ['licence', "text not null default 'R'"],
       ['sr', `real not null default ${SR_START}`],
       ['sr_last', 'real'],
+      // how the account signs in: 'password' (the first accounts), 'guest' (a device key), 'playGames'; the Google
+      // Play Games player id once linked
+      ['kind', "text not null default 'password'"],
+      ['pgs_id', 'text'],
     ])
       if (!cols.has(c)) this.sql.exec(`alter table users add column ${c} ${type}`);
     this.sql.exec('create unique index if not exists users_invite on users (invite_code)');
     this.sql.exec('create index if not exists users_rating on users (rating desc)');
+    this.sql.exec('create unique index if not exists users_pgs on users (pgs_id)');
     for (const c of SEED_CODES)
       this.sql.exec('insert or ignore into codes (code, coins, what, max_uses) values (?, ?, ?, ?)', c.code, c.coins, c.what, c.maxUses);
   }
@@ -242,6 +253,12 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
           return { status: 201, body: await this.register(body) };
         case 'login':
           return { status: 200, body: await this.login(body) };
+        case 'guest':
+          return { status: 201, body: await this.guest(body) };
+        case 'resume':
+          return { status: 200, body: await this.resume(body) };
+        case 'nick':
+          return { status: 200, body: { user: this.rename(token, body) } };
         case 'logout':
           if (token) this.sql.exec('delete from tokens where token = ?', token);
           return { status: 200, body: { ok: true } };
@@ -421,9 +438,9 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     if (!token || !/^[0-9a-f]{48}$/.test(token)) return null;
     return (
       this.rows<AccountUser>(
-        'select u.id as id, u.nick as nick, u.country as country, u.num as num, u.abbr as abbr, u.colour as colour, u.avatar as avatar from tokens t join users u on u.id = t.user_id where t.token = ?',
+        'select u.id as id, u.nick as nick, u.country as country, u.num as num, u.abbr as abbr, u.colour as colour, u.avatar as avatar, u.kind as kind, (u.pgs_id is not null) as playGames from tokens t join users u on u.id = t.user_id where t.token = ?',
         token,
-      )[0] ?? null
+      ).map((u) => ({ ...u, playGames: Boolean(u.playGames) }))[0] ?? null
     );
   }
 
@@ -518,6 +535,113 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
       }
     }
     return { token: this.newToken(id), user: { id, nick } };
+  }
+
+  /** A free driver name: the one asked for, else with a number after it (or DriverNNNN when none is asked for). */
+  private freeNick(want: unknown): string {
+    const base = typeof want === 'string' && want.trim() !== '' ? checkNick(want) : 'Driver';
+    const taken = (n: string) => this.rows('select 1 from users where nick_key = ?', n.toLowerCase()).length > 0;
+    if (base !== 'Driver' && !taken(base)) return base;
+    for (let i = 0; i < 40; i++) {
+      const digits = String(1000 + Math.floor(Math.random() * (i < 20 ? 9000 : 90000)));
+      const n = base.slice(0, NICK_MAX - digits.length) + digits;
+      if (!taken(n)) return n;
+    }
+    throw new HttpError(409, 'That nickname is taken.');
+  }
+
+  /** A new account of kind `kind` under a free name; its key (a password nobody types) hashed as a password is. */
+  private async newAccount(nick: string, key: string, kind: 'guest' | 'playGames', pgsId: string | null): Promise<string> {
+    const salt = randomHex(16);
+    const hash = await hashPassword(key, salt);
+    const id = crypto.randomUUID();
+    this.sql.exec(
+      'insert into users (id, nick, nick_key, pass_hash, salt, created_at, last_seen, kind, pgs_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      id,
+      nick,
+      nick.toLowerCase(),
+      hash,
+      salt,
+      Date.now(),
+      Date.now(),
+      kind,
+      pgsId,
+    );
+    return id;
+  }
+
+  /** Play as a guest: an account under the driver name asked for (a number after it when taken) and a device key the
+   *  game keeps to sign back in (resume). */
+  private async guest(body: Record<string, unknown>): Promise<{ token: string; user: AccountUser; key: string }> {
+    const nick = this.freeNick(body.nick);
+    const key = randomHex(24);
+    const id = await this.newAccount(nick, key, 'guest', null);
+    if (body.invite) {
+      try {
+        this.applyInvite(id, body.invite);
+      } catch {
+        /* not applied */
+      }
+    }
+    return { token: this.newToken(id), user: { id, nick, kind: 'guest', playGames: false }, key };
+  }
+
+  /** Back in with the device key (a token the server no longer has, or a new token after signing out of one). */
+  private async resume(body: Record<string, unknown>): Promise<{ token: string; user: AccountUser }> {
+    const id = typeof body.id === 'string' ? body.id : '';
+    const key = typeof body.key === 'string' && /^[0-9a-f]{48}$/.test(body.key) ? body.key : '';
+    const u = this.rows<{ id: string; nick: string; pass_hash: string; salt: string }>('select id, nick, pass_hash, salt from users where id = ?', id)[0];
+    if (!u || !key || !sameHash(await hashPassword(key, u.salt), u.pass_hash)) throw new HttpError(401, 'This device cannot sign in to that account.');
+    this.sql.exec('update users set last_seen = ? where id = ?', Date.now(), u.id);
+    return { token: this.newToken(u.id), user: this.userOfId(u.id) };
+  }
+
+  private userOfId(id: string): AccountUser {
+    const u = this.rows<AccountUser>(
+      'select id, nick, country, num, abbr, colour, avatar, kind, (pgs_id is not null) as playGames from users where id = ?',
+      id,
+    )[0];
+    return { ...u, playGames: Boolean(u.playGames) };
+  }
+
+  /**
+   * Google Play Games, after the Worker exchanged the game's auth code with Google (index.ts playGamesSignIn): the
+   * account linked to that player, else the signed-in one is linked (a guest keeps what it raced), else a new one under
+   * the Play Games name. Not reachable from the API router: only the Worker, with the player id Google gave it.
+   */
+  async playGames(token: string | null, playerId: string, name: string): Promise<AccountReply> {
+    try {
+      if (!/^[\w.-]{1,64}$/.test(playerId)) throw new HttpError(400, 'Bad Play Games player.');
+      const linked = this.rows<{ id: string }>('select id from users where pgs_id = ?', playerId)[0];
+      let id = linked?.id;
+      const me = this.userOf(token);
+      if (!id && me) {
+        this.sql.exec('update users set pgs_id = ? where id = ?', playerId, me.id);
+        id = me.id;
+      }
+      let key: string | undefined;
+      if (!id) {
+        const clean = name.replace(/[^\p{L}\p{N} _.-]/gu, '').trim().slice(0, NICK_MAX);
+        key = randomHex(24);
+        id = await this.newAccount(this.freeNick(clean.length >= NICK_MIN ? clean : ''), key, 'playGames', playerId);
+      }
+      this.sql.exec('update users set last_seen = ? where id = ?', Date.now(), id);
+      const body = { token: me && me.id === id && token ? token : this.newToken(id), user: this.userOfId(id), ...(key ? { key } : {}) };
+      return { status: 200, json: JSON.stringify(body) };
+    } catch (e) {
+      if (e instanceof HttpError) return { status: e.status, json: JSON.stringify({ error: e.message }) };
+      throw e;
+    }
+  }
+
+  /** A new driver name (not one somebody has). */
+  private rename(token: string | null, body: Record<string, unknown>): AccountUser {
+    const me = this.requireUser(token);
+    const nick = checkNick(body.nick);
+    const other = this.rows<{ id: string }>('select id from users where nick_key = ?', nick.toLowerCase())[0];
+    if (other && other.id !== me.id) throw new HttpError(409, 'That nickname is taken.');
+    this.sql.exec('update users set nick = ?, nick_key = ? where id = ?', nick, nick.toLowerCase(), me.id);
+    return this.userOfId(me.id);
   }
 
   // ---------------------------------------------------------------- coins ---
@@ -658,12 +782,15 @@ export class AccountsDO extends DurableObject<Record<string, never>> {
     });
   }
 
-  /** Delete my account and everything of it (friends, laps, results): signed in, and the password again. */
+  /** Delete my account and everything of it (friends, laps, results): signed in, and the password (a guest's: its
+   *  device key) again; one linked to Google Play Games with `confirm: true` (the Play Games sign-in is its proof). */
   private async deleteAccount(token: string | null, body: Record<string, unknown>): Promise<void> {
     const me = this.requireUser(token);
-    const pw = checkPassword(body.password);
-    const u = this.rows<{ pass_hash: string; salt: string }>('select pass_hash, salt from users where id = ?', me.id)[0];
-    if (!u || !sameHash(await hashPassword(pw, u.salt), u.pass_hash)) throw new HttpError(401, 'Wrong password.');
+    const u = this.rows<{ pass_hash: string; salt: string; pgs_id: string | null }>('select pass_hash, salt, pgs_id from users where id = ?', me.id)[0];
+    if (!(u?.pgs_id && body.confirm === true)) {
+      const pw = checkPassword(body.password);
+      if (!u || !sameHash(await hashPassword(pw, u.salt), u.pass_hash)) throw new HttpError(401, 'Wrong password.');
+    }
     this.ctx.storage.transactionSync(() => {
       this.sql.exec('delete from tokens where user_id = ?', me.id);
       this.sql.exec('delete from friends where user_id = ?1 or friend_id = ?1', me.id);

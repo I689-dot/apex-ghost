@@ -1773,3 +1773,33 @@ assumes the old peak; retune AI_GRIP if needed).
   lod0.glb, and four cars' lod1.glb too, each imported and packed twice. build-cars.py keeps such a level once (the
   entry points at lod0.glb). `python3 -I tools/godot/build-cars.py --dedupe` does it for cars already installed:
   godot/assets/cars went from 1.8 GB to 1.1 GB, and the game no longer loads the same model twice.
+
+## 2026-11-20: Google Play Games or a guest, no accounts to make
+
+- The user: "users should have the option of login with google play games or playing as guests, not real accounts".
+- The sign-in screen:
+  - **Continue with Google Play Games** (Android, with the plugin).
+  - **Play as guest**: a driver name, which is optional. The server picks DriverNNNN when none is given and adds a
+    number to a name that is taken.
+  - Once this device has a driver: **Continue as <name>**.
+  - Nobody creates a nickname-and-password account any more. The first ones still sign in from a small link.
+- Guests are server accounts, so they can still race online, earn coins and appear in records.
+  - The server gives the device a random key (`user://device.json`). The game signs back in with it on its own,
+    including after a lost token.
+  - Signing out keeps the key: the sign-in screen offers Continue as … instead.
+  - Deleting the driver uses the key, so no password is asked.
+- Google Play Games:
+  - The game gets a server auth code from the plugin. The Worker exchanges it with Google and asks the Play Games API
+    for the player id, so a player id is never taken from the game.
+  - A guest who links Play Games keeps what it raced.
+  - Setup steps for the owner: docs/play-games-sign-in.md (Play Console project, OAuth clients, the Worker's secret,
+    the plugin with the Gradle build).
+  - The plugin is not installed yet. It cannot work without those ids, and it needs the Gradle build, which changes
+    how the APK is made.
+- Settings › Account:
+  - How you sign in.
+  - Link Google Play Games.
+  - Driver name › Change (new: `account/nick`).
+  - The password row only for the first accounts.
+- Server: `account/guest`, `account/resume`, `account/nick` and `account/play-games`, plus the users columns `kind`
+  and `pgs_id`. A Play Games account is deleted with `confirm: true`.

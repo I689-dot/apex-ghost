@@ -1,6 +1,7 @@
 extends Node
-## The signed-in account (port of net/account.ts), an autoload named Account: a nickname and a password (no e-mail:
-## the server's accounts.ts), its friends, presence and records. The token is kept on this device; signed in, your
+## The signed-in account (port of net/account.ts), an autoload named Account: a guest (a driver name and a device key
+## kept in user://device.json) or a Google Play Games player, no e-mail and no password (the server's accounts.ts; the
+## first nickname-and-password accounts still sign in), its friends, presence and records. The token is kept on this device; signed in, your
 ## nickname is the account's, your rooms tell the server who you are (hello.account) so your laps and results go to
 ## your records, and a heartbeat tells your friends where you are.
 ## API calls are async: `var r = await Account.login(nick, pw)` returns {ok, status, data, error}.
@@ -8,6 +9,8 @@ extends Node
 signal changed(account)
 
 const SAVE_PATH := "user://account.json"
+## {id, key, nick}: the guest (or Play Games) account this device signs back in to without anyone typing anything.
+const DEVICE_PATH := "user://device.json"
 
 ## {token, user} or null.
 var current: Variant = null
@@ -15,6 +18,8 @@ var _presence := {"state": "menu", "room": null, "trackId": null, "session": nul
 var _last_sent := ""
 var _timer: Timer = null
 var _accounts_on: Variant = null
+## Sign back in on its own with the device key (off after signing out: the sign-in screen offers it instead).
+var auto_resume := true
 
 func _ready() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
@@ -78,6 +83,82 @@ func probe_accounts() -> bool:
 	_accounts_on = r.status != 503
 	return _accounts_on
 
+# ------------------------------------------------------- guest and Google Play Games ---
+
+## The device key's account ({id, key, nick}), or {} when this device has none.
+func device() -> Dictionary:
+	if not FileAccess.file_exists(DEVICE_PATH):
+		return {}
+	var v = JSON.parse_string(FileAccess.get_file_as_string(DEVICE_PATH))
+	return v if typeof(v) == TYPE_DICTIONARY and v.has("id") and v.has("key") else {}
+
+func _save_device(d: Dictionary) -> void:
+	if d.is_empty():
+		if FileAccess.file_exists(DEVICE_PATH):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(DEVICE_PATH))
+		return
+	var f := FileAccess.open(DEVICE_PATH, FileAccess.WRITE)
+	if f != null:
+		f.store_string(JSON.stringify(d))
+
+## How the signed-in account signs in: "guest", "playGames" or "password" (the first accounts).
+func kind() -> String:
+	if current == null:
+		return ""
+	var u: Dictionary = current.user
+	if u.get("playGames", false):
+		return "playGames"
+	return str(u.get("kind", "guest" if device().get("id", "") == u.get("id", "") else "password"))
+
+## Play as a guest: an account under that driver name (empty: the server picks DriverNNNN; a number is added to a
+## taken one) whose key stays on this device.
+func guest(nick: String, invite: String = "") -> Dictionary:
+	var body := {"nick": nick.strip_edges()}
+	if invite.strip_edges() != "":
+		body.invite = invite.strip_edges()
+	var r := await api("account/guest", body)
+	if r.ok:
+		_save_device({"id": r.data.user.id, "key": r.data.key, "nick": r.data.user.nick})
+		_save({"token": r.data.token, "user": r.data.user})
+	return r
+
+## Back in to the device key's account.
+func resume() -> Dictionary:
+	var d := device()
+	if d.is_empty():
+		return {"ok": false, "status": 404, "data": {}, "error": "No driver on this device."}
+	var r := await api("account/resume", {"id": d.id, "key": d.key})
+	if r.ok:
+		d.nick = r.data.user.nick
+		_save_device(d)
+		_save(r.data)
+	elif r.status == 401:
+		_save_device({}) # the account is gone (deleted elsewhere)
+	return r
+
+## Google Play Games: the plugin's server auth code (PlayGames.auth_code) for the server to check with Google. Signed
+## in as a guest, the guest is linked to the player (what it raced is kept); a player with an account signs in to it.
+func play_games(code: String) -> Dictionary:
+	var r := await api("account/play-games", {"code": code})
+	if r.ok:
+		if r.data.has("key"):
+			_save_device({"id": r.data.user.id, "key": r.data.key, "nick": r.data.user.nick})
+		_save({"token": r.data.token, "user": r.data.user})
+	return r
+
+## A new driver name.
+func rename(nick: String) -> Dictionary:
+	var r := await api("account/nick", {"nick": nick.strip_edges()})
+	if r.ok and current != null:
+		var a: Dictionary = current.duplicate()
+		a.user = r.data.user
+		_save(a)
+		var d := device()
+		if d.get("id", "") == r.data.user.id:
+			d.nick = r.data.user.nick
+			_save_device(d)
+	return r
+
 ## invite: a friend's invite code (optional; a wrong one does not stop the account, it is just not applied).
 func register(nick: String, password: String, invite: String = "") -> Dictionary:
 	var body := {"nick": nick, "password": password}
@@ -139,14 +220,22 @@ func ranking(scope: String = "global") -> Dictionary:
 func change_password(old_pw: String, new_pw: String) -> Dictionary:
 	return await api("account/password", {"password": old_pw, "newPassword": new_pw})
 
-## Deletes the account and everything of it on the server (the password again first), then signs out here.
-func delete_account(pw: String) -> Dictionary:
-	var r := await api("account/delete", {"password": pw})
+## Deletes the account and everything of it on the server, then signs out here: a guest's proof is its device key, a
+## Play Games player's the Play Games sign-in; the first accounts' the password again (pw).
+func delete_account(pw: String = "") -> Dictionary:
+	var d := device()
+	var mine: bool = current != null and d.get("id", "") == current.user.get("id", "")
+	var body: Dictionary = {"confirm": true} if kind() == "playGames" else {"password": d.key if mine and pw == "" else pw}
+	var r := await api("account/delete", body)
 	if r.ok:
+		if mine:
+			_save_device({})
 		_save(null)
 	return r
 
+## Signs out here (the device key stays: the sign-in screen offers "Continue as …").
 func logout() -> void:
+	auto_resume = false
 	if current != null:
 		await api("account/logout", {})
 	_save(null)

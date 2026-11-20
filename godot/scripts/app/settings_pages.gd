@@ -168,13 +168,32 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 	col.add_child(UIW.margins(card, 10, 6, 0, 10))
 	SettingsPanel._head(col, I18n.t("Driver profile"))
 	col.add_child(SettingsPanel._row(I18n.t("Flag, number, code, helmet"), UIKit.button(I18n.t("Edit"), func(): SocialUI.profile_modal(app, refresh)), I18n.t("How you appear on the timing screens.")))
+	col.add_child(SettingsPanel._row(I18n.t("Driver name"), UIKit.button(I18n.t("Change"), func(): _rename_modal(app, refresh)), I18n.t("The name on the timing screens and in friends' lists.")))
 	SettingsPanel._head(col, I18n.t("Sign-in"))
-	col.add_child(SettingsPanel._row(I18n.t("Password"), UIKit.button(I18n.t("Change"), func(): _password_modal(app)), I18n.t("Your other devices are signed out when it changes.")))
+	var kind := Account.kind()
+	var how: String = {"playGames": I18n.t("Google Play Games"), "guest": I18n.t("Guest on this device")}.get(kind, I18n.t("Nickname and password"))
+	var how_tip: String = {"playGames": I18n.t("Sign in with Google Play Games on any phone to race as this driver."), "guest": I18n.t("Kept on this device only: deleting the game's data or a new phone loses it.") + (" " + I18n.t("Link Google Play Games to keep it.") if PlayGames.available() else "")}.get(kind, "")
+	col.add_child(SettingsPanel._row(I18n.t("Signed in as"), UIKit.label(how, 16, UIKit.TEXT, true, 600), how_tip))
+	if kind != "playGames" and PlayGames.available():
+		var link := UIKit.button(I18n.t("Link"), Callable(), true)
+		link.pressed.connect(func():
+			link.disabled = true
+			var code: String = await PlayGames.auth_code()
+			var r: Dictionary = await Account.play_games(code) if code != "" else {"ok": false, "error": "Google Play Games did not sign you in."}
+			if not is_instance_valid(link):
+				return
+			link.disabled = false
+			app.toast(I18n.t("Linked to Google Play Games") if r.ok else I18n.t(str(r.error)))
+			if r.ok:
+				refresh.call())
+		col.add_child(SettingsPanel._row(I18n.t("Google Play Games"), link, I18n.t("Your driver, coins and records on any phone you sign in to Play Games with.")))
+	if kind == "password":
+		col.add_child(SettingsPanel._row(I18n.t("Password"), UIKit.button(I18n.t("Change"), func(): _password_modal(app)), I18n.t("Your other devices are signed out when it changes.")))
 	col.add_child(SettingsPanel._row(I18n.t("Sign out"), UIKit.button(I18n.t("Sign out"), func():
 		var close: Callable = app.overlay_layer.get_children().filter(func(c): return c.has_meta("close")).back().get_meta("close")
 		close.call()
 		await Account.logout()
-		app.show_start()), I18n.t("Back to the sign-in screen.")))
+		app.show_start()), I18n.t("Back to the sign-in screen (Continue as {nick} brings you back).", {"nick": str(u.nick)}) if kind != "password" else I18n.t("Back to the sign-in screen.")))
 	SettingsPanel._head(col, I18n.t("Online"))
 	if not S.has("online"):
 		S["online"] = {"region": "auto"}
@@ -188,6 +207,36 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 	SettingsPanel._toggle(col, I18n.t("Show friends where I am"), I18n.t("Off: you appear offline to your friends (menu, lobby or racing)."), S.privacy, "showOnline", changed)
 	SettingsPanel._head(col, I18n.t("Delete account"))
 	col.add_child(SettingsPanel._row(I18n.t("Delete my account"), UIKit.button(I18n.t("Delete…"), func(): _delete_modal(app)), I18n.t("Your account, laps, results and friends are deleted for good.")))
+
+static func _rename_modal(app: App, refresh: Callable) -> void:
+	var m := UIW.modal(app.overlay_layer, 460)
+	var body: VBoxContainer = m.body
+	var close := func(): m.root.queue_free()
+	UIW.modal_head(body, I18n.t("Driver name"), close)
+	var nick := LineEdit.new()
+	nick.max_length = 16
+	nick.text = str(Account.account().user.nick)
+	body.add_child(UIW.field(I18n.t("2 to 16 letters, numbers, spaces, _ . -"), nick))
+	var err := UIKit.label("", 15, UIKit.BAD)
+	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(err)
+	var go := UIKit.button(I18n.t("Save"), Callable(), true)
+	var save := func():
+		go.disabled = true
+		var r: Dictionary = await Account.rename(nick.text)
+		if not is_instance_valid(go):
+			return
+		go.disabled = false
+		if r.ok:
+			close.call()
+			refresh.call()
+		else:
+			err.text = I18n.t(str(r.error))
+	go.pressed.connect(save)
+	nick.text_submitted.connect(func(_t): save.call())
+	body.add_child(go)
+	if not UIKit.touch():
+		nick.grab_focus.call_deferred()
 
 static func _password_modal(app: App) -> void:
 	var m := UIW.modal(app.overlay_layer, 460)
@@ -238,7 +287,9 @@ static func _delete_modal(app: App) -> void:
 	var pw := LineEdit.new()
 	pw.secret = true
 	pw.max_length = 72
-	body.add_child(UIW.field(I18n.t("Your password"), pw))
+	# (a guest's proof is its device key, a Play Games player's the Play Games sign-in: only the first accounts type it)
+	if Account.kind() == "password":
+		body.add_child(UIW.field(I18n.t("Your password"), pw))
 	var sure := UIW.row(I18n.t("I understand it cannot be undone"), UIW.switch(false, func(_on): pass))
 	body.add_child(sure)
 	var err := UIKit.label("", 15, UIKit.BAD)

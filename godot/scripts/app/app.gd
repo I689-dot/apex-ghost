@@ -248,6 +248,13 @@ func show_start() -> void:
 	if Account.account() != null or offline or Account.accounts_enabled() == false or Settings.testing or OS.get_environment("APEX_AUTO") != "":
 		show_menu()
 		return
+	# the driver this device has (a guest, a Play Games player): back in without a word, unless it was signed out of
+	if Account.auto_resume and not Account.device().is_empty():
+		screen = "signin"
+		var r: Dictionary = await Account.resume()
+		if r.ok:
+			show_menu()
+			return
 	show_sign_in()
 
 func show_sign_in() -> void:

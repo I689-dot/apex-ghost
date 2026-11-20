@@ -11,9 +11,12 @@ static func fmt_lap(ms: float) -> String:
 
 # ----------------------------------------------------------------- sign in ---
 
-## The sign-in screen the game opens on (the user, 2026-11-17: you are signed in before the menu; the menu has no
-## sign-in of its own): the logo, sign in or create an account, then the menu. If the server cannot be reached, a
-## solo-only way in ("Play offline"); if it keeps no accounts at all, the game goes straight to the menu (App.show_start).
+## The sign-in screen the game opens on (the user, 2026-11-17: you are signed in before the menu; 2026-11-20: "login
+## with google play games or playing as guests, not real accounts"): the logo, then Continue with Google Play Games
+## (Android with the plugin: PlayGames) and Play as guest (a driver name, nothing else: the server gives this device a
+## key), or Continue as the driver this device already has. An older nickname-and-password account still signs in
+## from the small link under them. If the server cannot be reached, a solo-only way in ("Play offline"); if it keeps no
+## accounts at all, the game goes straight to the menu (App.show_start).
 static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) -> Control:
 	# (a landscape phone is shorter than the card: it scrolls, centred while it fits; 2026-11-21 on a Pixel 10a the
 	# Sign in button was off the bottom of the screen)
@@ -37,8 +40,117 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	body.add_child(UIW.hair())
 	var offline_box := UIW.vbox(8)
 	offline_box.visible = false
-	_sign_in_form(body, "login", on_done, func(): offline_box.visible = true)
-	var ol := UIW.muted(I18n.t("The game server cannot be reached, so your account cannot be checked. You can still race the AI offline."), 14)
+	var unreachable := func(): offline_box.visible = true
+	var err := UIKit.label("", 15, UIKit.BAD)
+	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var lead := UIW.muted(I18n.t("Race in seconds: no e-mail, no password."), 15)
+	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(lead)
+	var ways := UIW.vbox(10)
+	body.add_child(ways)
+	var buttons: Array[Button] = []
+	# one sign-in at a time: every button off while one is asked; r: the server's answer
+	var busy := func(on: bool):
+		for b in buttons:
+			if is_instance_valid(b):
+				b.disabled = on
+	var answer := func(r: Dictionary) -> void:
+		if r.ok:
+			on_done.call()
+			return
+		err.text = I18n.t(str(r.error))
+		if r.status == 0:
+			unreachable.call()
+	var tall := func(b: Button) -> Button:
+		b.custom_minimum_size = Vector2(0, 56)
+		buttons.append(b)
+		return b
+	# the driver this device already has
+	var dev := Account.device()
+	if not dev.is_empty():
+		var cont := UIKit.button(I18n.t("Continue as {nick}", {"nick": str(dev.get("nick", ""))}).to_upper(), Callable(), true)
+		cont.pressed.connect(func():
+			err.text = ""
+			busy.call(true)
+			var r: Dictionary = await Account.resume()
+			if not is_instance_valid(cont):
+				return
+			busy.call(false)
+			if r.status == 401:
+				cont.visible = false
+			answer.call(r))
+		ways.add_child(tall.call(cont))
+	if PlayGames.available():
+		var pg := UIKit.button(I18n.t("Continue with Google Play Games"), Callable(), dev.is_empty())
+		pg.pressed.connect(func():
+			err.text = ""
+			busy.call(true)
+			var code: String = await PlayGames.auth_code()
+			if not is_instance_valid(pg):
+				return
+			if code == "":
+				busy.call(false)
+				err.text = I18n.t("Google Play Games did not sign you in.")
+				return
+			var r: Dictionary = await Account.play_games(code)
+			if not is_instance_valid(pg):
+				return
+			busy.call(false)
+			answer.call(r))
+		ways.add_child(tall.call(pg))
+	# a guest: the driver name (empty: the server picks one), a friend's invite code if there is one
+	var guest_box := UIW.vbox(8)
+	guest_box.visible = false
+	var nick := LineEdit.new()
+	nick.max_length = 16
+	nick.placeholder_text = I18n.t("Your driver name (optional)")
+	guest_box.add_child(UIW.field(I18n.t("Driver name"), nick))
+	var invite := LineEdit.new()
+	invite.max_length = 12
+	invite.placeholder_text = "CG-XXXXX"
+	invite.text_changed.connect(func(t): invite.text = t.to_upper(); invite.caret_column = invite.text.length())
+	guest_box.add_child(UIW.field(I18n.t("A friend's invite code (optional: you both get coins)"), invite))
+	var note := UIW.muted(I18n.t("A guest driver is kept on this device.") + ("  " + I18n.t("Link Google Play Games later in Settings › Account to keep it on any phone.") if PlayGames.available() else ""), 13)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guest_box.add_child(note)
+	var start := UIKit.button(I18n.t("Start racing").to_upper(), Callable(), true)
+	var go_guest := func():
+		err.text = ""
+		busy.call(true)
+		var r: Dictionary = await Account.guest(nick.text, invite.text)
+		if not is_instance_valid(start):
+			return
+		busy.call(false)
+		answer.call(r)
+	start.pressed.connect(go_guest)
+	nick.text_submitted.connect(func(_t): go_guest.call())
+	guest_box.add_child(tall.call(start))
+	var guest := UIKit.button(I18n.t("Play as guest"), Callable(), dev.is_empty() and not PlayGames.available())
+	guest.pressed.connect(func():
+		guest.visible = false
+		guest_box.visible = true
+		if not touch:
+			nick.grab_focus())
+	ways.add_child(tall.call(guest))
+	ways.add_child(guest_box)
+	body.add_child(err)
+	# an older nickname-and-password account
+	var legacy_box := UIW.vbox(8)
+	legacy_box.visible = false
+	_sign_in_form(legacy_box, on_done, unreachable)
+	var legacy := LinkButton.new()
+	legacy.text = I18n.t("I have a nickname and password")
+	legacy.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
+	legacy.add_theme_color_override("font_color", UIKit.SOFT)
+	legacy.add_theme_font_size_override("font_size", 14)
+	legacy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	legacy.pressed.connect(func():
+		legacy.visible = false
+		legacy_box.visible = true)
+	body.add_child(legacy)
+	body.add_child(legacy_box)
+	var ol := UIW.muted(I18n.t("The game server cannot be reached, so you cannot sign in now. You can still race the AI offline."), 14)
 	ol.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	offline_box.add_child(ol)
 	offline_box.add_child(UIKit.button(I18n.t("Play offline (solo only)"), on_offline))
@@ -53,12 +165,9 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	probe.call()
 	return scroll
 
-## The sign-in form: Sign in / Create account tabs, nickname, password, the button. on_unreachable: called when the
-## server cannot be reached.
-static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, on_unreachable: Callable = Callable()) -> void:
-	var state := {"mode": mode}
-	var lead := UIW.muted("")
-	lead.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+## Signing in to one of the first accounts (a nickname and a password; no new ones are made). on_unreachable: called
+## when the server cannot be reached.
+static func _sign_in_form(body: VBoxContainer, on_done: Callable, on_unreachable: Callable = Callable()) -> void:
 	var nick := LineEdit.new()
 	nick.max_length = 16
 	nick.placeholder_text = I18n.t("Your nickname")
@@ -66,44 +175,17 @@ static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, 
 	pw.max_length = 72
 	pw.secret = true
 	pw.placeholder_text = I18n.t("Password")
-	var show := UIW.row(I18n.t("Show password"), UIW.switch(false, func(on): pw.secret = not on))
 	var err := UIKit.label("", 15, UIKit.BAD)
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var submit := UIKit.button("", Callable(), true)
-	# the tabs call set_mode through the dictionary: it is made after them
-	var ref := {}
-	var tabs := UIW.tabs([["login", I18n.t("Sign in")], ["register", I18n.t("Create account")]], mode, func(k): ref.set_mode.call(k), true)
-	tabs.alignment = BoxContainer.ALIGNMENT_BEGIN
-	var pw_field := UIW.field(I18n.t("Password"), pw)
-	var invite := LineEdit.new()
-	invite.max_length = 12
-	invite.placeholder_text = "CG-XXXXX"
-	invite.text_changed.connect(func(t): invite.text = t.to_upper(); invite.caret_column = invite.text.length())
-	var invite_field := UIW.field(I18n.t("A friend's invite code (optional: you both get coins)"), invite)
-	var set_mode := func(md: String):
-		state.mode = md
-		for b in tabs.get_children():
-			b.set_active(b.get_meta("key") == md)
-		lead.text = I18n.t("Welcome back. Sign in to race.") if md == "login" else I18n.t("Just a nickname and a password. Your laps, results, licence and coins are kept, and friends can find you.")
-		submit.text = (I18n.t("Sign in") if md == "login" else I18n.t("Create account")).to_upper()
-		invite_field.visible = md == "register"
-		err.text = ""
-	ref.set_mode = set_mode
-	body.add_child(tabs)
-	body.add_child(lead)
+	var submit := UIKit.button(I18n.t("Sign in").to_upper(), Callable(), false)
 	body.add_child(UIW.field(I18n.t("Nickname"), nick))
-	body.add_child(pw_field)
-	body.add_child(invite_field)
-	body.add_child(show)
+	body.add_child(UIW.field(I18n.t("Password"), pw))
+	body.add_child(UIW.row(I18n.t("Show password"), UIW.switch(false, func(on): pw.secret = not on)))
 	body.add_child(err)
 	var go := func():
 		err.text = ""
 		submit.disabled = true
-		var r: Dictionary
-		if state.mode == "register":
-			r = await Account.register(nick.text, pw.text, invite.text)
-		else:
-			r = await Account.login(nick.text, pw.text)
+		var r: Dictionary = await Account.login(nick.text, pw.text)
 		if not is_instance_valid(submit):
 			return
 		submit.disabled = false
@@ -116,12 +198,8 @@ static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, 
 	submit.pressed.connect(go)
 	pw.text_submitted.connect(func(_t): go.call())
 	nick.text_submitted.connect(func(_t): pw.grab_focus())
-	submit.custom_minimum_size = Vector2(0, 52)
+	submit.custom_minimum_size = Vector2(0, 48)
 	body.add_child(submit)
-	set_mode.call(mode)
-	# (not on a touch screen: a focused field opens the on-screen keyboard over the whole form before anyone taps it)
-	if not UIKit.touch():
-		nick.grab_focus.call_deferred()
 
 # ----------------------------------------------------------------- friends ---
 

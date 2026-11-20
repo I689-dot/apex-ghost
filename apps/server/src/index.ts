@@ -4,7 +4,7 @@
  *   GET  /api/rooms          → public rooms (the room list before joining), from the DirectoryDO
  *   GET  /api/rooms/:code/ws → WebSocket into the room's Durable Object
  *   GET  /health
- *   /api/account/register|login|logout|delete|password|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats,
+ *   /api/account/guest|resume|nick|play-games, /api/account/register|login|logout|delete|password|me, /api/friends[/add|accept|remove], /api/presence, /api/records, /api/stats,
  *   /api/wallet, /api/redeem, /api/invite[/apply], /api/ranking (economy.ts)
  *       → accounts.ts (AccountsDO, its own SQLite database); presence lives in the DirectoryDO
  * One Durable Object per room (idFromName(code)); WebSocket Hibernation API.
@@ -31,6 +31,11 @@ export interface Env {
   SIGNAL: DurableObjectNamespace<SignalDO>;
   /** "1": online play without an account (the local dev server's .dev.vars). */
   OPEN_ONLINE?: string;
+  /** Google Play Games sign-in: the game server's OAuth client (Google Cloud › Credentials, type Web application, in
+   *  the Play Games project). The id is public (the game asks Google for an auth code for it); the secret is a Worker
+   *  secret (`wrangler secret put GOOGLE_CLIENT_SECRET`), never in the repo or the game. Unset: Play Games is off. */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 const TRACK = trackRace as unknown as TrackRaceData;
@@ -54,8 +59,34 @@ const directory = (env: Env) => env.DIRECTORY.get(env.DIRECTORY.idFromName('dire
 const accounts = (env: Env) => env.ACCOUNTS.get(env.ACCOUNTS.idFromName('accounts'));
 const bearer = (req: Request) => req.headers.get('Authorization')?.match(/^Bearer ([0-9a-f]{48})$/)?.[1] ?? null;
 
+/**
+ * Google Play Games sign-in: the game's server auth code (the Play Games plugin's requestServerSideAccess for
+ * GOOGLE_CLIENT_ID) exchanged with Google for an access token, the player it belongs to asked of the Play Games API,
+ * then the AccountsDO signs that player in (or links the signed-in guest to it). The player id comes from Google,
+ * never from the game.
+ */
+async function playGamesSignIn(req: Request, env: Env): Promise<Response> {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return json({ error: 'Google Play Games sign-in is not set up on this server.' }, 503);
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const code = typeof body.code === 'string' ? body.code.trim() : '';
+  if (!code || code.length > 2048) return json({ error: 'No Play Games sign-in code.' }, 400);
+  const tok = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, grant_type: 'authorization_code', redirect_uri: '' }),
+  });
+  const t = (await tok.json().catch(() => ({}))) as { access_token?: string };
+  if (!tok.ok || !t.access_token) return json({ error: 'Google did not accept the Play Games sign-in. Try again.' }, 401);
+  const me = await fetch('https://games.googleapis.com/games/v1/players/me', { headers: { Authorization: `Bearer ${t.access_token}` } });
+  const p = (await me.json().catch(() => ({}))) as { playerId?: string; displayName?: string };
+  if (!me.ok || !p.playerId) return json({ error: 'Google Play Games did not say who you are. Try again.' }, 401);
+  const reply = await accounts(env).playGames(bearer(req), p.playerId, p.displayName ?? '');
+  return json(JSON.parse(reply.json), reply.status);
+}
+
 /** Accounts, friends, presence and records (accounts.ts: the AccountsDO). */
 async function accountApi(req: Request, env: Env, path: string): Promise<Response> {
+  if (path === 'play-games' && req.method === 'POST') return playGamesSignIn(req, env);
   const op = path as AccountOp;
   const body = req.method === 'POST' ? ((await req.json().catch(() => ({}))) as Record<string, unknown>) : {};
   const query = Object.fromEntries(new URL(req.url).searchParams);
@@ -116,7 +147,7 @@ export default {
       return out;
     }
     const am = url.pathname.match(
-      /^\/api\/(?:account\/)?(register|login|logout|delete|password|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats|trace|telemetry|traces|drivers|wallet|redeem|invite(?:\/apply)?|ranking)$/,
+      /^\/api\/(?:account\/)?(register|login|guest|resume|nick|play-games|logout|delete|password|me|profile|friends(?:\/add|\/accept|\/remove)?|presence|records|stats|trace|telemetry|traces|drivers|wallet|redeem|invite(?:\/apply)?|ranking)$/,
     );
     if (am) return accountApi(req, env, am[1]);
 
