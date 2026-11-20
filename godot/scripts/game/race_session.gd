@@ -3,7 +3,7 @@ extends Node3D
 ## One race: loads everything for it, runs physics / render / network until the results arrive (port of
 ## game/session.ts RaceSession). A Node3D holding the world: track, environment, my car (a Jolt Vehicle with a CarVisual
 ## child, interpolated by the engine), the bots I simulate (also Vehicles), the other drivers' cars (CarVisuals driven by
-## RemoteCarBuffer), cameras and the HUD. Optional subsystems (cinematic, pit crews, TV cameras, audio, grass,
+## RemoteCarBuffer), cameras and the HUD. Optional subsystems (cinematic, TV cameras, audio, grass,
 ## forest ...) are plain fields that stay null until their module attaches: every use is guarded.
 
 ## The physics step: 120 Hz (a phone runs 60: the sim holds its lap time within 0.3 %, see tests/ailap.gd).
@@ -213,7 +213,6 @@ var cinematic = null
 var snd = null
 var tv = null
 var tv_on := false
-var crews = null
 var racing_line = null
 var road_wear = null
 var mirror = null
@@ -2077,7 +2076,6 @@ func _process_inner(dt: float) -> void:
 	update_pit(server_now)
 	update_limiters(server_now)
 	update_bot_pits(server_now)
-	update_crews(dt, cam_pos)
 	kb.end_frame()
 	if mirror != null:
 		mirror.visible = Settings.data.mirror and cinematic == null and not tv_on and cockpit.looking_forward and not kb.held("lookBack")
@@ -2723,10 +2721,6 @@ func session_text(server_now: float) -> String:
 
 var _tris := PackedFloat32Array()
 var _tri_grid := {}
-var _crew_of := {}
-var _crew_centre: Array = []
-var _crew_work: Array = []
-var _crew_pool: Array = []
 
 ## Height of the visible road at (x, z) under top (the highest surface below the probe), from the triangles near the pit lane.
 func _road_height(x: float, z: float, top: float):
@@ -2786,7 +2780,7 @@ func _build_garage_wall(monitor: PitLaneMonitor) -> void:
 			body.add_child(cs)
 	add_child(body)
 
-## Pit lane: markings, the crews at their garages, the smoothed surface where the map's own is rough.
+## Pit lane: markings and the smoothed surface where the map's own is rough.
 func _build_pit_lane(entries: Dictionary) -> void:
 	var lane: Dictionary = track_data.pitLane
 	pit = PitLaneMonitor.new(track_data)
@@ -2868,35 +2862,6 @@ func _build_pit_lane(entries: Dictionary) -> void:
 		add_child(pit.build_surface(paint_ground, wall_probe))
 	var mine = null if spectator else {"slot": race.slots.get(me, 0), "name": names.get(me, "")}
 	add_child(pit.build_markings(paint_ground, mine))
-	# a crew in front of every entrant's garage, in the car's colour
-	var boxes := pit.boxes()
-	var crew_boxes: Array = []
-	for id in race.grid:
-		var pl = _player(id)
-		var e = entries.get(pl.carId) if pl != null and pl.carId != null else null
-		if e == null or boxes.is_empty():
-			continue
-		var ab: Array = boxes[pit.box_of(race.slots.get(id, 0))]
-		var i2 := roundi((ab[0] + ab[1]) / 2.0)
-		var pts: Array = lane.points
-		var away := pit.away_at(i2)
-		var sh := pit.shift_at(i2)
-		var q0: Array = pts[maxi(0, i2 - 1)]
-		var q1: Array = pts[mini(pts.size() - 1, i2 + 1)]
-		var x: float = pts[i2][0] + away.x * sh
-		var z: float = pts[i2][2] + away.y * sh
-		_crew_of[id] = crew_boxes.size()
-		var centre := Vector3(x, paint_ground.call(x, z, pts[i2][1]), z)
-		_crew_centre.append(centre)
-		_crew_pool.append({"car": null, "u": 0.0, "events": null})
-		crew_boxes.append({"centre": centre, "along": Vector3(q1[0] - q0[0], 0, q1[2] - q0[2]).normalized(), "away": Vector3(away.x, 0, away.y), "colour": e.color})
-	if SHOW_PIT_CREWS and not crew_boxes.is_empty() and ResourceLoader.exists("res://scripts/game/pit_crew.gd"):
-		crews = PitCrews.new(crew_boxes)
-		add_child(crews)
-
-## The mechanics at the garages and their work at a stop (PitCrews): off (the user, 2026-11-16: no people in the boxes);
-## the stops' timing and service are the same without them.
-const SHOW_PIT_CREWS := false
 
 ## Pit lane: limiter, pit-in/out for the lap logic, the service box.
 func update_pit(server_now: float) -> void:
@@ -3016,36 +2981,6 @@ func stop_event(e: Dictionary, v: Vehicle, plan: Dictionary, audible: bool) -> v
 	if snd != null:
 		snd.pit_event(e.kind, pan)
 
-## The crews: mine works to my stop's timeline; a bot's (when I run it) to its own; anyone else's car standing in its
-## box gets its crew round it; the rest wait in front of their garages.
-func update_crews(dt: float, cam_pos: Vector3) -> void:
-	if crews == null:
-		return
-	_crew_work.resize(_crew_pool.size())
-	_crew_work.fill(null)
-	var set_work := func(id: String, obj: Node3D, entry: Dictionary, u: float, events) -> void:
-		if not _crew_of.has(id):
-			return
-		var i: int = _crew_of[id]
-		var w: Dictionary = _crew_pool[i]
-		w.car = {"pos": obj.global_position, "quat": obj.global_transform.basis.get_rotation_quaternion(), "entry": entry}
-		w.u = u
-		w.events = events
-		_crew_work[i] = w
-	var now := Time.get_ticks_msec() as float
-	if pit_hold and not spectator:
-		set_work.call(me, my_visual, vehicle.car, (now - service.start) / 1000.0 if service != null else 0.0, service.events if service != null else null)
-	for r: Remote in remotes.values():
-		var b := r.bot
-		if b != null:
-			if b.service_end > 0.0 or b.ai.at_box():
-				set_work.call(r.id, r.visual, r.entry, (now - b.service_start) / 1000.0, b.service_events)
-			continue
-		if _crew_of.has(r.id):
-			var i2: int = _crew_of[r.id]
-			if r.vel.length_squared() < 0.4 and r.visual.global_position.distance_squared_to(_crew_centre[i2]) < 20.0:
-				set_work.call(r.id, r.visual, r.entry, 0.0, null)
-	crews.update_crews(dt, cam_pos, _crew_work)
 
 # ------------------------------------------------------------------ ui ---
 
