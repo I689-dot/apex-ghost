@@ -1803,3 +1803,14 @@ assumes the old peak; retune AI_GRIP if needed).
   - The password row only for the first accounts.
 - Server: `account/guest`, `account/resume`, `account/nick` and `account/play-games`, plus the users columns `kind`
   and `pgs_id`. A Play Games account is deleted with `confirm: true`.
+- The black first start on the phone, found:
+  - The intro loaded its car on the main thread before the first frame. On the Pixel 10a, the Porsche's full model
+    (one of the intro's two cars) never finished loading that way: 0 % CPU, flat memory, for minutes. It happened
+    every time the Porsche was picked, about half of all starts.
+  - The same model loads in 70 ms on the PC, and in a thread on the phone in about 4 s.
+- The fix: the intro now reads its car in a thread with frames going on, and is left out if the car is not loaded
+  after 8 s. Its car is also no longer kept in memory after the intro.
+- After that, the start came up 4 times out of 4 with the Porsche and 3 times out of 3 with both cars.
+- One native crash in the Mali driver (vkAllocateDescriptorSets) right after the first guest sign-in opened the
+  garage. The phone was short of memory at the time: about 530 MB free, swap full, Android killing other apps. It did
+  not come back in the starts after.

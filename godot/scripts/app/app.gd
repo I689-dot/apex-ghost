@@ -801,10 +801,26 @@ func _play_intro() -> void:
 		pool = cars.cars.filter(func(c): return c.role != "safety")
 	if pool.is_empty():
 		return
-	var intro := IntroCinematic.new(pool[randi() % pool.size()])
+	var entry: Dictionary = pool[randi() % pool.size()]
 	# the studio is drawn by itself: the menu and its backdrop wait under it
 	bg.visible = false
 	ui.visible = false
+	# the car read in a thread, frames going on (on the phone the main thread once waited for ever on a car's model:
+	# a black screen at start); not there in time, no intro
+	var f: String = str(entry.lods[0])
+	Assets.request(f)
+	var t0 := Time.get_ticks_msec()
+	while not Assets.scene_ready(f) and Time.get_ticks_msec() - t0 < 8000:
+		await get_tree().process_frame
+	if not Assets.scene_ready(f):
+		print("[boot] intro: %s not loaded after 8 s, skipped" % entry.id)
+		bg.visible = true
+		ui.visible = true
+		return
+	var held := Assets.scene_result(f)
+	print("[boot] intro: %s in %d ms" % [entry.id, Time.get_ticks_msec() - t0])
+	var intro := IntroCinematic.new(entry)
+	held = null
 	add_child(intro)
 	var over := intro.overlay()
 	overlay_layer.add_child(over)
@@ -816,7 +832,8 @@ func _play_intro() -> void:
 		ui.modulate.a = 0.0
 		ui.create_tween().tween_property(ui, "modulate:a", 1.0, 0.5)
 		over.queue_free()
-		intro.queue_free())
+		intro.queue_free()
+		Assets.forget_car_model(entry, 1, false))
 	intro.play()
 
 func _shots_only() -> void:
