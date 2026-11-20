@@ -15,14 +15,23 @@ static func fmt_lap(ms: float) -> String:
 ## sign-in of its own): the logo, sign in or create an account, then the menu. If the server cannot be reached, a
 ## solo-only way in ("Play offline"); if it keeps no accounts at all, the game goes straight to the menu (App.show_start).
 static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) -> Control:
-	var root := CenterContainer.new()
-	UIKit.full(root)
-	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NAVY_SOLID, 0.94), Color(1, 1, 1, 0.18), 1, 10, Vector2(34, 28)))
+	# (a landscape phone is shorter than the card: it scrolls, centred while it fits; 2026-11-21 on a Pixel 10a the
+	# Sign in button was off the bottom of the screen)
+	var touch := UIKit.touch()
 	var vp := app.get_viewport().get_visible_rect().size
-	card.custom_minimum_size = Vector2(minf(520.0, vp.x - 32.0), 0)
-	var body := UIW.vbox(12)
-	var logo := UIW.logo(52)
+	var scroll := ScrollContainer.new()
+	UIKit.full(scroll)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var root := CenterContainer.new()
+	root.custom_minimum_size = vp
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(root)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NAVY_SOLID, 0.94), Color(1, 1, 1, 0.18), 1, 10, Vector2(28, 16) if touch else Vector2(34, 28)))
+	card.custom_minimum_size = Vector2(minf(560.0 if touch else 520.0, vp.x - 32.0), 0)
+	var body := UIW.vbox(8 if touch else 12)
+	var logo := UIW.logo(40 if touch else 52)
 	logo.alignment = BoxContainer.ALIGNMENT_CENTER
 	body.add_child(logo)
 	body.add_child(UIW.hair())
@@ -42,7 +51,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 		if is_instance_valid(offline_box) and r.status == 0:
 			offline_box.visible = true
 	probe.call()
-	return root
+	return scroll
 
 ## The sign-in form: Sign in / Create account tabs, nickname, password, the button. on_unreachable: called when the
 ## server cannot be reached.

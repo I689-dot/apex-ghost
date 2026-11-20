@@ -10,7 +10,7 @@ func _walk(n: Node) -> Array:
 
 func _initialize() -> void:
 	var id := OS.get_environment("CAR_ID") if OS.get_environment("CAR_ID") != "" else "vantage_gt3_evo_heart_of_racing"
-	var inst: Node = load("res://assets/cars/%s/cockpit.glb" % id).instantiate()
+	var inst: Node = load(Assets.path(str(CarsDb.by_id(id).get("cockpit", "assets/cars/%s/lod0.glb" % id)))).instantiate()
 	for n in _walk(inst):
 		if n is MeshInstance3D and n.mesh != null:
 			var mi := n as MeshInstance3D

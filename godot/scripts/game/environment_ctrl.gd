@@ -255,6 +255,12 @@ func set_look(l: Dictionary) -> void:
 			env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	if l.has("white"):
 		env.tonemap_white = float(l.white)
+	# (AgX has its own white and a contrast, Godot 4.5 up: "white" above is the other tonemappers'; AgX's default white
+	# 16.29 and contrast 1.25 are what the looks were fitted with)
+	if l.has("agx_contrast"):
+		env.tonemap_agx_contrast = float(l.agx_contrast)
+	if l.has("agx_white"):
+		env.tonemap_agx_white = float(l.agx_white)
 	_apply_post(quality)
 
 func _update_lut(sun_v: Vector3, haze: float, force: bool = false) -> void:

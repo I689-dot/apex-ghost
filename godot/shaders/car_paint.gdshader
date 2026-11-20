@@ -45,6 +45,10 @@ uniform float flake_size = 0.0009;
 // parallel to the panel and send the light back towards the viewer only face-on), so each panel changes with the view
 uniform float paint_purity = 1.0;
 uniform float flop = 0.0;
+// the lacquer's depth (the classic layered paint model): seen at a grazing angle the light crosses more of the tinted
+// coat, so the colour there is deeper and richer (a darker, purer shade of itself); face-on it is the colour as mixed.
+// What a single plastic layer lacks: every panel's shade turns with the view.
+uniform float paint_depth = 0.0;
 
 varying vec3 cpos;
 
@@ -139,6 +143,10 @@ void fragment() {
 		}
 	}
 	float nv = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	if (paint_depth > 0.0) {
+		vec3 deep = c * c * 1.15;
+		c = mix(c, deep, paint_depth * pow(1.0 - nv, 1.4));
+	}
 	if (flop > 0.0) {
 		c *= mix(1.0, mix(0.35, 1.18, pow(nv, 0.55)), flop);
 	}

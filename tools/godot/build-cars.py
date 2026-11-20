@@ -129,6 +129,45 @@ def install(cid, c, meta, out, png, entries):
     })
     if 'name' in c:
         e['name'] = c['name']
+    dedupe(cid, dst, e)
+
+
+def _md5(p):
+    import hashlib
+    h = hashlib.md5()
+    with open(p, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def dedupe(cid, dst, e):
+    """The levels car-lods.mjs writes the same as LOD0 (cockpit.glb is LOD0 whenever the model has no separate interior;
+    lod1 is LOD0 when the source is under lod1's triangle cap) kept once: the entry points at lod0.glb and the copy goes.
+    The APK carried every copy twice, imported scene and textures (2.15 GB, the format's limit is 2 GiB), and the game
+    loaded them twice."""
+    lod0 = os.path.join(dst, 'lod0.glb')
+    if not os.path.exists(lod0):
+        return
+    h0 = _md5(lod0)
+    url0 = e['lods'][0]
+    cp = os.path.join(dst, 'cockpit.glb')
+    if os.path.exists(cp) and _md5(cp) == h0:
+        os.remove(cp)
+        for extra in (cp + '.import',):
+            if os.path.exists(extra):
+                os.remove(extra)
+        e['cockpit'] = url0
+        e['cockpitBytes'] = os.path.getsize(lod0)
+        print(f'[dedupe] {cid}: cockpit.glb = lod0.glb, kept once')
+    l1 = os.path.join(dst, 'lod1.glb')
+    if os.path.exists(l1) and _md5(l1) == h0:
+        os.remove(l1)
+        if os.path.exists(l1 + '.import'):
+            os.remove(l1 + '.import')
+        e['lods'][1] = url0
+        e['bytes'] = sum(os.path.getsize(os.path.join(dst, f)) for f in ('lod0.glb', 'lod2.glb') if os.path.exists(os.path.join(dst, f)))
+        print(f'[dedupe] {cid}: lod1.glb = lod0.glb, kept once')
 
 
 # the driver's eye from the steering wheel, where the converter's eye search is not trusted (it put several eyes 15-25 cm
@@ -170,6 +209,16 @@ def import_models():
 
 
 def main():
+    # --dedupe: only the duplicate levels of the cars already installed (no rebuild)
+    if '--dedupe' in sys.argv:
+        path = os.path.join(ROOT, 'godot/data/cars.json')
+        data = json.load(open(path))
+        for e in data['cars']:
+            d = os.path.join(ROOT, 'godot/assets/cars', e['id'])
+            if os.path.isdir(d) and e.get('lods'):
+                dedupe(e['id'], d, e)
+        json.dump(data, open(path, 'w'), indent=1)
+        return
     src_root = sys.argv[1]
     only = sys.argv[sys.argv.index('--car') + 1] if '--car' in sys.argv else None
     os.makedirs(WORK, exist_ok=True)

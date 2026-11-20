@@ -132,6 +132,8 @@ static func _set_paint(pm: ShaderMaterial, livery: Dictionary, fin: Dictionary, 
 	pm.set_shader_parameter("pearl", fin.pearl)
 	pm.set_shader_parameter("flakes", fin.get("flakes", 0.0))
 	pm.set_shader_parameter("flop", fin.get("flop", 0.0))
+	# (the lacquer's depth: every lacquered finish; CAR_DEPTH overrides it, comparisons)
+	pm.set_shader_parameter("paint_depth", float(OS.get_environment("CAR_DEPTH")) if OS.get_environment("CAR_DEPTH") != "" else (0.0 if fin.clearcoat <= 0.0 else 0.8))
 	# the aero (the livery's "aero"): the wing all of it, the lowest band of the body too; carbon, or painted in
 	# the second colour; "body": no trim
 	var aero: String = livery.get("aero", "carbon")

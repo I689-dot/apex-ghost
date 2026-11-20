@@ -1762,3 +1762,14 @@ assumes the old peak; retune AI_GRIP if needed).
 - Graphics › Other cars › Full-resolution cars: every car with its LOD0 (the unsimplified source model, 300k-2.5M
   triangles) at every distance. LOD0 already was the source model, for your car and for others within 30 m x the
   preset's scale.
+- Paint, second step: the lacquer's depth. At a grazing angle a panel's colour is deeper and richer (the light crosses
+  more of the tinted coat: the classic layered car-paint model), so every curved panel's shade turns with the view;
+  0.8 on every lacquered finish. AgX's own white and contrast can now be set by a circuit look (agx_white,
+  agx_contrast). The looks' "white" is the other tonemappers' and AgX ignores it; the looks were fitted with AgX's
+  defaults (16.29, 1.25), and a contrast of 1.45 was tried and left (it changes the whole picture).
+- The phone (a Pixel 10a over USB, the user's): the sign-in card was taller than a landscape phone, and its Sign in
+  button was off the screen. It now scrolls (centred while it fits) and is more compact on touch.
+- The APK was 2.147 GB, 117 KB under the format's 2 GiB limit: every car's cockpit.glb was a byte-for-byte copy of its
+  lod0.glb, and four cars' lod1.glb too, each imported and packed twice. build-cars.py keeps such a level once (the
+  entry points at lod0.glb). `python3 -I tools/godot/build-cars.py --dedupe` does it for cars already installed:
+  godot/assets/cars went from 1.8 GB to 1.1 GB, and the game no longer loads the same model twice.
