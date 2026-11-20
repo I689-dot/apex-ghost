@@ -1,0 +1,14 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ Mercedes-AMG GT3 EVO (1465 kg, RWD) on a flat pad
+rest drift (3 s)               0.0000 m, max speed 0.000 m/s, compression 0.025/0.025/0.026/0.026/, ride y -0.001
+0-100 km/h                     4.38 s
+0-200 km/h                     12.61 s
+top speed (45 s)               272 km/h (spec 280)
+shifts                         2@103 3@138 4@173 5@208 6@245 
+lateral drift on straight      0.00 m after 2688 m
+braking 200->0                 86.4 m in 3.30 s (ABS on)
+exit=0 seconds=3

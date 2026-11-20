@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+layout: Shanghai International Circuit
+collision bodies: 6 in 1342 ms
+t= 0  speed   0.0 km/h  y=-0.00  surface=asphalt gear=1
+t= 2  speed  50.3 km/h  y=-0.00  surface=asphalt gear=1
+t= 4  speed  97.8 km/h  y=0.05  surface=asphalt gear=2
+t= 6  speed 134.5 km/h  y=-0.00  surface=asphalt gear=3
+t= 8  speed 162.6 km/h  y=-0.03  surface=asphalt gear=4
+t=10  speed 185.1 km/h  y=0.22  surface=asphalt gear=4
+moved 401 m, centreline index 72, progress 362 m
+exit=0 seconds=3

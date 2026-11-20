@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok   no reference at first
+ok   best has a reference
+ok   optimal built from the three sectors
+ok   a dirty sector is not taken
+ok   clean faster sectors are taken
+ok   on the optimal lap the delta is zero
+ok   on the optimal sectors the delta is zero
+ok   the sector delta restarts at zero with the sector
+0 failures
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=8

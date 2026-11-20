@@ -1,0 +1,18 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok   three players
+ok   a line reaches everyone, the sender too
+ok   with the sender's nick
+ok   /rc reaches the host
+ok   and comes back to the sender
+ok   but not to the others
+ok   control characters are stripped: '[b]bold[/b] ix/i tabhere'
+ok   a long line is cut to 120
+ok   a second line inside the minimum gap is dropped
+ok   an empty line is ignored
+ok   an empty /rc is ignored
+failures: 0 (errors sent 1)
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=8

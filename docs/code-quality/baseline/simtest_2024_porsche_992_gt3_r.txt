@@ -1,0 +1,14 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ Porsche 911 GT3 R (992) (1405 kg, RWD) on a flat pad
+rest drift (3 s)               0.0000 m, max speed 0.000 m/s, compression 0.021/0.021/0.026/0.026/, ride y -0.001
+0-100 km/h                     4.14 s
+0-200 km/h                     11.56 s
+top speed (45 s)               274 km/h (spec 282)
+shifts                         2@99 3@135 4@172 5@210 6@251 
+lateral drift on straight      0.00 m after 2750 m
+braking 200->0                 86.1 m in 3.29 s (ABS on)
+exit=0 seconds=3

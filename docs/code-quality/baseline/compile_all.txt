@@ -1,0 +1,7 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+152 scripts, 0 failed
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=10

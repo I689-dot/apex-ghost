@@ -1,0 +1,22 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok   room created
+ok   welcome received
+ok   first player is the host
+ok   car locked
+ok   bot added
+ok   briefing started
+ok   session loading
+ok   qualifying set up for 2 cars
+ok   countdown
+ok   racing
+laps: ["1:104139(out)", "2:104039"]
+ok   laps timed from binary packets (2)
+ok   timed lap 104039 ms is near 104039 ms
+ok   sector times sent
+ok   standings broadcast
+failures: 0
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=1

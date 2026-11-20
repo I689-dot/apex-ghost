@@ -1,0 +1,14 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ BMW M4 GT3 (1420 kg, RWD) on a flat pad
+rest drift (3 s)               0.0000 m, max speed 0.000 m/s, compression 0.024/0.024/0.024/0.024/, ride y -0.000
+0-100 km/h                     4.19 s
+0-200 km/h                     11.80 s
+top speed (45 s)               269 km/h (spec 278)
+shifts                         2@112 3@150 4@188 5@228 
+lateral drift on straight      0.00 m after 2725 m
+braking 200->0                 85.5 m in 3.27 s (ABS on)
+exit=0 seconds=3

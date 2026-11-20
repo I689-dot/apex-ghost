@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+layout: Circuit de Spa-Francorchamps
+collision bodies: 7 in 1003 ms
+t= 0  speed   0.0 km/h  y=1.64  surface=asphalt gear=1
+t= 2  speed  48.1 km/h  y=1.88  surface=asphalt gear=1
+t= 4  speed  96.8 km/h  y=2.62  surface=asphalt gear=1
+t= 6  speed 131.4 km/h  y=3.78  surface=asphalt gear=3
+t= 8  speed 159.4 km/h  y=6.12  surface=asphalt gear=3
+t=10  speed 179.0 km/h  y=10.07  surface=grass gear=4
+moved 329 m, centreline index 78, progress 389 m
+exit=0 seconds=2

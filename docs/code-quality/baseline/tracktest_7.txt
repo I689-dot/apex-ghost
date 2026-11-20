@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+layout: Circuit de Barcelona-Catalunya
+collision bodies: 6 in 693 ms
+t= 0  speed   0.0 km/h  y=0.44  surface=asphalt gear=1
+t= 2  speed  50.6 km/h  y=0.31  surface=asphalt gear=1
+t= 4  speed  99.0 km/h  y=-0.15  surface=asphalt gear=2
+t= 6  speed 136.4 km/h  y=-1.24  surface=asphalt gear=3
+t= 8  speed 165.4 km/h  y=-3.19  surface=asphalt gear=4
+t=10  speed 188.8 km/h  y=-5.19  surface=asphalt gear=4
+moved 415 m, centreline index 81, progress 405 m
+exit=0 seconds=1

@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+layout: Nürburgring GP · Short (no Müllenbachschleife)
+collision bodies: 7 in 925 ms
+t= 0  speed   0.0 km/h  y=-1.75  surface=asphalt gear=1
+t= 2  speed  50.9 km/h  y=-1.92  surface=asphalt gear=1
+t= 4  speed  99.5 km/h  y=-2.53  surface=asphalt gear=2
+t= 6  speed 136.5 km/h  y=-3.59  surface=asphalt gear=3
+t= 8  speed 165.0 km/h  y=-5.14  surface=asphalt gear=4
+t=10  speed 184.8 km/h  y=-7.70  surface=grass gear=4
+moved 399 m, centreline index 125, progress 622 m
+exit=0 seconds=2

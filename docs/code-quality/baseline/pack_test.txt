@@ -1,0 +1,21 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+[boot] packs
+ok   not present before the download
+ok   manifest fetched
+ok   a cut download stops with an error
+ok   the part is kept for resuming
+ok   resumed and finished
+ok   installed with its hash
+ok   mounted: its file reads from res://
+ok   present after the download
+ok   an update is offered
+ok   a damaged download is refused
+ok   update installed
+ok   update mounted over the old one
+ok   the old version's file removed
+0 failures
+exit=0 seconds=9

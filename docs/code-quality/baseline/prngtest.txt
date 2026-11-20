@@ -1,0 +1,9 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+0.9797282678,0.3067522645,0.4842054215,0.8179344125,0.5094283693
+897075448
+ABCDE { "ok": true, "nick": "bMax/b Z" }
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=9

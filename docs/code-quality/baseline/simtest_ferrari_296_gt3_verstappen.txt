@@ -1,0 +1,14 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ Ferrari 296 GT3 (1415 kg, RWD) on a flat pad
+rest drift (3 s)               0.0000 m, max speed 0.000 m/s, compression 0.022/0.022/0.027/0.027/, ride y -0.016
+0-100 km/h                     3.72 s
+0-200 km/h                     10.97 s
+top speed (45 s)               275 km/h (spec 284)
+shifts                         2@95 3@129 4@162 5@197 6@232 
+lateral drift on straight      0.00 m after 2803 m
+braking 200->0                 85.5 m in 3.27 s (ABS on)
+exit=0 seconds=4

@@ -1,0 +1,28 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ AI lap: Wrenfeld F6 GT3 R on Circuit de Spa-Francorchamps
+  racing line built in 5 ms
+  quasi-steady-state lap on the racing line: 2:19.994
+    t=  0 s  lap distance   115 m    0 km/h
+    t= 20 s  lap distance   709 m  194 km/h
+    t= 40 s  lap distance  1766 m  214 km/h
+    t= 60 s  lap distance  2750 m  143 km/h
+    t= 80 s  lap distance  3562 m  194 km/h
+    t=100 s  lap distance  4596 m  125 km/h
+    t=120 s  lap distance  5411 m  186 km/h
+    t=140 s  lap distance  6641 m  204 km/h
+  lap 1: 2:32.382 (out)
+    t=160 s  lap distance  7413 m   85 km/h
+    t=180 s  lap distance  8346 m  166 km/h
+    t=200 s  lap distance  9498 m  122 km/h
+    t=220 s  lap distance 10241 m  141 km/h
+    t=240 s  lap distance 11189 m  195 km/h
+    t=260 s  lap distance 12062 m  111 km/h
+    t=280 s  lap distance 13130 m  236 km/h
+    t=300 s  lap distance 14015 m  140 km/h
+  lap 2: 2:29.162
+skill 0.97: lap 2:29.162, resets 0, top 245 km/h, finished=true, off the track 0 times
+exit=0 seconds=26

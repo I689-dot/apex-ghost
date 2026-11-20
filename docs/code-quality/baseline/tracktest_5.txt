@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+layout: Silverstone Circuit
+collision bodies: 6 in 720 ms
+t= 0  speed   0.0 km/h  y=-0.51  surface=asphalt gear=1
+t= 2  speed  48.8 km/h  y=-0.33  surface=asphalt gear=1
+t= 4  speed  96.7 km/h  y=0.21  surface=asphalt gear=1
+t= 6  speed 132.3 km/h  y=1.21  surface=asphalt gear=3
+t= 8  speed 160.9 km/h  y=2.48  surface=asphalt gear=3
+t=10  speed 182.1 km/h  y=3.95  surface=asphalt gear=4
+moved 364 m, centreline index 61, progress 311 m
+exit=0 seconds=2

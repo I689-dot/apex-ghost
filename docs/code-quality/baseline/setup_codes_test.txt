@@ -1,0 +1,16 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   code has the prefix
+ok   round trip keeps the setup
+ok   whitespace around a pasted code is fine
+ok   not a code
+ok   empty
+ok   bad base64/json
+ok   huge code refused
+ok   hostile values are clamped
+ok   a plain setup without pressures
+0 failures
+exit=0 seconds=8

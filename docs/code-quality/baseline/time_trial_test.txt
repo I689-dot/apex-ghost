@@ -1,0 +1,19 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+plain : ["1 v=false b=false p=false", "2 v=true b=true p=false", "3 v=true b=true p=false", "4 v=false b=false p=false", "5 v=true b=true p=false", "6 v=true b=true p=false"]
+streak: ["1 v=false b=false p=false", "2 v=true b=false p=true", "3 v=true b=true p=false", "4 v=false b=false p=false", "5 v=true b=false p=true", "6 v=true b=true p=false"]
+ok   six laps each
+ok   the first is the out lap
+ok   plain: the first clean lap is the best
+ok   the lap with a reset is invalid
+ok   plain: the faster lap after it is the best at once
+ok   streak: the first clean lap waits for a second
+ok   streak: the second clean lap in a row counts
+ok   streak: the lap with a reset is invalid
+ok   streak: a faster lap straight after a bad one doesn't count yet
+ok   streak: the next clean lap counts
+failures: 0
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=10

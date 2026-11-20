@@ -1,0 +1,18 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+samples: ["gravel", "kerb", "grass", "squeal", "scrape", "crash_light", "crash_medium", "crash_heavy", "crash_debris", "grass_tyre", "sand", "road", "wet_road", "splash"]
+vantage_gt3_evo_heart_of_racing amgV8tt bank=viper loops=13 norm=0.85
+2020_audi_r8_lms_evo v10 bank=v10 loops=9 norm=1.49
+bmw_m4_gt3_vecarz bmwI6 bank=i6 loops=9 norm=0.96
+ferrari_296_gt3_verstappen ferrariV6 bank=v8f loops=9 norm=1.4
+ford_mustang_gt3 muscleV8 bank=viper loops=13 norm=0.85
+2020_mclaren_720s_gt3 mclarenV8 bank=v8tt loops=9 norm=2.35
+mercedes_amg_gt3_evo amgV8 bank=viper loops=13 norm=0.85
+2024_porsche_992_gt3_r boxer6 bank=flat6 loops=9 norm=0.94
+audio ok, buses: 9
+WARNING: 42 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+exit=0 seconds=11

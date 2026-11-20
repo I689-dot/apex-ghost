@@ -1,0 +1,79 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+[boot] app
+[boot] layers
+[boot] data
+[boot] audio
+[boot] graphics
+[boot] input
+[boot] start screen
+ok   the menu layer carries the theme
+ok   the menu focuses a control for the pad (Button)
+ok   menu play builds (en)
+ok   menu online builds (en)
+ok   menu friends builds (en)
+ok   career profile builds (en)
+ok   career achievements builds (en)
+ok   career ranks builds (en)
+ok   career ranking builds (en)
+ok   settings graphics builds (en): 29 controls
+ok   settings display builds (en): 25 controls
+ERROR: Lambda capture at index 0 was freed. Passed "null" instead.
+   at: call (modules/gdscript/gdscript_lambda_callable.cpp:110)
+   GDScript backtrace (most recent call first):
+       [0] refresh (res://scripts/app/store_screen.gd:89)
+       [1] invite (res://scripts/net/account.gd:210)
+       [2] api (res://scripts/net/account.gd:71)
+ok   settings view builds (en): 23 controls
+ok   settings driving builds (en): 21 controls
+ok   settings interface builds (en): 34 controls
+ok   settings audio builds (en): 14 controls
+ok   settings controls builds (en): 58 controls
+ok   settings controller builds (en): 91 controls
+ok   settings account builds (en): 16 controls
+ok   settings presets builds (en): 13 controls
+ok   the menu has no sign-in button
+ok   the sign-in screen asks for the password
+ok   store coins builds
+ok   store items builds
+ok   store offers builds
+ok   store redeem builds
+ok   store invite builds
+ok   a promotional code adds its coins to the preview balance
+ok   the checkout's pay button is off in the preview
+ok   stepper steps right and holds at the end (["c"])
+ok   stepper steps left and holds at the start (["c", "b", "a"])
+ok   a read-only stepper does not step
+ok   switch reports a flip
+ok   a read-only switch is disabled
+ok   the records modal opens
+ok   Esc closes the modal
+ok   the settings open over the menu
+ok   Esc closes the settings, the menu stays
+ok   Esc from the career returns to the menu
+ok   joined a solo room
+ok   lobby hub builds with the start button
+ok   lobby circuit builds with the start button
+ok   lobby car builds with the start button
+ok   lobby session builds with the start button
+ok   lobby conditions builds with the start button
+ok   lobby rules builds with the start button
+ok   lobby drivers builds with the start button
+ok   Esc from a lobby page returns to the overview
+ok   the overview shows the six weekend tabs
+ok   the paint page shows your car and the colour choices
+ok   the results build with Back to lobby
+0 failures
+WARNING: 22 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+ERROR: 28 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.
+ERROR: 13 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.
+ERROR: 3 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+WARNING: 172 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 7 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit=0 seconds=13

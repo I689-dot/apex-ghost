@@ -1,0 +1,21 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   bound devices drive the car
+ok   at rest: straight, no pedals (-0.00 0.00 0.00)
+ok   wheel half left: steer +0.5 (0.50)
+ok   throttle pressed fully, its axis turned round (1.00)
+ok   brake half way (0.50)
+ok   the shifter in neutral (0)
+ok   the shifter in 3rd (3)
+ok   the shifter in reverse (-1)
+ok   the shift-up paddle presses the game's shift-up
+ok   the clutch learnt on the pedals' axis 3 ({ "dev": "fake pedals", "nth": 0, "kind": "axis", "index": 3, "min": 1.0, "max": -1.0, "deadzone": 0.02 })
+ok   its ends: rest +1, pressed -1
+ok   the steering learnt on the wheel's axis 5
+ok   turned the way it went first (left): steer +1 (1.00)
+ok   unplugged: the bindings stop driving
+0 failures
+exit=0 seconds=12

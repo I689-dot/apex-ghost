@@ -1,0 +1,29 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   trophies: 3 a win, 2 a podium, 1 a top six, none after or for a DNF
+ok   the Rookie Cup is open, Class D shut at the start
+ok   P2 in a cup race: 2 trophies, their credits ({ "trophies": 2, "gained": 2, "credits": 3000, "cup": "rookie_cup", "race": 0 })
+ok   a win after it: one new trophy, paid once ({ "trophies": 3, "gained": 1, "credits": 1500, "cup": "rookie_cup", "race": 0 })
+ok   a worse result keeps the best
+ok   no race set: nothing scored
+ok   6 trophies open Class D, not C
+ok   the featured race: double credits, no cup trophies ({ "trophies": 3, "gained": 3, "credits": 12000, "cup": "weekly", "race": 0, "weekly": true })
+ok   pass tier 3, 50 XP into the next
+ok   a reached free reward claims once
+ok   a tier not reached cannot be claimed
+ok   premium locked; 2 free rewards still to claim
+ok   a race gives pass XP (298)
+ok   the contracts advance: the win, 3 clean laps, 4 places gained (capped at 3)
+ok   a win fills a daily chest
+ok   a done contract claims once; an unfinished one cannot
+ok   a chest opens once
+ok   no chest past the day's wins
+ok   the free bonus, then its cooldown
+ok   no interstitial before its number of races
+ok   an interstitial after 3 races
+ok   and not again until the next ones
+0 failures
+exit=0 seconds=10

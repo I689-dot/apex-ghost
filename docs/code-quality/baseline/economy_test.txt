@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   a driver signs up ()
+ok   their invite code (CG-89SQN)
+ok   a friend signs up with it
+ok   the friend starts with 300 coins (300.0)
+ok   a code adds its 500 ({ "coins": 800.0, "added": 500.0, "what": "500 coins" })
+ok   the same code a second time is refused (You have used this code already.)
+ok   the store shows the server's balance and its history
+ok   the ranking answers with my place ({ "rank": 1.0, "rating": 1500.0, "races": 0.0 })
+ok   the friends ranking answers
+ok   a new driver's online licence: R 2.50 ({ "licence": "R", "sr": 2.5, "srLast": <null> })
+[boot] app
+[boot] layers
+[boot] data
+[boot] audio
+[boot] graphics
+[boot] input
+[boot] start screen
+[boot] intro
+ok   the career shows the online licence
+0 failures
+WARNING: 2 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+ERROR: 2 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.
+ERROR: 2 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+WARNING: 18 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 2 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+exit=0 seconds=11

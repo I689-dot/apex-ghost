@@ -1,0 +1,19 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+ok   20 Hz out of 60 fps frames: 66 samples in 200 frames
+ok   101 samples, 5 s
+ok   position is interpolated between samples (41.000)
+ok   rotation is interpolated (0.5125)
+ok   steer and brake light
+ok   times outside the buffer are clamped
+ok   a reset is a jump, not a drive across the track
+ok   velocity from the samples: 40.00
+ok   no velocity across a jump
+ok   unknown car
+ok   ring buffer holds 7200 samples
+ok   oldest samples dropped
+failures: 0
+[boot] settings
+[boot] settings loaded
+[boot] packs
+exit=0 seconds=8

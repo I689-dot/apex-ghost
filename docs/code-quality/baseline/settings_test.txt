@@ -1,0 +1,31 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   graphics page builds (en): 32 rows
+ok   display page builds (en): 24 rows
+ok   view page builds (en): 21 rows
+ok   driving page builds (en): 16 rows
+ok   interface page builds (en): 28 rows
+ok   audio page builds (en): 10 rows
+ok   a plain preset is not custom
+ok   ultra mirrors from the ultra preset
+ok   overrides make it custom
+ok   mirror updates from the low preset (2)
+ok   cockpit detail from the low preset
+ok   car detail from the low preset
+ok   the rest stays ultra
+ok   old settings get the display defaults
+ok   upscalers ["bilinear", "fsr", "fsr2"] on forward_plus
+ok   RX 7600 XT ranks ultra
+ok   UHD 630 does not
+ok   assist level Casual sets every assist and the full line
+ok   Expert: manual gears, no traction control
+ok   changing one assist makes it Custom
+ok   a preset keeps the settings, not the paint or the presets
+ok   loading it brings the settings back, the paint stays
+ok   a loaded preset is a copy (changing it later does not reach the settings)
+ok   a starting point sets its own keys and leaves the rest
+0 failures
+exit=0 seconds=11

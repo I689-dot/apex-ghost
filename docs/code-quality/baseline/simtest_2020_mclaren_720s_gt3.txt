@@ -1,0 +1,14 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ McLaren 720S GT3 (1410 kg, RWD) on a flat pad
+rest drift (3 s)               0.0000 m, max speed 0.000 m/s, compression 0.022/0.022/0.026/0.026/, ride y -0.021
+0-100 km/h                     3.85 s
+0-200 km/h                     11.12 s
+top speed (45 s)               277 km/h (spec 285)
+shifts                         2@100 3@135 4@169 5@206 6@244 
+lateral drift on straight      0.00 m after 2800 m
+braking 200->0                 85.4 m in 3.27 s (ABS on)
+exit=0 seconds=4

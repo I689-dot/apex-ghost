@@ -1,0 +1,17 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   a guest under its driver name ()
+ok   its device key is kept
+ok   the same name again gets a number (Gst747462451)
+ok   back in with the device key
+ok   a new driver name, on the device too
+ok   a taken name is refused
+ok   signing out keeps the key, no sign-in on its own
+ok   deleting the driver: no password asked, the key forgotten ()
+ok   the deleted driver cannot come back
+ok   Play Games: not set up on a server without its Google client
+0 failures
+exit=0 seconds=9

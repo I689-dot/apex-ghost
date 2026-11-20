@@ -1,0 +1,19 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+ok   the dial's size kept ({ &"x": 0.03125, &"y": 0.03125, &"scale": 1.2 })
+ok   the dial moved to the top left ((40.0, 40.0), was (770.8, 1098.0))
+ok   a new HUD puts the dial where it was saved ((40.0, 40.0))
+ok   and at its size (1.20)
+ok   in a smaller window every block's corner stays on the screen
+ok   Reset all clears the layout
+ok   Cancel puts the layout back
+0 failures
+WARNING: 3 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2735)
+ERROR: 1 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+WARNING: 10 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+exit=0 seconds=8

@@ -1,0 +1,884 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+WARNING: The variable "d" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/game/settings.gd:60)
+WARNING: The local function parameter "invite" is shadowing an already-declared function at line 209 in the current class.
+     at: GDScript::reload (res://scripts/net/account.gd:115)
+WARNING: The local function parameter "invite" is shadowing an already-declared function at line 209 in the current class.
+     at: GDScript::reload (res://scripts/net/account.gd:163)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/shared/constants.gd:39)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/shared/track_math.gd:32)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/shared/track_math.gd:52)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/shared/race_tracker.gd:302)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/shared/race_tracker.gd:398)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/shared/race_tracker.gd:646)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/shared/race_control.gd:30)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/shared/race_control.gd:145)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/shared/race_control.gd:198)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "sign" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/shared/car_state.gd:92)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/shared/room_core.gd:184)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/shared/room_core.gd:887)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_next_id" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/net/local_room.gd:14)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "media" is never used in the function "<anonymous lambda>()". If this is intended, prefix it with an underscore: "_media".
+     at: GDScript::reload (res://scripts/net/p2p.gd:67)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "index" is never used in the function "<anonymous lambda>()". If this is intended, prefix it with an underscore: "_index".
+     at: GDScript::reload (res://scripts/net/p2p.gd:67)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/net/p2p.gd:133)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/net/p2p.gd:240)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/net/connection.gd:134)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/net/connection.gd:327)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/ui_kit.gd:242)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "size" is shadowing an already-declared property in the base class "Control".
+     at: GDScript::reload (res://scripts/game/dash_display.gd:250)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/dash_display.gd:387)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/circuit_map.gd:39)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "left" is never used in the function "_init()". If this is intended, prefix it with an underscore: "_left".
+     at: GDScript::reload (res://scripts/ui/race_overlays.gd:83)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "size" is shadowing an already-declared property in the base class "Control".
+     at: GDScript::reload (res://scripts/ui/hud.gd:77)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "size" is shadowing an already-declared property in the base class "Control".
+     at: GDScript::reload (res://scripts/ui/hud.gd:88)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "step" is shadowing an already-declared function at line 45 in the current class.
+     at: GDScript::reload (res://scripts/physics/keyboard_driver.gd:37)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "load" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/physics/tire_model.gd:52)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "load" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/physics/tire_model.gd:75)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "items" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/game/prof.gd:57)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "b" is shadowing an already-declared function at line 20 in the current class.
+     at: GDScript::reload (res://scripts/game/prof.gd:61)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "b" is shadowing an already-declared function at line 20 in the current class.
+     at: GDScript::reload (res://scripts/game/prof.gd:73)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/wet_fx.gd:36)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_tmp_hit" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/physics/vehicle.gd:73)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "CH" is declared but never used in the block. If this is intended, prefix it with an underscore: "_CH".
+     at: GDScript::reload (res://scripts/physics/vehicle.gd:746)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/pit_lane.gd:93)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:25)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/ai.gd:27)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/ai.gd:60)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "skill" is shadowing an already-declared variable at line 365 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:106)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:173)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:193)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:211)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:226)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/ai.gd:232)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:271)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/ai.gd:278)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "track" is shadowing an already-declared variable at line 362 in the current class.
+     at: GDScript::reload (res://scripts/game/ai.gd:304)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/ai.gd:485)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/road_patches.gd:36)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/road_patches.gd:147)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:185)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:412)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:441)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:459)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:474)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:529)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/forest.gd:608)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/spa_look.gd:506)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/spa_props.gd:81)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/wall_cut.gd:22)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/track_scene.gd:124)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "mats" is declared but never used in the block. If this is intended, prefix it with an underscore: "_mats".
+     at: GDScript::reload (res://scripts/game/track_scene.gd:243)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/track_scene.gd:328)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "q" is never used in the function "_apply_eye()". If this is intended, prefix it with an underscore: "_q".
+     at: GDScript::reload (res://scripts/game/environment_ctrl.gd:288)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "viewport_size" is never used in the function "_init()". If this is intended, prefix it with an underscore: "_viewport_size".
+     at: GDScript::reload (res://scripts/game/cockpit_camera.gd:36)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/track_limits.gd:23)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "start" is shadowing an already-declared function at line 28 in the current class.
+     at: GDScript::reload (res://scripts/game/lap_delta.gd:98)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/chat_panel.gd:79)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/net/remote_car_buffer.gd:102)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/car_setup.gd:63)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/car_setup.gd:110)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:56)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:60)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:61)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:61)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:62)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:63)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:63)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/car_paint.gd:77)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/crowd.gd:77)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/spa_crowd.gd:24)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "hide" is shadowing an already-declared method in the base class "Node3D".
+     at: GDScript::reload (res://scripts/game/grass_shells.gd:122)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "round" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/game/grass_blades.gd:78)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/grass_blades.gd:102)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/grass_blades.gd:180)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "basis" is shadowing an already-declared property in the base class "Node3D".
+     at: GDScript::reload (res://scripts/game/grass_blades.gd:190)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "basis" is shadowing an already-declared property in the base class "Node3D".
+     at: GDScript::reload (res://scripts/game/crash_fx.gd:166)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Reassigning lambda capture does not modify the outer local variable "seed_v".
+     at: GDScript::reload (res://scripts/game/windshield_fx.gd:50)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "len" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/game/windshield_fx.gd:59)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/road_wear.gd:17)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "mesh" is shadowing an already-declared property in the base class "MeshInstance3D".
+     at: GDScript::reload (res://scripts/game/road_wear.gd:82)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_fade" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/audio/engine_voice.gd:36)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function parameter "load" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/audio/engine_voice.gd:91)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "rn" is never used in the function "_update_engine()". If this is intended, prefix it with an underscore: "_rn".
+     at: GDScript::reload (res://scripts/audio/engine_voice.gd:168)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local "for" iterator variable "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/audio/game_audio.gd:38)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/audio/game_audio.gd:199)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/audio/game_audio.gd:212)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/audio/game_audio.gd:221)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/audio/game_audio.gd:281)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_birds" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/audio/ambience.gd:15)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/audio/session_audio.gd:32)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "g" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/audio/session_audio.gd:197)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/safety_car_look.gd:67)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "gun" is never used in the function "_pose_rigged()". If this is intended, prefix it with an underscore: "_gun".
+     at: GDScript::reload (res://scripts/game/pit_crews.gd:484)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/ui/pit_menu.gd:102)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/ui/pit_menu.gd:122)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "show" is shadowing an already-declared method in the base class "CanvasItem".
+     at: GDScript::reload (res://scripts/ui/pit_menu.gd:188)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/race_session.gd:11)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/race_session.gd:25)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/race_session.gd:28)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_replay_hint" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/game/race_session.gd:177)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_acc_time" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/game/race_session.gd:241)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/race_session.gd:568)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/race_session.gd:606)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/race_session.gd:935)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/race_session.gd:969)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/race_session.gd:1481)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "names" is shadowing an already-declared variable at line 121 in the current class.
+     at: GDScript::reload (res://scripts/game/race_session.gd:1756)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "names" is shadowing an already-declared variable at line 121 in the current class.
+     at: GDScript::reload (res://scripts/game/race_session.gd:1775)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/race_session.gd:1799)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:1835)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:1967)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "rc" is shadowing an already-declared variable at line 188 in the current class.
+     at: GDScript::reload (res://scripts/game/race_session.gd:2055)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/race_session.gd:2322)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:2370)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "room" is shadowing an already-declared variable at line 96 in the current class.
+     at: GDScript::reload (res://scripts/game/race_session.gd:2551)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/game/race_session.gd:2624)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:2922)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:3005)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:3018)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:3019)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "position" is shadowing an already-declared property in the base class "Node3D".
+     at: GDScript::reload (res://scripts/game/race_session.gd:3304)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/game/race_session.gd:3345)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/race_session.gd:3502)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/input/gamepad_input.gd:37)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/input/gamepad_input.gd:65)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/input/gamepad_input.gd:214)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/input/gamepad_input.gd:215)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_held" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/input/device_bindings.gd:49)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/input/device_bindings.gd:160)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/input/device_bindings.gd:161)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/ui/touch_controls.gd:336)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/ui/touch_controls.gd:337)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "place_window()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/settings.gd.place_window()".
+     at: GDScript::reload (res://scripts/game/graphics.gd:44)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/ui_widgets.gd:85)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/ui_widgets.gd:104)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "row" is shadowing an already-declared function at line 460 in the current class.
+     at: GDScript::reload (res://scripts/ui/ui_widgets.gd:152)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "row" is shadowing an already-declared function at line 460 in the current class.
+     at: GDScript::reload (res://scripts/ui/ui_widgets.gd:401)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "row" is shadowing an already-declared function at line 460 in the current class.
+     at: GDScript::reload (res://scripts/ui/ui_widgets.gd:426)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "row" is shadowing an already-declared function at line 460 in the current class.
+     at: GDScript::reload (res://scripts/ui/ui_widgets.gd:448)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "xp" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/game/career.gd:156)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/store_screen.gd:229)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/store_screen.gd:230)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "row" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/app/store_screen.gd:377)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "load" has the same name as a built-in function.
+     at: GDScript::reload (res://scripts/app/social_ui.gd:378)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/social_ui.gd:479)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/social_ui.gd:480)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/social_ui.gd:495)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "sign_in" is never used in the function "_driver_chip()". If this is intended, prefix it with an underscore: "_sign_in".
+     at: GDScript::reload (res://scripts/app/menu_screen.gd:164)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/menu_screen.gd:292)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/menu_screen.gd:373)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/track_outline.gd:25)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/track_outline.gd:27)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "size" is shadowing an already-declared property in the base class "Control".
+     at: GDScript::reload (res://scripts/ui/track_outline.gd:33)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_adv_open" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:21)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:25)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "pack_of()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/track_packs.gd.pack_of()".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:162)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "pack_of()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/track_packs.gd.pack_of()".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:183)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "pack_of()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/track_packs.gd.pack_of()".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:183)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "base_url()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/track_packs.gd.base_url()".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:210)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The class variable "_hero_rects" is declared but never used in the class.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:259)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "is_host" is never used in the function "_event_page()". If this is intended, prefix it with an underscore: "_is_host".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:791)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:819)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:938)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The parameter "all_cars" is never used in the function "_player_row()". If this is intended, prefix it with an underscore: "_all_cars".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:964)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:1048)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:1096)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:1306)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:1345)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "default_settings()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/settings.gd.default_settings()".
+     at: GDScript::reload (res://scripts/app/lobby_screen.gd:1403)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:49)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "credits" is shadowing an already-declared function at line 381 in the current class.
+     at: GDScript::reload (res://scripts/game/progression.gd:176)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:192)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:407)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:407)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:409)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:409)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/game/progression.gd:410)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/app/mobile_ui.gd:137)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/app/mobile_ui.gd:140)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "size" is shadowing an already-declared property in the base class "Control".
+     at: GDScript::reload (res://scripts/app/mobile_ui.gd:177)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/ui/pad_setup.gd:113)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/ui/device_setup.gd:34)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "col" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/app/settings_panel.gd:137)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/settings_panel.gd:574)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The function "default_settings()" is a static function but was called from an instance. Instead, it should be directly called from the type: "res://scripts/game/settings.gd.default_settings()".
+     at: GDScript::reload (res://scripts/app/settings_panel.gd:627)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "total" is declared but never used in the block. If this is intended, prefix it with an underscore: "_total".
+     at: GDScript::reload (res://scripts/app/mobile_modes.gd:98)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "races" is declared but never used in the block. If this is intended, prefix it with an underscore: "_races".
+     at: GDScript::reload (res://scripts/app/mobile_modes.gd:102)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/mobile_modes.gd:128)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/mobile_modes.gd:166)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/mobile_home.gd:33)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "cars" is shadowing an already-declared function at line 421 in the current class.
+     at: GDScript::reload (res://scripts/app/mobile_home.gd:328)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "cars" is shadowing an already-declared function at line 421 in the current class.
+     at: GDScript::reload (res://scripts/app/mobile_home.gd:338)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/mobile_home.gd:507)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "ok" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/app/mobile_home.gd:522)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/ui/replay_bar.gd:90)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/results_screen.gd:36)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The variable "top" is declared below in the parent block.
+     at: GDScript::reload (res://scripts/app/results_screen.gd:65)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/app/app.gd:77)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local function parameter "name" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/app/app.gd:208)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "owner" is shadowing an already-declared property in the base class "Node".
+     at: GDScript::reload (res://scripts/app/app.gd:386)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "tr" is shadowing an already-declared method in the base class "Object".
+     at: GDScript::reload (res://scripts/app/app.gd:546)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Values of the ternary operator are not mutually compatible.
+     at: GDScript::reload (res://scripts/app/app.gd:615)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/app/app.gd:626)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer used when an enum value is expected. If this is intended, cast the integer to the enum type using the "as" keyword.
+     at: GDScript::reload (res://scripts/app/app.gd:627)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: Integer division. Decimal part will be discarded.
+     at: GDScript::reload (res://scripts/app/app.gd:782)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+WARNING: The local variable "held" is declared but never used in the block. If this is intended, prefix it with an underscore: "_held".
+     at: GDScript::reload (res://scripts/app/app.gd:820)
+     GDScript backtrace (most recent call first):
+         [0] _initialize (res://tests/compile_all.gd:8)
+152 scripts, 0 failed
+[boot] settings
+[boot] settings loaded
+[boot] packs

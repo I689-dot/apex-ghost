@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+layout: Circuit Zandvoort
+collision bodies: 6 in 1431 ms
+t= 0  speed   0.0 km/h  y=-0.03  surface=asphalt gear=1
+t= 2  speed  50.4 km/h  y=-0.04  surface=asphalt gear=1
+t= 4  speed  98.3 km/h  y=0.00  surface=asphalt gear=2
+t= 6  speed 134.8 km/h  y=-0.02  surface=asphalt gear=3
+t= 8  speed 162.9 km/h  y=-0.00  surface=asphalt gear=4
+t=10  speed 185.6 km/h  y=0.01  surface=asphalt gear=4
+moved 410 m, centreline index 78, progress 390 m
+exit=0 seconds=2

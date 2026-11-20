@@ -1,0 +1,14 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[boot] settings
+[boot] settings loaded
+[boot] packs
+▶ Audi R8 LMS Evo (1420 kg, RWD) on a flat pad
+rest drift (3 s)               0.0000 m, max speed 0.000 m/s, compression 0.022/0.022/0.028/0.028/, ride y -0.000
+0-100 km/h                     4.33 s
+0-200 km/h                     11.84 s
+top speed (45 s)               271 km/h (spec 280)
+shifts                         2@101 3@137 4@173 5@211 6@252 
+lateral drift on straight      0.00 m after 2718 m
+braking 200->0                 85.7 m in 3.28 s (ABS on)
+exit=0 seconds=4
