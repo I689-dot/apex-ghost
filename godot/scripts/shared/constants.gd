@@ -2,7 +2,6 @@ class_name Const
 extends RefCounted
 ## Shared game constants (port of packages/shared/src/constants.ts).
 
-const GAME_NAME := "GRIDCORSA"
 const PROTOCOL_VERSION := 8
 
 const MAX_PLAYERS := 12
@@ -36,7 +35,6 @@ const NICK_MAX := 16
 ## Car state sampling rate (Hz) and how many samples are packed per network message.
 const STATE_HZ := 20
 const STATES_PER_PACKET := 2
-const PACKET_HZ := STATE_HZ / STATES_PER_PACKET
 
 ## Remote-car interpolation delay. Must exceed one packet interval plus jitter.
 const INTERP_DELAY_MS := 150
@@ -50,11 +48,9 @@ const BRIEFING_MS := 30000
 ## Pre-race cinematic, then the 3-2-1 start lights.
 const COUNTDOWN_MS := 16000
 const FINISH_TIMEOUT_MS := 60000
-const RESET_PENALTY_MS := 3000
 const RESET_FREEZE_MS := 1500
 
 ## Anti-cheat sanity limits used by the server.
 const MAX_PLAUSIBLE_SPEED_MS := 115 # ~414 km/h
 const MAX_CLOCK_SKEW_MS := 3000
 
-const PHYSICS_HZ := 120

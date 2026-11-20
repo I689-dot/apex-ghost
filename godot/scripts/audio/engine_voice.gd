@@ -33,7 +33,6 @@ var _raw_rpm := 1000.0
 var _boost := 0.0
 var _last_load := 0.0
 var _cut_until := 0.0
-var _fade := 1.0
 ## Overrun: seconds left of crackling after a lift from high revs, and when the next pop comes.
 var _overrun := 0.0
 var _next_pop := 0.0

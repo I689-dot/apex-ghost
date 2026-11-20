@@ -3,10 +3,6 @@ extends RefCounted
 ## Centreline and gate helpers (port of packages/shared/src/track.ts). A track is the layout's JSON Dictionary:
 ## centerline is a flat Array [x, y, z, ...]; gates, grid etc. as in the file. Vectors are Arrays of 3 floats.
 
-## Horizontal side vector (pointing to the driver's left when facing d).
-static func gate_side(d: Array) -> Array:
-	return [d[2], 0.0, -d[0]]
-
 ## Segment a->b crosses gate g (from behind to in front, within its width)? Returns 0..1 along the segment, or -1.
 static func crosses_gate(g: Dictionary, a: Vector3, b: Vector3) -> float:
 	var p: Array = g.p

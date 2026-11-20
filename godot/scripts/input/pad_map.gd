@@ -66,7 +66,3 @@ static func read(device: int) -> Dictionary:
 		else:
 			axes[i] = Input.get_joy_axis(device, std[i])
 	return {"buttons": buttons, "axes": axes, "layout": kind, "name": Input.get_joy_name(device)}
-
-## Plausible game controllers only (a keyboard's "joystick" interface reports no sticks).
-static func plausible(device: int) -> bool:
-	return Input.get_joy_name(device) != ""

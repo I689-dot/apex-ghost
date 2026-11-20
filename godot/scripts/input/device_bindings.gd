@@ -46,7 +46,6 @@ static func joy_axis(d: int, a: int) -> float:
 static func joy_button(d: int, b: int) -> bool:
 	return bool(fake.buttons.get("%d/%d" % [d, b], false)) if fake.has("buttons") else Input.is_joy_button_pressed(d, b)
 
-var _held := {}
 var _prev_buttons := {}
 
 static func bindings() -> Dictionary:

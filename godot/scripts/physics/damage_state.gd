@@ -3,7 +3,6 @@ extends RefCounted
 ## A car's damage (port of physics/damage.ts). Zones: 0 front, 1 rear, 2 left, 3 right, 4 engine, 5 suspension.
 ## Values 0 (new) .. 1 (wrecked). Corners are FL, FR, RL, RR.
 
-const ZONES := ["front", "rear", "left", "right", "engine", "suspension"]
 const CORNER_KEYS := ["FL", "FR", "RL", "RR"]
 
 const CAP_POWER := 0.3

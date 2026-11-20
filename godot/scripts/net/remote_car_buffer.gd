@@ -58,9 +58,6 @@ func push(s: CarState, seq: int) -> void:
 func has_data() -> bool:
 	return _count > 0
 
-func newest_time() -> float:
-	return (_states[_head] as CarState).t if _count > 0 else 0.0
-
 ## Sample at server_now - delay_ms (0: the present). dt (s) drives the error decay.
 func sample(server_now: float, dt: float, delay_ms: float = Const.INTERP_DELAY_MS) -> RemoteSample:
 	if _count == 0:

@@ -46,9 +46,6 @@ func ratio(g: int = 999) -> float:
 		return -float(s.reverseRatio) * float(s.finalDrive)
 	return float(s.gears[g - 1]) * float(s.finalDrive)
 
-func is_shifting() -> bool:
-	return shift_timer > 0.0
-
 func request_shift(dir: int) -> void:
 	var cur := gear if _pending_gear == -999 else _pending_gear
 	var target := cur + dir

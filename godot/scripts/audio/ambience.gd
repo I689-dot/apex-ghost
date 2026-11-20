@@ -12,7 +12,6 @@ var _crowd_g := 0.0
 var _next_bird := 0.0
 var _next_thunder := 0.0
 var _last_t := 0.0
-var _birds: Array = []
 
 func _init(audio: GameAudio) -> void:
 	a = audio

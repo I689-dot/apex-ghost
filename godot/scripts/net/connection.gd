@@ -6,7 +6,6 @@ extends Node
 
 signal message(msg: Dictionary)
 signal binary(buf: PackedByteArray)
-signal state_changed(state: String)
 
 ## "connecting", "open", "reconnecting" or "closed".
 var state := "connecting"
@@ -239,14 +238,6 @@ func _stop_timers() -> void:
 	_ping_at = -1.0
 	_ka_at = -1.0
 
-## Re-run a quick clock sync (e.g. after the app was paused).
-func resync() -> void:
-	if state == "open":
-		_samples = []
-		_start_timers()
-	elif state == "reconnecting" and not (_ws != null and _ws.get_ready_state() == WebSocketPeer.STATE_CONNECTING):
-		_open()
-
 func _schedule_reconnect() -> void:
 	if state != "reconnecting":
 		_reconnect_start = _now_ms()
@@ -261,7 +252,6 @@ func _schedule_reconnect() -> void:
 
 func _set_state(s: String) -> void:
 	state = s
-	state_changed.emit(s)
 
 ## Current server time estimate (ms).
 func server_now() -> float:

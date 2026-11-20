@@ -43,9 +43,6 @@ func _on_joy(device: int, on: bool) -> void:
 		_release()
 		connected_changed.emit(false, name)
 
-func controller_connected() -> bool:
-	return connected
-
 ## While the button setup in Settings listens to the pad, the game must not act on it.
 func pause_pad(on: bool) -> void:
 	paused = on

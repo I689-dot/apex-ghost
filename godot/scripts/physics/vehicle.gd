@@ -70,7 +70,6 @@ var _pre_ang := Vector3.ZERO
 var _last_good := Transform3D.IDENTITY
 var _shape: CollisionShape3D
 var _material := PhysicsMaterial.new()
-var _tmp_hit := {}
 ## The setup's alignment, differential, ducts and engine map (apply_setup): static camber (deg, front / rear), toe
 ## (rad; front negative = out, rear positive = in), the differential's preload (Nm) and coast lock, the brake ducts'
 ## cooling, the map's fuel use.
@@ -162,11 +161,6 @@ func set_air(air_c: float, track_temp_c: float, density: float) -> void:
 	air_density = density
 	drivetrain.air_scale = C.engine_air_scale(specs, density)
 
-## Tyres straight out of the garage: a little above air temperature.
-func set_tyre_temps(c: float) -> void:
-	for w in wheels:
-		w.temp = c
-
 ## A new set of tyres (pit stop): new tread, garage temperature, pressures set now.
 func fit_tyres(comp: Dictionary, temp_c: float) -> void:
 	compound = comp
@@ -257,16 +251,8 @@ func tyre_grip_avg() -> float:
 func is_reverse() -> bool:
 	return drivetrain.gear < 0
 
-func rpm_ratio() -> float:
-	return drivetrain.rpm / float(specs.redlineRpm)
-
 func shift(dir: int) -> void:
 	drivetrain.request_shift(dir)
-
-## Angular speed (rad/s) at the wheels in the current gear at a given rpm.
-func wheel_omega_at(rpm: float) -> float:
-	var r := drivetrain.ratio()
-	return 0.0 if r == 0.0 else (rpm * Drivetrain.RPM_TO_RADS) / r
 
 func world_com() -> Vector3:
 	return global_transform * center_of_mass
@@ -743,7 +729,6 @@ func _split_axle(a: int, b: int, torque: float) -> void:
 		wa.drive_torque = 0.0
 		wb.drive_torque = 0.0
 		return
-	var CH := C.CHASSIS
 	var lock: float = float(specs.diffLock) * (1.0 if torque >= 0.0 else _diff_coast)
 	var d := wa.omega - wb.omega
 	var limit: float = _diff_preload + lock * absf(torque) * 0.5

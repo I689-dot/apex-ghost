@@ -10,8 +10,6 @@ const SAMPLE_NAMES := ["gravel", "kerb", "grass", "squeal", "scrape", "crash_lig
 const LOOPED := ["gravel", "kerb", "grass", "squeal", "scrape", "grass_tyre", "sand", "road", "wet_road"]
 const PAN_STEPS := 8
 
-## There is no worklet / main-thread distinction here: the engine voices are always the cheap recorded-loop kind.
-var worklet_ok := true
 var settled := true
 var samples := {}
 var noise: PackedFloat32Array
@@ -77,16 +75,8 @@ func set_levels(l: Dictionary) -> void:
 	var r: float = l.get("radio", 0.9)
 	f.call("Radio", r * r * 1.4)
 
-## RMS of the mixed output right now (diagnostics).
-func level() -> float:
-	var db := maxf(AudioServer.get_bus_peak_volume_left_db(0, 0), AudioServer.get_bus_peak_volume_right_db(0, 0))
-	return db_to_linear(db)
-
 func resume() -> void:
 	pass
-
-func when_ready() -> bool:
-	return true
 
 # ------------------------------------------------------------ rendering ---
 

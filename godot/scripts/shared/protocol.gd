@@ -6,11 +6,9 @@ extends RefCounted
 ## Largest impulse a bump may carry (N*s): a 1.4 t car stopped from 30 m/s.
 const MAX_BUMP_IMPULSE := 42000.0
 
-const PHASES := ["lobby", "briefing", "loading", "countdown", "racing", "results"]
 const TYRE_CHOICES := ["soft", "medium", "hard", "wet"]
 const TIME_CHOICES := ["random", "dawn", "morning", "midday", "afternoon", "evening", "night"]
 const CHANGE_CHOICES := ["random", "off", "on"]
-const SESSION_KINDS := ["practice", "qualifying", "race"]
 
 static func default_rules() -> Dictionary:
 	## cleanStreak (Time trial, solo only): a lap counts as the best only after another clean lap in a row, as in iRacing.
@@ -178,6 +176,3 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			return c
 		_:
 			return {}
-
-static func encode_json(msg: Dictionary) -> String:
-	return JSON.stringify(msg)

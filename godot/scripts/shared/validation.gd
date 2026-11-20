@@ -41,15 +41,6 @@ static func sanitize_nickname(raw) -> Dictionary:
 static func nickname_key(nick: String) -> String:
 	return nick.to_lower()
 
-static func generate_room_code(rng: RandomNumberGenerator = null) -> String:
-	if rng == null:
-		rng = RandomNumberGenerator.new()
-		rng.randomize()
-	var s := ""
-	for i in Const.ROOM_CODE_LENGTH:
-		s += Const.ROOM_CODE_ALPHABET[rng.randi() % Const.ROOM_CODE_ALPHABET.length()]
-	return s
-
 ## Normalises user input ("ab c-d e" -> "ABCDE") and checks it only uses the room-code alphabet. "" when invalid.
 static func normalize_room_code(raw) -> String:
 	if typeof(raw) != TYPE_STRING:
