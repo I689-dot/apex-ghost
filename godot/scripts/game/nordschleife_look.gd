@@ -19,6 +19,8 @@ static func profile() -> Dictionary:
 	p["lawn_re"] = "^(grass_0|grassbrd_gp|grass_fill|grass_ns)"
 	p["kerb_re"] = "^(curb_0|curb_b|curbs_new|curb_misc|curb_ns)"
 	(p["detail"] as Array).push_front(["^(galvanized_ns|grail_ns)$", "metal", 1.0])
+	# the Nordschleife's kerbs take the GP kerbs' grain too (2026-11-20: they were repainted but had none)
+	(p["detail"] as Array).push_front(["^curb_ns$", "concrete", 1.6])
 	# the far terrain about the whole lap (build_far.py with FAR_MODEL_DIRS=godot/assets/track)
 	p["far_dir"] = "assets/maps/nordschleife"
 	p["forest_near_scale"] = SpaLook.FOREST_NEAR_SCALE
