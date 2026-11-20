@@ -103,7 +103,7 @@ static func default_settings() -> Dictionary:
 		# the window and the picture (Display page): windowed / borderless / fullscreen, vsync, a frame-rate cap (0: none),
 		# the monitor it opens on (-1: where the desktop puts it; APEX_SCREEN overrides),
 		# the upscaler used under a resolution scale below 100 %, and contrast / saturation over the game's own grade
-		"display": {"windowMode": "windowed", "uiSize": "medium", "eyeAdaptation": true, "hdr": false, "lensFlare": true, "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0, "screen": -1, "sideScreens": "off", "sideAngle": 0},
+		"display": {"menuLayout": "auto", "windowMode": "windowed", "uiSize": "medium", "eyeAdaptation": true, "hdr": false, "lensFlare": true, "vsync": true, "maxFps": 0, "upscaler": "bilinear", "contrast": 1.0, "saturation": 1.0, "screen": -1, "sideScreens": "off", "sideAngle": 0},
 		# the field-of-view calculator: the screen's visible width and the eyes' distance from it (cm)
 		"screen": {"widthCm": 60.0, "distanceCm": 70.0},
 		"assists": {"abs": true, "tc": 1, "stability": false, "steering": false}, "manualGearbox": false,

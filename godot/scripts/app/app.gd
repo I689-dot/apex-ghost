@@ -14,6 +14,8 @@ var screen := "menu"
 var spectating := false
 var browsing := ""
 var pending_race: Dictionary = {}
+## Where back goes from a screen of the mobile layout (screens named "m_..."): MobileModes, MobilePass, the store.
+var back_to: Callable = Callable()
 var pending_start_at = null
 var audio: GameAudio = null
 var gamepad: GamepadInput = null
@@ -258,7 +260,32 @@ func show_menu(error: String = "") -> void:
 	teardown_connection()
 	set_backdrop("hero")
 	Account.set_presence({"state": "menu", "room": null, "trackId": null, "session": null})
+	# a career race left before it was raced: its AI level back, nothing scored
+	var ev: Dictionary = Progression.data().event
+	if ev.has("difficulty"):
+		Settings.data.ai.difficulty = float(ev.difficulty)
+		Progression.clear_event()
+	if mobile_layout():
+		set_ui(MobileHome.build(self))
+		if error != "":
+			toast(error)
+		return
 	set_ui(MenuScreen.build(self, error))
+
+## The phone layout (MobileHome, after RESOURCES/UI-MOBILE-REFERENCE) or the PC's (MenuScreen): Display › Menu layout,
+## "auto" picks the phone layout on a touch screen. APEX_MOBILE_UI=1 forces it (screenshots on the PC).
+func mobile_layout() -> bool:
+	if OS.get_environment("APEX_MOBILE_UI") != "":
+		return true
+	var l := str(Settings.data.display.get("menuLayout", "auto"))
+	return l == "mobile" or (l == "auto" and UIKit.touch())
+
+## The PC menu's tab (Friends, Online) from the mobile layout, with back to the home.
+func show_classic_menu(tab: String) -> void:
+	MenuScreen._tab = tab
+	screen = "m_classic"
+	back_to = func(): show_menu()
+	set_ui(MenuScreen.build(self))
 
 ## The solo career's page (rank, licence, Driver Rating, record, achievements).
 func show_career() -> void:
@@ -645,6 +672,8 @@ func open_settings() -> void:
 func show_results(m: Dictionary) -> void:
 	set_pause(false)
 	var gain = null
+	var prog := {}
+	var ev_result := {}
 	var stats := {}
 	if session != null:
 		stats = session.career_stats()
@@ -662,10 +691,28 @@ func show_results(m: Dictionary) -> void:
 			"map": str(track_entry(pending_race.get("trackId", "")).get("map", "")),
 		}, true)
 		gain = CareerData.add_session(s)
+		# the mobile layout's progression: pass XP, contracts, chests; a career cup race's trophies
+		prog = Progression.record_session(s)
+		var pev: Dictionary = Progression.data().event
+		if m.kind == "race" and not pev.is_empty():
+			var want := str(app_event_track(pev))
+			if want == "" or want == str(pending_race.get("trackId", "")):
+				if pev.has("difficulty"):
+					Settings.data.ai.difficulty = float(pev.difficulty)
+				ev_result = Progression.score_event(s.position, s.field)
 	_drop_session()
 	screen = "results"
 	set_backdrop("pole", pending_race.get("trackId", ""))
 	set_ui(ResultsScreen.build(self, m, gain))
+	if mobile_layout() and not prog.is_empty():
+		MobileHome.race_rewards(self, prog, ev_result, gain)
+
+## The circuit of the career race being driven ("" for the week's featured race: MobileModes.weekly picks it).
+func app_event_track(ev: Dictionary) -> String:
+	if str(ev.get("cup", "")) == "weekly":
+		return MobileModes.weekly(self).track
+	var c := Progression.cup(str(ev.get("cup", "")))
+	return str(c[3][int(ev.race)][0]) if not c.is_empty() else ""
 
 ## Dev: APEX_AUTO=solo plays through menu → lobby → briefing → race by itself (SHOT_DIR saves a screenshot per step).
 func _autotest() -> void:
@@ -863,6 +910,9 @@ func go_back() -> bool:
 		else:
 			top.queue_free()
 		return true
+	if screen.begins_with("m_") and back_to.is_valid():
+		back_to.call()
+		return true
 	match screen:
 		"career":
 			show_menu()
@@ -886,6 +936,8 @@ func _notification(what: int) -> void:
 				go_back()
 			elif screen == "race" and session != null:
 				session.toggle_pause()
+			elif screen.begins_with("m_") and back_to.is_valid():
+				back_to.call()
 			elif screen == "menu":
 				get_tree().quit()
 			elif screen == "career":

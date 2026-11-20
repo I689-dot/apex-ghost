@@ -1700,3 +1700,43 @@ assumes the old peak; retune AI_GRIP if needed).
   achievements, menu photos and grass masks.
 - Also: the Nürburgring short layout's learned grip (1.0: 1:49.0 / 8 excursions -> 1:46.8 / 2; 0.9: 1:44.7 / 2 ->
   1:44.3 / 1). The GP's run made it slower with an excursion, so it was not kept.
+
+## Godot: the mobile layout, after the user's references (2026-11-20)
+
+- The user put 28 screenshots of a free-to-play mobile racing game in RESOURCES/UI-MOBILE-REFERENCE and asked for a
+  phone UI like it, with ads for revenue (not set up) and a career inspired by it. Its layout and features were
+  taken; its name, branding and art were not.
+- Display › Menu layout: Automatic (the phone layout on a touch screen), Phone or PC. APEX_MOBILE_UI=1 forces it.
+  The PC menu (MenuScreen) is unchanged.
+- MobileHome, the garage:
+  - your car turning in the middle, with arrows to change it;
+  - the left column: the season pass (tier, XP, rewards to claim, time left), the week's featured event (double
+    credits) and a special offer;
+  - top right: contracts, friends, settings, credits and coins;
+  - right: the free bonus (a rewarded ad), the daily-wins chests, the championship and the daily wins (x/6);
+  - the bottom bar: Shop, Cars, Paint, Contracts and RACE.
+- MobileModes (RACE):
+  - the categories down the left (Career, Events, Online racing, Quick race) and photo cards on the right;
+  - Career: six class cups (Rookie, D, C, B, A, Pro; 3-5 races each on the six circuits, rising AI level). A cup opens
+    at a number of trophies. A race gives 3 trophies for a win, 2 for a podium and 1 for a top-six finish; the best
+    counts, and new trophies pay credits.
+  - Events: the featured race, the championship, Time trial.
+  - Online: create room, join, host on this device, friends.
+- MobilePass: 30 tiers over a 42-day season, free rewards above and premium below. The premium track is a store
+  preview (the checkout preview, no payment), so its rewards stay locked.
+- Progression (user://progression.json): trophies, pass XP and claims, three daily contracts (the same for everyone
+  that day), daily wins and chests, the free bonus every 4 hours, and the interstitial's cadence.
+  - Every offline session gives pass XP and advances the contracts.
+  - Credits are the career's (CareerData coins). Store coins are only ever added to the offline preview balance; when
+    signed in, only the server awards them.
+- Ads (MobileAds), placeholders only: no network, nothing fetched.
+  - Rewarded: the free bonus, and double credits after a race; the reward only when the stand-in has run to its end.
+  - Interstitial: every 3 offline races, after the rewards, never after a doubled race, never during one.
+  - A real network (AdMob through an Android plugin, with consent) replaces MobileAds._show().
+- After an offline race the Total rewards panel lists the trophies, credits, pass XP, contracts advanced and any chest,
+  with the double-credits offer. After a 3-trophy win, once a week at most, a rate-us prompt.
+- A cup race is a solo room with a 2-minute qualifying (the room's minimum is 1) and the race; its AI level is
+  restored afterwards, also when the race is left before it was run.
+- Tests: tests/progression_test.gd (22 checks, dry: nothing saved), tests/mobile_shots.gd (every screen at 20:9).
+- Also: Shanghai's learned grip (skill 0.95: 2:07.6 with 2 excursions -> 2:07.3 with none; 0.9: 2:06.4 -> 2:08.1, no
+  excursions either way). Kept: an excursion costs more in a race.

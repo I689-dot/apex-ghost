@@ -391,6 +391,11 @@ static func _display(col: Control, changed: Callable) -> void:
 	_head(col, I18n.t("Resolution"))
 	_range(col, I18n.t("Resolution scale"), I18n.t("The 3D picture's resolution against the screen's (the HUD stays sharp)"), S, "resolutionScale", 0.5, 1.0, 0.05, _pct, changed)
 	_select(col, I18n.t("Upscaling"), I18n.t("How a picture under 100 % is brought to the screen: FSR keeps it sharper"), d, "upscaler", Graphics.upscalers().map(func(o): return [o[0], I18n.t(o[1])]), changed)
+	_head(col, I18n.t("Menus"))
+	if not d.has("menuLayout"):
+		d.menuLayout = "auto"
+	_select(col, I18n.t("Menu layout"), I18n.t("Phone: the garage home, career cups, season pass and contracts. PC: the sections along the top. From the next visit to the menu"), d, "menuLayout",
+		[["auto", I18n.t("Automatic (phone on a touch screen)")], ["mobile", I18n.t("Phone")], ["classic", I18n.t("PC")]], changed)
 	_head(col, I18n.t("Picture"))
 	_range(col, I18n.t("Brightness"), "", S, "brightness", 0.6, 1.5, 0.05, _pct, changed)
 	_range(col, I18n.t("Contrast"), "", d, "contrast", 0.8, 1.25, 0.01, _pct, changed)
