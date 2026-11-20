@@ -5,7 +5,46 @@ together with `git log`.
 
 ## State
 
-- **Phase:** check-in 1 answered (2026-11-20). Next: the rendered baseline, then the bug fixes (F3), then phase 2.
+- **Phase:** phase 2 (guardrails) is done (2026-11-20). Next: batch 2, the dead code (F1, F2 as answered).
+- **After the bug fixes, the headless baseline is unchanged.** A third run, after the fixes, matches the first. The
+  only difference was the order of two menu_test lines, which are printed asynchronously; compare that test's lines
+  sorted.
+- **Guardrails (phase 2):**
+  - `project.godot` now sets `debug/gdscript/warnings/untyped_declaration=1` and `return_value_discarded=1`. Every
+    other warning the job asks for was already on by default.
+  - `tests/compile_all.gd` still fails when a script does not compile. It now also starts itself again with `--debug`
+    and prints the warnings per script, per kind, and in total. `WARNINGS=0` compiles only.
+  - `held` (app.gd, the threaded load kept referenced) carries `@warning_ignore("unused_variable")` with its reason.
+- **Warnings from here on** (the number every batch reports): **2,591 in 131 scripts.** By kind:
+
+  | Kind | Count |
+  |---|---:|
+  | Function without a return type (lambdas included) | 625 |
+  | `for` variable without a type | 531 |
+  | Return value discarded | 507 |
+  | Parameter without a type | 386 |
+  | Variable without a type | 322 |
+  | Everything else | 220 |
+
+  The `untyped_declaration` part is batch 3's work. `return_value_discarded` is mostly `connect()`, `append`-like
+  calls and `await`ed values that are ignored on purpose; it stays a warning and is not a target.
+- **Bug fixes done**, each in its own commit with its measurement:
+  - `410126a` gd.sh passes runner-test arguments. Before, `-- 5 x` hung the run.
+  - `e3743b4` the phone home's Settings gear applies changes at once. The new `tests/phone_settings_test.gd` checks
+    it: the master bus stayed at −3.9 dB before the fix and goes to −40.0 dB after, for a slider at 0.1.
+  - `51bbbf2` the forest cards are 256 px on High and Ultra. At Spa they were 128x268 before and 256x537 after;
+    Medium and Low are unchanged at 128x268.
+  - `6fe2182` each circuit's own sky with the Forward+ ratio on the PC. Every circuit was 0.620; now Zandvoort
+    0.602, Silverstone and Barcelona 0.638, Shanghai 0.567, Spa and the Nürburgring 0.620. The Mobile values are
+    unchanged.
+  - `6019b1d` the Nordschleife's `curb_ns` gets the kerb grain on High and Ultra.
+  - `50fcccf` inspect_car.gd skips the levels the car dedupe keeps once.
+  - Not fixed here: `setLivery` (a server change, under Later). The drift items in F3.7 are left for the
+    duplication batches: each is fixed in its own commit when its batch reaches it.
+- **Frame rates depend on what else the PC is doing.** After the fixes, Spa Ultra gave 75.9 / 78.6 fps, and the same
+  run with the old forest.gd gave 75.4 / 81.6. The browser was using about 80 % of a CPU and the GPU was 22 % busy
+  before the test started. Rule: compare frame rates only back to back, old code against new code, in the same
+  conditions; never against the baseline file from another time.
 - **The user's answers at check-in 1:**
   - **Pit crews:** delete `pit_crews.gd` and the crew code in race_session.gd.
   - **Dev knobs:** remove the look, paint and line knobs (SPA_LOOK, SPA_TINT, LOOK_ROLES, SPA_DEBUG, MUL_GAIN,

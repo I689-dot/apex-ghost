@@ -817,6 +817,9 @@ func _play_intro() -> void:
 		bg.visible = true
 		ui.visible = true
 		return
+	# (held, not read: the threaded load's result must stay referenced until the intro loads it from the cache, else
+	# it is freed at once and loaded again on the main thread)
+	@warning_ignore("unused_variable")
 	var held := Assets.scene_result(f)
 	print("[boot] intro: %s in %d ms" % [entry.id, Time.get_ticks_msec() - t0])
 	var intro := IntroCinematic.new(entry)
