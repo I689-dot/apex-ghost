@@ -2,7 +2,12 @@ extends Node
 func _ready() -> void:
 	var id := "2024_porsche_992_gt3_r"
 	for f in ["lod0", "lod1", "lod2", "cockpit"]:
-		var res = load("res://assets/cars/%s/%s.glb" % [id, f])
+		var path := "res://assets/cars/%s/%s.glb" % [id, f]
+		# (a level identical to lod0 is kept once since build-cars.py --dedupe: cars.json points it at lod0.glb)
+		if not ResourceLoader.exists(path):
+			print("%s: no file (the same as lod0)" % f)
+			continue
+		var res = load(path)
 		var inst: Node = res.instantiate()
 		var count := 0
 		var tris := 0
