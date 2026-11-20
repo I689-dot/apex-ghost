@@ -3,7 +3,7 @@ extends Node3D
 ## One race: loads everything for it, runs physics / render / network until the results arrive (port of
 ## game/session.ts RaceSession). A Node3D holding the world: track, environment, my car (a Jolt Vehicle with a CarVisual
 ## child, interpolated by the engine), the bots I simulate (also Vehicles), the other drivers' cars (CarVisuals driven by
-## RemoteCarBuffer), cameras and the HUD. Optional subsystems (cinematic, pit crews, TV cameras, audio, radio, grass,
+## RemoteCarBuffer), cameras and the HUD. Optional subsystems (cinematic, pit crews, TV cameras, audio, grass,
 ## forest ...) are plain fields that stay null until their module attaches: every use is guarded.
 
 ## The physics step: 120 Hz (a phone runs 60: the sim holds its lap time within 0.3 %, see tests/ailap.gd).
@@ -46,7 +46,6 @@ class Remote:
 	var visual: CarVisual
 	var buffer := RemoteCarBuffer.new()
 	var damage := DamageState.new()
-	var last_damage_version := 0
 	## Last known velocity (for engine pitch and Doppler).
 	var vel := Vector3.ZERO
 	## Set on the host for bots: simulated here and streamed to everyone else.
@@ -61,8 +60,6 @@ class Remote:
 	var bump_yaw := 0.0
 	var bump_from := ""
 	var bump_sent := 0.0
-	## Where the visual sits (a bot's follows its vehicle; a remote human's is set from the buffer).
-	var node: Node3D
 
 class LocalBot:
 	extends RefCounted
@@ -89,7 +86,8 @@ class LocalBot:
 	var exit_at := 0.0
 	var pit_sent := false
 
-## Callbacks the app supplies: on_countdown_text(text, sub), on_pause_toggle(open), on_results(msg), on_fatal(message).
+## Callbacks the app supplies: on_countdown_text(text, sub), on_pause_toggle(open), on_replay_toggle(open),
+## on_results(msg), on_fatal(message), audio() (the GameAudio).
 var cb: Dictionary = {}
 var conn: Connection
 var race: Dictionary
@@ -121,9 +119,7 @@ var local_tracker: RaceTracker = null
 var names := {}
 var numbers := {}
 var standings: Array = []
-var finish_deadline = null
 var running := false
-var disposed := false
 var step_count := 0
 var start_at = null
 var seq := 0
@@ -174,7 +170,6 @@ var _replay_proxy := Node3D.new()
 var _replay_chase := ChaseCamera.new()
 var _replay_saved := {}
 var _replay_poses := PackedFloat32Array()
-var _replay_hint := -1
 var ghost := BestLapGhost.new()
 var ghost_visual: CarVisual = null
 var ghost_loading := false
@@ -203,7 +198,6 @@ var jack_lift := 0.0
 var loc := {"s": 0.0, "dot": 1.0, "index": 0, "lateral": 0.0}
 var map_timer := 0.0
 var rel_hints := {}
-var spot := {"left": false, "right": false, "aheadS": null, "behindS": null}
 var countdown_shown := ""
 var spec_target := ""
 var spec_cam := Camera3D.new()
@@ -217,7 +211,6 @@ var pit_cam_t := 0.0
 # optional subsystems, attached by their modules
 var cinematic = null
 var snd = null
-var radio = null
 var tv = null
 var tv_on := false
 var crews = null
@@ -234,11 +227,8 @@ var wet_fx: WetFx = null
 var sprays := {}
 var _in_water := false
 var blades = null
-var perf = null
 var timing: TimingScreen
-var rs := {"flag": "", "pitDue": false, "fuelLow": false, "fuelCrit": false, "tyresCold": false, "rain": false, "mins": {}, "spotL": false, "spotR": false, "aheadPit": "", "behindPit": "", "leader": "", "lastPos": 0, "startPos": 0, "gapAhead": null, "gapBehind": null, "checked": false}
 
-var _acc_time := 0.0
 var _ui_acc := 0.0
 ## Dev: a driver for my car (tests: the AI drives it).
 var autodrive: AiDriver = null
@@ -436,7 +426,6 @@ func load_session(progress: Callable) -> void:
 		rem.visual.rotation = Vector3(0, g.yaw, 0)
 		add_child(rem.visual)
 		CarPaint.apply(rem.visual, livery_of(r.id))
-		rem.node = rem.visual
 		remotes[rem.slot] = rem
 	await step.call(I18n.t("Bringing out the other drivers"))
 	var line = await RacingLinePrep.finish(line_task)
@@ -494,7 +483,6 @@ func load_session(progress: Callable) -> void:
 		hud.set_damage_car(my_entry, lines)
 	else:
 		hud.set_spectating(true)
-	_collect_env_materials()
 	_apply_weather()
 	await step.call(I18n.t("Compiling shaders"))
 	await _warm_up()
@@ -639,7 +627,6 @@ func request_reset() -> void:
 		flash(I18n.t("Reset to the track"))
 
 # ----------------------------------------------------- optional modules ---
-# Each hook does its work when the module exists (the later ports fill them in), and nothing otherwise.
 
 func _load_forest(q: Dictionary) -> void:
 	forest = await Forest.load_forest(self, track, track_data, q)
@@ -654,7 +641,6 @@ func _attach_world_extras(q: Dictionary) -> void:
 		crowd = SpaCrowd.build(track, track_data, float(q.crowd))
 	elif SpaLook.use(track_data):
 		crowd = SpaCrowd.build(track, track_data, float(q.crowd), SpaLook._p("stand_re", Crowd.STAND_MAT_RE), float(SpaLook._p("seat_m", 0.0)))
-		print("[crowd] ", crowd.multimesh.instance_count if crowd != null else 0, " spectators")
 	else:
 		crowd = Crowd.build(track, track_data, float(q.crowd))
 	if crowd != null:
@@ -726,9 +712,6 @@ func _build_cinematic(entries: Dictionary) -> void:
 	cinematic = Cinematic.new(track_data, entrants, {"trackName": track_data.name, "facts": facts, "format": format})
 	add_child(cinematic.camera)
 
-func _collect_env_materials() -> void:
-	pass
-
 func _warm_up() -> void:
 	# the first frames compile the shaders: show everything once, behind the loading screen
 	track.show_all()
@@ -751,7 +734,6 @@ func _on_message(m: Dictionary) -> void:
 			if m.raceId != race.raceId:
 				return
 			standings = m.list
-			finish_deadline = m.finishDeadline
 			hud.set_board(m.list, me, names)
 			update_timing()
 		"lap":
@@ -771,7 +753,6 @@ func _on_message(m: Dictionary) -> void:
 				flash(I18n.t("+{s} s: {what}", {"s": "%.0f" % (m.ms / 1000.0), "what": what}) if mine else I18n.t("{name}: +{s} s, {what}", {"name": pname, "s": "%.0f" % (m.ms / 1000.0), "what": what}), 4000.0, "bad" if mine else "info")
 			if mine:
 				_chime("invalid")
-				_say("penalty_dt" if m.get("driveThrough", false) else "penalty_time", 2, {"key": "penalty", "cooldown": 8})
 		"served":
 			if m.playerId == me:
 				flash(I18n.t("Mandatory stop done") if m.what == "stop" else I18n.t("Drive-through served"), 3000.0, "good")
@@ -801,10 +782,6 @@ func _on_message(m: Dictionary) -> void:
 					if standings[i].id == me:
 						pos = i + 1
 				flash("%s%s" % [I18n.t("FINISHED") if race.kind == "race" else I18n.t("SESSION COMPLETE"), " · P%d" % pos if pos > 0 else ""], 8000.0, "good")
-				if race.kind == "race":
-					_say("win" if pos == 1 else ("podium" if pos > 0 and pos <= 3 else ("points" if pos > 0 and pos <= 10 else "finish")), 3, {"ttl": 15})
-				else:
-					_say("pole" if pos == 1 else "session_end", 2, {"ttl": 15})
 			else:
 				flash(I18n.t("{name} has completed the session", {"name": names.get(m.playerId, I18n.t("A driver"))}), 3000.0)
 		"damage":
@@ -865,17 +842,10 @@ func _on_my_lap(m: Dictionary) -> void:
 	flash(I18n.t("Lap {n}: {time}", {"n": m.lap - 1, "time": fmt_lap(m.lapMs)}) + tag + pen, 3500.0, "bad" if not m.valid else (("best" if session_best else "pb") if m.best else "lap"))
 	if m.valid:
 		_chime(("session-best" if session_best else "best") if m.best else "lap")
-	if m.valid and m.best:
-		_say("fastest_lap" if session_best else "personal_best", 1, {"key": "lap-best", "cooldown": 30})
-	radio_lap()
 
 func _chime(kind: String) -> void:
 	if snd != null:
 		snd.chime(kind)
-
-func _say(line: String, priority: int, opts: Dictionary = {}) -> void:
-	if radio != null:
-		radio.say(line, priority, opts)
 
 ## Race control changed something: announce the new course state.
 func _on_race_control(state: Dictionary) -> void:
@@ -1108,7 +1078,6 @@ func _create_local_bots(entries: Dictionary) -> void:
 		r.visual.reparent(v, false)
 		r.visual.position = Vector3.ZERO
 		r.visual.rotation = Vector3.ZERO
-		r.node = v
 		if b.pit != null:
 			b.pit.measure_boxes(wall_probe)
 			var ab: Array = b.pit.boxes()[b.pit.box_of(r.slot)]
@@ -1283,7 +1252,7 @@ func after_contacts() -> void:
 	var now := Time.get_ticks_msec() as float
 	for sv in simulated():
 		var v: Vehicle = sv[1]
-		if v.has_method("_touching_car") and v._touching_car():
+		if v._touching_car():
 			hit_at[sv[0]] = now
 	for r: Remote in remotes.values():
 		var body := r.body
@@ -1401,22 +1370,6 @@ func impact_damage(impulse: float, push: Vector3, is_car: bool = false) -> void:
 		flash(I18n.t("Puncture! Bring it back to the pits"), 3500.0, "bad")
 		if snd != null:
 			snd.impact(1.0)
-		_say("puncture", 3, {"key": "damage", "cooldown": 6})
-	else:
-		var z := damage.zones
-		var line := ""
-		if sev > 0.85:
-			line = "big_crash"
-		elif z[4] > 0.25 and res.zone <= 1:
-			line = "damage_engine"
-		elif maxf(maxf(damage.corners[0], damage.corners[1]), maxf(damage.corners[2], damage.corners[3])) > 0.15:
-			line = "damage_susp"
-		elif res.zone == 0 and z[0] > 0.15:
-			line = "damage_front"
-		elif res.zone == 1 and z[1] > 0.15:
-			line = "damage_rear"
-		if line != "":
-			_say(line, 2, {"key": "damage", "cooldown": 20, "ttl": 5})
 	if snd != null:
 		snd.impact(sev)
 	Gamepad.rumble(impulse / (vehicle.mass * 5.0))
@@ -1524,10 +1477,6 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 				_chime("invalid")
 			if not e.get("contact", false) and (e.get("warning", 0) != 0 or e.get("invalidated", false) or e.get("blackWhite", false)):
 				incident(1)
-			if e.get("invalidated", false):
-				_say("lap_deleted", 2, {"key": "limits", "cooldown": 15})
-			elif e.get("warning", 0) != 0 or e.get("blackWhite", false):
-				_say("limits_warning", 1, {"key": "limits", "cooldown": 15})
 		elif e.type == "penalty" and e.playerId == me:
 			var s := "%.0f" % (e.ms / 1000.0)
 			var text2: String
@@ -1541,7 +1490,6 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 				text2 = I18n.t("Shortcut: +{s} s penalty", {"s": s})
 			flash(text2, 3200.0, "bad")
 			_chime("invalid")
-			_say("penalty_time", 2, {"key": "penalty", "cooldown": 8})
 	if tr.passed < 0 or tr.laps == 0:
 		live_delta = null
 		return
@@ -2280,7 +2228,6 @@ func update_remote(r: Remote, server_now: float, dt: float, cam_pos: Vector3) ->
 		var susp := [0.0, 0.0, 0.0, 0.0]
 		for i in 4:
 			susp[i] = clampf(v.wheels[i].compression, 0.0, 0.25) - 0.02
-		r.visual.wheel_out = r.visual.wheel_out
 		r.visual.position = Vector3(0, b.lift, 0)
 		r.visual.set_pose(v.steer_angle, v.wheels[0].angle, v.wheels[2].angle, susp)
 		r.visual.set_lights(v.pedals.brake > 0.1 and not v.is_reverse(), headlights_on, env.night)
@@ -2960,7 +2907,6 @@ func update_pit(server_now: float) -> void:
 	var p := v.global_position
 	var ev := pit.update(p.x, p.z, absf(loc.lateral) - edge, v.telemetry.speed)
 	if ev == "enter":
-		_say("pit_limiter", 2, {"cooldown": 30, "ttl": 3})
 		conn.send_json({"t": "pit", "in": true})
 		local_tracker.pit_in(me, server_now)
 		flash(I18n.t("Stop in the yellow box for service"), 4000.0)
@@ -3043,9 +2989,6 @@ func finish_service(plan: Dictionary) -> void:
 	release_from_box()
 
 func release_from_box() -> void:
-	if service != null:
-		_say("pit_go", 3, {"ttl": 3})
-		rs.tyresCold = false
 	service = null
 	jack_lift = 0.0
 	my_visual.wheel_out = [0.0, 0.0, 0.0, 0.0]
@@ -3103,150 +3046,6 @@ func update_crews(dt: float, cam_pos: Vector3) -> void:
 			if r.vel.length_squared() < 0.4 and r.visual.global_position.distance_squared_to(_crew_centre[i2]) < 20.0:
 				set_work.call(r.id, r.visual, r.entry, 0.0, null)
 	crews.update_crews(dt, cam_pos, _crew_work)
-
-# --------------------------------------------------------------- radio ---
-
-## The radio's ear on the session, every frame: a call when something changes (flags, the pit window, fuel, tyres, rain,
-## the clock, rivals pitting, a new leader) and the spotter's "car left / right / three wide / clear".
-func radio_frame(server_now: float, flag: String, flag_text: String, fuel_low: bool) -> void:
-	var r = radio
-	if r == null or spectator or start_at == null:
-		return
-	var v := vehicle
-	var racing: bool = server_now >= start_at and finished_ms == null
-	if not rs.checked and start_at - server_now < 12000.0:
-		rs.checked = true
-		r.say("radio_check", 1, {"ttl": 10})
-	if not racing:
-		return
-	if flag != rs.flag:
-		var prev: String = rs.flag
-		rs.flag = flag
-		var line := ""
-		match flag:
-			"sc":
-				line = "sc_in" if flag_text == I18n.t("SAFETY CAR IN THIS LAP") else "sc"
-			"fcy":
-				line = "fcy"
-			"yellow":
-				line = "yellow"
-			"blue":
-				line = "blue"
-			"green":
-				line = "green" if prev == "sc" or prev == "fcy" else ""
-			"meatball":
-				line = "box_this_lap"
-		if line != "":
-			r.say(line, 2 if line == "yellow" or line == "blue" else 3, {"key": "flag-%s" % line, "cooldown": 25 if line == "yellow" else 12, "ttl": 4})
-	var due := driver_change_state() == "due"
-	if due and not rs.pitDue:
-		r.say("pit_window_open", 2, {"ttl": 10})
-	rs.pitDue = due
-	if fuel_low and not rs.fuelLow:
-		r.say("fuel_low", 2, {"ttl": 10})
-	rs.fuelLow = fuel_low
-	var crit: bool = v.fuel_l >= 0.0 and fuel_per_lap > 0.0 and v.fuel_l < fuel_per_lap * 0.9
-	if crit and not rs.fuelCrit:
-		r.say("fuel_critical", 3, {"ttl": 10})
-	rs.fuelCrit = crit
-	# tyres: cold a minute in, overheating any time
-	var temps: Array = v.wheels.map(func(w): return w.temp)
-	var avg := 0.0
-	var mx := 0.0
-	for t in temps:
-		avg += t
-		mx = maxf(mx, t)
-	avg /= 4.0
-	if not rs.tyresCold and server_now - start_at > 60000.0 and avg < 55.0 and v.telemetry.speed > 25.0:
-		rs.tyresCold = true
-		r.say("tyres_cold", 1, {"ttl": 8})
-	if mx > 115.0:
-		r.say("tyres_hot", 1, {"cooldown": 120, "ttl": 8})
-	if v.wheels.any(func(w): return w.wear > 0.7):
-		r.say("tyres_worn", 1, {"cooldown": 300, "ttl": 10})
-	# rain
-	var wet: bool = weather.rain > 0.2
-	if wet and not rs.rain:
-		r.say("rain_now", 2, {"cooldown": 120, "ttl": 10})
-	if not wet and rs.rain and weather.rain < 0.03:
-		r.say("drying", 1, {"cooldown": 120, "ttl": 10})
-	rs.rain = true if wet else (false if weather.rain < 0.03 else rs.rain)
-	var ch = race.weather.change
-	if ch != null and (ch.to == "light_rain" or ch.to == "heavy_rain") and not wet:
-		var in_s: float = (start_at + ch.atSec * 1000.0 - server_now) / 1000.0
-		if in_s > 60.0 and in_s < 240.0:
-			r.say("rain_coming", 1, {"cooldown": 600, "ttl": 10})
-	# the clock: 20, 10 and 5 minutes left in a timed session
-	var total: float = race.get("raceMs", 0) if race.kind == "race" else race.sessionMs
-	if total > 0.0:
-		var left: float = start_at + total - server_now
-		for m in [20, 10, 5]:
-			if left < m * 60000.0 and left > m * 60000.0 - 20000.0 and total > m * 60000.0 and not rs.mins.has(m):
-				rs.mins[m] = true
-				r.say("min%d" % m, 1, {"ttl": 15})
-	# rivals: the cars either side in the classification pitting, a new leader (from lap 3)
-	if race.kind == "race":
-		var i := -1
-		for k in standings.size():
-			if standings[k].id == me:
-				i = k
-		var ahead = standings[i - 1] if i > 0 else null
-		var behind = standings[i + 1] if i >= 0 and i + 1 < standings.size() else null
-		if ahead != null and ahead.inPit and rs.aheadPit != ahead.id:
-			r.say("car_ahead_pits", 1, {"ttl": 6})
-		rs.aheadPit = ahead.id if ahead != null and ahead.inPit else ""
-		if behind != null and behind.inPit and rs.behindPit != behind.id:
-			r.say("car_behind_pits", 1, {"ttl": 6})
-		rs.behindPit = behind.id if behind != null and behind.inPit else ""
-		var lead: String = standings[0].id if standings.size() > 0 else ""
-		if rs.leader != "" and lead != "" and lead != rs.leader and lead != me and my_laps >= 3:
-			r.say("new_leader", 1, {"ttl": 6})
-		rs.leader = lead
-	# the spotter: someone alongside (racing speed only, not in the pit lane)
-	var L: bool = spot.left and v.telemetry.speed > 12.0 and not (pit != null and pit.in_lane)
-	var R: bool = spot.right and v.telemetry.speed > 12.0 and not (pit != null and pit.in_lane)
-	if L and R and not (rs.spotL and rs.spotR):
-		r.say("three_wide", 3, {"key": "spot", "cooldown": 2, "ttl": 1})
-	elif L and not rs.spotL and not R:
-		r.say("car_left", 3, {"key": "spot", "cooldown": 2, "ttl": 1})
-	elif R and not rs.spotR and not L:
-		r.say("car_right", 3, {"key": "spot", "cooldown": 2, "ttl": 1})
-	elif not L and not R and (rs.spotL or rs.spotR):
-		r.say("clear", 3, {"key": "spot-clear", "cooldown": 3, "ttl": 1})
-	rs.spotL = L
-	rs.spotR = R
-
-## At the line, in a race: the start, the position, the gap to the nearest car and its trend, the last lap.
-func radio_lap() -> void:
-	var r = radio
-	if r == null or race.kind != "race":
-		return
-	var pos := 0
-	for k in standings.size():
-		if standings[k].id == me:
-			pos = k + 1
-	if rs.startPos == 0:
-		rs.startPos = race.grid.find(me) + 1
-	if my_laps == 2 and pos > 0 and rs.startPos != 0 and pos < rs.startPos:
-		r.say("good_start", 1, {"ttl": 8})
-	if pos > 0 and pos <= 24 and (pos != rs.lastPos or my_laps % 3 == 0):
-		r.say("pos_%d" % pos, 1, {"key": "pos", "cooldown": 20, "ttl": 8})
-	rs.lastPos = pos
-	# the nearest car on the road within 10 s, and whether the gap is coming down
-	var a = spot.aheadS
-	var b = spot.behindS
-	if a != null and a < 10.0 and (b == null or a <= b):
-		if rs.gapAhead != null and rs.gapAhead - a > 0.3:
-			r.say("catching", 1, {"key": "trend", "cooldown": 40, "ttl": 8})
-		r.say("ahead_%d" % maxi(1, mini(20, roundi(a * 2.0))), 1, {"key": "gap", "cooldown": 25, "ttl": 8})
-	elif b != null and b < 10.0:
-		if rs.gapBehind != null and rs.gapBehind - b > 0.3:
-			r.say("losing", 1, {"key": "trend", "cooldown": 40, "ttl": 8})
-		r.say("behind_%d" % maxi(1, mini(20, roundi(b * 2.0))), 1, {"key": "gap", "cooldown": 25, "ttl": 8})
-	rs.gapAhead = a
-	rs.gapBehind = b
-	if race.get("raceMs", 0) == 0 and race.laps > 1 and my_laps == race.laps:
-		r.say("last_lap", 2, {"ttl": 10})
 
 # ------------------------------------------------------------------ ui ---
 
@@ -3309,7 +3108,6 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 		sector_delta = null
 	var cur_lap: float = 0.0 if race_t < 0.0 or finished_ms != null else server_now - lap_start_ms()
 	var rc_hud := race_control_hud(server_now)
-	radio_frame(server_now, rc_hud.flag, rc_hud.flagText, rc_hud.fuelLow)
 	var mytr: RaceTracker.PlayerRaceState = local_tracker.players.get(me) if local_tracker != null else null
 	var lap_label: String
 	if finished_ms != null:
@@ -3428,16 +3226,8 @@ func update_relative(p: Vector3, fx: float, fz: float) -> void:
 	var my_num = car_number(me)
 	map_cars.append({"x": p.x, "z": p.z, "label": str(my_num) if my_num != null else (str(mine.position) if mine != null and mine.position != 0 else ""), "me": true, "lap": "same", "inPit": pit != null and pit.in_lane})
 	hud.set_map_cars(map_cars)
-	spot.left = left
-	spot.right = right
-	var same_ahead: Array = rows.filter(func(r): return r.gapS >= 0.0 and r.lap == "same" and not r.inPit)
-	same_ahead.sort_custom(func(a, b): return a.gapS < b.gapS)
-	var same_behind: Array = rows.filter(func(r): return r.gapS < 0.0 and r.lap == "same" and not r.inPit)
-	same_behind.sort_custom(func(a, b): return a.gapS > b.gapS)
-	spot.aheadS = same_ahead[0].gapS if not same_ahead.is_empty() else null
-	spot.behindS = -same_behind[0].gapS if not same_behind.is_empty() else null
 
-# ------------------------------------------------------------ teardown ---
+# --------------------------------------------------------------- spray ---
 
 ## Spray behind every car near the camera on a wet track, and a splash (with its sound) where my wheels hit a puddle.
 func _update_spray(dt: float, cam_pos: Vector3) -> void:
@@ -3472,9 +3262,10 @@ func _update_spray(dt: float, cam_pos: Vector3) -> void:
 			snd.splash(strength)
 	_in_water = hit
 
+# ------------------------------------------------------------ teardown ---
+
 func dispose() -> void:
 	running = false
-	disposed = true
 	if conn != null:
 		if conn.message.is_connected(_on_message):
 			conn.message.disconnect(_on_message)
@@ -3550,8 +3341,6 @@ func _refresh_track_probes() -> void:
 ## A reflection probe riding with your car (High / Ultra): the paint, glass and rims reflect the track, the barriers,
 ## the pit buildings and the cars round you, not only the sky. Your own car is left out of it (it would reflect its
 ## own inside), and so are the forest, grass and crowd (layer 2: the cost of drawing six views of them every frame).
-var car_probe: ReflectionProbe = null
-
 func _add_car_probe(v: CarVisual) -> void:
 	var p := ReflectionProbe.new()
 	p.name = "car_probe"
@@ -3568,4 +3357,3 @@ func _add_car_probe(v: CarVisual) -> void:
 	# night the capture is nearly black (the cockpit and the road near you went black on High and Ultra)
 	p.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
 	v.add_child(p)
-	car_probe = p
