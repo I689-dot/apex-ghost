@@ -40,8 +40,10 @@ var _cached_q: Dictionary = {}
 var _sessions := {}
 
 func _ready() -> void:
+	print("[boot] settings")
 	_move_old_user_dir()
 	data = load_settings()
+	print("[boot] settings loaded")
 
 ## The game was called Apex Ghost until 2026-11-17, then CorsaGhost, and is GridCorsa since 2026-11-18; Godot keeps a
 ## game's data (settings, sign-in, career, track packs) in a folder named after it: on the first start under the new

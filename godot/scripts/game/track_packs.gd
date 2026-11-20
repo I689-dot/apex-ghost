@@ -34,6 +34,7 @@ var _check: FileAccess
 var _req: HTTPRequest
 
 func _ready() -> void:
+	print("[boot] packs")
 	DirAccess.make_dir_recursive_absolute(DIR)
 	state = _read(DIR + "state.json")
 	manifest = _read(DIR + "manifest.json")

@@ -23,10 +23,10 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	UIKit.full(scroll)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	var root := CenterContainer.new()
-	root.custom_minimum_size = vp
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(root)
+	# (centred by its expand flags: the scroll gives it its own size, in the UI canvas's units, whenever that is larger)
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NAVY_SOLID, 0.94), Color(1, 1, 1, 0.18), 1, 10, Vector2(28, 16) if touch else Vector2(34, 28)))
 	card.custom_minimum_size = Vector2(minf(560.0 if touch else 520.0, vp.x - 32.0), 0)
@@ -119,7 +119,9 @@ static func _sign_in_form(body: VBoxContainer, mode: String, on_done: Callable, 
 	submit.custom_minimum_size = Vector2(0, 52)
 	body.add_child(submit)
 	set_mode.call(mode)
-	nick.grab_focus.call_deferred()
+	# (not on a touch screen: a focused field opens the on-screen keyboard over the whole form before anyone taps it)
+	if not UIKit.touch():
+		nick.grab_focus.call_deferred()
 
 # ----------------------------------------------------------------- friends ---
 

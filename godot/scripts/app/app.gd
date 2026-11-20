@@ -53,14 +53,19 @@ func _ready() -> void:
 	# a phone's CPU: the vehicle model runs at 60 Hz (the lap time holds within 0.3 % of 120 Hz)
 	if OS.has_feature("mobile"):
 		Engine.physics_ticks_per_second = 60
+	print("[boot] app")
 	get_tree().root.theme = UIKit.build_theme()
 	_build_layers()
+	print("[boot] layers")
 	cars = CarsDb.file()
 	track_index = TrackData.list_layouts()
+	print("[boot] data")
 	audio = GameAudio.new()
 	add_child(audio)
+	print("[boot] audio")
 	graphics = Graphics.new()
 	add_child(graphics)
+	print("[boot] graphics")
 	gamepad = GamepadInput.new()
 	gamepad.driving = func(): return screen == "race" and pause_ui == null and session != null
 	gamepad.spectating = func(): return spectating
@@ -68,12 +73,15 @@ func _ready() -> void:
 	# wheels, pedal sets, shifters and handbrakes, each bound in the settings
 	devices = DeviceBindings.new()
 	add_child(devices)
+	print("[boot] input")
 	gamepad.connected_changed.connect(func(on, name): toast(I18n.t("Controller connected: {name}", {"name": name}) if on else I18n.t("Controller disconnected")))
 	Account.changed.connect(func(_a): if screen == "menu": show_start())
 	show_start()
+	print("[boot] start screen")
 	var auto := OS.get_environment("APEX_AUTO")
 	if auto == "intro" or (auto == "" and Settings.data.get("introCinematic", true)):
 		_play_intro()
+		print("[boot] intro")
 	if auto == "intro":
 		_shots_only.call_deferred()
 	elif auto == "ui":
