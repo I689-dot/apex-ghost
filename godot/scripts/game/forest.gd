@@ -109,6 +109,8 @@ static func load_forest(host: Node, track: TrackScene, track_data: Dictionary, q
 	return f
 
 func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
+	# known before the cards are baked (_make_species): their size follows the near range
+	quality = q
 	# the scanned spruces and beech (build_trees.py) where a circuit has its own look (Spa, the Nürburgring)
 	if SpaLook.use(track_data) and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
 		species_file = "res://assets/vegetation/trees_spa.glb"
