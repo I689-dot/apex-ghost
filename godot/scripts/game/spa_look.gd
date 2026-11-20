@@ -93,8 +93,9 @@ const ASPHALT_DETAIL_MEAN := 0.5
 ## Fitted on the base asphalt's match with the video (Kemmel, Raidillon: Delta E under 4).
 ## The PC's Forward+ renderer against the phone's Mobile one, same scene (the multiply passes made equal: Forest.
 ## ensure_globals' mul_gain): the sky paler (Mobile's 10-bit buffer clips its brightest blue before the tonemapper, which
-## Forward+ rolls off toward white). Fitted at the same seven spots.
-const ENV_FP := {"sky": 0.62}
+## Forward+ rolls off toward white). Fitted at the same seven spots: Spa's sky 0.70 on Mobile is 0.62 on Forward+, and
+## every circuit's own sky takes the same ratio (until 2026-11-20 the others got Spa's 0.62 itself on the PC).
+const SKY_FP := 0.62 / 0.70
 
 const TARGET := [
 	["^asph_spa_(base|base2|new|pit|pit2)$", [0.19, 0.19, 0.195]],
@@ -394,7 +395,7 @@ static func texture_mean(t: Texture2D) -> Color:
 static func env_look() -> Dictionary:
 	var l: Dictionary = (_p("env", ENV) as Dictionary).duplicate()
 	if forward_plus():
-		l.merge(_p("env_fp", ENV_FP), true)
+		l.sky = float(l.get("sky", 1.0)) * SKY_FP
 	var o = JSON.parse_string(OS.get_environment("SPA_LOOK")) if OS.get_environment("SPA_LOOK") != "" else null
 	if o is Dictionary:
 		l.merge(o, true)
