@@ -35,6 +35,8 @@ const CLIMATE := {
 	"zandvoort": {"altitudeM": 5.0, "highLow": [[14, 10], [18, 13], [20, 16], [20, 16], [18, 14]]},
 	"spa": {"altitudeM": 430.0, "highLow": [[17, 7], [20, 10], [22, 12], [21, 12], [18, 9]]},
 	"silverstone": {"altitudeM": 150.0, "highLow": [[17, 7], [20, 10], [22, 12], [22, 12], [19, 10]]},
+	"barcelona": {"altitudeM": 110.0, "highLow": [[23, 12], [27, 16], [30, 19], [30, 19], [27, 16]]},
+	"shanghai": {"altitudeM": 4.0, "highLow": [[25, 16], [28, 21], [32, 26], [32, 26], [28, 22]]},
 }
 
 static func _pick_weighted(rng: Prng, entries: Array) -> String:

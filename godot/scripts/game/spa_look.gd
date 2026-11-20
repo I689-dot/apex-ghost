@@ -10,7 +10,7 @@ extends RefCounted
 ## is a detail mask of Assetto Corsa's multi-layer shader, not transparency.
 
 ## The same treatment for another circuit (the user, 2026-11-18: the Nürburgring as Spa): a profile overrides the
-## tables below by key (NurburgringLook.PROFILE, SilverstoneLook.PROFILE, ZandvoortLook.PROFILE, NordschleifeLook); Spa's profile is empty, so Spa reads these constants as before.
+## tables below by key (NurburgringLook.PROFILE, SilverstoneLook.PROFILE, ZandvoortLook.PROFILE, NordschleifeLook, BarcelonaLook.PROFILE, ShanghaiLook.PROFILE); Spa's profile is empty, so Spa reads these constants as before.
 ## use() picks the profile for a track (true: the circuit has a look of its own).
 static var profile: Dictionary = {}
 
@@ -31,6 +31,12 @@ static func use(track_data: Dictionary) -> bool:
 		return true
 	if map == "nordschleife":
 		profile = NordschleifeLook.profile()
+		return true
+	if map == "barcelona":
+		profile = BarcelonaLook.PROFILE
+		return true
+	if map == "shanghai":
+		profile = ShanghaiLook.PROFILE
 		return true
 	profile = {}
 	return false

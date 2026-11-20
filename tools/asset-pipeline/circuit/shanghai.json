@@ -1,0 +1,209 @@
+{
+ "_doc": "Shanghai International Circuit: the Godot app's build from the user's model (RESOURCES/CIRCUIT-MODELS). prep: tools/asset-pipeline/circuit/prep.py; analysis: track_analysis.py; godot: the collision, render and track file.",
+ "id": "shanghai",
+ "name": "Shanghai International Circuit",
+ "source": "source/shanghai_compressed.glb",
+ "prep": {
+  "code": "sh",
+  "rename": {
+   "tarmac": "asph_sh_road",
+   "Out": "asph_sh_runoff",
+   "14": "asph_sh_paddock",
+   "15": "asph_sh_paddock2",
+   "Pit_lane": "asph_sh_pit",
+   "raceline": "asph_sh_g1",
+   "skid": "asph_sh_g2",
+   "01_-_default": "asph_sh_g3",
+   "28": "asph_sh_trans",
+   "Pirelli_terra": "asph_sh_runoff_art1",
+   "Petronas_out": "asph_sh_runoff_art2",
+   "Line_asf": "lines_sh",
+   "LInea_PITNew": "lines_sh_pit",
+   "sha_gridlines_a": "lines_sh_grid",
+   "9!0": "curb_sh",
+   "12": "curb_sh_2",
+   "material_#110": "curb_sh_3",
+   "Kerb_giallo": "curb_sh_yellow",
+   "Prato": "grass_sh",
+   "32": "grass_sh_bank",
+   "base!0": "top2_sh",
+   "base": "top2_sh_paddock",
+   "16": "sand_sh",
+   "17": "sand_sh_2",
+   "13": "astroturf_sh",
+   "RUG_blu": "astroturf_sh_blue",
+   "tree04a": "trees_sh_04a",
+   "tree04b": "trees_sh_04b",
+   "tree06a": "trees_sh_06a",
+   "Nuove_Barriere": "wall_sh_barrier",
+   "sha_barrier_pitwall_b": "wall_sh_pitwall",
+   "Muro_cemento": "wall_sh_concrete",
+   "24": "wall_sh_brick",
+   "25": "wall_sh_1",
+   "26": "wall_sh_3",
+   "26!0": "wall_sh_2",
+   "22": "wall_sh_drain",
+   "Rail": "grail_sh",
+   "sha_barrier_armcostubyellow_a": "grail_sh_yellow",
+   "wirefence_pole_d": "fence_sh",
+   "Recinto": "fence_sh_2",
+   "sha_barrier_pitwall_a!0": "fence_sh_3",
+   "34": "water_sh"
+  },
+  "hide": []
+ },
+ "analysis": {
+  "unit": 2.0,
+  "scaleRange": [
+   0.99,
+   1.01
+  ],
+  "materials": {},
+  "traceDilate": 0,
+  "boundaryMaxAboveRoad": 1.5,
+  "widthDespike": 1.0,
+  "layouts": [],
+  "id": "shanghai",
+  "name": "Shanghai International Circuit",
+  "officialLengthM": 5322.65,
+  "surfaceRules": [
+   [
+    "^lines",
+    "asphalt"
+   ],
+   [
+    "^curb",
+    "curb"
+   ],
+   [
+    "^(asph|pavement)",
+    "asphalt"
+   ],
+   [
+    "^top2",
+    "grass"
+   ],
+   [
+    "^(grass|astroturf)",
+    "grass"
+   ],
+   [
+    "^gravel",
+    "gravel"
+   ],
+   [
+    "^sand",
+    "sand"
+   ],
+   [
+    "^(wall_|grail|fence)",
+    "wall"
+   ]
+  ],
+  "road": [
+   "asph_sh_road",
+   "asph_sh_g1",
+   "asph_sh_g2",
+   "asph_sh_g3",
+   "asph_sh_pit"
+  ],
+  "traceRoad": [
+   "asph_sh_g1"
+  ],
+  "edgeLines": "lines_sh",
+  "curbs": [
+   "curb_sh",
+   "curb_sh_2",
+   "curb_sh_3",
+   "curb_sh_yellow"
+  ],
+  "markings": {
+   "mode": "boxes",
+   "finishAt": {
+    "at": [
+     -108.6,
+     376.7
+    ],
+    "dir": [
+     -0.985,
+     0.174
+    ],
+    "len": 15
+   },
+   "raceTowards": [
+    -167.7,
+    387.1
+   ],
+   "gridBehindFinish": true,
+   "gridSynth": {
+    "behindM": 12,
+    "stepM": 8,
+    "latM": 2.8,
+    "poleSide": 1
+   }
+  },
+  "_length": "The model is in true metres (fitted onto OpenStreetMap at 1:1): officialLengthM is the traced racing surface's raw length, so the scale comes out 1.0 (the real lap 5451 m)."
+ },
+ "godot": {
+  "_note": "The Godot build (collision, render, track file): game = s * glTF + t, from the track analysis (scale 1, its offset).",
+  "toGameFrame": {
+   "s": 1.000000521073481,
+   "R": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     0,
+     1,
+     0
+    ],
+    [
+     0,
+     0,
+     1
+    ]
+   ],
+   "t": [
+    -0.037689208984375,
+    3.25448430668224,
+    -1.620269775390625
+   ]
+  },
+  "overlay": "^(asph_sh_g|asph_sh_trans|lines_sh)",
+  "surfaceRules": [
+   [
+    "^(asph_sh_g|asph_sh_trans|lines_sh)",
+    null
+   ],
+   [
+    "^(asph|pavement)",
+    "asphalt"
+   ],
+   [
+    "^curb",
+    "curb"
+   ],
+   [
+    "^(grass|top2|astroturf)",
+    "grass"
+   ],
+   [
+    "^sand",
+    "gravel"
+   ],
+   [
+    "^(wall_|grail|fence)",
+    "wall"
+   ]
+  ],
+  "renderRe": {
+   "tree": "^(trees_sh|treeline)",
+   "terrain": "^top2_sh",
+   "track": "^(asph|curb|lines|grass|sand|grail|wall_|fence|pavement|top2|astroturf|water)",
+   "alpha": "^(trees_|treeline|fence|lines|asph_sh_g|asph_sh_trans|sha_building_glasstower_a_03|sha_pole_ranking|sha_barrier_grandstandboundary|sha_grandstand_underbrolly_b_02|aa_1!0|aa_4|core_start_lights|lg_|sha_distantbuildings)"
+  }
+ },
+ "turns": 16
+}

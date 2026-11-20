@@ -5,7 +5,7 @@ import tracksRace from '@apex/shared/generated/tracks-race.json';
 
 const TRACKS = tracksRace as unknown as Record<string, TrackRaceData>;
 /** Layouts only the Godot app has (their entries from tools/asset-pipeline/<circuit>/track.mjs). */
-const GODOT_ONLY = ['silverstone'];
+const GODOT_ONLY = ['silverstone', 'barcelona', 'shanghai'];
 const index = JSON.parse(readFileSync(new URL('../../client/public/assets/tracks.json', import.meta.url), 'utf8')).tracks as { id: string }[];
 
 /** Position on the centreline at lap distance s (wraps). */

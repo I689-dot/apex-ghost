@@ -1,0 +1,676 @@
+{
+ "_doc": "Circuit de Barcelona-Catalunya: the Godot app's build from the user's model (RESOURCES/CIRCUIT-MODELS). prep: tools/asset-pipeline/circuit/prep.py; analysis: track_analysis.py; godot: the collision, render and track file.",
+ "id": "barcelona",
+ "name": "Circuit de Barcelona-Catalunya",
+ "source": "source/untitled.glb",
+ "prep": {
+  "code": "bc",
+  "rename": {
+   "ROAD_TRACKMAIN": "asph_bc_road",
+   "ROAD_TRACKMAIN_L": "asph_bc_old",
+   "ROAD_TRACKFILL": "asph_bc_fill",
+   "ROAD_PATCH": "asph_bc_patch",
+   "ROAD_PATCH.001": "asph_bc_patch2",
+   "GROOVE1": "asph_bc_g1",
+   "GROOVE2": "asph_bc_g2",
+   "STRP_PITSKIDS02": "asph_bc_g3",
+   "STRP_TRANSITIONS02": "asph_bc_g4",
+   "rdcp_GREEN_1": "asph_bc_paint_green",
+   "rdcp_GREEN_1.001": "asph_bc_paint_green2",
+   "RDCP_RED_PAINT": "asph_bc_paint_red",
+   "RDCP_RED-PITLANE": "asph_bc_paint_redpit",
+   "RDCP_YELLOW": "asph_bc_paint_yellow",
+   "RDCP_PINK": "asph_bc_paint_pink",
+   "RDCP_CONCRETE1": "pavement_bc_conc",
+   "RDCP_CONCRETE_1": "pavement_bc_conc2",
+   "RDCP_FLOOR_INSIDE": "pavement_bc_floor",
+   "EDGELINE_1": "lines_bc_edge",
+   "STRP_WHITELINE": "lines_bc_white",
+   "WHITELINE5": "lines_bc_w5",
+   "YELLOWLINE4": "lines_bc_y4",
+   "RED_EDGE2": "lines_bc_red",
+   "GREEN_EDGE2": "lines_bc_green",
+   "ASPH_WHITE": "lines_bc_asphwhite",
+   "RMBL13": "curb_bc",
+   "RMBL14": "curb_bc_2",
+   "RMBL_ANTICUT": "curb_bc_anticut",
+   "RMBL_TGREEN30": "curb_bc_teeth",
+   "RMBL_33": "curb_bc_3",
+   "GRASS_MAIN": "grass_bc",
+   "SAT1": "top2_bc",
+   "ROAD_SOIL": "sand_bc_soil",
+   "GRVL_TRAPS_01": "sand_bc",
+   "GRVL_TRANS": "sand_bc_border",
+   "TREES2": "trees_bc",
+   "PINES_TOP": "trees_bc_pines",
+   "BUSHES": "trees_bc_bushes",
+   "IVY": "trees_bc_ivy",
+   "WALL101.001": "wall_bc",
+   "BARRIER": "wall_bc_barrier",
+   "BARRIERS_B": "wall_bc_barrier2",
+   "BARREIRA": "wall_bc_safer",
+   "TWALL_SAFER": "wall_bc_safer2",
+   "TIRES": "wall_bc_tyres",
+   "CONCRETE_WALL": "wall_bc_concrete",
+   "BLACK_WALL": "wall_bc_black",
+   "ARMCO": "grail_bc",
+   "FENCE_TRACK": "fence_bc",
+   "FENCE_EXT": "fence_bc_ext",
+   "NET_BLUE": "fence_bc_net",
+   "BOX_FENCE.001": "fence_bc_box"
+  },
+  "hide": [
+   "SKY"
+  ]
+ },
+ "analysis": {
+  "unit": 2.0,
+  "scaleRange": [
+   0.99,
+   1.01
+  ],
+  "materials": {},
+  "traceDilate": 0,
+  "boundaryMaxAboveRoad": 1.5,
+  "widthDespike": 1.0,
+  "layouts": [],
+  "id": "barcelona",
+  "name": "Circuit de Barcelona-Catalunya",
+  "officialLengthM": 4610.7,
+  "surfaceRules": [
+   [
+    "^lines",
+    "asphalt"
+   ],
+   [
+    "^curb",
+    "curb"
+   ],
+   [
+    "^(asph|pavement)",
+    "asphalt"
+   ],
+   [
+    "^top2",
+    "grass"
+   ],
+   [
+    "^(grass|astroturf)",
+    "grass"
+   ],
+   [
+    "^gravel",
+    "gravel"
+   ],
+   [
+    "^sand",
+    "sand"
+   ],
+   [
+    "^(wall_|grail|fence)",
+    "wall"
+   ]
+  ],
+  "road": [
+   "asph_bc_road",
+   "asph_bc_g1",
+   "asph_bc_g2",
+   "asph_bc_patch",
+   "asph_bc_patch2",
+   "asph_bc_old"
+  ],
+  "traceRoad": [
+   "asph_bc_road",
+   "asph_bc_old"
+  ],
+  "edgeLines": "lines_bc_edge",
+  "curbs": [
+   "curb_bc",
+   "curb_bc_2",
+   "curb_bc_3",
+   "curb_bc_anticut",
+   "curb_bc_teeth"
+  ],
+  "markings": {
+   "mode": "boxes",
+   "finishAt": {
+    "at": [
+     155.8,
+     110.8
+    ],
+    "dir": [
+     -0.22,
+     0.976
+    ],
+    "len": 15
+   },
+   "raceTowards": [
+    142.6,
+    169.3
+   ],
+   "gridBehindFinish": true,
+   "gridSynth": {
+    "behindM": 12,
+    "stepM": 8,
+    "latM": 2.8,
+    "poleSide": 1
+   }
+  },
+  "pitLane": {
+   "raw": [
+    [
+     399.66,
+     -536.11
+    ],
+    [
+     419.19,
+     -518.67
+    ],
+    [
+     430.86,
+     -507.93
+    ],
+    [
+     447.77,
+     -492.29
+    ],
+    [
+     462.02,
+     -476.01
+    ],
+    [
+     467.77,
+     -467.93
+    ],
+    [
+     471.82,
+     -461.04
+    ],
+    [
+     476.22,
+     -449.21
+    ],
+    [
+     478.26,
+     -439.15
+    ],
+    [
+     478.88,
+     -430.82
+    ],
+    [
+     478.5,
+     -421.8
+    ],
+    [
+     477.38,
+     -411.03
+    ],
+    [
+     474.33,
+     -399.48
+    ],
+    [
+     471.32,
+     -390.77
+    ],
+    [
+     469.1,
+     -386.11
+    ],
+    [
+     465.63,
+     -379.26
+    ],
+    [
+     460.88,
+     -371.57
+    ],
+    [
+     456.08,
+     -363.66
+    ],
+    [
+     400.76,
+     -277.43
+    ],
+    [
+     377.59,
+     -240.86
+    ],
+    [
+     369.16,
+     -227.35
+    ],
+    [
+     357.99,
+     -210.76
+    ],
+    [
+     343.93,
+     -188.3
+    ],
+    [
+     300.5,
+     -121.03
+    ],
+    [
+     203.6,
+     29.96
+    ],
+    [
+     188.74,
+     53.57
+    ],
+    [
+     181.83,
+     64.26
+    ],
+    [
+     178.54,
+     67.97
+    ],
+    [
+     163.12,
+     91.77
+    ],
+    [
+     152.3,
+     108.69
+    ],
+    [
+     142.41,
+     125.08
+    ],
+    [
+     125.9,
+     153.7
+    ],
+    [
+     98.66,
+     202.45
+    ],
+    [
+     78.22,
+     237.11
+    ],
+    [
+     48.92,
+     291.19
+    ],
+    [
+     20.38,
+     342.21
+    ]
+   ],
+   "box": [
+    -260,
+    160
+   ],
+   "speedLimitKmh": 60
+  },
+  "_traceRoad": "ROAD_TRACKMAIN_L (asph_bc_old) is the 2023 layout's own piece between turns 13 and 14 (where the chicane was): part of the lap.",
+  "traceExclude": [
+   [
+    [
+     211.5,
+     -557.8
+    ],
+    [
+     215.5,
+     -561.0
+    ],
+    [
+     219.5,
+     -564.1
+    ],
+    [
+     223.3,
+     -567.3
+    ],
+    [
+     227.1,
+     -570.4
+    ],
+    [
+     230.8,
+     -573.6
+    ],
+    [
+     234.4,
+     -576.3
+    ],
+    [
+     238.2,
+     -578.6
+    ],
+    [
+     242.2,
+     -579.7
+    ],
+    [
+     246.6,
+     -579.8
+    ],
+    [
+     251.3,
+     -580.3
+    ],
+    [
+     256.4,
+     -580.9
+    ],
+    [
+     263.5,
+     -582.3
+    ],
+    [
+     267.4,
+     -586.8
+    ],
+    [
+     272.5,
+     -588.5
+    ],
+    [
+     278.6,
+     -588.1
+    ],
+    [
+     284.2,
+     -588.4
+    ],
+    [
+     290.6,
+     -588.3
+    ],
+    [
+     296.6,
+     -588.9
+    ],
+    [
+     302.4,
+     -587.8
+    ],
+    [
+     307.0,
+     -585.9
+    ],
+    [
+     307.2,
+     -585.9
+    ],
+    [
+     311.1,
+     -583.6
+    ],
+    [
+     316.6,
+     -580.6
+    ],
+    [
+     321.0,
+     -578.4
+    ],
+    [
+     325.0,
+     -575.8
+    ],
+    [
+     328.8,
+     -573.0
+    ],
+    [
+     332.7,
+     -570.3
+    ],
+    [
+     336.6,
+     -567.5
+    ],
+    [
+     340.5,
+     -564.7
+    ],
+    [
+     344.5,
+     -562.0
+    ],
+    [
+     348.5,
+     -559.4
+    ],
+    [
+     352.8,
+     -557.0
+    ],
+    [
+     357.0,
+     -554.6
+    ],
+    [
+     361.0,
+     -552.0
+    ],
+    [
+     365.1,
+     -549.3
+    ],
+    [
+     369.2,
+     -546.5
+    ],
+    [
+     369.2,
+     -470.0
+    ],
+    [
+     211.5,
+     -470.0
+    ]
+   ],
+   [
+    [
+     366.3,
+     -550.9
+    ],
+    [
+     370.4,
+     -548.0
+    ],
+    [
+     373.8,
+     -544.3
+    ],
+    [
+     377.0,
+     -540.7
+    ],
+    [
+     380.4,
+     -537.5
+    ],
+    [
+     386.1,
+     -533.0
+    ],
+    [
+     399.2,
+     -534.5
+    ],
+    [
+     391.1,
+     -527.8
+    ],
+    [
+     393.0,
+     -523.3
+    ],
+    [
+     395.4,
+     -519.0
+    ],
+    [
+     397.8,
+     -514.6
+    ],
+    [
+     400.1,
+     -510.2
+    ],
+    [
+     402.3,
+     -505.7
+    ],
+    [
+     404.6,
+     -501.3
+    ],
+    [
+     406.9,
+     -496.9
+    ],
+    [
+     409.3,
+     -492.5
+    ],
+    [
+     411.6,
+     -488.0
+    ],
+    [
+     409.8,
+     -487.1
+    ],
+    [
+     407.5,
+     -491.5
+    ],
+    [
+     405.2,
+     -495.9
+    ],
+    [
+     402.8,
+     -500.4
+    ],
+    [
+     400.5,
+     -504.8
+    ],
+    [
+     398.3,
+     -509.3
+    ],
+    [
+     396.0,
+     -513.8
+    ],
+    [
+     393.6,
+     -518.3
+    ],
+    [
+     391.1,
+     -522.6
+    ],
+    [
+     389.3,
+     -527.0
+    ],
+    [
+     401.2,
+     -534.5
+    ],
+    [
+     385.2,
+     -531.3
+    ],
+    [
+     378.9,
+     -536.3
+    ],
+    [
+     375.6,
+     -539.3
+    ],
+    [
+     372.4,
+     -542.8
+    ],
+    [
+     369.2,
+     -546.5
+    ],
+    [
+     365.1,
+     -549.3
+    ]
+   ]
+  ],
+  "_traceExclude": "The 2023 layout's lap runs round the outer arc of the last sector; the old chicane (the inner diagonal and loop, still in the model and in OpenStreetMap) and the wide run-off band beside it are taken out of the masks: under the arc's inner edge + 3 m (from the lap's own centreline there, s 3630-3825) down to z -470, then a 2 m strip along the edge to s 3900, past the band and short of the pit entry.",
+  "_length": "The model is in true metres (fitted onto OpenStreetMap at 1:1): officialLengthM is the traced racing surface's raw length, so the scale comes out 1.0 (the real lap 4657 m)."
+ },
+ "godot": {
+  "_note": "The Godot build (collision, render, track file): game = s * glTF + t, from the track analysis (scale 1, its offset).",
+  "toGameFrame": {
+   "s": 0.9999935336506461,
+   "R": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     0,
+     1,
+     0
+    ],
+    [
+     0,
+     0,
+     1
+    ]
+   ],
+   "t": [
+    -6.8811492919921875,
+    0.4751432646404613,
+    10.398712158203125
+   ]
+  },
+  "overlay": "^(asph_bc_g|lines_bc)",
+  "surfaceRules": [
+   [
+    "^(asph_bc_g|lines_bc)",
+    null
+   ],
+   [
+    "^(asph|pavement)",
+    "asphalt"
+   ],
+   [
+    "^curb",
+    "curb"
+   ],
+   [
+    "^(grass|top2)",
+    "grass"
+   ],
+   [
+    "^sand",
+    "gravel"
+   ],
+   [
+    "^(wall_|grail|fence)",
+    "wall"
+   ]
+  ],
+  "renderRe": {
+   "tree": "^trees_bc",
+   "terrain": "^top2_bc",
+   "track": "^(asph|curb|lines|grass|sand|grail|wall_|fence|pavement|top2)",
+   "alpha": "^(trees_|fence|lines|asph_bc_g|STRUCTURES-ALPHA|GARAGE_RAIL|HUT_001|PROT-BOX|TRUCK_GLASS|ROLEX_BANNER)"
+  }
+ },
+ "turns": 14
+}

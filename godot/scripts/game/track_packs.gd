@@ -16,9 +16,9 @@ signal changed(id: String)
 ## (APEX_PACKS_DIR: another folder, for tests)
 var DIR := OS.get_environment("APEX_PACKS_DIR") if OS.get_environment("APEX_PACKS_DIR") != "" else "user://packs/"
 ## Track layout id -> pack id (several layouts of a circuit share its pack).
-const PACK_OF := {"spa": "spa", "silverstone": "silverstone"}
+const PACK_OF := {"spa": "spa", "silverstone": "silverstone", "barcelona": "barcelona", "shanghai": "shanghai"}
 ## A file of each pack, to tell whether it is present (bundled in a development build or mounted) before any manifest.
-const PROBES := {"spa": "res://assets/maps/spa_g/map_track.glb", "silverstone": "res://assets/maps/silverstone/map_track.glb"}
+const PROBES := {"spa": "res://assets/maps/spa_g/map_track.glb", "silverstone": "res://assets/maps/silverstone/map_track.glb", "barcelona": "res://assets/maps/barcelona/map_track.glb", "shanghai": "res://assets/maps/shanghai/map_track.glb"}
 const CHUNK := 1 << 20
 
 var manifest := {}

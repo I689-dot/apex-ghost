@@ -129,6 +129,18 @@ def rasterize(ms: list[dict], value=None, mode="1"):
 
 
 road_mask = rasterize(road).astype(bool)
+# "traceExclude": polygons (raw [x, z]) of road the lap does not use, taken out of the masks the trace and the widths
+# read (not the collision): Barcelona's old chicane, still in the model beside the 2023 layout's sweep, where barrier
+# lines could not stop the trace (it turned into the fork, or back on itself)
+EXCL = None
+if CFG.get("traceExclude"):
+    _ex = Image.new("1", (W, H), 0)
+    _exd = ImageDraw.Draw(_ex)
+    for poly_ in CFG["traceExclude"]:
+        _px, _pz = to_px(np.array([p_[0] for p_ in poly_], float), np.array([p_[1] for p_ in poly_], float))
+        _exd.polygon(list(zip(_px.tolist(), _pz.tolist())), fill=1)
+    EXCL = np.array(_ex).astype(bool)
+    road_mask &= ~EXCL
 height = rasterize(road, value=True, mode="F")
 # the top of the racing surface at each pixel (traceRoad: on the stacked maps a see-through rubber layer over the
 # base asphalt). A long painted line more than BURIED under it, with that surface all round it, is an older layout's
@@ -422,6 +434,8 @@ if "traceRoad" in CFG:
         g_[:, 1:] |= trace_mask[:, :-1]
         g_[:, :-1] |= trace_mask[:, 1:]
         trace_mask = g_ & road_mask
+if EXCL is not None:
+    trace_mask = trace_mask & ~EXCL
 
 
 if os.environ.get("TRACE_DEBUG"):

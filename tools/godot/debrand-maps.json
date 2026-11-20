@@ -1480,5 +1480,1239 @@
     }
    ]
   }
+ },
+ "barcelona/map_scenery.glb": {
+  "BANNER_AWS_BLUE": {
+   "size": [
+    512,
+    256
+   ],
+   "patches": [
+    {
+     "what": "AWS",
+     "rect": [
+      0,
+      0,
+      512,
+      256
+     ],
+     "bg": "#0b1f3a",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "BANNER_SPANISHGP": {
+   "size": [
+    512,
+    256
+   ],
+   "patches": [
+    {
+     "what": "#SpanishGP (the F1 event)",
+     "rect": [
+      0,
+      0,
+      512,
+      256
+     ],
+     "bg": "#111111",
+     "label": "#GRIDCORSA",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "BANNER_motorola": {
+   "size": [
+    512,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Motorola razr",
+     "rect": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "bg": "#0b1630",
+     "label": "SLIPSTREAM",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "logo-repsol": {
+   "size": [
+    512,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Repsol",
+     "rect": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "bg": "#0d2b5e",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "logos_sponsor": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "DHL",
+     "rect": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "bg": "#f2c500",
+     "label": "PITBOX",
+     "fg": "#c4001a"
+    },
+    {
+     "what": "Michelin",
+     "rect": [
+      0,
+      128,
+      512,
+      256
+     ],
+     "bg": "#1a3a8a",
+     "label": "GHOST TYRES",
+     "fg": "#f2c500"
+    },
+    {
+     "what": "Total",
+     "rect": [
+      0,
+      256,
+      512,
+      384
+     ],
+     "bg": "#f4f4f4",
+     "label": "RACE LAB",
+     "fg": "#d8232a"
+    },
+    {
+     "what": "Visit Portugal",
+     "rect": [
+      0,
+      384,
+      512,
+      512
+     ],
+     "bg": "#f4f4f4",
+     "label": "TRACK DAY",
+     "fg": "#1c7c3c"
+    }
+   ]
+  },
+  "logos_sponsor_road": {
+   "size": [
+    512,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Pirelli",
+     "rect": [
+      0,
+      0,
+      512,
+      128
+     ],
+     "bg": [
+      500,
+      64
+     ],
+     "label": "GRIP+",
+     "fg": "#e8e8e8"
+    },
+    {
+     "what": "Rolex",
+     "rect": [
+      0,
+      128,
+      512,
+      256
+     ],
+     "bg": [
+      500,
+      200
+     ],
+     "label": "HAIRPIN",
+     "fg": "#c9a64a"
+    }
+   ]
+  },
+  "SPONSORS": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "Sistemas Ricoh",
+     "rect": [
+      4,
+      231,
+      118,
+      259
+     ],
+     "bg": "#d9d9d9",
+     "label": "TORQUE",
+     "fg": "#c0392b"
+    },
+    {
+     "what": "Facebook, RSS and Twitter icons",
+     "rect": [
+      400,
+      156,
+      512,
+      182
+     ],
+     "bg": [
+      396,
+      168
+     ]
+    }
+   ]
+  },
+  "Dist_Marks_01": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "Pirelli (50)",
+     "rect": [
+      84,
+      8,
+      170,
+      34
+     ],
+     "bg": "#3f3f3f"
+    },
+    {
+     "what": "Pirelli (100)",
+     "rect": [
+      356,
+      8,
+      442,
+      34
+     ],
+     "bg": "#3f3f3f"
+    },
+    {
+     "what": "Pirelli (150)",
+     "rect": [
+      84,
+      284,
+      170,
+      310
+     ],
+     "bg": "#3f3f3f"
+    },
+    {
+     "what": "Pirelli (F1 board)",
+     "rect": [
+      356,
+      284,
+      442,
+      310
+     ],
+     "bg": "#3f3f3f"
+    },
+    {
+     "what": "F1 logo",
+     "rect": [
+      352,
+      376,
+      448,
+      416
+     ],
+     "bg": "#0a0a0a",
+     "label": "GC",
+     "fg": "#f07c22"
+    }
+   ]
+  },
+  "Startlights_GPVWC": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "F1 Spanish Grand Prix",
+     "rect": [
+      308,
+      248,
+      508,
+      292
+     ],
+     "bg": "#111111",
+     "label": "GRIDCORSA",
+     "fg": "#dddddd"
+    }
+   ]
+  },
+  "garages_13_16": {
+   "size": [
+    512,
+    256
+   ],
+   "patches": [
+    {
+     "what": "SimRacingHUD",
+     "rect": [
+      33,
+      8,
+      107,
+      30
+     ],
+     "bg": "#0a0a0a"
+    },
+    {
+     "what": "SimRacingHUD",
+     "rect": [
+      289,
+      8,
+      363,
+      30
+     ],
+     "bg": "#0a0a0a"
+    },
+    {
+     "what": "SimRacingHUD",
+     "rect": [
+      33,
+      136,
+      107,
+      158
+     ],
+     "bg": "#0a0a0a"
+    },
+    {
+     "what": "SimRacingHUD",
+     "rect": [
+      289,
+      136,
+      363,
+      158
+     ],
+     "bg": "#0a0a0a"
+    },
+    {
+     "what": "Fanatec",
+     "rect": [
+      38,
+      43,
+      97,
+      57
+     ],
+     "bg": [
+      30,
+      50
+     ]
+    },
+    {
+     "what": "Fanatec",
+     "rect": [
+      294,
+      43,
+      353,
+      57
+     ],
+     "bg": [
+      286,
+      50
+     ]
+    },
+    {
+     "what": "Fanatec",
+     "rect": [
+      38,
+      171,
+      97,
+      185
+     ],
+     "bg": [
+      30,
+      178
+     ]
+    },
+    {
+     "what": "Fanatec",
+     "rect": [
+      294,
+      171,
+      353,
+      185
+     ],
+     "bg": [
+      286,
+      178
+     ]
+    },
+    {
+     "what": "SRHF1",
+     "rect": [
+      45,
+      73,
+      73,
+      110
+     ],
+     "bg": [
+      30,
+      90
+     ]
+    },
+    {
+     "what": "SRHF1",
+     "rect": [
+      301,
+      73,
+      329,
+      110
+     ],
+     "bg": [
+      286,
+      90
+     ]
+    },
+    {
+     "what": "SRHF1",
+     "rect": [
+      45,
+      201,
+      73,
+      238
+     ],
+     "bg": [
+      30,
+      218
+     ]
+    },
+    {
+     "what": "SRHF1",
+     "rect": [
+      301,
+      201,
+      329,
+      238
+     ],
+     "bg": [
+      286,
+      218
+     ]
+    }
+   ]
+  },
+  "time-tower": {
+   "size": [
+    256,
+    512
+   ],
+   "patches": [
+    {
+     "what": "la Caixa",
+     "rect": [
+      0,
+      0,
+      126,
+      126
+     ],
+     "bg": [
+      4,
+      4
+     ],
+     "label": "GRIDCORSA",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "pit_misc": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "gpvwc (the model's makers)",
+     "rect": [
+      414,
+      281,
+      459,
+      395
+     ],
+     "bg": [
+      400,
+      330
+     ]
+    }
+   ]
+  },
+  "pitlane-build1": {
+   "size": [
+    512,
+    512
+   ],
+   "patches": [
+    {
+     "what": "ice-cream heart logo (kiosk)",
+     "rect": [
+      214,
+      148,
+      312,
+      232
+     ],
+     "bg": [
+      219,
+      152
+     ]
+    },
+    {
+     "what": "ice-cream heart logo (kiosk, side)",
+     "rect": [
+      366,
+      175,
+      472,
+      312
+     ],
+     "bg": [
+      372,
+      205
+     ]
+    },
+    {
+     "what": "ice-cream heart logo (kiosk, front)",
+     "rect": [
+      310,
+      148,
+      366,
+      222
+     ],
+     "bg": [
+      219,
+      152
+     ]
+    }
+   ]
+  }
+ },
+ "barcelona/map_track.glb": {
+  "SaferWALLS_IN": {
+   "size": [
+    128,
+    512
+   ],
+   "patches": [
+    {
+     "what": "Monster Energy",
+     "rect": [
+      0,
+      0,
+      128,
+      512
+     ],
+     "bg": "#0a0a0a",
+     "label": "KERB & CO",
+     "fg": "#5cd65c",
+     "rotate": -90
+    }
+   ]
+  }
+ },
+ "shanghai/map_scenery.glb": {
+  "Emirates_better": {
+   "size": [
+    256,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Emirates Fly Better",
+     "rect": [
+      0,
+      0,
+      256,
+      128
+     ],
+     "bg": "#c8102e",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "fly_better": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Emirates Fly Better",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#c8102e",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "fly_emirates_terrain_a": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Fly Emirates",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#c8102e",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "helix_board_c": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Fly Emirates",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#c8102e",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Heine_no": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Heineken: when you drive, never drink",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#1e5b2e",
+     "label": "DRIVE SAFE",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "PAT_Einak_basso": {
+   "size": [
+    256,
+    51
+   ],
+   "patches": [
+    {
+     "what": "Heineken",
+     "rect": [
+      0,
+      0,
+      256,
+      51
+     ],
+     "bg": "#1e5b2e",
+     "label": "SLIPSTREAM",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "lg_board_a": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Heineken",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#1e5b2e",
+     "label": "SLIPSTREAM",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Petronas_sign": {
+   "size": [
+    256,
+    51
+   ],
+   "patches": [
+    {
+     "what": "Petronas",
+     "rect": [
+      0,
+      0,
+      256,
+      51
+     ],
+     "bg": "#00a19c",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Petronas_sign_cina": {
+   "size": [
+    256,
+    128
+   ],
+   "patches": [
+    {
+     "what": "Petronas (Chinese)",
+     "rect": [
+      0,
+      0,
+      256,
+      128
+     ],
+     "bg": "#00a19c",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "Pirelli_pan": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Pirelli",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#ffcc00",
+     "label": "GRIP+",
+     "fg": "#111111"
+    }
+   ]
+  },
+  "PAT_pZero_alto": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Pirelli P Zero",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#0a0a0a",
+     "label": "GRIP+",
+     "fg": "#ffcc00"
+    }
+   ]
+  },
+  "allianz_board_a": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Allianz",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#003781",
+     "label": "RACE LAB",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "f1_board_a": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Rolex",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    }
+   ]
+  },
+  "f1_board_b": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "DHL",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#ffcc00",
+     "label": "PITBOX",
+     "fg": "#d40511"
+    }
+   ]
+  },
+  "rolex_board_a": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Rolex",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    }
+   ]
+  },
+  "rolex_board_b": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Rolex",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    }
+   ]
+  },
+  "rolex_terrain_a": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Rolex",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    }
+   ]
+  },
+  "ubs_brake_a": {
+   "size": [
+    256,
+    128
+   ],
+   "patches": [
+    {
+     "what": "DHL",
+     "rect": [
+      0,
+      0,
+      256,
+      128
+     ],
+     "bg": "#ffcc00",
+     "label": "PITBOX",
+     "fg": "#d40511"
+    }
+   ]
+  },
+  "Formula_1000": {
+   "size": [
+    256,
+    64
+   ],
+   "patches": [
+    {
+     "what": "Formula 1 1000th race",
+     "rect": [
+      0,
+      0,
+      256,
+      64
+     ],
+     "bg": "#121417",
+     "label": "GRIDCORSA",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "telo_1000": {
+   "size": [
+    256,
+    32
+   ],
+   "patches": [
+    {
+     "what": "F1 1000 poster (real drivers' faces)",
+     "rect": [
+      0,
+      0,
+      256,
+      32
+     ],
+     "bg": "#121417",
+     "label": "GRIDCORSA",
+     "fg": "#f4f4f4"
+    }
+   ]
+  },
+  "PIT_animato": {
+   "size": [
+    256,
+    16
+   ],
+   "patches": [
+    {
+     "what": "sponsor strip (Yutime, DHL, Heineken, Emirates)",
+     "rect": [
+      0,
+      0,
+      256,
+      16
+     ],
+     "bg": "#121417"
+    }
+   ]
+  },
+  "Roex_display_anim": {
+   "size": [
+    256,
+    6
+   ],
+   "patches": [
+    {
+     "what": "Rolex display strip",
+     "rect": [
+      0,
+      0,
+      256,
+      6
+     ],
+     "bg": "#121417"
+    }
+   ]
+  },
+  "PAT_screen": {
+   "size": [
+    96,
+    256
+   ],
+   "patches": [
+    {
+     "what": "TV screens showing F1 broadcast footage",
+     "rect": [
+      0,
+      0,
+      96,
+      256
+     ],
+     "bg": "#101418"
+    }
+   ]
+  },
+  "PAT_screen_2": {
+   "size": [
+    96,
+    256
+   ],
+   "patches": [
+    {
+     "what": "TV screens showing F1 broadcast footage",
+     "rect": [
+      0,
+      0,
+      96,
+      256
+     ],
+     "bg": "#101418"
+    }
+   ]
+  },
+  "BLocchi_sponsor": {
+   "size": [
+    256,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Emirates",
+     "rect": [
+      35,
+      0,
+      256,
+      56
+     ],
+     "bg": "#c8102e",
+     "label": "TORQUE WORKS",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Petronas",
+     "rect": [
+      35,
+      56,
+      256,
+      142
+     ],
+     "bg": "#00a19c",
+     "label": "APEX FUEL",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Rolex",
+     "rect": [
+      35,
+      142,
+      256,
+      210
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    },
+    {
+     "what": "DHL",
+     "rect": [
+      35,
+      210,
+      256,
+      256
+     ],
+     "bg": "#ffcc00",
+     "label": "PITBOX",
+     "fg": "#d40511"
+    }
+   ]
+  },
+  "Blocchi _dist": {
+   "size": [
+    205,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Heineken",
+     "rect": [
+      103,
+      0,
+      205,
+      72
+     ],
+     "bg": "#1e5b2e",
+     "label": "SLIPSTREAM",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "Rolex",
+     "rect": [
+      103,
+      72,
+      205,
+      116
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    },
+    {
+     "what": "Emirates",
+     "rect": [
+      103,
+      116,
+      205,
+      169
+     ],
+     "bg": "#c8102e",
+     "label": "TORQUE",
+     "fg": "#f4f4f4"
+    },
+    {
+     "what": "DHL",
+     "rect": [
+      103,
+      169,
+      205,
+      221
+     ],
+     "bg": "#ffcc00",
+     "label": "PITBOX",
+     "fg": "#d40511"
+    }
+   ]
+  },
+  "rolex_clock_hd": {
+   "size": [
+    256,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Rolex and the F1 Germany GP line",
+     "rect": [
+      0,
+      0,
+      128,
+      90
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    },
+    {
+     "what": "Rolex",
+     "rect": [
+      128,
+      0,
+      256,
+      90
+     ],
+     "bg": "#006039",
+     "label": "HAIRPIN",
+     "fg": "#d4b062"
+    }
+   ]
+  },
+  "SEGNI_pirelli_new": {
+   "size": [
+    256,
+    171
+   ],
+   "patches": [
+    {
+     "what": "Pirelli marks on the distance discs",
+     "rect": [
+      18,
+      92,
+      250,
+      106
+     ],
+     "bg": "#1a1a1a"
+    }
+   ]
+  },
+  "sha_sign_paddockclub_a_d": {
+   "size": [
+    128,
+    256
+   ],
+   "patches": [
+    {
+     "what": "Formula One Paddock",
+     "rect": [
+      8,
+      10,
+      120,
+      42
+     ],
+     "bg": [
+      4,
+      30
+     ],
+     "label": "PADDOCK",
+     "fg": "#e6e6e6"
+    }
+   ]
+  }
+ },
+ "shanghai/map_track.glb": {
+  "New_line_PIT": {
+   "size": [
+    256,
+    16
+   ],
+   "patches": [
+    {
+     "what": "F1 1000 logos along the pit line",
+     "rect": [
+      0,
+      0,
+      256,
+      16
+     ],
+     "bg": "#e8e8e8"
+    }
+   ]
+  }
  }
 }

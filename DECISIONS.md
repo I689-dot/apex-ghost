@@ -1662,3 +1662,41 @@ assumes the old peak; retune AI_GRIP if needed).
   - Zandvoort: 0.9 1:46.8 / 6 off -> 1:45.6 / 0 off; 0.95 1:46.6 / 6 -> 1:46.1 / 0; 1.0 1:46.9 / 3 -> 1:47.1 / 0.
 - This morning's judgement (keep a learned file only if it is faster) is corrected: a learned file is judged on the lap
   and the excursions together, since in a race each excursion past the warnings costs 5 s.
+
+## Godot: Barcelona-Catalunya and Shanghai (2026-11-20)
+
+- The user added RESOURCES/CIRCUIT-MODELS/barcelona-catalunya-grand-prix-2023-layout.zip and
+  shanghai-international-circuit-2018-layout.zip (Assetto Corsa conversions like Spa and Silverstone) and asked for
+  both with the most realistic look.
+- The Silverstone pipeline made general, in tools/asset-pipeline/circuit/:
+  - prep.py (Blender, driven by <id>.json "prep": renames, faces to hide, an optional atlas split, optional
+    synthesised edge lines);
+  - the track analysis, collision, render and far terrain as for Silverstone;
+  - track.mjs (the track file, the index entry and the game server's entry).
+- Both models are in true metres (fitted onto OpenStreetMap at 1:1): Barcelona 6.3 m mean, Shanghai 3.8 m. The
+  centrelines are 4,643 m (the real lap 4,657 m) and 5,390 m (5,451 m).
+- Barcelona keeps the old chicane (the layout before 2023) beside the new final sweep, and OpenStreetMap still has it.
+  The trace turned into it, and a first exclusion cut the real road, sending the trace across the grass into the pit
+  lane (the bots then stuck at 4,019 m with 20 resets). track_analysis.py now takes "traceExclude" polygons, taken out
+  of the masks the trace and widths read (not the collision). Barcelona's polygon is built from the lap's own
+  centreline: the arc's inner edge + 3 m.
+- Looks (BarcelonaLook, ShanghaiLook: SpaLook profiles):
+  - Barcelona: a dry, clear Catalan afternoon. The run-off paints come out green, red, yellow and pink (the export
+    had left them all a flat grey), and there is a drier lawn and the stone pines.
+  - Shanghai: a humid, hazy Yangtze-delta afternoon. Its compressed model (256 px textures) is carried by the scanned
+    road and gravel and the grain layers; the paddock and pit asphalt (near black: a specular mask read as colour)
+    are brought to a pale grey.
+  - Both: scanned road and gravel, kerb repaint, lawn, grain, catch fence, scanned spectators on the stands (40,000
+    and 39,000 at full density), and far terrain from Copernicus and WorldCover.
+- Brands painted over (debrand-maps.json):
+  - Barcelona: AWS, #SpanishGP, Motorola, Repsol, DHL, Michelin, Total, Visit Portugal, Pirelli, Rolex, Ricoh, la
+    Caixa, Monster Energy, Fanatec, SimRacingHUD, SRHF1, the F1 logos and an ice-cream brand.
+  - Shanghai: Emirates, Heineken, Petronas, Pirelli, Allianz, Rolex, DHL, the F1 1000 artwork with real drivers'
+    faces, and screens showing F1 broadcasts.
+  - The circuits' own names and crests stay.
+- Bots: lines from raceline.ts (estimates 1:33.8 and 1:55.4). Barcelona at skill 0.9-0.95 laps in 1:44.0-1:44.5
+  with no resets or excursions; Shanghai 2:06.4-2:07.6. Downloadable packs as Silverstone.
+- Ultra 1080p with 4 AI cars: Barcelona 89.8 fps, Shanghai 76.5. Lobby flags, places and years, climate,
+  achievements, menu photos and grass masks.
+- Also: the Nürburgring short layout's learned grip (1.0: 1:49.0 / 8 excursions -> 1:46.8 / 2; 0.9: 1:44.7 / 2 ->
+  1:44.3 / 1). The GP's run made it slower with an excursion, so it was not kept.

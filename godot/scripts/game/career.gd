@@ -42,6 +42,8 @@ const ACHIEVEMENTS := [
 	["win_zandvoort", "Orange army", "Win at Zandvoort", 300],
 	["win_nurburgring", "Ring master", "Win at the Nürburgring", 300],
 	["win_silverstone", "Flat through Maggotts", "Win at Silverstone", 300],
+	["win_barcelona", "Master of Montmeló", "Win at Barcelona-Catalunya", 300],
+	["win_shanghai", "Through the snail", "Win at Shanghai", 300],
 	["licence_d", "Licensed", "Earn a Class D licence", 200],
 	["licence_b", "Experienced", "Earn a Class B licence", 400],
 	["licence_a", "Elite licence", "Earn a Class A licence", 600],
@@ -122,11 +124,13 @@ static func _achieved(id: String, c: Dictionary, s: Dictionary) -> bool:
 		"km_100": return c.km >= 100.0
 		"km_1000": return c.km >= 1000.0
 		# (an achievement once earned stays: a circuit added later does not take it back)
-		"all_circuits": return ["nurburgring", "spa", "zandvoort", "silverstone"].all(func(m): return c.circuits.has(m))
+		"all_circuits": return ["nurburgring", "spa", "zandvoort", "silverstone", "barcelona", "shanghai"].all(func(m): return c.circuits.has(m))
 		"win_spa": return race and s.position == 1 and s.field > 1 and map == "spa"
 		"win_zandvoort": return race and s.position == 1 and s.field > 1 and map == "zandvoort"
 		"win_nurburgring": return race and s.position == 1 and s.field > 1 and (map == "nurburgring" or map == "nordschleife")
 		"win_silverstone": return race and s.position == 1 and s.field > 1 and map == "silverstone"
+		"win_barcelona": return race and s.position == 1 and s.field > 1 and map == "barcelona"
+		"win_shanghai": return race and s.position == 1 and s.field > 1 and map == "shanghai"
 		"licence_d": return LICENCES.find(c.licence) >= 1
 		"licence_b": return LICENCES.find(c.licence) >= 3
 		"licence_a": return LICENCES.find(c.licence) >= 4

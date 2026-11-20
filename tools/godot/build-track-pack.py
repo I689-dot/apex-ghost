@@ -36,6 +36,18 @@ PACKS = {
         'probe': 'res://assets/maps/silverstone/map_track.glb',
         'name': 'Silverstone',
     },
+    'barcelona': {
+        'files': ['assets/maps/barcelona/*'],
+        'skip': ['*.import', '*.uid'],
+        'probe': 'res://assets/maps/barcelona/map_track.glb',
+        'name': 'Barcelona-Catalunya',
+    },
+    'shanghai': {
+        'files': ['assets/maps/shanghai/*'],
+        'skip': ['*.import', '*.uid'],
+        'probe': 'res://assets/maps/shanghai/map_track.glb',
+        'name': 'Shanghai',
+    },
 }
 # per platform: its export platform, preset options and the files only the other platform's pack carries
 PLATFORMS = {
