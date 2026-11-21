@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Compares a run of baseline.sh with docs/code-quality/baseline: compare.sh <run dir>. Prints the tests whose
-# deterministic output differs (timings, random ids and exit-time leak counts left out; menu_test's lines sorted, as it
-# prints some asynchronously) and PASS or FAIL.
+# deterministic output differs (timings, random ids and exit-time leak counts left out, and audiotest's bus count,
+# which depends on when the engine voices' buses are freed under load; menu_test's lines sorted, as it prints some
+# asynchronously) and PASS or FAIL.
 set -u
 B="$(cd "$(dirname "$0")" && pwd)/baseline"
 RUN="$1"
-DROP='seconds=| ms\b|[0-9]+ ?ms|fps|Godot Engine|^\s*$|ObjectDB instances|RID allocations|RIDs of type|resources still in use|welcome:|state=open|carLock|invite code|gets a number|^\s+at: '
+DROP='audio ok, buses:|seconds=| ms\b|[0-9]+ ?ms|fps|Godot Engine|^\s*$|ObjectDB instances|RID allocations|RIDs of type|resources still in use|welcome:|state=open|carLock|invite code|gets a number|^\s+at: '
 fail=0
 for f in "$B"/*.txt; do
   n=$(basename "$f")
