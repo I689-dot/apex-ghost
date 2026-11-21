@@ -1,9 +1,9 @@
 class_name CareerData
 extends RefCounted
 ## The solo career, after the games' progression (port of career.ts): experience and driver levels (Forza, Gran
-## Turismo) and an iRacing licence with its Safety Rating, coins and the garage. Kept on this device
-## (user://career.json). A career is a Dictionary {xp, licence, sr, sessions, races, wins, podiums, poles, km,
-## cleanLaps, coins, owned, daily}.
+## Turismo) and an iRacing licence with its Safety Rating, and coins. Kept on this device (user://career.json). A
+## career is a Dictionary {xp, licence, sr, sessions, races, wins, podiums, poles, km, cleanLaps, coins, ...}; `owned`
+## and `daily` are the old garage's (removed 2026-11-21), kept in the file but no longer read.
 
 const LICENCES := ["R", "D", "C", "B", "A", "P"]
 const LICENCE_NAME := {"R": "Rookie", "D": "Class D", "C": "Class C", "B": "Class B", "A": "Class A", "P": "Pro"}
@@ -242,51 +242,3 @@ static func add_session(s: Dictionary) -> Dictionary:
 		"levelAfter": level_of(c.xp).level, "licenceBefore": before.licence, "licenceAfter": c.licence,
 		"srBefore": before.sr, "srAfter": c.sr,
 	}
-
-# ------------------------------------------------------------- the garage ---
-
-## A car's price in coins: by power to weight, a little more for a newer model.
-static func car_price(car: Dictionary) -> int:
-	var pw: float = float(car.specs.powerKw) / float(car.specs.massKg)
-	var year: float = float(car.year) if car.get("year") != null else 2015.0
-	var p := 60000.0 + maxf(0.0, pw - 0.24) * 3200000.0 + maxf(0.0, year - 2015.0) * 5000.0
-	return int(roundf(minf(900000.0, maxf(50000.0, p)) / 5000.0)) * 5000
-
-## The garage the first time: the three most affordable cars, and the car last driven. Later calls change nothing.
-static func init_garage(cars: Array, current: Variant = null) -> void:
-	var c := load_career()
-	if not c.owned.is_empty():
-		return
-	var sorted := cars.duplicate()
-	sorted.sort_custom(func(a, b): return car_price(a) < car_price(b))
-	c.owned = sorted.slice(0, 3).map(func(x): return x.id)
-	if current != null and not c.owned.has(current):
-		c.owned.append(current)
-	save_career(c)
-
-static func owns_car(id: String) -> bool:
-	return load_career().owned.has(id)
-
-## Buys a car: false when there are not coins enough.
-static func buy_car(car: Dictionary) -> bool:
-	var c := load_career()
-	if c.owned.has(car.id):
-		return true
-	var price := car_price(car)
-	if c.coins < price:
-		return false
-	c.coins -= price
-	c.owned.append(car.id)
-	save_career(c)
-	return true
-
-## The daily bonus (5,000 coins, once a day): what was given, 0 if already today.
-static func claim_daily() -> int:
-	var c := load_career()
-	var today := Time.get_date_string_from_system(true)
-	if c.daily == today:
-		return 0
-	c.daily = today
-	c.coins += 5000
-	save_career(c)
-	return 5000

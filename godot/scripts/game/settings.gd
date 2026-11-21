@@ -3,11 +3,6 @@ extends Node
 ## `data` (a Dictionary) and saved to user://settings.json. Quality presets come from res://data/quality.json, which
 ## tools/godot/export-quality.mjs generates from settings.ts.
 
-const CONTROL_ACTIONS := [
-	"throttle", "brake", "steerLeft", "steerRight", "handbrake", "shiftUp", "shiftDown", "resetCar", "toggleGearbox",
-	"lookLeft", "lookRight", "lookBack", "timing", "pause", "camera", "damage", "tvCamera", "deltaMode",
-	"brakeBiasUp", "brakeBiasDown", "tcCycle", "absToggle", "chat", "replay",
-]
 const CAMERA_MODES := ["cockpit", "chase", "far"]
 
 const ACTION_LABEL := {
@@ -19,7 +14,7 @@ const ACTION_LABEL := {
 	"brakeBiasUp": "Brake bias forward", "brakeBiasDown": "Brake bias rearward", "tcCycle": "Traction control level", "absToggle": "ABS on / off", "chat": "Text chat", "replay": "Replay",
 }
 
-## Key bindings by the web game's KeyboardEvent.code names (translated to Godot keys by InputMapper).
+## Key bindings by the web game's KeyboardEvent.code names (translated to Godot keys by KeyMap).
 const DEFAULT_BINDINGS := {
 	"throttle": ["KeyW", "ArrowUp"], "brake": ["KeyS", "ArrowDown"], "steerLeft": ["KeyA", "ArrowLeft"],
 	"steerRight": ["KeyD", "ArrowRight"], "handbrake": ["Space"], "shiftUp": ["ShiftLeft", "KeyE"],

@@ -1,17 +1,8 @@
 class_name TopView
 extends RefCounted
-## A car seen from straight above (port of game/topView.ts): a picture of the car's own model (nose up, transparent
-## background), and its technical line drawing (surface creases, silhouette, height steps) for the damage report and
-## the status instrument. Both are rendered once at load, each car gets its own. The car is instanced again in a
-## private SubViewport world, so the live car is never touched.
-
-class Picture:
-	extends RefCounted
-	var texture: ImageTexture
-	var min_x: float
-	var max_x: float
-	var min_z: float
-	var max_z: float
+## A car seen from straight above (port of game/topView.ts): its technical line drawing (surface creases, silhouette,
+## height steps) for the damage report and the status instrument, rendered once at load for each car. The car is
+## instanced again in a private SubViewport world, so the live car is never touched.
 
 class Lines:
 	extends RefCounted
@@ -51,12 +42,12 @@ static func _car_box(root: Node3D) -> AABB:
 		first = false
 	return box if not first else AABB()
 
-static func _make_world(host: Node, px_w: int, px_h: int, model: PackedScene, box: AABB, with_light: bool) -> Array:
+static func _make_world(host: Node, px_w: int, px_h: int, model: PackedScene, box: AABB) -> Array:
 	var vp := SubViewport.new()
 	vp.size = Vector2i(px_w, px_h)
 	vp.own_world_3d = true
 	vp.transparent_bg = true
-	vp.msaa_3d = Viewport.MSAA_4X if with_light else Viewport.MSAA_DISABLED
+	vp.msaa_3d = Viewport.MSAA_DISABLED
 	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	host.add_child(vp)
 	var car: Node3D = model.instantiate()
@@ -69,43 +60,7 @@ static func _make_world(host: Node, px_w: int, px_h: int, model: PackedScene, bo
 	vp.add_child(cam)
 	# looking down with +z (forward) up the picture: the picture's right is the car's right (-x)
 	cam.global_transform = Transform3D(Basis(Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 1, 0)), Vector3(box.get_center().x, box.end.y + 5.0, box.get_center().z))
-	if with_light:
-		var env := WorldEnvironment.new()
-		var e := Environment.new()
-		e.background_mode = Environment.BG_CLEAR_COLOR
-		e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-		e.ambient_light_color = Color(0.85, 0.85, 0.9)
-		e.ambient_light_energy = 0.9
-		env.environment = e
-		vp.add_child(env)
-		var sun := DirectionalLight3D.new()
-		sun.rotation_degrees = Vector3(-70, 210, 0)
-		sun.light_energy = 1.0
-		vp.add_child(sun)
 	return [vp, car, cam]
-
-## The car's model from straight above (nose up). model: the car's PackedScene (any level). Async: await it.
-static func render_top_view(host: Node, model: PackedScene, px_wide: int = 120) -> Picture:
-	var probe: Node3D = model.instantiate()
-	var box := _car_box(probe)
-	probe.free()
-	if box.size == Vector3.ZERO:
-		return null
-	var W := px_wide * 2
-	var H := roundi(W * box.size.z / box.size.x)
-	var parts := _make_world(host, W, H, model, box, true)
-	var vp: SubViewport = parts[0]
-	await RenderingServer.frame_post_draw
-	await RenderingServer.frame_post_draw
-	var img := vp.get_texture().get_image()
-	vp.queue_free()
-	var pic := Picture.new()
-	pic.texture = ImageTexture.create_from_image(img)
-	pic.min_x = box.position.x
-	pic.max_x = box.end.x
-	pic.min_z = box.position.z
-	pic.max_z = box.end.z
-	return pic
 
 ## The car's own model as a technical line drawing from straight above: rendered twice top-down, its surface
 ## directions and its height, and drawn where either jumps. Async: await it.
@@ -119,7 +74,7 @@ static func render_top_lines(host: Node, model: PackedScene, px_wide: int = 220)
 	var H := roundi(W * box.size.z / box.size.x)
 	var imgs: Array = []
 	for pass_i in 2:
-		var parts := _make_world(host, W, H, model, box, false)
+		var parts := _make_world(host, W, H, model, box)
 		var vp: SubViewport = parts[0]
 		var car: Node3D = parts[1]
 		var sh := Shader.new()

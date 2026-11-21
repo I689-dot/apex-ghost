@@ -7,7 +7,7 @@ const WHEELS := ["FL", "FR", "RL", "RR"]
 ## Where a car's levels switch (x car_lod_scale), by their place in its list: the first up to 30 m, the second to 130 m,
 ## the third beyond. Other cars load lod1 and lod2 (Assets.load_car_model's first_level 1): lod1 near, lod2 from 30 m.
 const LOD_DIST := [0.0, 30.0, 130.0]
-## The quality preset's car detail distance (QualityConfig.carLodScale): set before the cars are built.
+## The quality preset's car detail distance (the preset's carLodScale): set before the cars are built.
 static var car_lod_scale := 1.0
 ## 1 while the camera is in your own cockpit (set by the session each frame).
 static var cockpit_glass := 0.0

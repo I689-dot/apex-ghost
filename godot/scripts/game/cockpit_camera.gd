@@ -33,7 +33,7 @@ var _auto_raise := 0.0
 ## Part of EYE_UP that fits under this car's roof (auto_seat measures it).
 var _game_up := EYE_UP
 
-func _init(car_entry: Dictionary, car_object: Node3D, fov: float, viewport_size: Vector2 = Vector2(1280, 720)) -> void:
+func _init(car_entry: Dictionary, car_object: Node3D, fov: float) -> void:
 	entry = car_entry
 	camera = Camera3D.new()
 	camera.fov = fov

@@ -3,7 +3,8 @@ extends Node3D
 ## The loaded track: render scene, collision and centreline helpers (port of game/track.ts Track). Chunks are the
 ## map's GLB files split by the asset pipeline (one node per chunk, named in the layout's "chunks" list); the layout
 ## may list only some chunks of a file (the Nordschleife layout swaps the GP's terrain and junction walls for its
-## own copies). Surface shading beyond the glTF materials is added by TrackShading (shaders).
+## own copies). Surface shading beyond the glTF materials comes from SpaLook (circuits with a look of their own) and
+## GroundDetail.
 
 ## Large areas whose small texture tile repeats visibly.
 const GROUND_MAT_RE := "(?i)^(grass|top2|terrain_fill|astroturf|sand|gravel)"
@@ -33,10 +34,8 @@ var road_materials: Array = [] # {mat, color, roughness}
 var light_materials: Array = []
 var start_lights := {"red": [], "green": []}
 var lawn_materials: Array = []
-var kerb_materials: Array = []
 ## Every ground surface (grass, gravel, terrain, paving): not structures.
 var ground_materials: Array = []
-var collision_bodies: Array[StaticBody3D] = []
 var ground_query: GroundQuery = null
 var forest = null
 ## Spa's hills past the model's terrain (SpaFar), or null.
@@ -90,7 +89,7 @@ func load_scene() -> TrackScene:
 		ch.radius = c.radius
 		chunks.append(ch)
 	_pull_ground_pieces()
-	# a circuit with its own look (SpaLook: Spa, and the Nürburgring through its profile)
+	# a circuit with its own look (SpaLook: Spa, and the others through their profiles)
 	var looked := SpaLook.use(data)
 	GroundDetail.paint_re = SpaLook._p("own_re", SpaLook.OWN_RE) if looked else ""
 	_prepare_materials()
@@ -106,7 +105,7 @@ func load_scene() -> TrackScene:
 		if data.get("id", "") == "spa":
 			add_child(SpaProps.build(self))
 	_lift_decals()
-	collision_bodies = TrackCollision.build(self, data)
+	TrackCollision.build(self, data)
 	return self
 
 ## Ground pieces leave their (culled) scenery chunk for an always-visible group.
@@ -175,7 +174,6 @@ func _prepare_materials() -> void:
 			# kerbs are painted concrete: a satin sheen, not the asphalt's matte
 			if _match("(?i)^curb", nm) and sm.albedo_texture != null:
 				sm.roughness = 0.6
-				kerb_materials.append(sm)
 			if _match(ROAD_MAT_RE, nm):
 				road_materials.append({"mat": sm, "color": sm.albedo_color, "roughness": sm.roughness})
 			if _match(LIGHT_MAT_RE, nm):
@@ -240,7 +238,6 @@ func _lift_decals() -> void:
 				for i in verts.size():
 					verts[i] += off
 				arrays[Mesh.ARRAY_VERTEX] = verts
-			var mats := []
 			rebuilt.add_surface_from_arrays(mesh.surface_get_primitive_type(s), arrays)
 			rebuilt.surface_set_material(rebuilt.get_surface_count() - 1, mesh.surface_get_material(s))
 		mi.mesh = rebuilt
@@ -250,17 +247,6 @@ func build_ground_query(world: World3D) -> GroundQuery:
 	ground_query = GroundQuery.new(world)
 	ground_query.patches = RoadPatches.build(data, ground_query.height_below)
 	return ground_query
-
-## All standard materials of the track.
-func materials() -> Array:
-	var out := {}
-	for n in CarVisual._walk(self):
-		if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
-			for s in (n as MeshInstance3D).mesh.get_surface_count():
-				var m := (n as MeshInstance3D).mesh.surface_get_material(s)
-				if m is StandardMaterial3D:
-					out[m] = true
-	return out.keys()
 
 ## Quality settings that act on the scene: shadow casting by kind.
 func apply_quality(q: Dictionary) -> void:

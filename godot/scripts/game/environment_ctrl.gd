@@ -6,7 +6,6 @@ extends Node3D
 
 const NIGHT_C := Color(0.012, 0.016, 0.03)
 const OVERCAST_C := Color(0.62, 0.66, 0.7)
-const DUSK_C := Color(0.42, 0.5, 0.75)
 const LUT_SIZE := Vector2i(128, 64)
 
 ## Tests and look comparisons: the sun's {elevation, azimuth} (radians) instead of the clock's (empty: off).
@@ -272,10 +271,6 @@ func _update_lut(sun_v: Vector3, haze: float, force: bool = false) -> void:
 	lut_mat.set_shader_parameter("uHaze", haze)
 	lut_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
-## Reflection strength: dimmer at night.
-func env_intensity() -> float:
-	return 0.25 + 0.75 * (1.0 - night)
-
 ## The eye's adaptation (Display › Eye adaptation): the exposure follows what the camera sees, slowly, as an eye or a TV
 ## camera does (out of the forest into the sun, into the dark under the trees, the pit building's shade, the night).
 ## Kept within a narrow range round the exposure the game sets (time of day, the circuit's look), so the picture is
@@ -285,7 +280,7 @@ func env_intensity() -> float:
 ## about a third (the road's median at midday 145-170 / 255 against 114-123 without it).
 var camera_attrs := CameraAttributesPractical.new()
 
-func _apply_eye(q: Dictionary) -> void:
+func _apply_eye() -> void:
 	var on: bool = bool(Settings.data.display.get("eyeAdaptation", true)) and not OS.has_feature("mobile")
 	camera_attrs.auto_exposure_enabled = on
 	camera_attrs.auto_exposure_speed = 0.55
@@ -295,7 +290,7 @@ func _apply_eye(q: Dictionary) -> void:
 	world_env.camera_attributes = camera_attrs
 
 func _apply_post(q: Dictionary) -> void:
-	_apply_eye(q)
+	_apply_eye()
 	# bloom (only the sun, headlights and floodlights pass the threshold) and the filmic grade of High / Ultra
 	env.glow_enabled = bool(q.bloom)
 	env.glow_hdr_threshold = 4.0

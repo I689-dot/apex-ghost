@@ -508,8 +508,6 @@ func hud_node() -> Hud:
 
 func start() -> void:
 	# triple screens: the monitors beside the game's carry the view on (Display → Side screens)
-	if OS.get_environment("SIDE_SCREENS") != "":
-		Settings.data.display.sideScreens = OS.get_environment("SIDE_SCREENS")
 	side_screens = SideScreens.new()
 	add_child(side_screens)
 	conn.send_json({"t": "loaded", "raceId": race.raceId})

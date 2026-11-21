@@ -220,8 +220,8 @@ static func racing_line_for(track: Dictionary) -> Dictionary:
 ## compromises through linked corners, the kerbs used). {x, z, offset, ds, curvature, lo, hi, alt}; {} when the
 ## file is missing or made for another version of the layout. lo / hi: where the car's centre may go; alt: the cautious
 ## line (minimum curvature 2 m inside the asphalt edges), which the slower bots lean towards.
-## How far the optimised line keeps from the drivable edge (m; LINE_MARGIN env in tests).
-static var LINE_MARGIN: float = float(OS.get_environment("LINE_MARGIN")) if OS.get_environment("LINE_MARGIN") != "" else 0.6
+## How far the optimised line keeps from the drivable edge (m).
+const LINE_MARGIN := 0.6
 
 static func line_from_file(track: Dictionary) -> Dictionary:
 	var path := "res://data/racelines/%s.json" % track.id
@@ -322,7 +322,6 @@ var _wrong_way := 0.0
 var _off_track := 0.0
 ## Set when the AI teleported itself back onto the track (forwarded as the reset flag).
 var reset_requested := false
-var dbg_vt := 0.0
 ## Joining the racing line: from the grid (or a reset) the bot first holds the line it stands on and merges onto its
 ## racing line over BLEND_M.
 var _blend_off := 0.0
@@ -590,7 +589,6 @@ func update(dt: float, race_started: bool, weather_grip: float, checkpoint_s: fl
 	if not pit.is_empty():
 		vt = minf(vt, pit.v)
 	_last_s = s
-	dbg_vt = vt
 	var err := vt - speed
 	if err > 0.0:
 		var thr := clampf(0.4 + err * 0.3, 0.0, 1.0)

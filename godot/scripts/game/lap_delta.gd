@@ -81,9 +81,6 @@ func commit_best() -> void:
 	_best = _cur.duplicate()
 	_has_best = true
 
-func has_reference() -> bool:
-	return _has_best
-
 ## Current lap time minus the reference's time at this distance (ms), or null without a reference. In "sectors" mode
 ## the delta restarts at zero with each sector.
 func delta(lap_dist_m: float, lap_ms: float, mode: String = "best") -> Variant:

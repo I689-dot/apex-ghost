@@ -3,7 +3,8 @@ extends RefCounted
 ## Spa-Francorchamps's own materials (the Godot build from the new source model, tools/asset-pipeline/spa_godot/):
 ## how each of the source's Assetto Corsa materials draws here, and the colour each class is brought to so a clear
 ## afternoon matches the reference video (docs/spa-rebuild: the look sheet, colours measured from the video frames).
-## The other circuits never pass through here.
+## Every circuit with a look of its own goes through here with its profile (use(): the Nürburgring, the Nordschleife,
+## Silverstone, Zandvoort, Barcelona, Shanghai; the *_look.gd scripts); Spa's values are the defaults.
 ##
 ## The source's export lost every alpha mode. Its rubber layers (asph_spa_g*) are black decals whose alpha is the rubber
 ## (groove3: black, alpha 50/255 on average): drawn opaque they painted the racing surface black. The base asphalt's alpha
@@ -391,23 +392,19 @@ static func texture_mean(t: Texture2D) -> Color:
 	_means[t] = Color(acc.x, acc.y, acc.z)
 	return _means[t]
 
-## ENV, with a test's SPA_LOOK (JSON) over it (look comparisons).
+## The circuit's ENV (its sky with the Forward+ ratio on the PC).
 static func env_look() -> Dictionary:
 	var l: Dictionary = (_p("env", ENV) as Dictionary).duplicate()
 	if forward_plus():
 		l.sky = float(l.get("sky", 1.0)) * SKY_FP
-	var o = JSON.parse_string(OS.get_environment("SPA_LOOK")) if OS.get_environment("SPA_LOOK") != "" else null
-	if o is Dictionary:
-		l.merge(o, true)
 	return l
 
 static func forward_plus() -> bool:
 	return RenderingServer.get_current_rendering_method() == "forward_plus"
 
-## TINT, or a test's SPA_TINT (JSON: [[pattern, [r, g, b]], ...]).
+## The circuit's TINT: [[pattern, [r, g, b]], ...].
 static func tints() -> Array:
-	var o = JSON.parse_string(OS.get_environment("SPA_TINT")) if OS.get_environment("SPA_TINT") != "" else null
-	return o if o is Array else _p("tint", TINT)
+	return _p("tint", TINT)
 
 ## Tints of what draws its own shared textures, not the circuit's materials: "@lawn" (the 3D grass shells and blades),
 ## "@forest" (the forest's trees and impostors).
@@ -476,12 +473,6 @@ static func apply(track: TrackScene) -> void:
 						(m.next_pass as ShaderMaterial).set_shader_parameter("asph_mean", ASPHALT_DETAIL_MEAN)
 			if how != "":
 				counts[how] = counts.get(how, 0) + 1
-			if OS.get_environment("LOOK_ROLES") != "":
-				var roles := []
-				for pair in [["road", road_re], ["lawn", lawn_re], ["paint", paint_re], ["kerb", kerb_re], ["fence", fence_re]]:
-					if (pair[1] as RegEx).search(m.resource_name) != null:
-						roles.append(pair[0])
-				print("[look roles] %s draw=%s %s next=%s" % [m.resource_name, how, roles, m.next_pass != null])
 			if road_re.search(m.resource_name) != null:
 				_road_surface(m)
 			if lawn_re.search(m.resource_name) != null:
@@ -503,8 +494,6 @@ static func apply(track: TrackScene) -> void:
 					if scanned != "":
 						mean = SCAN_MEAN[scanned]
 					var want: Color = t[1]
-					if OS.get_environment("SPA_DEBUG") != "":
-						print("[spa look] ", m.resource_name, " tex ", m.albedo_texture.resource_path if m.albedo_texture else "-", " ", m.albedo_texture.get_size() if m.albedo_texture else "", " mean ", mean, " albedo_color before ", m.albedo_color, " metal ", m.metallic, " rough ", m.roughness, " spec ", m.metallic_specular)
 					# albedo_color is an sRGB colour (the shader takes it to linear): the linear factor target / mean goes in encoded
 					m.albedo_color = Color(_enc(want.r / maxf(mean.r, 0.002)), _enc(want.g / maxf(mean.g, 0.002)), _enc(want.b / maxf(mean.b, 0.002)), m.albedo_color.a)
 					for r in track.road_materials:
@@ -523,11 +512,6 @@ static func apply(track: TrackScene) -> void:
 						if r.mat == m:
 							r.color = m.albedo_color
 					break
-	if OS.get_environment("SPA_DEBUG") != "":
-		for mm in seen:
-			var sm := mm as StandardMaterial3D
-			if sm != null and sm.resource_name.begins_with("asph_spa_") and not sm.resource_name.begins_with("asph_spa_g"):
-				print("[spa look] final ", sm.resource_name, " tex ", sm.albedo_texture.resource_path if sm.albedo_texture else "-", " col ", sm.albedo_color, " vc ", sm.vertex_color_use_as_albedo, " rough ", sm.roughness, " nrm ", sm.normal_enabled, " tri ", sm.uv1_triplanar, " detail ", sm.detail_enabled, " next ", sm.next_pass != null, " shading ", sm.shading_mode)
 	# the repainted textures live on in their materials: no static reference left to outlive the scene (a leak at exit)
 	_painted.clear()
 	if Settings.data.quality == "high" or Settings.data.quality == "ultra":
@@ -584,9 +568,7 @@ const CARD_TREE_MAX := 30.0
 const CARD_BROADLEAF := 0.35
 
 static func card_trees(out: Array) -> void:
-	var spruce_before := 0
 	for e in out:
-		spruce_before += 1 if e.spruce else 0
 		if float(e.h) < 4.0:
 			continue
 		e.h = minf(float(e.h) * CARD_TREE_SCALE, CARD_TREE_MAX)
@@ -594,5 +576,3 @@ static func card_trees(out: Array) -> void:
 		if e.spruce and hsh < int(CARD_BROADLEAF * 1000.0):
 			e.spruce = false
 			e.h = float(e.h) * 0.85
-	if OS.get_environment("SPA_DEBUG") != "":
-		print("[spa look] card trees: %d (spruce %d -> %d)" % [out.size(), spruce_before, out.filter(func(e): return e.spruce).size()])

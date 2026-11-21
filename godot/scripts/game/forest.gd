@@ -83,16 +83,9 @@ static func ensure_globals() -> void:
 		# writes every pass at half value into its 10-bit buffer and decodes x2, a multiply pass included: each one
 		# halves what it covers (measured: Zandvoort's road 35/255 on Mobile, 158 on Forward+, 155 on Mobile with a gain
 		# of 2). The circuits were tuned on Mobile, so Forward+ (the PC) halves too and every circuit looks the same on
-		# both. MUL_GAIN overrides it (experiments).
+		# both.
 		var gain := 0.5 if RenderingServer.get_current_rendering_method() == "forward_plus" else 1.0
-		if OS.get_environment("MUL_GAIN") != "":
-			gain = float(OS.get_environment("MUL_GAIN"))
 		RenderingServer.global_shader_parameter_add("mul_gain", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, gain)
-
-## Wind strength (0 calm … ~2 storm), from the weather.
-static func set_wind_strength(v: float) -> void:
-	ensure_globals()
-	RenderingServer.global_shader_parameter_set("wind_strength", v)
 
 ## The map's scattered forest (if any) and its trackside trees (null when there are neither). Called as
 ## `await load_forest(host, track_scene, track_data, quality)` (the forest is added to host).
@@ -111,14 +104,13 @@ static func load_forest(host: Node, track: TrackScene, track_data: Dictionary, q
 func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 	# known before the cards are baked (_make_species): their size follows the near range
 	quality = q
-	# the scanned spruces and beech (build_trees.py) where a circuit has its own look (Spa, the Nürburgring)
+	# the scanned spruces and beech (build_trees.py) where a circuit has its own look (SpaLook.use)
 	if SpaLook.use(track_data) and ResourceLoader.exists("res://assets/vegetation/trees_spa.glb"):
 		species_file = "res://assets/vegetation/trees_spa.glb"
 		near_scale = SpaLook._p("forest_near_scale", SpaLook.FOREST_NEAR_SCALE)
 		hero_m = SpaLook._p("forest_hero", SpaLook.FOREST_HERO)
 		shadow_m = SpaLook._p("forest_shadow", SpaLook.FOREST_SHADOW)
-		# FOREST_NO_FADE: hard level changes (measuring what the blends cost)
-		fades = OS.get_environment("FOREST_NO_FADE") == ""
+		fades = true
 	var ref = track_data.get("forest", null)
 	if ref != null:
 		var base := Assets.path(ref.file).get_base_dir()

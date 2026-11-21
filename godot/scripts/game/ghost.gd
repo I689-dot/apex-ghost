@@ -35,9 +35,6 @@ func lap_ended(new_best: bool) -> void:
 func abort_lap() -> void:
 	_n = 0
 
-func has_ghost() -> bool:
-	return _best_n > 0
-
 ## Pose of the best lap at lap_ms: {p: Vector3, q: Quaternion}, or {} outside the recorded lap.
 func pose(lap_ms: float) -> Dictionary:
 	var b := _best

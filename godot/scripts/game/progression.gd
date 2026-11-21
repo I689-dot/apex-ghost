@@ -124,12 +124,6 @@ static func total_trophies() -> int:
 		n += cup_trophies(c[0])
 	return n
 
-static func max_trophies() -> int:
-	var n := 0
-	for c in CUPS:
-		n += 3 * (c[3] as Array).size()
-	return n
-
 static func cup_open(id: String) -> bool:
 	return total_trophies() >= int(cup(id)[4])
 
