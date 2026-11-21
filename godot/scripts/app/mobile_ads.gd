@@ -25,7 +25,7 @@ static func interstitial(app: App, on_done: Callable) -> void:
 		on_done.call()
 		return
 	Progression.interstitial_shown()
-	_show(app, false, "", func(_ok): on_done.call())
+	_show(app, false, "", func(_ok: bool) -> void: on_done.call())
 
 static func _show(app: App, reward: bool, what: String, on_done: Callable) -> void:
 	var layer := Control.new()

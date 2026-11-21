@@ -155,7 +155,7 @@ static func reward_popup(app: App, title: String, lines: Array) -> void:
 	var m := UIW.modal(app.overlay_layer, 440)
 	var b: VBoxContainer = m.body
 	UIW.modal_head(b, title, func() -> void: m.root.queue_free())
-	for l in lines:
+	for l: String in lines:
 		var row := UIW.hbox(10)
 		row.add_child(Icon.make("gift", 22, GOLD))
 		row.add_child(UIKit.label(l, 20, UIKit.TEXT, true, 600))

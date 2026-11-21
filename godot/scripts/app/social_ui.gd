@@ -109,7 +109,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	var invite := LineEdit.new()
 	invite.max_length = 12
 	invite.placeholder_text = "CG-XXXXX"
-	invite.text_changed.connect(func(t): invite.text = t.to_upper(); invite.caret_column = invite.text.length())
+	invite.text_changed.connect(func(t: String) -> void: invite.text = t.to_upper(); invite.caret_column = invite.text.length())
 	guest_box.add_child(UIW.field(I18n.t("A friend's invite code (optional: you both get coins)"), invite))
 	var note := UIW.muted(I18n.t("A guest driver is kept on this device.") + ("  " + I18n.t("Link Google Play Games later in Settings › Account to keep it on any phone.") if PlayGames.available() else ""), 13)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -124,7 +124,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 		busy.call(false)
 		answer.call(r)
 	start.pressed.connect(go_guest)
-	nick.text_submitted.connect(func(_t): go_guest.call())
+	nick.text_submitted.connect(func(_t: String) -> void: go_guest.call())
 	guest_box.add_child(tall.call(start))
 	var guest := UIKit.button(I18n.t("Play as guest"), Callable(), dev.is_empty() and not PlayGames.available())
 	guest.pressed.connect(func() -> void:
@@ -196,8 +196,8 @@ static func _sign_in_form(body: VBoxContainer, on_done: Callable, on_unreachable
 			if r.status == 0 and on_unreachable.is_valid():
 				on_unreachable.call()
 	submit.pressed.connect(go)
-	pw.text_submitted.connect(func(_t): go.call())
-	nick.text_submitted.connect(func(_t): pw.grab_focus())
+	pw.text_submitted.connect(func(_t: String) -> void: go.call())
+	nick.text_submitted.connect(func(_t: String) -> void: pw.grab_focus())
 	submit.custom_minimum_size = Vector2(0, 48)
 	body.add_child(submit)
 
@@ -216,7 +216,7 @@ static func _where(p: Variant, app: App) -> String:
 		return I18n.t("Watching {room}", {"room": p.get("room", "")})
 	return I18n.t("Racing · {track} {session}", {"track": track, "session": session}).strip_edges() if track != "" else I18n.t("Racing")
 
-static func _ago(ms) -> String:
+static func _ago(ms: Variant) -> String:
 	if ms == null or ms == 0:
 		return ""
 	var m := roundi((Time.get_unix_time_from_system() * 1000.0 - ms) / 60000.0)
@@ -245,12 +245,12 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 			if f.get("presence") != null:
 				return 1 if f.presence.state == "racing" else 2
 			return 4 if f.status == "outgoing" else 3
-		all.sort_custom(func(a, b): return rank.call(a) < rank.call(b) or (rank.call(a) == rank.call(b) and a.nick.naturalnocasecmp_to(b.nick) < 0))
+		all.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return rank.call(a) < rank.call(b) or (rank.call(a) == rank.call(b) and a.nick.naturalnocasecmp_to(b.nick) < 0))
 		for c in list.get_children():
 			c.queue_free()
 		if all.is_empty():
 			list.add_child(UIW.muted(I18n.t("No friends yet: add them by their nickname.")))
-		for f in all:
+		for f: Dictionary in all:
 			list.add_child(UIW.row_line(_friend_row(app, f, join, watch, _self.refresh, err)))
 	var add := func() -> void:
 		err.text = ""
@@ -260,7 +260,7 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 			_self.refresh.call()
 		else:
 			err.text = I18n.t(str(r.error))
-	input.text_submitted.connect(func(_t): add.call())
+	input.text_submitted.connect(func(_t: String) -> void: add.call())
 	var row := UIW.hbox(8)
 	row.add_child(input)
 	row.add_child(UIKit.button(I18n.t("Add"), add))
@@ -334,7 +334,7 @@ static func room_list(app: App, join: Callable, watch: Callable) -> Control:
 			c.queue_free()
 		if rooms.is_empty():
 			list.add_child(UIW.muted(I18n.t("No public sessions right now. Create a room and make it public, or play solo.")))
-		for r in rooms:
+		for r: Dictionary in rooms:
 			var row := UIW.hbox(12)
 			row.add_child(UIKit.label(I18n.t(app.track_entry(r.trackId).get("name", r.trackId)), 17, UIKit.TEXT, false, 700))
 			row.add_child(UIKit.label(phase_text.call(r), 15))
@@ -366,11 +366,11 @@ static func records_modal(app: App) -> void:
 	var tracks: Array = app.track_index
 	var cars: Array = app.cars.cars
 	var state := {"track": tracks[0].id, "car": "", "scope": "global", "wet": false}
-	for t in tracks:
+	for t: Dictionary in tracks:
 		if t.get("default", false):
 			state.track = t.id
 	var car_name := func(id: String) -> String:
-		for c in cars:
+		for c: Dictionary in cars:
 			if c.id == id:
 				return c.name
 		return id
@@ -394,7 +394,7 @@ static func records_modal(app: App) -> void:
 		grid.add_theme_constant_override("h_separation", 14)
 		for h: String in [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Lap"), I18n.t("Gap"), I18n.t("Laps")]:
 			grid.add_child(UIKit.label(String(h).to_upper(), 14, UIKit.SOFT, true, 600))
-		for r in rows:
+		for r: Dictionary in rows:
 			var col := UIKit.ACCENT_2 if r.get("me", false) else UIKit.TEXT
 			grid.add_child(UIKit.label(str(r.position), 15, col))
 			grid.add_child(UIKit.label(r.nick, 15, col))
@@ -404,14 +404,14 @@ static func records_modal(app: App) -> void:
 			grid.add_child(UIKit.label(str(r.laps), 15, UIKit.MUTED))
 		results.add_child(grid)
 	var filters := UIW.hbox(8)
-	filters.add_child(UIW.select(state.track, tracks.map(func(t): return [t.id, I18n.t(t.name)]), func(v): state.track = v; load.call()))
+	filters.add_child(UIW.select(state.track, tracks.map(func(t: Dictionary) -> Array: return [t.id, I18n.t(t.name)]), func(v: Variant) -> void: state.track = v; load.call()))
 	var car_opts: Array = [["", I18n.t("All cars")]]
-	for c in cars:
+	for c: Dictionary in cars:
 		if c.role != "safety":
 			car_opts.append([c.id, c.name])
-	filters.add_child(UIW.select("", car_opts, func(v): state.car = v; load.call()))
-	filters.add_child(UIW.select("global", [["global", I18n.t("Everyone")], ["friends", I18n.t("Friends")]], func(v): state.scope = v; load.call()))
-	filters.add_child(UIW.select("dry", [["dry", I18n.t("Dry")], ["wet", I18n.t("Wet")]], func(v): state.wet = v == "wet"; load.call()))
+	filters.add_child(UIW.select("", car_opts, func(v: Variant) -> void: state.car = v; load.call()))
+	filters.add_child(UIW.select("global", [["global", I18n.t("Everyone")], ["friends", I18n.t("Friends")]], func(v: Variant) -> void: state.scope = v; load.call()))
+	filters.add_child(UIW.select("dry", [["dry", I18n.t("Dry")], ["wet", I18n.t("Wet")]], func(v: Variant) -> void: state.wet = v == "wet"; load.call()))
 	body.add_child(filters)
 	var sc := UIW.scroll(results)
 	sc.custom_minimum_size = Vector2(0, 220)
@@ -437,7 +437,7 @@ static func records_modal(app: App) -> void:
 		career.add_child(UIW.h3(I18n.t("Your best laps")))
 		if s.best.is_empty():
 			career.add_child(UIW.muted(I18n.t("No timed laps yet.")))
-		for b in s.best:
+		for b: Dictionary in s.best:
 			career.add_child(UIKit.label("%s   %s   %s" % [I18n.t(app.track_entry(b.trackId).get("name", b.trackId)), fmt_lap(b.lapMs), car_name.call(b.carId)], 15))
 	load.call()
 	load_career.call()
@@ -454,7 +454,7 @@ static func profile_modal(app: App, on_done: Callable) -> void:
 	var opts: Array = [["", I18n.t("Not set")]]
 	for c in COUNTRIES.split(" "):
 		opts.append([c, c])
-	var country := UIW.select(me.get("country", ""), opts, func(_v): pass)
+	var country := UIW.select(me.get("country", ""), opts, func(_v: Variant) -> void: pass)
 	var row := UIW.hbox(8)
 	row.add_child(country)
 	body.add_child(UIW.field(I18n.t("Country"), row))
@@ -466,7 +466,7 @@ static func profile_modal(app: App, on_done: Callable) -> void:
 	var abbr := LineEdit.new()
 	abbr.max_length = 3
 	abbr.text = me.get("abbr", "") if me.get("abbr") != null else ""
-	abbr.text_changed.connect(func(t): abbr.text = t.to_upper(); abbr.caret_column = abbr.text.length())
+	abbr.text_changed.connect(func(t: String) -> void: abbr.text = t.to_upper(); abbr.caret_column = abbr.text.length())
 	body.add_child(UIW.field(I18n.t("Code"), abbr))
 	var colour := ColorPickerButton.new()
 	colour.color = Color(me.get("colour", "#ff2d3d") if me.get("colour") != null else "#ff2d3d")
@@ -476,8 +476,8 @@ static func profile_modal(app: App, on_done: Callable) -> void:
 	body.add_child(err)
 	body.add_child(UIKit.button(I18n.t("Save"), func() -> void:
 		err.text = ""
-		var n = int(num.value) if num.value > 0 else null
-		var a = abbr.text if abbr.text != "" else null
+		var n: Variant = int(num.value) if num.value > 0 else null
+		var a: Variant = abbr.text if abbr.text != "" else null
 		if n != null and (n < 1 or n > 999):
 			err.text = I18n.t("The number goes from 1 to 999.")
 			return

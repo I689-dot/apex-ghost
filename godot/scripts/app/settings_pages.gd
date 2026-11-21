@@ -32,7 +32,7 @@ const NOT_IN_PRESETS := ["profiles", "nickname", "livery", "lastCar", "savedSetu
 
 static func assist_level() -> String:
 	var S: Dictionary = Settings.data
-	for k in ASSIST_LEVELS:
+	for k: String in ASSIST_LEVELS:
 		var l: Dictionary = ASSIST_LEVELS[k]
 		if l.assists == S.assists and l.manualGearbox == S.manualGearbox and l.racingLine == S.racingLine:
 			return k
@@ -52,7 +52,7 @@ static func assist_row(changed: Callable, refresh: Callable) -> Control:
 	var cur := assist_level()
 	if cur == "custom":
 		opts.append(["custom", I18n.t("Custom")])
-	var c := UIW.chips(cur, opts, func(v):
+	var c := UIW.chips(cur, opts, func(v: Variant) -> void:
 		if v == "custom":
 			return
 		apply_assist_level(v)
@@ -71,13 +71,13 @@ static func profiles() -> Dictionary:
 
 static func snapshot() -> Dictionary:
 	var out := {}
-	for k in Settings.data:
+	for k: String in Settings.data:
 		if not NOT_IN_PRESETS.has(k):
 			out[k] = Settings.data[k].duplicate(true) if Settings.data[k] is Dictionary or Settings.data[k] is Array else Settings.data[k]
 	return out
 
 static func load_profile(p: Dictionary) -> void:
-	for k in p:
+	for k: String in p:
 		if NOT_IN_PRESETS.has(k):
 			continue
 		Settings.data[k] = p[k].duplicate(true) if p[k] is Dictionary or p[k] is Array else p[k]
@@ -97,7 +97,7 @@ static func presets(col: Control, app: App, changed: Callable, refresh: Callable
 		changed.call()
 		app.toast(I18n.t("Saved: {n}", {"n": n}))
 		refresh.call()
-	name_box.text_submitted.connect(func(_t): save.call())
+	name_box.text_submitted.connect(func(_t: String) -> void: save.call())
 	var save_row := UIW.hbox(8)
 	save_row.add_child(name_box)
 	save_row.add_child(UIKit.button(I18n.t("Save current settings"), save, true))
@@ -106,7 +106,7 @@ static func presets(col: Control, app: App, changed: Callable, refresh: Callable
 	names.sort()
 	if names.is_empty():
 		col.add_child(UIW.margins(UIW.muted(I18n.t("No presets yet: set things up as you like them and save them here."), 15), 10, 8, 0, 8))
-	for n in names:
+	for n: String in names:
 		var r := UIW.hbox(8)
 		var nn: String = n
 		r.add_child(UIKit.button(I18n.t("Load"), func() -> void:
@@ -124,7 +124,7 @@ static func presets(col: Control, app: App, changed: Callable, refresh: Callable
 			refresh.call()))
 		col.add_child(SettingsPanel._row(nn, r))
 	SettingsPanel._head(col, I18n.t("Starting points"))
-	for st in STARTERS:
+	for st: Array in STARTERS:
 		var s: Array = st
 		col.add_child(SettingsPanel._row(I18n.t(s[0]), UIKit.button(I18n.t("Use"), func() -> void:
 			load_profile(s[2])
@@ -137,12 +137,12 @@ static func presets(col: Control, app: App, changed: Callable, refresh: Callable
 # ---------------------------------------------------------------- account ---
 
 static func account(col: Control, app: App, changed: Callable, refresh: Callable) -> void:
-	var a = Account.account()
+	var a: Variant = Account.account()
 	if a == null:
 		SettingsPanel._head(col, I18n.t("Account"))
 		col.add_child(UIW.margins(UIW.muted(I18n.t("You are playing offline: no account is signed in."), 15), 10, 8, 0, 8))
-		SettingsPanel._buttons(col, [UIKit.button(I18n.t("Connect again"), func():
-			var close: Callable = app.overlay_layer.get_children().filter(func(c): return c.has_meta("close")).back().get_meta("close")
+		SettingsPanel._buttons(col, [UIKit.button(I18n.t("Connect again"), func() -> void:
+			var close: Callable = app.overlay_layer.get_children().filter(func(c: Node) -> bool: return c.has_meta("close")).back().get_meta("close")
 			close.call()
 			app.offline = false
 			app.show_start(), true)])
@@ -189,8 +189,8 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 		col.add_child(SettingsPanel._row(I18n.t("Google Play Games"), link, I18n.t("Your driver, coins and records on any phone you sign in to Play Games with.")))
 	if kind == "password":
 		col.add_child(SettingsPanel._row(I18n.t("Password"), UIKit.button(I18n.t("Change"), func() -> void: _password_modal(app)), I18n.t("Your other devices are signed out when it changes.")))
-	col.add_child(SettingsPanel._row(I18n.t("Sign out"), UIKit.button(I18n.t("Sign out"), func():
-		var close: Callable = app.overlay_layer.get_children().filter(func(c): return c.has_meta("close")).back().get_meta("close")
+	col.add_child(SettingsPanel._row(I18n.t("Sign out"), UIKit.button(I18n.t("Sign out"), func() -> void:
+		var close: Callable = app.overlay_layer.get_children().filter(func(c: Node) -> bool: return c.has_meta("close")).back().get_meta("close")
 		close.call()
 		await Account.logout()
 		app.show_start()), I18n.t("Back to the sign-in screen (Continue as {nick} brings you back).", {"nick": str(u.nick)}) if kind != "password" else I18n.t("Back to the sign-in screen.")))
@@ -233,7 +233,7 @@ static func _rename_modal(app: App, refresh: Callable) -> void:
 		else:
 			err.text = I18n.t(str(r.error))
 	go.pressed.connect(save)
-	nick.text_submitted.connect(func(_t): save.call())
+	nick.text_submitted.connect(func(_t: String) -> void: save.call())
 	body.add_child(go)
 	if not UIKit.touch():
 		nick.grab_focus.call_deferred()
@@ -296,8 +296,8 @@ static func _delete_modal(app: App) -> void:
 	body.add_child(err)
 	var go := UIKit.button(I18n.t("Delete my account"), Callable(), false)
 	go.add_theme_color_override("font_color", UIKit.BAD)
-	go.pressed.connect(func():
-		var sw: UIW.Switch = sure.find_children("*", "", true, false).filter(func(n): return n is UIW.Switch).front()
+	go.pressed.connect(func() -> void:
+		var sw: UIW.Switch = sure.find_children("*", "", true, false).filter(func(n: Node) -> bool: return n is UIW.Switch).front()
 		if not sw.button_pressed:
 			err.text = I18n.t("Tick the box first.")
 			return

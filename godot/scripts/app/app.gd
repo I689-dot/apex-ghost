@@ -15,7 +15,7 @@ var spectating := false
 var pending_race: Dictionary = {}
 ## Where back goes from a screen of the mobile layout (screens named "m_..."): MobileModes, MobilePass, the store.
 var back_to: Callable = Callable()
-var pending_start_at = null
+var pending_start_at: Variant = null
 var audio: GameAudio = null
 var gamepad: GamepadInput = null
 var devices: DeviceBindings
@@ -66,15 +66,15 @@ func _ready() -> void:
 	add_child(graphics)
 	print("[boot] graphics")
 	gamepad = GamepadInput.new()
-	gamepad.driving = func(): return screen == "race" and pause_ui == null and session != null
-	gamepad.spectating = func(): return spectating
+	gamepad.driving = func() -> bool: return screen == "race" and pause_ui == null and session != null
+	gamepad.spectating = func() -> bool: return spectating
 	add_child(gamepad)
 	# wheels, pedal sets, shifters and handbrakes, each bound in the settings
 	devices = DeviceBindings.new()
 	add_child(devices)
 	print("[boot] input")
-	gamepad.connected_changed.connect(func(on, name): toast(I18n.t("Controller connected: {name}", {"name": name}) if on else I18n.t("Controller disconnected")))
-	Account.changed.connect(func(_a): if screen == "menu": show_start())
+	gamepad.connected_changed.connect(func(on: bool, name: String) -> void: toast(I18n.t("Controller connected: {name}", {"name": name}) if on else I18n.t("Controller disconnected")))
+	Account.changed.connect(func(_a: Variant) -> void: if screen == "menu": show_start())
 	show_start()
 	print("[boot] start screen")
 	var auto := OS.get_environment("APEX_AUTO")
@@ -211,7 +211,7 @@ func set_backdrop(name: String, track_id: String = "") -> void:
 		backdrop.texture = null
 		return
 	var map := ""
-	for t in track_index:
+	for t: Dictionary in track_index:
 		if t.id == track_id:
 			map = str(t.get("map", ""))
 	var suffix := "_" + map if map != "" and map != "nurburgring" and map != "nordschleife" else ""
@@ -221,13 +221,13 @@ func set_backdrop(name: String, track_id: String = "") -> void:
 	backdrop.texture = load(path) if ResourceLoader.exists(path) else null
 
 func my_info() -> Dictionary:
-	for p in room.get("players", []):
+	for p: Dictionary in room.get("players", []):
 		if p.id == me:
 			return p
 	return {}
 
 func track_entry(id: String) -> Dictionary:
-	for t in track_index:
+	for t: Dictionary in track_index:
 		if t.id == id:
 			return t
 	return {}
@@ -383,7 +383,7 @@ func _on_message(m: Dictionary) -> void:
 		"carLock":
 			if not m.ok and m.get("carId", null) != null:
 				var owner := ""
-				for p in room.get("players", []):
+				for p: Dictionary in room.get("players", []):
 					if p.id == m.get("owner"):
 						owner = p.nick
 				toast(I18n.t("{owner} already has that car.", {"owner": owner}) if owner != "" else I18n.t("That car is not available."))
@@ -404,8 +404,8 @@ func _on_message(m: Dictionary) -> void:
 func _auto_fill() -> void:
 	var online := conn != null and not LocalRoom.is_local_code(room.get("code", conn.code))
 	var host: bool = my_info().get("host", false)
-	var humans: int = room.get("players", []).filter(func(p): return not p.bot).size()
-	var bots: int = room.get("players", []).filter(func(p): return p.bot).size()
+	var humans: int = room.get("players", []).filter(func(p: Dictionary) -> bool: return not p.bot).size()
+	var bots: int = room.get("players", []).filter(func(p: Dictionary) -> bool: return p.bot).size()
 	if room.is_empty() or not online or not host or room.phase != "lobby" or humans > 1 or bots > 0 or spectating:
 		if room.is_empty() or room.phase != "lobby" or humans > 1:
 			_alone_since = 0.0
@@ -415,10 +415,10 @@ func _auto_fill() -> void:
 	if _alone_since == 0.0:
 		_alone_since = Time.get_ticks_msec()
 		_fill_timer = get_tree().create_timer(15.0)
-		_fill_timer.timeout.connect(func():
+		_fill_timer.timeout.connect(func() -> void:
 			if room.is_empty() or room.phase != "lobby" or _filled:
 				return
-			if room.players.filter(func(p): return not p.bot).size() > 1 or room.players.any(func(p): return p.bot):
+			if room.players.filter(func(p: Dictionary) -> bool: return not p.bot).size() > 1 or room.players.any(func(p: Dictionary) -> bool: return p.bot):
 				return
 			_filled = true
 			for i in 7:
@@ -509,14 +509,14 @@ func _process(_dt: float) -> void:
 	if perf != null:
 		perf.conn = conn
 		perf.graphics = graphics
-		perf.remotes = func(): return session.remotes.values().map(func(r): return r.buffer) if session != null else []
+		perf.remotes = func() -> Array: return session.remotes.values().map(func(r: RaceSession.Remote) -> RemoteCarBuffer: return r.buffer) if session != null else []
 	if screen == "briefing" and _brief_clock != null and is_instance_valid(_brief_clock) and conn != null and room.get("briefingUntil") != null:
 		var left := maxf(0.0, room.briefingUntil - conn.server_now())
 		_brief_clock.text = "%d s" % ceili(left / 1000.0)
 
 # --------------------------------------------------------------- loading ---
 
-func start_loading(race: Dictionary, start_at) -> void:
+func start_loading(race: Dictionary, start_at: Variant) -> void:
 	# a circuit that comes as a download and is not installed (a room's host picked it): back to the lobby, where the
 	# main action downloads it (LobbyScreen); the race goes on without us
 	if not Packs.ready_for(str(race.trackId)):
@@ -553,7 +553,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	col.add_child(label)
 	var root := Control.new()
 	var my_car: Variant = null
-	for c in cars.cars:
+	for c: Dictionary in cars.cars:
 		if c.id == my_info().get("carId"):
 			my_car = {"url": CarStudio.picture(c, CarStudio.my_livery(), true), "name": c.name}
 	var reel := CinematicReel.new(CinematicReel.track_reel(str(tr.get("map", "")), I18n.t(tr.get("name", "")), my_car, I18n.t("RACE") if race.kind == "race" else I18n.t("QUALIFYING")), {"loop": true, "shotMs": 4600.0})
@@ -565,16 +565,16 @@ func start_loading(race: Dictionary, start_at) -> void:
 	set_ui(root)
 	var slot: int = race.slots.get(me, 0) + 1
 	var s := RaceSession.new(race, room, me, cars, conn, {
-		"on_countdown_text": func(text, sub = ""): set_countdown(text, sub),
-		"on_pause_toggle": func(open): set_pause(open),
-		"on_replay_toggle": func(open): set_replay(open),
-		"on_results": func(m): show_results(m),
-		"on_fatal": func(msg): show_menu(msg),
-		"audio": func(): return audio,
+		"on_countdown_text": func(text: String, sub: String = "") -> void: set_countdown(text, sub),
+		"on_pause_toggle": func(open: bool) -> void: set_pause(open),
+		"on_replay_toggle": func(open: bool) -> void: set_replay(open),
+		"on_results": func(m: Dictionary) -> void: show_results(m),
+		"on_fatal": func(msg: String) -> void: show_menu(msg),
+		"audio": func() -> GameAudio: return audio,
 	}, spectating)
 	session = s
 	add_child(s)
-	await s.load_session(func(l, t, lbl):
+	await s.load_session(func(l: float, t: float, lbl: String) -> void:
 		bar.value = (l / t) if t > 0.0 else 0.0
 		label.text = lbl)
 	if session != s:
@@ -591,10 +591,10 @@ func start_loading(race: Dictionary, start_at) -> void:
 	# the sun's glare, under the HUD (drawn first in the same layer)
 	if not OS.has_feature("mobile"):
 		var flare := LensFlare.new()
-		var sref = s
-		flare.camera_of = func(): return get_viewport().get_camera_3d()
-		flare.sun_dir_of = func(): return sref.env.sun_dir if is_instance_valid(sref) and sref.env != null else Vector3.UP
-		flare.strength_of = func(): return sref.env.flare_strength if is_instance_valid(sref) and sref.env != null else 0.0
+		var sref: RaceSession = s
+		flare.camera_of = func() -> Camera3D: return get_viewport().get_camera_3d()
+		flare.sun_dir_of = func() -> Vector3: return sref.env.sun_dir if is_instance_valid(sref) and sref.env != null else Vector3.UP
+		flare.strength_of = func() -> float: return sref.env.flare_strength if is_instance_valid(sref) and sref.env != null else 0.0
 		hud_layer.add_child(flare)
 	hud_layer.add_child(hud)
 	UIKit.full(hud)
@@ -604,7 +604,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	touch = TouchControls.new()
 	touch.key_action.connect(_touch_key)
 	touch.skip_intro.connect(func() -> void: _key_event(KEY_ENTER, true); _key_event(KEY_ENTER, false))
-	touch.spectator_key.connect(func(code): var k := KeyMap.key_of(code); _key_event(k, true); _key_event(k, false))
+	touch.spectator_key.connect(func(code: String) -> void: var k := KeyMap.key_of(code); _key_event(k, true); _key_event(k, false))
 	touch_layer.add_child(touch)
 	touch.spectating = spectating
 	touch.chat_enabled = LocalRoom.is_local_code(conn.code) and not spectating
@@ -693,7 +693,7 @@ func show_results(m: Dictionary) -> void:
 		stats = session.career_stats()
 	if not stats.is_empty() and conn != null and LocalRoom.is_local_code(conn.code) and not spectating:
 		var mine: Variant = null
-		for r in m.rows:
+		for r: Dictionary in m.rows:
 			if r.id == me:
 				mine = r
 		var ok: bool = mine != null and ((not mine.dnf and mine.totalMs != null) if m.kind == "race" else mine.bestLapMs != null)
@@ -795,9 +795,9 @@ func _autotest() -> void:
 ## the circuit and a car, then the menu (port of playIntro in main.ts).
 func _play_intro() -> void:
 	var intro_cars := ["ferrari_296_gt3_verstappen", "corvette_z06_gt3r", "mclaren_720s_gt3_inception_racing", "lamborghini_huracan_gt3_evo2", "2025_bmw_m4_gt3_evo_g82", "2024_porsche_992_gt3_r"]
-	var pool: Array = cars.cars.filter(func(c): return intro_cars.has(c.id))
+	var pool: Array = cars.cars.filter(func(c: Dictionary) -> bool: return intro_cars.has(c.id))
 	if pool.is_empty():
-		pool = cars.cars.filter(func(c): return c.role != "safety")
+		pool = cars.cars.filter(func(c: Dictionary) -> bool: return c.role != "safety")
 	if pool.is_empty():
 		return
 	var entry: Dictionary = pool[randi() % pool.size()]
@@ -874,7 +874,7 @@ func _ui_shots() -> void:
 	show_sign_in()
 	await shot.call("signin")
 	show_menu()
-	ChampionshipUI.open(self, func(): return "Max")
+	ChampionshipUI.open(self, func() -> String: return "Max")
 	await shot.call("champ")
 	clear.call()
 	SocialUI.records_modal(self)
@@ -905,7 +905,7 @@ func _ui_shots() -> void:
 		await shot.call("briefing_" + t)
 	LobbyScreen._brief_tab = "setup"
 	# the results, from made-up rows, with the room closed so no championship is scored
-	var ids: Array = CarsDb.selectable().map(func(c): return c.id)
+	var ids: Array = CarsDb.selectable().map(func(c: Dictionary) -> String: return c.id)
 	var nicks := ["Max", "Harry Ashdown", "Sem van Doorn", "Lucas Moreau", "Jonas Keller", "Marco Rossi"]
 	var rows: Array = []
 	for i in nicks.size():
@@ -964,7 +964,7 @@ func go_back() -> bool:
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_WM_GO_BACK_REQUEST:
-			if screen != "race" and overlay_layer.get_children().any(func(c): return c.has_meta("modal")):
+			if screen != "race" and overlay_layer.get_children().any(func(c: Node) -> bool: return c.has_meta("modal")):
 				go_back()
 			elif screen == "race" and session != null:
 				session.toggle_pause()

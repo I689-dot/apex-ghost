@@ -129,7 +129,7 @@ func _init(entry: Dictionary) -> void:
 	UIKit.full(_fade)
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_ui.add_child(_fade)
-	_ui.gui_input.connect(func(e): if (e is InputEventMouseButton or e is InputEventScreenTouch) and e.pressed: finish())
+	_ui.gui_input.connect(func(e: InputEvent) -> void: if (e is InputEventMouseButton or e is InputEventScreenTouch) and e.pressed: finish())
 
 ## The 2D layer (caption, logo, fades): the app puts it on its overlay layer.
 func overlay() -> Control:

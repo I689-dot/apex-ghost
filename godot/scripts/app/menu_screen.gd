@@ -8,7 +8,7 @@ extends RefCounted
 static var _tab := "play"
 
 static func build(app: App, error: String = "") -> Control:
-	var signed_in = Account.account()
+	var signed_in: Variant = Account.account()
 	var root := Control.new()
 	var err := UIKit.label(error, 16, UIKit.BAD)
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -24,7 +24,7 @@ static func build(app: App, error: String = "") -> Control:
 	code.custom_minimum_size = Vector2(220, 52 if UIKit.touch() else 46)
 	code.add_theme_font_override("font", UIKit.font(true, 600))
 	code.add_theme_font_size_override("font_size", 26)
-	code.text_changed.connect(func(t): code.text = t.to_upper(); code.caret_column = code.text.length())
+	code.text_changed.connect(func(t: String) -> void: code.text = t.to_upper(); code.caret_column = code.text.length())
 
 	var online: bool = signed_in != null or Account.accounts_enabled() == false
 	if not online and Account.accounts_enabled() == null:
@@ -57,7 +57,7 @@ static func build(app: App, error: String = "") -> Control:
 			err.text = ""
 			m.root.queue_free()
 		row.add_child(UIKit.button(I18n.t("Save"), save, true))
-		le.text_submitted.connect(func(_t): save.call())
+		le.text_submitted.connect(func(_t: String) -> void: save.call())
 		b.add_child(row)
 		le.grab_focus.call_deferred()
 	nick_label.text = (nick.text if nick.text != "" else I18n.t("Your nickname")).to_upper()
@@ -80,10 +80,10 @@ static func build(app: App, error: String = "") -> Control:
 		if res != "":
 			app.show_menu(res)
 	var solo := func():
-		await go.call(func(n):
+		await go.call(func(n: String) -> String:
 			return await app.join(LocalRoom.create(), n))
 	var create := func():
-		await go.call(func(n):
+		await go.call(func(n: String) -> String:
 			var c := await Connection.create_room()
 			if c == "":
 				return I18n.t(Connection.last_error) if Connection.last_error != "" else I18n.t("Cannot reach the game server. Check your connection.")
@@ -94,14 +94,14 @@ static func build(app: App, error: String = "") -> Control:
 			err.text = I18n.t("Enter the 5-character room code.")
 			code.grab_focus()
 			return
-		await go.call(func(n):
+		await go.call(func(n: String) -> String:
 			# a race hosted on a device: straight to it (no account needed, as on a LAN)
 			var hosted: bool = await P2p.is_p2p_code(c)
 			if not hosted and not online:
 				return I18n.t("Online needs an account")
 			return await app.join(c, n, spectate))
 	var host := func():
-		await go.call(func(n):
+		await go.call(func(n: String) -> String:
 			var r: Dictionary = await P2p.host_race()
 			if r.has("error"):
 				return r.error
@@ -116,7 +116,7 @@ static func build(app: App, error: String = "") -> Control:
 	var _self := {}
 	_self.render = func() -> void:
 		# the error line, the code box and the nickname are shared by the tabs: detach them before the old tab is freed
-		for shared in [err, code, nick_label]:
+		for shared: Control in [err, code, nick_label]:
 			if shared.get_parent() != null:
 				shared.get_parent().remove_child(shared)
 		for c in frame.get_children():
@@ -127,7 +127,7 @@ static func build(app: App, error: String = "") -> Control:
 		elif _tab == "store":
 			body = StoreScreen.build(app, _self.render)
 		elif _tab == "friends":
-			body = SocialUI.friends_panel(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("You are playing offline. Friends need the game server."), sign_in)
+			body = SocialUI.friends_panel(app, func(c: String) -> void: code.text = c; join_it.call(false), func(c: String) -> void: join_it.call(true, c)) if signed_in != null else _gate(I18n.t("Friends"), I18n.t("You are playing offline. Friends need the game server."), sign_in)
 			# a readable column in the middle, as the references' entry list
 			var holder := HBoxContainer.new()
 			holder.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -161,7 +161,7 @@ static func build(app: App, error: String = "") -> Control:
 
 ## The driver at the top right: licence and Safety Rating, the name, rank and level (a button to the career), the
 ## account's actions and the gear to the settings.
-static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Callable) -> Array:
+static func _driver_chip(app: App, signed_in: Variant, nick_label: Label, edit_nick: Callable) -> Array:
 	var out: Array = []
 	var career := CareerData.load_career()
 	var lic: String = career.licence
@@ -256,9 +256,9 @@ static func _play_tab(app: App, online: bool, err: Label, solo: Callable, create
 		hero.add_child(UIKit.label(I18n.t("Ready to race").to_upper(), 62, UIKit.TEXT, true, 700))
 		col.add_child(hero)
 	var circuits := {}
-	for t in app.track_index:
+	for t: Dictionary in app.track_index:
 		circuits[LobbyScreen.circuit_of(t)] = true
-	var champ = Championship.load_saved()
+	var champ: Variant = Championship.load_saved()
 	var cards := UIW.hbox(14 if UIKit.touch() else 18)
 	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var lock := "" if online else I18n.t("Offline: connect again to play online")
@@ -288,7 +288,7 @@ static func _card(photo: String, tags: Array, title: String, sub: String, stats:
 	b.get_node("clip").add_child(UIW.photo_fill("res://assets/ui/" + photo, 0.45 if lock != "" else 0.95, 0.95))
 	var col := UIW.vbox(6)
 	var tr := UIW.hbox(6)
-	for t in tags:
+	for t: Array in tags:
 		tr.add_child(UIW.tag(t[0], t[1], true, UIKit.INK if t[1] == UIKit.SOFT or t[1] == UIKit.ACCENT_2 else Color.WHITE))
 	col.add_child(tr)
 	var tl := UIKit.label(title.to_upper(), 34 if touch else 40, UIKit.TEXT, true, 700)
@@ -305,7 +305,7 @@ static func _card(photo: String, tags: Array, title: String, sub: String, stats:
 		var g := GridContainer.new()
 		g.columns = 2
 		g.add_theme_constant_override("h_separation", 26)
-		for st in stats:
+		for st: Array in stats:
 			g.add_child(UIW.stat(st[0], st[1], 28 if touch else 32))
 		col.add_child(g)
 	var content: MarginContainer = b.get_node("content")
@@ -370,7 +370,7 @@ static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join
 		left.add_child(_host_panel(host))
 	row.add_child(UIW.scroll(left) if UIKit.touch() else left)
 	if online:
-		var rl := SocialUI.room_list(app, func(c): code.text = c; join_it.call(false), func(c): join_it.call(true, c))
+		var rl := SocialUI.room_list(app, func(c: String) -> void: code.text = c; join_it.call(false), func(c: String) -> void: join_it.call(true, c))
 		rl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		rl.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		row.add_child(rl)

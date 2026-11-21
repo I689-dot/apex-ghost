@@ -95,7 +95,7 @@ static func _mode_card(title: String, photo: String, sub: String, cb: Callable, 
 # ---------------------------------------------------------------- career ---
 
 static func _career(app: App, cards: HBoxContainer) -> void:
-	for c in Progression.CUPS:
+	for c: Array in Progression.CUPS:
 		var id: String = c[0]
 		var open := Progression.cup_open(id)
 		var b := _cup_card(app, c, open)
@@ -208,7 +208,7 @@ static func start_cup_race(app: App, cup_id: String, race: int) -> void:
 
 ## The week's featured race: a circuit by the week of the year, double credits from its trophies.
 static func weekly(app: App) -> Dictionary:
-	var ids: Array = app.track_index.filter(func(t): return t.id != "nurburgring_24h").map(func(t): return t.id)
+	var ids: Array = app.track_index.filter(func(t: Dictionary) -> bool: return t.id != "nurburgring_24h").map(func(t: Dictionary) -> String: return t.id)
 	if ids.is_empty():
 		ids = ["spa"]
 	var week := int(Time.get_unix_time_from_system() / (7 * 86400.0))
@@ -240,7 +240,7 @@ static func _events(app: App, cards: HBoxContainer) -> void:
 			Progression.set_event("weekly", 0)
 			Progression.data().event.difficulty = Settings.data.ai.difficulty
 			await _solo(app, w.track, int(w.laps), int(w.bots), 2)))
-	var champ = Championship.load_saved()
+	var champ: Variant = Championship.load_saved()
 	cards.add_child(_mode_card(I18n.t("Championship"), "res://assets/ui/photo_aerial_spa.webp",
 		I18n.t("Round {n} of {m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("A season on every circuit, F1 points"),
 		func() -> void: ChampionshipUI.open(app, func(): return MobileHome.nick())))
@@ -304,7 +304,7 @@ static func _join_dialog(app: App) -> void:
 		var err := await app.join(c, MobileHome.nick())
 		if err != "":
 			app.show_menu(err)
-	code.text_submitted.connect(func(_t): go.call())
+	code.text_submitted.connect(func(_t: String) -> void: go.call())
 	var j := UIKit.button(I18n.t("Join"), go, true)
 	j.size_flags_horizontal = Control.SIZE_SHRINK_END
 	b.add_child(j)
@@ -318,7 +318,7 @@ static func _quick(app: App, cards: HBoxContainer) -> void:
 		var err := await app.join(LocalRoom.create(), MobileHome.nick())
 		if err != "":
 			app.show_menu(err)))
-	for t in app.track_index:
+	for t: Dictionary in app.track_index:
 		var id: String = t.id
 		cards.add_child(_mode_card(I18n.t(str(t.name)), MobileUI.photo(str(t.get("map", "")), "aerial"), I18n.t("{km} km · 3 laps", {"km": "%.1f" % (float(t.length) / 1000.0)}), func() -> void:
 			if not Packs.ready_for(id):

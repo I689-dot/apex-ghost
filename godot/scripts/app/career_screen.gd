@@ -25,13 +25,13 @@ static func build(app: App) -> Control:
 	var top := UIW.top_bar({
 		"title": I18n.t("Career"), "back": app.show_menu,
 		"tabs": [["profile", I18n.t("Profile")], ["achievements", I18n.t("Achievements")], ["ranks", I18n.t("Ranks")], ["ranking", I18n.t("Ranking")]],
-		"tab": _tab, "on_tab": func(k): _tab = k; app.show_career(), "tabs_left": UIKit.touch(),
+		"tab": _tab, "on_tab": func(k: String) -> void: _tab = k; app.show_career(), "tabs_left": UIKit.touch(),
 		"right": [UIKit.button(I18n.t("Lap records"), func() -> void: SocialUI.records_modal(app))],
 	})
 	return UIW.screen(top, body)
 
 static func _name() -> String:
-	var a = Account.account()
+	var a: Variant = Account.account()
 	if a != null:
 		return str(a.user.nick)
 	var n := str(Settings.data.get("nickname", ""))
@@ -121,7 +121,7 @@ static func _profile(c: Dictionary) -> Control:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	var races := int(c.races)
-	for st in [[str(int(c.poles)), I18n.t("Poles")], [("%d %%" % roundi(100.0 * c.wins / races)) if races > 0 else "–", I18n.t("Win rate")],
+	for st: Array in [[str(int(c.poles)), I18n.t("Poles")], [("%d %%" % roundi(100.0 * c.wins / races)) if races > 0 else "–", I18n.t("Win rate")],
 			[str(int(c.cleanLaps)), I18n.t("Clean laps")], ["%d km" % roundi(c.km), I18n.t("Distance")], [str(int(c.sessions)), I18n.t("Sessions")],
 			[_thousands(int(c.coins)), I18n.t("Credits")]]:
 		var t := UIW.big_stat(st[0], st[1], 40 if touch else 46)
@@ -195,8 +195,8 @@ static func _achievements(c: Dictionary) -> Control:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	# the unlocked ones first
-	var list: Array = CareerData.ACHIEVEMENTS.filter(func(a): return got.has(a[0])) + CareerData.ACHIEVEMENTS.filter(func(a): return not got.has(a[0]))
-	for a in list:
+	var list: Array = CareerData.ACHIEVEMENTS.filter(func(a: Array) -> bool: return got.has(a[0])) + CareerData.ACHIEVEMENTS.filter(func(a: Array) -> bool: return not got.has(a[0]))
+	for a: Array in list:
 		grid.add_child(_achievement(a, got.has(a[0])))
 	col.add_child(grid)
 	return UIW.scroll(col)
@@ -269,7 +269,7 @@ static func _ranking(app: App) -> Control:
 		col.add_child(UIW.muted(I18n.t("You are playing offline: the ranking needs the game server.")))
 		return col
 	var head := UIW.hbox(12)
-	head.add_child(UIW.chips(_scope, [["global", I18n.t("Everyone")], ["friends", I18n.t("Friends")]], func(v): _scope = v; app.show_career()))
+	head.add_child(UIW.chips(_scope, [["global", I18n.t("Everyone")], ["friends", I18n.t("Friends")]], func(v: Variant) -> void: _scope = v; app.show_career()))
 	head.add_child(UIW.spacer())
 	var mine := UIKit.label("", 22, UIKit.ACCENT_2, true, 700)
 	head.add_child(mine)
@@ -310,7 +310,7 @@ static func _ranking(app: App) -> Control:
 			var row := UIW.hbox(12)
 			var lic_txt := ("%s %.2f" % [str(e.licence), float(e.get("sr", CareerData.SR_START))]) if e.get("licence") else "—"
 			var cells := [[str(i + 1), 50], [str(e.nick) + ("  · " + str(e.abbr) if e.get("abbr") else ""), 0], [str(e.get("country")) if e.get("country") else "—", 90], [lic_txt, 110], [str(int(e.races)), 90], [str(int(e.rating)), 90]]
-			for c in cells:
+			for c: Array in cells:
 				var l := UIKit.label(String(c[0]), 18, UIKit.ACCENT_2 if me_row else UIKit.TEXT, c[1] != 0, 600 if c[1] != 0 else 500)
 				if int(c[1]) > 0:
 					l.custom_minimum_size = Vector2(c[1], 0)

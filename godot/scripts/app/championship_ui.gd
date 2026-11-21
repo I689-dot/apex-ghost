@@ -4,7 +4,7 @@ extends RefCounted
 ## one (rounds, race length, how many AI drivers) or abandon it. Each round is an offline room on the round's circuit.
 
 static func open(app: App, read_nick: Callable) -> void:
-	var cur = Championship.load_saved()
+	var cur: Variant = Championship.load_saved()
 	var m := UIW.modal(app.overlay_layer, 600)
 	var body: VBoxContainer = m.body
 	var close := func() -> void: m.root.queue_free()
@@ -14,7 +14,7 @@ static func open(app: App, read_nick: Callable) -> void:
 		body.add_child(UIW.muted(I18n.t("Round {n} of {m}: {track}.", {"n": cur.done + 1, "m": cur.rounds.size(), "track": I18n.t(app.track_entry(cur.rounds[mini(cur.done, cur.rounds.size() - 1)]).get("name", ""))}), 16))
 		body.add_child(UIW.section(I18n.t("Standings")))
 		var i := 0
-		for d in Championship.standings(cur).slice(0, 10):
+		for d: Dictionary in Championship.standings(cur).slice(0, 10):
 			i += 1
 			var row := UIW.hbox(10)
 			row.add_child(UIKit.label(str(i), 18, UIKit.SOFT, true, 600))
@@ -43,13 +43,13 @@ static func open(app: App, read_nick: Callable) -> void:
 	var seen := {}
 	var list := UIW.vbox(0)
 	body.add_child(UIW.section(I18n.t("Rounds")))
-	for t in tracks:
+	for t: Dictionary in tracks:
 		var key := LobbyScreen.circuit_of(t)
 		if seen.has(key):
 			continue
 		seen[key] = true
 		var main: Dictionary = t
-		for x in tracks:
+		for x: Dictionary in tracks:
 			if LobbyScreen.circuit_of(x) == key and x.get("default", false):
 				main = x
 		picks[main.id] = true
@@ -59,15 +59,15 @@ static func open(app: App, read_nick: Callable) -> void:
 	body.add_child(list)
 	var laps := [5]
 	var bots := [9]
-	body.add_child(UIW.field(I18n.t("Race length"), UIW.chips(5, [3, 5, 10, 15].map(func(v): return [v, I18n.t("{n} laps", {"n": v})]), func(v): laps[0] = v)))
-	body.add_child(UIW.field(I18n.t("AI drivers"), UIW.chips(9, [5, 9, 11].map(func(v): return [v, str(v)]), func(v): bots[0] = v)))
+	body.add_child(UIW.field(I18n.t("Race length"), UIW.chips(5, [3, 5, 10, 15].map(func(v: int) -> Array: return [v, I18n.t("{n} laps", {"n": v})]), func(v: Variant) -> void: laps[0] = v)))
+	body.add_child(UIW.field(I18n.t("AI drivers"), UIW.chips(9, [5, 9, 11].map(func(v: int) -> Array: return [v, str(v)]), func(v: Variant) -> void: bots[0] = v)))
 	var start := UIKit.button(I18n.t("Start the championship"), func() -> void:
 		var nick: String = read_nick.call()
 		if nick == "" or picks.is_empty():
 			return
 		var rounds: Array = []
 		var added := {}
-		for t in tracks:
+		for t: Dictionary in tracks:
 			if picks.has(t.id) and not added.has(t.id):
 				added[t.id] = true
 				rounds.append(t.id)
@@ -91,5 +91,5 @@ static func start_round(app: App, c: Dictionary, nick: String) -> void:
 	app.send({"t": "setSession", "minutes": c.qualiMinutes})
 	app.send({"t": "setRaceMinutes", "minutes": 0})
 	app.send({"t": "setRaceLaps", "laps": c.raceLaps})
-	for i in c.bots:
+	for i: int in c.bots:
 		app.send({"t": "addBot"})

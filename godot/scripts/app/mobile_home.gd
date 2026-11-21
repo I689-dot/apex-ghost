@@ -136,7 +136,7 @@ static func _bottom_bar(app: App, rerender: Callable) -> Control:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_top = -76
 	var row := UIW.hbox(6)
-	for it in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "items"), false],
+	for it: Array in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "items"), false],
 			["car", I18n.t("Cars"), func() -> void: cars(app, rerender), false],
 			["brush", I18n.t("Paint"), func() -> void: paint(app), false],
 			["list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0]]:
@@ -318,7 +318,7 @@ static func _tile(icon: String, title: String, sub: String, hot: bool, cb: Calla
 # ----------------------------------------------------------------- shared ---
 
 static func nick() -> String:
-	var a = Account.account()
+	var a: Variant = Account.account()
 	if a != null:
 		return str(a.user.nick)
 	var n := str(Settings.data.get("nickname", ""))
@@ -329,7 +329,7 @@ static func my_car() -> Dictionary:
 	if cars.is_empty():
 		return {}
 	var last := str(Settings.data.get("lastCar", ""))
-	for c in cars:
+	for c: Dictionary in cars:
 		if c.id == last:
 			return c
 	return cars[0]
@@ -369,7 +369,7 @@ static func free_bonus(app: App, rerender: Callable) -> void:
 	b.add_child(row)
 	var go := UIKit.button(I18n.t("Get free"), func() -> void:
 		m.root.queue_free()
-		MobileAds.rewarded(app, I18n.t("5,000 credits and 150 pass XP"), func(ok):
+		MobileAds.rewarded(app, I18n.t("5,000 credits and 150 pass XP"), func(ok: bool) -> void:
 			if not ok:
 				return
 			var r := Progression.claim_free_bonus()
@@ -427,7 +427,7 @@ static func cars(app: App, rerender: Callable) -> void:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	var mine := my_car()
-	for c in CarsDb.selectable():
+	for c: Dictionary in CarsDb.selectable():
 		var card := UIW.card_button(c.id == mine.get("id"), 6)
 		card.custom_minimum_size = Vector2(220, 150)
 		var col := UIW.vbox(2)
@@ -477,7 +477,7 @@ static func open_store(app: App, tab: String) -> void:
 ## TOTAL REWARDS panel: a cup race's trophies and credits, the pass XP, the contracts advanced, a daily-wins chest.
 ## The credits can be doubled by watching a rewarded ad placeholder; closing it may show an interstitial (every few
 ## races); after a win, once, the rate-us prompt.
-static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> void:
+static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain: Variant) -> void:
 	var lines: Array = []
 	var credits := int(ev.get("credits", 0))
 	if not ev.is_empty():
@@ -488,7 +488,7 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> vo
 	if credits > 0:
 		lines.append([I18n.t("Credits"), StoreScreen.fmt(credits)])
 	lines.append([I18n.t("Pass XP"), "+%d" % int(prog.get("passXp", 0))])
-	for i in prog.get("contracts", []):
+	for i: int in prog.get("contracts", []):
 		var c: Dictionary = Progression.data().contracts[i]
 		lines.append([Progression.contract_text(c), "%d/%d" % [int(c.progress), int(c.target)]])
 	if prog.get("chest", false):
@@ -507,7 +507,7 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> vo
 		var tr := CenterContainer.new()
 		tr.add_child(MobileUI.trophies(int(ev.trophies), 3, 44))
 		b.add_child(tr)
-	for l in lines:
+	for l: Array in lines:
 		var row := UIW.hbox(10)
 		var t := UIKit.label(l[0], 17, UIKit.SOFT)
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -519,7 +519,7 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> vo
 	if credits > 0:
 		var dbl := UIKit.button(I18n.t("Double credits · watch video"), func() -> void:
 			m.root.queue_free()
-			MobileAds.rewarded(app, I18n.t("{n} more credits", {"n": StoreScreen.fmt(credits)}), func(ok):
+			MobileAds.rewarded(app, I18n.t("{n} more credits", {"n": StoreScreen.fmt(credits)}), func(ok: bool) -> void:
 				if ok:
 					Progression.add_credits(credits)
 					MobileUI.reward_popup(app, I18n.t("Credits doubled"), [I18n.t("{n} credits", {"n": StoreScreen.fmt(credits)})])))

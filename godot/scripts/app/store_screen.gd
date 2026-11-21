@@ -93,7 +93,7 @@ static func build(app: App, rerender: Callable) -> Control:
 	var col := UIW.vbox(14)
 	var head := UIW.hbox(14)
 	head.add_child(UIW.tabs([["coins", I18n.t("Coins")], ["items", I18n.t("Paint & items")], ["offers", I18n.t("Offers")],
-		["redeem", I18n.t("Redeem code")], ["invite", I18n.t("Invite friends")]], _tab, func(k): _tab = k; rerender.call(), true))
+		["redeem", I18n.t("Redeem code")], ["invite", I18n.t("Invite friends")]], _tab, func(k: String) -> void: _tab = k; rerender.call(), true))
 	col.add_child(head)
 	col.add_child(_preview_banner())
 	refresh(rerender)
@@ -166,7 +166,7 @@ static func _coins(app: App, rerender: Callable) -> Control:
 	earn.columns = 2 if UIKit.touch() else 4
 	earn.add_theme_constant_override("h_separation", 10)
 	earn.add_theme_constant_override("v_separation", 10)
-	for e in EARN:
+	for e: Array in EARN:
 		var row := UIW.hbox(10)
 		var l := UIKit.label(I18n.t(e[0]), 16, UIKit.TEXT)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -182,7 +182,7 @@ static func _coins(app: App, rerender: Callable) -> Control:
 	var ledger: Array = _live.get("ledger", []) if signed_in() else []
 	if not ledger.is_empty():
 		col.add_child(UIW.section(I18n.t("Your coins"), fmt(coins())))
-		for e in ledger.slice(0, 8):
+		for e: Dictionary in ledger.slice(0, 8):
 			var r := UIW.hbox(10)
 			var when := Time.get_datetime_string_from_unix_time(int(float(e.at) / 1000.0)).replace("T", " ").substr(0, 16)
 			r.add_child(UIKit.label(when, 14, UIKit.DIM))
@@ -240,7 +240,7 @@ static func _checkout(app: App, title: String, lines: Array, price: float, _rere
 	body.add_child(_preview_banner())
 	# the order
 	var order := UIW.vbox(4)
-	for ln in lines:
+	for ln: Variant in lines:
 		if ln == null:
 			continue
 		var r := UIW.hbox(8)
@@ -280,7 +280,7 @@ static func _checkout(app: App, title: String, lines: Array, price: float, _rere
 			form.add_child(_field(I18n.t("Name on card"), ""))
 		else:
 			form.add_child(UIW.muted(I18n.t("You would finish paying in a {m} window, then come back here.", {"m": method.capitalize() if method != "wallet" else I18n.t("wallet")}), 15))
-	body.add_child(UIW.chips(methods[0][0], methods, func(v): fill_form.call(v)))
+	body.add_child(UIW.chips(methods[0][0], methods, func(v: Variant) -> void: fill_form.call(v)))
 	fill_form.call(methods[0][0])
 	body.add_child(form)
 	# pay
@@ -315,14 +315,14 @@ static func _items(app: App, rerender: Callable) -> Control:
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
 	var me := _my_car()
-	for it in ITEMS:
+	for it: Dictionary in ITEMS:
 		grid.add_child(_item_card(app, it, me, rerender))
 	col.add_child(grid)
 	return col
 
 static func _my_car() -> Dictionary:
 	var id: String = str(Settings.data.get("lastCar", ""))
-	for c in CarsDb.all():
+	for c: Dictionary in CarsDb.all():
 		if c.id == id:
 			return c
 	return CarsDb.all()[0]
@@ -404,7 +404,7 @@ static func _offers(app: App, rerender: Callable) -> Control:
 	var w := UIW.vbox(8)
 	w.add_child(UIW.tag(I18n.t("Welcome offer"), UIKit.CRIMSON))
 	w.add_child(UIKit.label(I18n.t("Starter pack").to_upper(), 40, UIKit.TEXT, true, 700))
-	for ln in [I18n.t("{n} coins", {"n": fmt(WELCOME.coins)}), I18n.t("Ghost Pearl paint (only in this pack)"), I18n.t("Double XP for 3 days")]:
+	for ln: String in [I18n.t("{n} coins", {"n": fmt(WELCOME.coins)}), I18n.t("Ghost Pearl paint (only in this pack)"), I18n.t("Double XP for 3 days")]:
 		var r := UIW.hbox(8)
 		r.add_child(UIKit.label("✓", 18, UIKit.GOOD, true, 700))
 		r.add_child(UIKit.label(ln, 18, UIKit.TEXT))
@@ -456,7 +456,7 @@ static func _redeem(rerender: Callable) -> Control:
 	le.custom_minimum_size = Vector2(320, 52)
 	le.add_theme_font_override("font", UIKit.font(true, 600))
 	le.add_theme_font_size_override("font_size", 26)
-	le.text_changed.connect(func(tx): le.text = tx.to_upper(); le.caret_column = le.text.length())
+	le.text_changed.connect(func(tx: String) -> void: le.text = tx.to_upper(); le.caret_column = le.text.length())
 	row.add_child(le)
 	var msg := UIKit.label("", 17, UIKit.TEXT)
 	msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -489,7 +489,7 @@ static func _redeem(rerender: Callable) -> Control:
 		else:
 			msg.text = I18n.t("That code is not valid or has expired.")
 			msg.add_theme_color_override("font_color", UIKit.BAD)
-	le.text_submitted.connect(func(_t): go.call())
+	le.text_submitted.connect(func(_t: String) -> void: go.call())
 	row.add_child(UIKit.button(I18n.t("Redeem"), go, true))
 	col.add_child(row)
 	col.add_child(msg)
@@ -539,7 +539,7 @@ static func _invite() -> Control:
 	row.add_child(at)
 	var b := UIW.vbox(8)
 	b.add_child(UIKit.label(I18n.t("Rewards").to_upper(), 24, UIKit.TEXT, true, 700))
-	for r in [
+	for r: Array in [
 		[I18n.t("Your friend signs up with your code"), I18n.t("they get {n}", {"n": "300"})],
 		[I18n.t("They finish 3 races"), I18n.t("you get {n}", {"n": "500"})],
 		[I18n.t("3 friends racing"), I18n.t("Founder paint")],

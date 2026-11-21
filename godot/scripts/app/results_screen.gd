@@ -8,10 +8,10 @@ extends RefCounted
 static func _classified(r: Dictionary, race: bool) -> bool:
 	return (not r.dnf and r.totalMs != null) if race else r.bestLapMs != null
 
-static func _total(r: Dictionary):
+static func _total(r: Dictionary) -> Variant:
 	return null if r.totalMs == null else r.totalMs + r.penaltyMs
 
-static func fmt_time(ms) -> String:
+static func fmt_time(ms: Variant) -> String:
 	if ms == null:
 		return "--:--.---"
 	var neg: bool = ms < 0
@@ -21,7 +21,7 @@ static func fmt_time(ms) -> String:
 	var r := int(fmod(t, 1000.0))
 	return "%s%d:%02d.%03d" % ["-" if neg else "", m, s, r]
 
-static func build(app: App, m: Dictionary, gain) -> Control:
+static func build(app: App, m: Dictionary, gain: Variant) -> Control:
 	var touch := UIKit.touch()
 	var race: bool = m.kind == "race"
 	var cars: Array = app.cars.cars
@@ -48,16 +48,16 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(chip)
 	col.add_child(head)
-	var car_name := func(id) -> String:
-		for c in cars:
+	var car_name := func(id: Variant) -> String:
+		for c: Dictionary in cars:
 			if c.id == id:
 				return c.name
 		return ""
-	var fastest_id = m.fastestLap.id if m.get("fastestLap") != null else null
+	var fastest_id: Variant = m.fastestLap.id if m.get("fastestLap") != null else null
 	# the podium: the top three as cards with their cars
 	var podium := UIW.hbox(14)
 	var shown := 0
-	for r in m.rows:
+	for r: Dictionary in m.rows:
 		if not _classified(r, race) or shown >= 3:
 			continue
 		var card := UIW.vbox(0)
@@ -76,7 +76,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		card.add_child(top)
 		var car_shown := CarsDb.resolve(str(r.carId))
 		var lv: Dictionary = CarStudio.my_livery() if r.get("id") == app.me else CarPaint.livery_for(str(r.get("id", "")))
-		for pl in app.room.get("players", []):
+		for pl: Dictionary in app.room.get("players", []):
 			if pl.id == r.get("id") and pl.get("livery") is Dictionary and not (pl.livery as Dictionary).is_empty() and pl.id != app.me:
 				lv = pl.livery
 		card.add_child(CarStudio.picture_rect(car_shown, lv, Vector2(0, 50 if touch else 96)))
@@ -104,7 +104,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hr.add_child(l)
 	standing.add_child(UIW.margins(hr, 10, 0, 10, 6))
-	for r in m.rows:
+	for r: Dictionary in m.rows:
 		var cl := _classified(r, race)
 		var me: bool = r.id == app.me
 		var cells: Array = []
@@ -149,7 +149,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 	col.add_child(UIW.panel(standing))
 	if fastest_id != null:
 		var who := ""
-		for r in m.rows:
+		for r: Dictionary in m.rows:
 			if r.id == fastest_id:
 				who = r.nick
 		col.add_child(UIKit.label(I18n.t("Fastest lap: {nick} · {time}", {"nick": who, "time": fmt_time(m.fastestLap.ms)}), 16, UIKit.GOOD, false, 600))
@@ -158,13 +158,13 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		col.add_child(career_block(gain))
 
 	# the weekend's record
-	for r in m.rows:
+	for r: Dictionary in m.rows:
 		var p := {}
-		for x in app.room.get("players", []):
+		for x: Dictionary in app.room.get("players", []):
 			if x.id == r.id:
 				p = x
 		var w: Dictionary = app.weekend.get(r.id, {"nick": r.nick, "num": p.get("num"), "country": p.get("country")})
-		var pos = r.position if _classified(r, race) else null
+		var pos: Variant = r.position if _classified(r, race) else null
 		if m.kind == "practice":
 			w.practice = pos
 		elif race:
@@ -180,17 +180,17 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		col.add_child(wk)
 
 	# a championship round (offline, on the round's circuit)
-	var champ = Championship.load_saved()
+	var champ: Variant = Championship.load_saved()
 	var champ_track: Variant = app.room.get("conditions", {}).get("trackId")
 	var next_button: Control = null
 	var my_nick: String = app.my_info().get("nick", Settings.data.nickname)
 	if race and champ != null and app.conn != null and LocalRoom.is_local_code(app.conn.code) and champ_track != null and (champ.rounds[champ.done] == champ_track if champ.done < champ.rounds.size() else false or champ.lastScored == "%s-%d" % [app.conn.code, m.raceId]):
 		var fastest_nick: Variant = null
 		if m.get("fastestLap") != null:
-			for r in m.rows:
+			for r: Dictionary in m.rows:
 				if r.id == m.fastestLap.id:
 					fastest_nick = r.nick
-		Championship.score_race(champ, "%s-%d" % [app.conn.code, m.raceId], m.rows.map(func(r): return {"nick": r.nick, "carId": r.carId, "classified": _classified(r, true)}), fastest_nick)
+		Championship.score_race(champ, "%s-%d" % [app.conn.code, m.raceId], m.rows.map(func(r: Dictionary) -> Dictionary: return {"nick": r.nick, "carId": r.carId, "classified": _classified(r, true)}), fastest_nick)
 		var over: bool = champ.done >= champ.rounds.size()
 		Championship.save(null if over else champ)
 		var table := Championship.standings(champ)
@@ -202,7 +202,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 			var nm := UIKit.label("%d. %s" % [i + 1, d.nick], 16, UIKit.ACCENT_2 if d.nick == my_nick else UIKit.TEXT, false, 700)
 			nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(nm)
-			row.add_child(UIKit.label(" ".join(d.results.map(func(p): return "P%d" % p if p != null and p != 0 else "–")), 12, UIKit.MUTED))
+			row.add_child(UIKit.label(" ".join(d.results.map(func(p: Variant) -> String: return "P%d" % p if p != null and p != 0 else "–")), 12, UIKit.MUTED))
 			row.add_child(UIKit.label(str(d.points), 18, UIKit.TEXT, true, 700))
 			cb.add_child(row)
 		if over and not table.is_empty():
@@ -243,23 +243,23 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 	return UIW.screen(top, UIW.scroll(col), UIW.action_bar(note, actions))
 
 static func _weekend_table(app: App, by: String) -> Control:
-	var rows: Array = app.weekend.keys().map(func(k): return [k, app.weekend[k]])
-	var sessions := [rows.any(func(r): return r[1].has("practice")), rows.any(func(r): return r[1].has("qualify")), rows.any(func(r): return r[1].has("race"))]
-	if sessions.filter(func(b): return b).size() < 2:
+	var rows: Array = app.weekend.keys().map(func(k: String) -> Array: return [k, app.weekend[k]])
+	var sessions := [rows.any(func(r: Array) -> bool: return r[1].has("practice")), rows.any(func(r: Array) -> bool: return r[1].has("qualify")), rows.any(func(r: Array) -> bool: return r[1].has("race"))]
+	if sessions.filter(func(b: bool) -> bool: return b).size() < 2:
 		return null
 	var key := func(w: Dictionary) -> int:
 		if by == "race":
 			return int(w.get("race", 999)) if str(w.get("race", "")).is_valid_int() else 999
 		var v: Variant = w.get("qualify") if by == "qualify" else w.get("practice")
 		return int(v) if v != null else 999
-	rows.sort_custom(func(a, b): return key.call(a[1]) < key.call(b[1]))
+	rows.sort_custom(func(a: Array, b: Array) -> bool: return key.call(a[1]) < key.call(b[1]))
 	var grid := GridContainer.new()
 	grid.columns = 6
 	grid.add_theme_constant_override("h_separation", 22)
 	grid.add_theme_constant_override("v_separation", 4)
 	for h: String in ["#", I18n.t("Driver"), I18n.t("Practice"), I18n.t("Qualify"), I18n.t("G"), I18n.t("Race")]:
 		grid.add_child(UIKit.label(String(h).to_upper(), 14, UIKit.SOFT, true, 600))
-	for r in rows:
+	for r: Array in rows:
 		var w: Dictionary = r[1]
 		var me: bool = r[0] == app.me
 		var c := UIKit.ACCENT_2 if me else UIKit.TEXT
@@ -287,7 +287,7 @@ static func career_block(g: Dictionary) -> Control:
 	var row := UIW.hbox(30)
 	var xp := UIW.vbox(2)
 	xp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	for l in g.lines:
+	for l: Array in g.lines:
 		var line := UIW.hbox(8)
 		var k := UIKit.label(I18n.t(l[0]), 15, UIKit.MUTED)
 		k.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -328,7 +328,7 @@ static func career_block(g: Dictionary) -> Control:
 	var d_r: int = int(g.get("ratingAfter", 0)) - int(g.get("ratingBefore", 0))
 	if g.has("ratingAfter"):
 		side.add_child(UIKit.label("%s %d   %s" % [I18n.t("Driver Rating"), int(g.ratingAfter), ("+%d" % d_r) if d_r > 0 else (("%d" % d_r) if d_r < 0 else "±0")], 15, UIKit.GOOD if d_r > 0 else (UIKit.BAD if d_r < 0 else UIKit.MUTED), false, 700))
-	for a in g.get("achievements", []):
+	for a: Array in g.get("achievements", []):
 		var ap := PanelContainer.new()
 		ap.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.ACCENT_2, 0.12), Color(UIKit.ACCENT_2, 0.7), 1, 4, Vector2(10, 3)))
 		ap.add_child(UIKit.label("★  %s · %s  +%d XP" % [I18n.t(a[1]), I18n.t(a[2]), a[3]], 14, UIKit.ACCENT_2, false, 700))
