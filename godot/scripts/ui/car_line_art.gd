@@ -29,7 +29,7 @@ func set_car(entry: Dictionary, line_data: TopView.Lines) -> void:
 		return
 	var W := line_data.width
 	var H := line_data.height
-	var wheels: Array = ["FL", "FR", "RL", "RR"].map(func(k): return entry.wheels[k])
+	var wheels: Array = ["FL", "FR", "RL", "RR"].map(func(k: String) -> Dictionary: return entry.wheels[k])
 	var z_f: float = (wheels[0].position[2] + wheels[1].position[2]) / 2.0
 	var z_r: float = (wheels[2].position[2] + wheels[3].position[2]) / 2.0
 	var w := line_data.max_x - line_data.min_x
@@ -65,8 +65,8 @@ func draw(zones: Array, corners: Array) -> bool:
 	var L := lines
 	var data := PackedByteArray()
 	data.resize(L.width * L.height * 4)
-	var zc: Array = zones.map(func(c: Color): return [c.r8, c.g8, c.b8])
-	var cc: Array = corners.map(func(c: Color): return [c.r8, c.g8, c.b8])
+	var zc: Array = zones.map(func(c: Color) -> Array: return [c.r8, c.g8, c.b8])
+	var cc: Array = corners.map(func(c: Color) -> Array: return [c.r8, c.g8, c.b8])
 	for i in L.lines.size():
 		var a := L.lines[i]
 		if a == 0:

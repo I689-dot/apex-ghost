@@ -156,7 +156,7 @@ func _headlight_icon(centre: Vector2, col: Color) -> void:
 		dome.append(o + Vector2(11.0 - cos(a) * 8.0, 12.0 + sin(a) * 7.0))
 	dome.append(dome[0])
 	draw_polyline(dome, col, 1.6, true)
-	for k in [-1, 0, 1]:
+	for k: int in [-1, 0, 1]:
 		draw_line(o + Vector2(15.5, 12.0 + k * 5.0), o + Vector2(21.0, 12.0 + k * 6.5), col, 1.6, true)
 
 func _engine_icon(centre: Vector2, col: Color) -> void:

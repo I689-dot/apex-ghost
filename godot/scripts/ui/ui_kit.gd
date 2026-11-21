@@ -109,7 +109,7 @@ static func build_theme() -> Theme:
 	th.set_color("font_hover_pressed_color", "Button", Color.WHITE)
 	th.set_color("font_disabled_color", "Button", Color(1, 1, 1, 0.32))
 	# drop-downs look like the buttons, the list like a menu panel
-	for st in ["normal", "hover", "pressed", "disabled"]:
+	for st: String in ["normal", "hover", "pressed", "disabled"]:
 		th.set_stylebox(st, "OptionButton", th.get_stylebox(st, "Button"))
 	th.set_stylebox("focus", "OptionButton", focus_ring())
 	th.set_font("font", "OptionButton", font(false, 600))
@@ -151,7 +151,7 @@ static func build_theme() -> Theme:
 	th.set_stylebox("background", "ProgressBar", box(Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 0, 2))
 	th.set_stylebox("fill", "ProgressBar", box(Color.WHITE, Color(0, 0, 0, 0), 0, 2))
 	# thin scroll bars, as the references' white hairline
-	for sb in ["VScrollBar", "HScrollBar"]:
+	for sb: String in ["VScrollBar", "HScrollBar"]:
 		th.set_stylebox("scroll", sb, box(Color(1, 1, 1, 0.06), Color(0, 0, 0, 0), 0, 3, Vector2(2, 2)))
 		th.set_stylebox("grabber", sb, box(Color(1, 1, 1, 0.5), Color(0, 0, 0, 0), 0, 3, Vector2(2, 2)))
 		th.set_stylebox("grabber_highlight", sb, box(Color(1, 1, 1, 0.8), Color(0, 0, 0, 0), 0, 3, Vector2(2, 2)))
@@ -214,7 +214,7 @@ static func set_primary(b: Button) -> void:
 	b.add_theme_stylebox_override("pressed", box(Color("c9d0dc"), Color("c9d0dc"), 1, 2, p))
 	b.add_theme_stylebox_override("hover_pressed", box(Color("c9d0dc"), Color("c9d0dc"), 1, 2, p))
 	b.add_theme_stylebox_override("disabled", box(Color(1, 1, 1, 0.16), Color(1, 1, 1, 0.16), 1, 2, p))
-	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+	for k: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(k, INK)
 	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.4))
 

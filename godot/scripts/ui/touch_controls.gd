@@ -100,13 +100,13 @@ func _layout() -> void:
 	var right := vp.x - margin - inset_r
 	var bottom := vp.y - margin - inset_b
 	var throttle := _widget("pedal", Rect2(right - thr_w, bottom - thr_h, thr_w, thr_h), "GAS", "", Color(0.19, 0.82, 0.35))
-	throttle.value_cb = func(v): InputState.touch.throttle = v
+	throttle.value_cb = func(v: float) -> void: InputState.touch.throttle = v
 	throttle.name = "throttle"
 	var brake_rect := Rect2(right - thr_w - 10.0 * k - brk_w, bottom - brk_h, brk_w, brk_h)
 	if _mode == "tilt":
 		brake_rect = Rect2(margin + inset_l, bottom - brk_h, brk_w, brk_h)
 	var brake := _widget("pedal", brake_rect, "BRAKE", "", Color(1, 0.27, 0.23))
-	brake.value_cb = func(v): InputState.touch.brake = v
+	brake.value_cb = func(v: float) -> void: InputState.touch.brake = v
 	brake.name = "brake"
 	if _mode != "tilt":
 		var steer := _widget("steer", Rect2(margin + inset_l, bottom - 118.0 * u * k, 250.0 * u * k, 118.0 * u * k), "", "", Color.WHITE)
@@ -171,7 +171,7 @@ func _widget(kind: String, rect: Rect2, label: String, action: String, color: Co
 	return w
 
 func _w(wname: String) -> Widget:
-	for w in widgets:
+	for w: Widget in widgets:
 		if w.name == wname:
 			return w
 	return null
@@ -259,7 +259,7 @@ func _press(index: int, w: Widget, pos: Vector2) -> void:
 			else:
 				_press_action(w.action, true)
 				_press_action(w.action, false)
-			get_tree().create_timer(0.12).timeout.connect(func(): w.down = false; queue_redraw())
+			get_tree().create_timer(0.12).timeout.connect(func() -> void: w.down = false; queue_redraw())
 		"steer":
 			_read_steer(index, w, pos)
 	queue_redraw()
@@ -273,7 +273,7 @@ func _release_finger(index: int) -> void:
 		"pedal":
 			# another finger may still hold it
 			var held := false
-			for f in _fingers.values():
+			for f: Dictionary in _fingers.values():
 				if f.widget == w:
 					held = true
 			if not held:
@@ -301,7 +301,7 @@ func _apply_steer() -> void:
 	if _mode == "tilt":
 		return
 	var v := 0.0
-	for s in _steer_fingers.values():
+	for s: float in _steer_fingers.values():
 		v = s # the latest thumb wins
 	_steer_value = v
 	InputState.touch.steer = v
@@ -319,7 +319,7 @@ func _release_all() -> void:
 		InputState.touch.steer = 0.0
 		_steer_value = 0.0
 	# held keys of the hold buttons
-	for a in ["timing", "lookBack", "handbrake"]:
+	for a: String in ["timing", "lookBack", "handbrake"]:
 		_press_action(a, false)
 
 ## Presses or releases the first key bound to an action (a synthetic key event).

@@ -69,7 +69,7 @@ func _build_menu() -> void:
 	_col.add_child(hint)
 	var c: Dictionary = Tyres.COMPOUNDS[info.current]
 	var avg_wear := 0.0
-	for w in info.wear:
+	for w: float in info.wear:
 		avg_wear += w
 	avg_wear /= 4.0
 	_col.add_child(UIKit.label(I18n.t("Tyres · fitted: {name}, {pct} tread", {"name": I18n.t(c.name), "pct": "%d %%" % roundi((1.0 - avg_wear) * 100.0)}), 16, Color.WHITE, true, 700))
@@ -88,7 +88,7 @@ func _build_menu() -> void:
 	var ids := ["keep", "soft", "medium", "hard", "wet"]
 	for i in ids.size():
 		var id: String = ids[i]
-		var comp = null if id == "keep" else Tyres.COMPOUNDS[id]
+		var comp: Variant = null if id == "keep" else Tyres.COMPOUNDS[id]
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_NONE
 		b.toggle_mode = false
@@ -118,7 +118,7 @@ func _build_menu() -> void:
 		inner.add_child(kl)
 		inner.set_anchors_preset(Control.PRESET_FULL_RECT)
 		b.add_child(inner)
-		b.pressed.connect(func(): _set_tyres(null if id == "keep" else id))
+		b.pressed.connect(func() -> void: _set_tyres(null if id == "keep" else id))
 		tyre_row.add_child(b)
 		_tyre_btns[id] = b
 	_col.add_child(tyre_row)
@@ -131,14 +131,14 @@ func _build_menu() -> void:
 		wet_hint = I18n.t("Track wet") if info.wetness > 0.3 else (I18n.t("Track damp") if info.wetness > 0.05 else I18n.t("Track dry"))
 	_col.add_child(UIKit.label(wet_hint, 13, UIKit.ACCENT_2))
 	_col.add_child(UIKit.label(I18n.t("Repairs"), 16, Color.WHITE, true, 700))
-	var z = info.zones
+	var z: Array = info.zones
 	_col.add_child(_repair(I18n.t("Bodywork & aero"), maxf(maxf(z[0], z[1]), maxf(z[2], z[3])), "body"))
 	_col.add_child(_repair(I18n.t("Suspension"), z[5], "suspension"))
 	_col.add_child(_repair(I18n.t("Engine"), z[4], "engine"))
-	var fr = _fuel_row()
+	var fr: Control = _fuel_row()
 	if fr != null:
 		_col.add_child(fr)
-	var dr = _driver_row()
+	var dr: Control = _driver_row()
 	if dr != null:
 		_col.add_child(dr)
 	_col.add_child(_breakdown)
@@ -159,7 +159,7 @@ func _repair(label: String, dmg: float, key: String) -> Control:
 	box.focus_mode = Control.FOCUS_NONE
 	box.button_pressed = plan[key]
 	box.disabled = dmg < 0.005
-	box.toggled.connect(func(on): plan[key] = on; _refresh())
+	box.toggled.connect(func(on: bool) -> void: plan[key] = on; _refresh())
 	row.add_child(box)
 	var l := UIKit.label(label, 15, UIKit.TEXT)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -169,8 +169,8 @@ func _repair(label: String, dmg: float, key: String) -> Control:
 	return row
 
 ## Fuel to add: a slider up to a full tank, with the laps it gives and a button for what the race still needs.
-func _fuel_row():
-	var f = info.fuel
+func _fuel_row() -> Control:
+	var f: Variant = info.fuel
 	if f == null:
 		return null
 	var room := maxf(0.0, f.tank - f.litres)
@@ -186,29 +186,29 @@ func _fuel_row():
 	var show := func() -> void:
 		var laps: float = (f.litres + plan.fuelL) / maxf(0.1, f.perLap)
 		_fuel_out.text = I18n.t("+{add} l → {l} l, ~{laps} laps", {"add": roundi(plan.fuelL), "l": roundi(f.litres + plan.fuelL), "laps": "%.1f" % laps})
-	slider.value_changed.connect(func(v): plan.fuelL = v; show.call(); _refresh())
+	slider.value_changed.connect(func(v: float) -> void: plan.fuelL = v; show.call(); _refresh())
 	_fuel_out.add_theme_font_size_override("font_size", 13)
 	row.add_child(slider)
 	row.add_child(_fuel_out)
 	box.add_child(row)
 	show.call()
 	if f.need != null:
-		box.add_child(UIKit.button(I18n.t("To the finish: +{l} l", {"l": ceili(minf(room, maxf(0.0, f.need - f.litres)))}), func():
+		box.add_child(UIKit.button(I18n.t("To the finish: +{l} l", {"l": ceili(minf(room, maxf(0.0, f.need - f.litres)))}), func() -> void:
 			plan.fuelL = ceilf(minf(room, maxf(0.0, f.need - f.litres)))
 			slider.value = plan.fuelL
 			show.call()
 			_refresh()))
 	return box
 
-func _driver_row():
-	var d = info.driverChange
+func _driver_row() -> Control:
+	var d: Variant = info.driverChange
 	if d == null:
 		return null
 	var row := HBoxContainer.new()
 	var box := CheckBox.new()
 	box.focus_mode = Control.FOCUS_NONE
 	box.button_pressed = plan.driverChange
-	box.toggled.connect(func(on): plan.driverChange = on; _refresh())
+	box.toggled.connect(func(on: bool) -> void: plan.driverChange = on; _refresh())
 	row.add_child(box)
 	var l := UIKit.label(I18n.t("Driver change"), 15, UIKit.TEXT)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -223,20 +223,20 @@ func _driver_row():
 	row.add_child(UIKit.label(note, 12, UIKit.ACCENT_2 if d == "due" else UIKit.MUTED))
 	return row
 
-func _set_tyres(id) -> void:
+func _set_tyres(id: Variant) -> void:
 	plan.tyres = id
 	_refresh()
 
 func _refresh() -> void:
-	for id in _tyre_btns:
+	for id: String in _tyre_btns:
 		var on: bool = (null if id == "keep" else id) == plan.tyres
 		var b: Button = _tyre_btns[id]
-		for st in ["normal", "hover", "pressed", "focus"]:
+		for st: String in ["normal", "hover", "pressed", "focus"]:
 			b.add_theme_stylebox_override(st, UIKit.box(Color(1, 1, 1, 0.22 if on else 0.06), UIKit.ACCENT_2 if on else UIKit.LINE, 2 if on else 1, 3))
 	var st := PitService.service_time(plan, info.zones)
 	for c in _breakdown.get_children():
 		c.queue_free()
-	for p in st.parts:
+	for p: Dictionary in st.parts:
 		var row := HBoxContainer.new()
 		var a := UIKit.label(p.label, 14, UIKit.TEXT)
 		a.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -277,16 +277,16 @@ func start() -> void:
 	# the jobs as the crew does them (PitCrew.stop_timeline), each ticking from waiting to working to done, as iRacing's
 	# pit service list and a TV pit graphic show them: no progress bar
 	var ev := PitCrew.stop_timeline(plan, info.zones)
-	var at := func(kind: String, wheel: int = -1):
-		for e in ev:
+	var at := func(kind: String, wheel: int = -1) -> Variant:
+		for e: Dictionary in ev:
 			if e.kind == kind and (wheel < 0 or e.wheel == wheel):
 				return e.at
 		return null
 	var fuel: float = plan.fuelL / PitService.REFUEL_LPS if plan.fuelL > 0.0 else 0.0
 	var driver: float = PitService.driver_change_s() if plan.driverChange else 0.0
-	var jack_up = at.call("jackUp")
-	var jack_down = at.call("jackDown")
-	var z = info.zones
+	var jack_up: Variant = at.call("jackUp")
+	var jack_down: Variant = at.call("jackDown")
+	var z: Array = info.zones
 	var repairs: Array = []
 	if plan.body:
 		repairs.append({"label": I18n.t("Bodywork & aero"), "seconds": PitService.body_time(z)})
@@ -303,26 +303,26 @@ func start() -> void:
 		jobs.append({"label": I18n.t("Car up"), "from": jack_up, "to": jack_up + 0.35})
 	var wheels := [I18n.t("Front left"), I18n.t("Front right"), I18n.t("Rear left"), I18n.t("Rear right")]
 	for w in 4:
-		var a = at.call("gunOff", w)
-		var b = at.call("gunOn", w)
+		var a: Variant = at.call("gunOff", w)
+		var b: Variant = at.call("gunOn", w)
 		if a != null and b != null:
 			var cname: String = Tyres.COMPOUNDS[plan.tyres if plan.tyres != null else "medium"].name
 			jobs.append({"label": "%s · %s" % [wheels[w], I18n.t(cname)], "from": a, "to": b + 0.7})
 	if jack_up != null:
 		var t0: float = jack_up + PitService.JACKS / 2.0
-		for p in repairs:
+		for p: Dictionary in repairs:
 			jobs.append({"label": p.label, "from": t0, "to": t0 + p.seconds})
 			t0 += p.seconds
 	if jack_down != null:
 		jobs.append({"label": I18n.t("Car down"), "from": jack_down, "to": st.total})
-	jobs.sort_custom(func(a, b): return a.from < b.from)
+	jobs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.from < b.from)
 	_clear_col()
 	_col.add_child(_head(I18n.t("PIT STOP")))
 	_count = UIKit.label("%.1f" % st.total, 64, Color.WHITE, true, 800)
 	_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_col.add_child(_count)
 	_jobs.clear()
-	for j in jobs:
+	for j: Dictionary in jobs:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var mark := ColorRect.new()
@@ -342,7 +342,7 @@ func start() -> void:
 
 ## Service time elapsed and seconds left: the jobs' states and the countdown.
 func set_progress(_u: float, left: float, elapsed: float = 0.0) -> void:
-	for j in _jobs:
+	for j: Dictionary in _jobs:
 		var col := Color(1, 1, 1, 0.25)
 		if elapsed >= j.to:
 			col = UIKit.GOOD

@@ -32,7 +32,7 @@ class InputsWidget:
 		var tw := 230.0
 		var ty := 12.0
 		var th := H - 24.0
-		for f in [0.25, 0.5, 0.75]:
+		for f: float in [0.25, 0.5, 0.75]:
 			draw_line(Vector2(tx, ty + th * f), Vector2(tx + tw, ty + th * f), Color(1, 1, 1, 0.08), 1.0)
 		var cols := [Color("30d158"), Color("ff453a")]
 		for k in 2:
@@ -104,7 +104,7 @@ func _init() -> void:
 
 ## Every frame: pedals 0..1, steering -1 (right) .. +1 (left) of full lock, delta to the best lap (ms) or null,
 ## gear (-1 R, 0 N), speed in the player's units with its label.
-func update(throttle: float, brake: float, steer: float, delta_ms, gear: int = 0, speed: float = 0.0, unit: String = "km/h", dt: float = 1.0 / 60.0) -> void:
+func update(throttle: float, brake: float, steer: float, delta_ms: Variant, gear: int = 0, speed: float = 0.0, unit: String = "km/h", dt: float = 1.0 / 60.0) -> void:
 	var o: Dictionary = Settings.data.overlays
 	inputs.visible = o.inputs
 	if o.inputs:
@@ -144,14 +144,14 @@ func set_relative(rows: Array, left: bool, right: bool) -> void:
 	relative.visible = o.relative and rows.size() >= 2
 	if not relative.visible:
 		return
-	var key := "|".join(rows.map(func(r): return "%s%s%.1f%s%s" % [r.id, r.position, r.gapS, r.lap, r.inPit]))
+	var key := "|".join(rows.map(func(r: Dictionary) -> String: return "%s%s%.1f%s%s" % [r.id, r.position, r.gapS, r.lap, r.inPit]))
 	if key == _rel_key:
 		return
 	_rel_key = key
 	for c in relative.get_children():
 		c.queue_free()
 	relative.add_child(UIKit.label(I18n.t("RELATIVE"), 12, Color(1, 1, 1, 0.65), true, 700))
-	for r in rows:
+	for r: Dictionary in rows:
 		relative.add_child(_rel_row(r))
 
 func _rel_row(r: Dictionary) -> Control:

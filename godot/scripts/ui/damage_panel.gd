@@ -34,7 +34,7 @@ func _init() -> void:
 	grid.add_theme_constant_override("h_separation", 4)
 	grid.add_theme_constant_override("v_separation", 4)
 	left.add_child(grid)
-	for k in ["LF", "RF", "LR", "RR"]:
+	for k: String in ["LF", "RF", "LR", "RR"]:
 		var l := UIKit.label(k, 12, Color("30d158"), true, 800)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.custom_minimum_size.x = 54
@@ -114,7 +114,7 @@ func _render(d: DamageState) -> void:
 		c.queue_free()
 	if rows.is_empty():
 		rows.append([I18n.t("No damage"), "", 0.0])
-	for r in rows:
+	for r: Array in rows:
 		var sev := CarLineArt.damage_colour(r[2])
 		var line := HBoxContainer.new()
 		var a := UIKit.label(r[0], 12, Color("d8dde3"), false, 500)

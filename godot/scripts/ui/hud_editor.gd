@@ -30,7 +30,7 @@ func _init() -> void:
 	hud = Hud.new()
 	add_child(hud)
 	_sample()
-	for k in hud.blocks():
+	for k: String in hud.blocks():
 		var h := Panel.new()
 		h.mouse_filter = Control.MOUSE_FILTER_STOP
 		h.mouse_default_cursor_shape = Control.CURSOR_MOVE
@@ -40,7 +40,7 @@ func _init() -> void:
 		name_l.position = Vector2(6, -20)
 		h.add_child(name_l)
 		var kk: String = k
-		h.gui_input.connect(func(e): _on_handle(kk, e))
+		h.gui_input.connect(func(e: InputEvent) -> void: _on_handle(kk, e))
 		add_child(h)
 		_handles[k] = h
 	add_child(_toolbar())
@@ -70,10 +70,10 @@ func _toolbar() -> Control:
 	_picked = UIKit.label("", 16, UIKit.ACCENT_2, true, 600)
 	col.add_child(_picked)
 	var r1 := UIW.hbox(8)
-	r1.add_child(UIKit.button("−", func(): _resize(_selected, -0.05)))
-	r1.add_child(UIKit.button("+", func(): _resize(_selected, 0.05)))
-	r1.add_child(UIKit.button(I18n.t("Reset this block"), func(): _reset(_selected)))
-	r1.add_child(UIKit.button(I18n.t("Reset all"), func(): _reset("")))
+	r1.add_child(UIKit.button("−", func() -> void: _resize(_selected, -0.05)))
+	r1.add_child(UIKit.button("+", func() -> void: _resize(_selected, 0.05)))
+	r1.add_child(UIKit.button(I18n.t("Reset this block"), func() -> void: _reset(_selected)))
+	r1.add_child(UIKit.button(I18n.t("Reset all"), func() -> void: _reset("")))
 	col.add_child(r1)
 	var r2 := UIW.hbox(8)
 	r2.alignment = BoxContainer.ALIGNMENT_END
@@ -83,8 +83,8 @@ func _toolbar() -> Control:
 	p.add_child(col)
 	# the middle of the screen: the HUD keeps to the edges
 	p.set_anchors_preset(Control.PRESET_CENTER)
-	p.resized.connect(func(): p.position = (size - p.size) / 2.0)
-	resized.connect(func(): p.position = (size - p.size) / 2.0)
+	p.resized.connect(func() -> void: p.position = (size - p.size) / 2.0)
+	resized.connect(func() -> void: p.position = (size - p.size) / 2.0)
 	return p
 
 func _entry(k: String) -> Dictionary:
@@ -105,7 +105,7 @@ func block_rect(b: Control) -> Rect2:
 
 func _process(_dt: float) -> void:
 	var all := hud.blocks()
-	for k in _handles:
+	for k: String in _handles:
 		var b: Control = all[k]
 		var h: Panel = _handles[k]
 		h.visible = b.visible
@@ -194,7 +194,7 @@ func _unhandled_key_input(e: InputEvent) -> void:
 func save() -> void:
 	# a block left where it was and at its size is no override
 	var L: Dictionary = Settings.data.hud.layout
-	for k in L.keys():
+	for k: String in L.keys():
 		if (L[k] as Dictionary).is_empty():
 			L.erase(k)
 	Settings.save()

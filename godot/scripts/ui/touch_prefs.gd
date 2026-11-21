@@ -14,7 +14,7 @@ static func _ensure() -> void:
 		return
 	data = DEFAULTS.duplicate()
 	if FileAccess.file_exists(SAVE_PATH):
-		var v = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+		var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if typeof(v) == TYPE_DICTIONARY:
 			data.merge(v, true)
 

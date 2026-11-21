@@ -169,7 +169,7 @@ func fit_tyres(comp: Dictionary, temp_c: float) -> void:
 		w.flat_spot = 0.0
 		w.temp = temp_c
 		w.set_c = temp_c
-		var s = setup.pressure
+		var s: Variant = setup.pressure
 		w.cold_psi = s[0 if w.front else 1] if s != null else C.ideal_cold_psi(comp.optimumC, temp_c)
 		w.pressure = w.cold_psi
 
@@ -180,7 +180,7 @@ func fit_wheel(i: int, comp: Dictionary, temp_c: float) -> void:
 	w.wear = 0.0
 	w.temp = temp_c
 	w.set_c = temp_c
-	var s = setup.pressure
+	var s: Variant = setup.pressure
 	w.cold_psi = s[0 if w.front else 1] if s != null else C.ideal_cold_psi(comp.optimumC, temp_c)
 	w.pressure = w.cold_psi
 

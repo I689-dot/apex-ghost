@@ -26,7 +26,7 @@ func set_track(t: Dictionary) -> void:
 	for i in range(0, cl.size(), 3):
 		_track_pts.append(Vector2(cl[i], cl[i + 2]))
 	_track_pts.append(_track_pts[0])
-	var pl = t.get("pitLane", null)
+	var pl: Variant = t.get("pitLane", null)
 	_pit_pts = PackedVector2Array()
 	_box_pts = PackedVector2Array()
 	if pl != null:
@@ -60,25 +60,25 @@ func _draw() -> void:
 	for p in _track_pts:
 		tp.append(xf * p)
 	var track_lines := _clip(tp, c, rr)
-	for l in track_lines:
+	for l: PackedVector2Array in track_lines:
 		draw_polyline(l, Color(0, 0, 0, 0.6), 22.0 * s, true)
-	for l in track_lines:
+	for l: PackedVector2Array in track_lines:
 		draw_polyline(l, Color(1, 1, 1, 0.9), 12.0 * s, true)
 	if not _pit_pts.is_empty() and not _box_pts.is_empty():
 		var pp := PackedVector2Array()
 		for p in _pit_pts:
 			pp.append(xf * p)
-		for l in _clip(pp, c, rr):
+		for l: PackedVector2Array in _clip(pp, c, rr):
 			draw_polyline(l, Color(1, 1, 1, 0.45), 6.0 * s, true)
 		var bp := PackedVector2Array()
 		for p in _box_pts:
 			bp.append(xf * p)
-		for l in _clip(bp, c, rr):
+		for l: PackedVector2Array in _clip(bp, c, rr):
 			draw_polyline(l, Color("ffd60a"), 7.0 * s, true)
 	var st := xf * _start
 	if st.distance_to(c) < rr - 8.0 * s:
 		draw_rect(Rect2(st - Vector2(8, 8) * s, Vector2(16, 16) * s), Color("ff3b30"))
-	for d in _dots:
+	for d: Dictionary in _dots:
 		var p := xf * Vector2(d.x, d.z)
 		if p.distance_to(c) > rr - 7.0:
 			continue

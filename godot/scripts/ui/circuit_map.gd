@@ -20,7 +20,7 @@ func _init() -> void:
 	custom_minimum_size = Vector2(W, H)
 	size = Vector2(W, H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for l in [_edge, _road]:
+	for l: Line2D in [_edge, _road]:
 		l.joint_mode = Line2D.LINE_JOINT_ROUND
 		l.begin_cap_mode = Line2D.LINE_CAP_ROUND
 		l.end_cap_mode = Line2D.LINE_CAP_ROUND
@@ -34,7 +34,7 @@ func _init() -> void:
 ## The corners of a circuit, numbered along the lap: stretches of the lap line turning tighter than ~260 m radius,
 ## split where the turn changes hand (chicanes are two), one number each at its tightest point. With the circuit's
 ## official count, the gentlest extra ones are left out. Returns [{x, z, out: [x, z], s}].
-static func find_corners(td: Dictionary, expected = null) -> Array:
+static func find_corners(td: Dictionary, expected: Variant = null) -> Array:
 	var cl: Array = td.centerline
 	var n := cl.size() / 3
 	var heading := PackedFloat64Array()
@@ -55,7 +55,7 @@ static func find_corners(td: Dictionary, expected = null) -> Array:
 		kappa[i] = d / (2.0 * win * step)
 	var thresh := 1.0 / 260.0
 	var regions: Array = []
-	var cur = null
+	var cur: Variant = null
 	var gap_max := roundi(25.0 / step)
 	var gap := 0
 	for i in n:
@@ -76,14 +76,14 @@ static func find_corners(td: Dictionary, expected = null) -> Array:
 			gap += 1
 			if gap > gap_max:
 				cur = null
-	var corners: Array = regions.filter(func(r): return (r.to - r.from) * step > 12.0 and r.turn > 0.25)
+	var corners: Array = regions.filter(func(r: Dictionary) -> bool: return (r.to - r.from) * step > 12.0 and r.turn > 0.25)
 	if expected != null and corners.size() > int(expected):
 		var sorted := corners.duplicate()
-		sorted.sort_custom(func(a, b): return a.turn > b.turn)
+		sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.turn > b.turn)
 		var keep := sorted.slice(0, int(expected))
-		corners = corners.filter(func(c): return keep.has(c))
+		corners = corners.filter(func(c: Dictionary) -> bool: return keep.has(c))
 	var out: Array = []
-	for c in corners:
+	for c: Dictionary in corners:
 		var i2: int = c.peak
 		var j2 := (i2 + 1) % n
 		var tx: float = cl[j2 * 3] - cl[i2 * 3]
@@ -96,7 +96,7 @@ static func find_corners(td: Dictionary, expected = null) -> Array:
 		out.append({"x": cl[i2 * 3], "z": cl[i2 * 3 + 2], "out": [(tz / tl) * sd, (-tx / tl) * sd], "s": td.cumS[i2]})
 	return out
 
-func set_track(td: Dictionary, turns = null) -> void:
+func set_track(td: Dictionary, turns: Variant = null) -> void:
 	var pad := 30.0
 	var cl: Array = td.centerline
 	var x0 := INF
@@ -141,17 +141,17 @@ func draw_cars(cars: Array) -> void:
 func _draw() -> void:
 	draw_line(_start[0] if not _start.is_empty() else Vector2.ZERO, _start[1] if not _start.is_empty() else Vector2.ZERO, Color.WHITE, 4.0)
 	var f := UIKit.font(true, 700)
-	for c in _corner_labels:
+	for c: Array in _corner_labels:
 		var pos: Vector2 = c[0]
 		var sz := f.get_string_size(c[1], HORIZONTAL_ALIGNMENT_CENTER, -1, 19)
 		# a dark outline, then the number
-		for o in [Vector2(-1.5, 0), Vector2(1.5, 0), Vector2(0, -1.5), Vector2(0, 1.5)]:
+		for o: Vector2 in [Vector2(-1.5, 0), Vector2(1.5, 0), Vector2(0, -1.5), Vector2(0, 1.5)]:
 			draw_string(f, pos + o + Vector2(-sz.x / 2.0, sz.y * 0.3), c[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color(0, 0, 0, 0.75))
 		draw_string(f, pos + Vector2(-sz.x / 2.0, sz.y * 0.3), c[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 19, Color.WHITE)
 	# you last, on top
 	var sorted := _cars.duplicate()
-	sorted.sort_custom(func(a, b): return int(a.me) < int(b.me))
-	for c in sorted:
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.me) < int(b.me))
+	for c: Dictionary in sorted:
 		var p := _px(c.x, c.z)
 		var r := 15.0 if c.me else 11.0
 		var fill := Color("ffd60a") if c.me else (Color("8b9099") if c.inPit else (Color("ff5a52") if c.lap == "ahead" else (Color("4aa3ff") if c.lap == "behind" else Color("f2f2f2"))))

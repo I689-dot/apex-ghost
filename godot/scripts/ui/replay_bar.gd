@@ -31,9 +31,9 @@ func _init(s: RaceSession) -> void:
 	_slider.min_value = 0.0
 	_slider.max_value = 1.0
 	_slider.step = 0.0
-	_slider.drag_started.connect(func(): _dragging = true)
-	_slider.drag_ended.connect(func(_changed: bool): _dragging = false)
-	_slider.value_changed.connect(func(v: float):
+	_slider.drag_started.connect(func() -> void: _dragging = true)
+	_slider.drag_ended.connect(func(_changed: bool) -> void: _dragging = false)
+	_slider.value_changed.connect(func(v: float) -> void:
 		if _dragging:
 			session.replay_seek_fraction(v))
 	top.add_child(_time)
@@ -42,29 +42,29 @@ func _init(s: RaceSession) -> void:
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
-	row.add_child(_button("⏪ 10 s", func(): session.replay_jump(-10000.0)))
-	row.add_child(_button("◀|", func(): session.replay_step(-1)))
-	_play = _button("⏸", func(): session.replay_toggle_play(), true)
+	row.add_child(_button("⏪ 10 s", func() -> void: session.replay_jump(-10000.0)))
+	row.add_child(_button("◀|", func() -> void: session.replay_step(-1)))
+	_play = _button("⏸", func() -> void: session.replay_toggle_play(), true)
 	row.add_child(_play)
-	row.add_child(_button("|▶", func(): session.replay_step(1)))
-	row.add_child(_button("10 s ⏩", func(): session.replay_jump(10000.0)))
+	row.add_child(_button("|▶", func() -> void: session.replay_step(1)))
+	row.add_child(_button("10 s ⏩", func() -> void: session.replay_jump(10000.0)))
 	row.add_child(UIW.spacer())
-	for sp in [-1.0, 0.25, 0.5, 1.0, 2.0, 4.0]:
-		var b := _button(("◀◀" if sp < 0.0 else ("%s×" % ("%g" % sp))), func(): session.replay_set_speed(sp))
+	for sp: float in [-1.0, 0.25, 0.5, 1.0, 2.0, 4.0]:
+		var b := _button(("◀◀" if sp < 0.0 else ("%s×" % ("%g" % sp))), func() -> void: session.replay_set_speed(sp))
 		_speed_buttons[sp] = b
 		row.add_child(b)
 	col.add_child(row)
 
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 8)
-	bottom.add_child(_button("◀", func(): session.replay_change_car(-1)))
+	bottom.add_child(_button("◀", func() -> void: session.replay_change_car(-1)))
 	_car.custom_minimum_size = Vector2(220, 0)
 	_car.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bottom.add_child(_car)
-	bottom.add_child(_button("▶", func(): session.replay_change_car(1)))
-	bottom.add_child(_button(I18n.t("Camera"), func(): session.replay_change_camera()))
+	bottom.add_child(_button("▶", func() -> void: session.replay_change_car(1)))
+	bottom.add_child(_button(I18n.t("Camera"), func() -> void: session.replay_change_camera()))
 	bottom.add_child(UIW.spacer())
-	bottom.add_child(_button(I18n.t("Close"), func(): session.close_replay(), true))
+	bottom.add_child(_button(I18n.t("Close"), func() -> void: session.close_replay(), true))
 	col.add_child(bottom)
 
 func _button(text: String, cb: Callable, primary: bool = false) -> Button:
@@ -82,7 +82,7 @@ func _process(_dt: float) -> void:
 	_time.text = "%s / %s" % [_clock(at), _clock(span)]
 	_play.text = "⏸" if session.replay_playing else "▶"
 	_car.text = session.replay_car_name() + "  ·  " + I18n.t(session.replay_camera_name())
-	for sp in _speed_buttons:
+	for sp: float in _speed_buttons:
 		_speed_buttons[sp].modulate = Color(1, 0.84, 0.04) if is_equal_approx(float(sp), session.replay_speed) else Color.WHITE
 
 static func _clock(ms: float) -> String:

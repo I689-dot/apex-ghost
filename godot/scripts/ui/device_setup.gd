@@ -26,10 +26,10 @@ func _init(on_change: Callable) -> void:
 	_prompt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_prompt.visible = false
 	add_child(_prompt)
-	_done = UIKit.button(I18n.t("Done"), func(): _finish(true))
+	_done = UIKit.button(I18n.t("Done"), func() -> void: _finish(true))
 	_done.visible = false
 	add_child(_done)
-	for f in DeviceBindings.FUNCTIONS:
+	for f: Array in DeviceBindings.FUNCTIONS:
 		var row := UIW.hbox(10)
 		var name := UIKit.label(I18n.t(f[2]), 15, UIKit.TEXT, false, 600)
 		name.custom_minimum_size = Vector2(190, 0)
@@ -48,8 +48,8 @@ func _init(on_change: Callable) -> void:
 		row.add_child(live)
 		var key: String = f[0]
 		var kind: String = f[1]
-		row.add_child(UIKit.button(I18n.t("Assign"), func(): _start(key, kind)))
-		row.add_child(UIKit.button(I18n.t("Clear"), func():
+		row.add_child(UIKit.button(I18n.t("Assign"), func() -> void: _start(key, kind)))
+		row.add_child(UIKit.button(I18n.t("Clear"), func() -> void:
 			DeviceBindings.bindings().erase(key)
 			changed.call()
 			_refresh()))
@@ -59,7 +59,7 @@ func _init(on_change: Callable) -> void:
 
 func _refresh() -> void:
 	var bs := DeviceBindings.bindings()
-	for key in _rows:
+	for key: String in _rows:
 		var r: Dictionary = _rows[key]
 		if not bs.has(key):
 			(r.bind as Label).text = "—"
@@ -79,7 +79,7 @@ func _start(key: String, kind: String) -> void:
 	_first.clear()
 	_best = [-1, -1, 0.0]
 	_quiet = 0.0
-	for d in DeviceBindings.joypads():
+	for d: int in DeviceBindings.joypads():
 		# plain arrays: a packed array is a value, changing one through the dictionary would change a copy
 		var ax: Array = []
 		for a in 10:
@@ -128,7 +128,7 @@ func _finish(save: bool) -> void:
 func _binding(d: int, kind: String, index: int) -> Dictionary:
 	var key := PadMap.pad_key(DeviceBindings.joy_name(d))
 	var nth := 0
-	for o in DeviceBindings.joypads():
+	for o: int in DeviceBindings.joypads():
 		if o == d:
 			break
 		if PadMap.pad_key(DeviceBindings.joy_name(o)) == key:
@@ -138,7 +138,7 @@ func _binding(d: int, kind: String, index: int) -> Dictionary:
 func _process(dt: float) -> void:
 	# live values of what is bound
 	var bs := DeviceBindings.bindings()
-	for key in _rows:
+	for key: String in _rows:
 		var r: Dictionary = _rows[key]
 		var v := 0.0
 		if bs.has(key):
@@ -153,7 +153,7 @@ func _process(dt: float) -> void:
 	if _learning == "":
 		return
 	if _kind == "button" or _kind == "gear":
-		for d in _btn_base:
+		for d: int in _btn_base:
 			for b in 64:
 				if DeviceBindings.joy_button(d, b) and not _btn_base[d][b]:
 					DeviceBindings.bindings()[_learning] = _binding(d, "button", b)
@@ -163,7 +163,7 @@ func _process(dt: float) -> void:
 		return
 	# axes: track each one's range, the one that travelled furthest wins
 	var moving := false
-	for d in _base:
+	for d: int in _base:
 		for a in 10:
 			var v := DeviceBindings.joy_axis(d, a)
 			_lo[d][a] = minf(_lo[d][a], v)

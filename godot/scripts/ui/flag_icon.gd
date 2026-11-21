@@ -6,7 +6,7 @@ extends RefCounted
 static var _tex := {}
 
 ## A TextureRect with the flag, or null for an unknown or empty code.
-static func make(cc, width: int = 20) -> TextureRect:
+static func make(cc: Variant, width: int = 20) -> TextureRect:
 	if cc == null or typeof(cc) != TYPE_STRING or not Accounts.profile_ok("country", cc):
 		return null
 	var tex := texture(cc)
@@ -24,6 +24,6 @@ static func texture(cc: String) -> Texture2D:
 	if _tex.has(key):
 		return _tex[key]
 	var path := "res://assets_static/flags/%s.png" % key
-	var t = load(path) if ResourceLoader.exists(path) else null
+	var t: Texture2D = load(path) if ResourceLoader.exists(path) else null
 	_tex[key] = t
 	return t

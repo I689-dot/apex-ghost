@@ -116,7 +116,7 @@ static func chips(current: Variant, options: Array, on: Callable, enabled: bool 
 	flow.add_theme_constant_override("h_separation", 4)
 	flow.add_theme_constant_override("v_separation", 4)
 	var pad := Vector2(14, 10) if UIKit.touch() else Vector2(12, 6)
-	for o in options:
+	for o: Array in options:
 		var b := Button.new()
 		b.text = String(o[1]).to_upper()
 		b.toggle_mode = true
@@ -126,17 +126,17 @@ static func chips(current: Variant, options: Array, on: Callable, enabled: bool 
 		b.add_theme_font_override("font", UIKit.font(true, 600))
 		b.add_theme_font_size_override("font_size", 18 if UIKit.touch() else 16)
 		if b.button_pressed:
-			for st in ["normal", "hover", "pressed", "disabled", "hover_pressed"]:
+			for st: String in ["normal", "hover", "pressed", "disabled", "hover_pressed"]:
 				b.add_theme_stylebox_override(st, UIKit.box(Color("f2f4f7"), Color("f2f4f7"), 1, 2, pad))
-			for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+			for k: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
 				b.add_theme_color_override(k, UIKit.INK)
 		else:
 			b.add_theme_stylebox_override("normal", UIKit.box(Color(0.02, 0.035, 0.08, 0.55), Color(0, 0, 0, 0), 0, 2, pad))
 			b.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.14), Color(0, 0, 0, 0), 0, 2, pad))
 			b.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.26), Color(0, 0, 0, 0), 0, 2, pad))
 			b.add_theme_stylebox_override("disabled", UIKit.box(Color(0.02, 0.035, 0.08, 0.3), Color(0, 0, 0, 0), 0, 2, pad))
-		var val = o[0]
-		b.pressed.connect(func(): if enabled: on.call(val))
+		var val: Variant = o[0]
+		b.pressed.connect(func() -> void: if enabled: on.call(val))
 		flow.add_child(b)
 	return flow
 
@@ -160,7 +160,7 @@ static func select(current: Variant, options: Array, on: Callable) -> OptionButt
 		o.add_item(String(options[i][1]), i)
 		if options[i][0] == current:
 			o.select(i)
-	o.item_selected.connect(func(i): on.call(options[i][0]))
+	o.item_selected.connect(func(i: int) -> void: on.call(options[i][0]))
 	return o
 
 ## ‹ value › of [[value, label], ...] (the references' rows: the pad's left / right steps it, a click on an arrow too).
@@ -225,7 +225,7 @@ static func modal(parent: Node, min_width: int = 460, full_height: bool = false)
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(body)
 	card.add_child(sc)
-	var fit := func():
+	var fit := func() -> void:
 		if is_instance_valid(sc) and is_instance_valid(body):
 			sc.custom_minimum_size.y = minf(body.get_combined_minimum_size().y, maxf(120.0, vp.y - 60.0))
 	body.minimum_size_changed.connect(fit)
@@ -269,7 +269,7 @@ static func close_button(cb: Callable) -> Button:
 	x.text = "✕"
 	x.focus_mode = Control.FOCUS_ALL
 	x.custom_minimum_size = Vector2(44, 44) if UIKit.touch() else Vector2(34, 34)
-	for st in ["normal", "disabled"]:
+	for st: String in ["normal", "disabled"]:
 		x.add_theme_stylebox_override(st, StyleBoxEmpty.new())
 	x.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 0, 3))
 	x.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.24), Color(0, 0, 0, 0), 0, 3))
@@ -320,7 +320,7 @@ static func top_bar(opts: Dictionary) -> Control:
 		back.add_theme_font_override("font", UIKit.font(false, 500))
 		back.add_theme_font_size_override("font_size", 34)
 		back.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
-		for st in ["normal", "disabled"]:
+		for st: String in ["normal", "disabled"]:
 			back.add_theme_stylebox_override(st, UIKit.box(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 2, Vector2(4, -4)))
 		back.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 0, 2, Vector2(4, -4)))
 		back.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.24), Color(0, 0, 0, 0), 0, 2, Vector2(4, -4)))
@@ -345,7 +345,7 @@ static func top_bar(opts: Dictionary) -> Control:
 		right.offset_right = -(18 if touch else 24)
 		right.alignment = BoxContainer.ALIGNMENT_END
 		right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		for c in opts.right:
+		for c: Control in opts.right:
 			if c != null:
 				c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 				right.add_child(c)
@@ -379,12 +379,12 @@ static func top_bar(opts: Dictionary) -> Control:
 static func tabs(items: Array, current: String, on: Callable, small: bool = false) -> HBoxContainer:
 	var row := UIW.hbox(6 if small else 10)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	for it in items:
+	for it: Array in items:
 		var key: String = it[0]
 		var b := TabButton.new(String(it[1]), key == current, small)
 		b.set_meta("key", key)
 		if on.is_valid():
-			b.pressed.connect(func(): on.call(key))
+			b.pressed.connect(func() -> void: on.call(key))
 		row.add_child(b)
 	return row
 
@@ -409,7 +409,7 @@ static func action_bar(note: Control, actions: Array) -> HBoxContainer:
 		row.add_child(note)
 	else:
 		row.add_child(UIW.spacer())
-	for a in actions:
+	for a: Control in actions:
 		if a != null:
 			a.custom_minimum_size = Vector2(maxf(a.custom_minimum_size.x, 168), maxf(a.custom_minimum_size.y, 54 if UIKit.touch() else 46))
 			row.add_child(a)
@@ -458,11 +458,11 @@ static func row(label: String, ctrl: Control, hint: String = "") -> PanelContain
 	ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(ctrl)
 	p.add_child(r)
-	p.mouse_entered.connect(func(): p.add_theme_stylebox_override("panel", lit))
-	p.mouse_exited.connect(func(): if not p.get_global_rect().has_point(p.get_global_mouse_position()): p.add_theme_stylebox_override("panel", normal))
+	p.mouse_entered.connect(func() -> void: p.add_theme_stylebox_override("panel", lit))
+	p.mouse_exited.connect(func() -> void: if not p.get_global_rect().has_point(p.get_global_mouse_position()): p.add_theme_stylebox_override("panel", normal))
 	if ctrl.focus_mode != Control.FOCUS_NONE:
-		ctrl.focus_entered.connect(func(): p.add_theme_stylebox_override("panel", lit))
-		ctrl.focus_exited.connect(func(): p.add_theme_stylebox_override("panel", normal))
+		ctrl.focus_entered.connect(func() -> void: p.add_theme_stylebox_override("panel", lit))
+		ctrl.focus_exited.connect(func() -> void: p.add_theme_stylebox_override("panel", normal))
 	return p
 
 ## A list row: the content over a hairline (entry lists, standings).
@@ -493,7 +493,7 @@ static func stat(label: String, value: String, size: int = 30, colour: Color = U
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var l := UIKit.label(label, 13, UIKit.SOFT, false, 500)
 	var v := UIKit.label(value.to_upper(), size, colour, true, 600)
-	for x in [l, v]:
+	for x: Label in [l, v]:
 		x.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		c.add_child(x)
 	return c
@@ -523,7 +523,7 @@ static func card_button(selected: bool = false, radius: int = UIKit.CARD_RADIUS,
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_ALL
 	var empty := StyleBoxEmpty.new()
-	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+	for st: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		b.add_theme_stylebox_override(st, empty)
 	b.add_theme_stylebox_override("focus", UIKit.focus_ring(radius))
 	var clip := Panel.new()
@@ -537,7 +537,7 @@ static func card_button(selected: bool = false, radius: int = UIKit.CARD_RADIUS,
 	var m := MarginContainer.new()
 	m.name = "content"
 	UIKit.full(m)
-	for s in ["left", "top", "right", "bottom"]:
+	for s: String in ["left", "top", "right", "bottom"]:
 		m.add_theme_constant_override("margin_" + s, pad)
 	m.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(m)
@@ -549,10 +549,10 @@ static func card_button(selected: bool = false, radius: int = UIKit.CARD_RADIUS,
 	var rim_h := _rim(Color.WHITE if selected else Color(1, 1, 1, 0.7), 2 if selected else 1, radius)
 	var rim_p := _rim(Color.WHITE, 2, radius)
 	rim.add_theme_stylebox_override("panel", rim_n)
-	b.mouse_entered.connect(func(): rim.add_theme_stylebox_override("panel", rim_h))
-	b.mouse_exited.connect(func(): rim.add_theme_stylebox_override("panel", rim_n))
-	b.button_down.connect(func(): rim.add_theme_stylebox_override("panel", rim_p))
-	b.button_up.connect(func(): rim.add_theme_stylebox_override("panel", rim_h if b.is_hovered() else rim_n))
+	b.mouse_entered.connect(func() -> void: rim.add_theme_stylebox_override("panel", rim_h))
+	b.mouse_exited.connect(func() -> void: rim.add_theme_stylebox_override("panel", rim_n))
+	b.button_down.connect(func() -> void: rim.add_theme_stylebox_override("panel", rim_p))
+	b.button_up.connect(func() -> void: rim.add_theme_stylebox_override("panel", rim_h if b.is_hovered() else rim_n))
 	b.add_child(rim)
 	return b
 
@@ -652,7 +652,7 @@ class TabButton:
 		var pad := Vector2(10, 8) if is_small else Vector2(12, 10)
 		if UIKit.touch():
 			pad += Vector2(4, 4)
-		for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		for st: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 			add_theme_stylebox_override(st, UIKit.box(Color(1, 1, 1, 0.07) if st == "hover" else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 2, pad))
 		add_theme_stylebox_override("focus", UIKit.focus_ring())
 		add_theme_font_override("font", UIKit.font(true, 600))
@@ -702,7 +702,7 @@ class Switch:
 		disabled = on == null
 		if disabled:
 			modulate.a = 0.45
-		toggled.connect(func(v): create_tween().tween_property(self, "anim", 1.0 if v else 0.0, 0.12))
+		toggled.connect(func(v: bool) -> void: create_tween().tween_property(self, "anim", 1.0 if v else 0.0, 0.12))
 		if on != null:
 			toggled.connect(on)
 
@@ -748,7 +748,7 @@ class Stepper:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if enabled else Control.CURSOR_ARROW
 		var f := UIKit.font(false, 600)
 		var widest := 0.0
-		for o in opts:
+		for o: Array in opts:
 			widest = maxf(widest, f.get_string_size(String(o[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, _fs()).x)
 		custom_minimum_size = Vector2(clampf(widest + 96.0, 180.0, 420.0), 44.0 if UIKit.touch() else 34.0)
 		if on.is_valid():

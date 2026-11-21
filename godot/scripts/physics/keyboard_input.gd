@@ -18,7 +18,7 @@ func process_event(e: InputEvent) -> void:
 		_pressed[e.physical_keycode] = true
 
 func held(action: String) -> bool:
-	for code in bindings.get(action, []):
+	for code: String in bindings.get(action, []):
 		var k := KeyMap.key_of(code)
 		if k != KEY_NONE and Input.is_physical_key_pressed(k):
 			return true
@@ -26,7 +26,7 @@ func held(action: String) -> bool:
 
 ## True once per key press. Call end_frame() after reading.
 func tapped(action: String) -> bool:
-	for code in bindings.get(action, []):
+	for code: String in bindings.get(action, []):
 		var k := KeyMap.key_of(code)
 		if k != KEY_NONE and _pressed.has(k):
 			return true

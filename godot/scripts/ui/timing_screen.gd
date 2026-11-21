@@ -26,21 +26,21 @@ func set_shown(v: bool) -> void:
 
 ## info(id) -> {nick, car, colour, bot}. list: the standings.
 func update_list(list: Array, me_id: String, info: Callable) -> void:
-	var key := "|".join(list.map(func(r): return "%s%s%s%s%s%s%s%s%s%s" % [r.id, r.position, r.bestLapMs, r.lastLapMs, r.laps, r.inPit, r.outLap, r.lapPenaltyMs, r.penaltyMs, r.finishedMs]))
+	var key := "|".join(list.map(func(r: Dictionary) -> String: return "%s%s%s%s%s%s%s%s%s%s" % [r.id, r.position, r.bestLapMs, r.lastLapMs, r.laps, r.inPit, r.outLap, r.lapPenaltyMs, r.penaltyMs, r.finishedMs]))
 	if key == _key:
 		return
 	_key = key
 	for c in _grid.get_children():
 		c.queue_free()
-	for h in [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Best lap"), I18n.t("Gap"), I18n.t("Last lap"), "S1", "S2", "S3", I18n.t("Laps"), I18n.t("Penalties"), I18n.t("Status")]:
+	for h: String in [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Best lap"), I18n.t("Gap"), I18n.t("Last lap"), "S1", "S2", "S3", I18n.t("Laps"), I18n.t("Penalties"), I18n.t("Status")]:
 		_grid.add_child(UIKit.label(h.to_upper(), 12, UIKit.MUTED, true, 700))
 	# fastest sector of the session (purple)
 	var best := [INF, INF, INF]
-	for r in list:
-		for i in r.bestSectors.size():
+	for r: Dictionary in list:
+		for i: int in r.bestSectors.size():
 			best[i] = minf(best[i], r.bestSectors[i])
 	var purple := Color("c77dff")
-	for r in list:
+	for r: Dictionary in list:
 		var inf: Dictionary = info.call(r.id)
 		var status: String
 		var scol: Color
@@ -71,7 +71,7 @@ func update_list(list: Array, me_id: String, info: Callable) -> void:
 		_grid.add_child(UIKit.label("" if r.bestLapMs == null or r.position == 1 or r.gapMs == null else "+%.3f" % (r.gapMs / 1000.0), 15, UIKit.MUTED, true, 700))
 		_grid.add_child(UIKit.label("" if r.lastLapMs == null else UIKit.fmt_lap(r.lastLapMs), 15, base, true, 700))
 		for k in 3:
-			var s = r.bestSectors[k] if k < r.bestSectors.size() else null
+			var s: Variant = r.bestSectors[k] if k < r.bestSectors.size() else null
 			_grid.add_child(UIKit.label("" if s == null else "%.3f" % (s / 1000.0), 15, purple if s != null and s <= best[k] else base, true, 700))
 		_grid.add_child(UIKit.label(str(r.laps), 15, base, true, 700))
 		_grid.add_child(UIKit.label("+%.1f s" % (r.penaltyMs / 1000.0) if r.penaltyMs > 0 else "", 15, UIKit.MUTED, true, 700))

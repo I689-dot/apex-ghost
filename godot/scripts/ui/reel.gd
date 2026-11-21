@@ -23,7 +23,7 @@ func _init(reel_shots: Array, opts: Dictionary = {}) -> void:
 	UIKit.full(self)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
-	for s in shots:
+	for s: Dictionary in shots:
 		var item := Control.new()
 		UIKit.full(item)
 		item.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -62,7 +62,7 @@ func _init(reel_shots: Array, opts: Dictionary = {}) -> void:
 		_items.append(item)
 	# letterbox bars, a vignette
 	if bars:
-		for top in [true, false]:
+		for top: bool in [true, false]:
 			var bar := ColorRect.new()
 			bar.color = Color.BLACK
 			bar.mouse_filter = Control.MOUSE_FILTER_IGNORE

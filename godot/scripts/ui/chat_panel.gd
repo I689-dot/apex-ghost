@@ -22,7 +22,7 @@ func _init() -> void:
 	_input.custom_minimum_size = Vector2(360, 0)
 	_input.visible = false
 	_input.text_submitted.connect(_on_submit)
-	_input.gui_input.connect(func(e: InputEvent):
+	_input.gui_input.connect(func(e: InputEvent) -> void:
 		if e is InputEventKey and e.pressed and e.keycode == KEY_ESCAPE:
 			close()
 			get_viewport().set_input_as_handled())

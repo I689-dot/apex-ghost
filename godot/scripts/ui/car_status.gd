@@ -110,17 +110,17 @@ var _lines_zones: Array = []
 func _show_lines(zones: Array) -> void:
 	if art.lines == null:
 		return
-	var zc: Array = zones.map(func(z): return CarLineArt.damage_colour(z))
+	var zc: Array = zones.map(func(z: float) -> Color: return CarLineArt.damage_colour(z))
 	art.draw(zc, [zc[0], zc[0], zc[1], zc[1]])
 
 ## temps: FL, FR, RL, RR (C); zones: front, rear, left, right, engine (0..1).
-func update_status(temps: Array, zones, abs_on: bool, tc_on: bool, compound: String, wear: Array, brakes: Array = []) -> void:
-	var t: Array = temps.map(func(x): return roundi(x))
+func update_status(temps: Array, zones: Array, abs_on: bool, tc_on: bool, compound: String, wear: Array, brakes: Array = []) -> void:
+	var t: Array = temps.map(func(x: float) -> int: return roundi(x))
 	var z: Array = []
 	for i in 5:
 		z.append(roundi((zones[i] if i < zones.size() else 0.0) * 20.0) / 20.0)
-	var wr: Array = wear.map(func(x): return roundi(x * 50.0))
-	var bk: Array = brakes.map(func(b): return "c" if b < 200.0 else ("o" if b <= 700.0 else ("h" if b <= 850.0 else "f")))
+	var wr: Array = wear.map(func(x: float) -> int: return roundi(x * 50.0))
+	var bk: Array = brakes.map(func(b: float) -> String: return "c" if b < 200.0 else ("o" if b <= 700.0 else ("h" if b <= 850.0 else "f")))
 	var key := "%s|%s|%s%s|%s|%s|%s" % [t, z, abs_on, tc_on, compound, wr, bk]
 	if key == _key:
 		return
@@ -130,7 +130,7 @@ func update_status(temps: Array, zones, abs_on: bool, tc_on: bool, compound: Str
 	_abs = abs_on
 	_tc = tc_on
 	_compound = compound
-	_wear = wr.map(func(x): return minf(1.0, x / 50.0))
+	_wear = wr.map(func(x: int) -> float: return minf(1.0, x / 50.0))
 	var cmap := {"c": Color("5ec8ff"), "o": Color("30d158"), "h": Color("ff9f0a"), "f": Color("ff453a")}
 	for i in 4:
 		_brake_cols[i] = cmap[bk[i] if i < bk.size() else "c"]
@@ -200,7 +200,7 @@ func _draw() -> void:
 	var tc_c := on if _tc else off
 	var tp := pad + Vector2(98, 92) * _scale
 	draw_polyline(PackedVector2Array([tp + Vector2(3, 9) * _scale, tp + Vector2(5, 4) * _scale, tp + Vector2(13, 4) * _scale, tp + Vector2(15, 9) * _scale, tp + Vector2(15, 12) * _scale, tp + Vector2(3, 12) * _scale, tp + Vector2(3, 9) * _scale]), tc_c, 1.4 * _scale * 0.6, true)
-	for sx in [4.0, 9.0, 14.0]:
+	for sx: float in [4.0, 9.0, 14.0]:
 		draw_line(tp + Vector2(sx, 14) * _scale, tp + Vector2(sx + 1.0, 18) * _scale, tc_c, 1.4 * _scale * 0.6, true)
 	# caption
 	var cap := I18n.t("TYRES °C · DAMAGE")

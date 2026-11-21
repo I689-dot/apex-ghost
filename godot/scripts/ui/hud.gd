@@ -291,7 +291,7 @@ func _apply_layout(scales: bool) -> void:
 	if L.is_empty():
 		return
 	var all := blocks()
-	for k in L:
+	for k: String in L:
 		var b: Control = all.get(k)
 		if b == null or typeof(L[k]) != TYPE_DICTIONARY:
 			continue
@@ -348,7 +348,7 @@ func _stack_banners() -> void:
 		y = 6.0 * clampf(s.y / 400.0, 1.0, 4.0) + 40.0 * clampf(s.y / 400.0, 1.0, 4.0) + 8.0
 	if _mirror_on:
 		y = maxf(y, RearMirror.screen_rect(s).end.y + 8.0)
-	for p in [_flag_panel, _fin_panel, _pit_panel, _msg_panel]:
+	for p: Control in [_flag_panel, _fin_panel, _pit_panel, _msg_panel]:
 		if not p.visible:
 			continue
 		var m: Vector2 = p.get_combined_minimum_size()
@@ -386,7 +386,7 @@ func set_spectating(on: bool) -> void:
 	_bc.visible = not on
 	damage_panel.visible = false
 
-func set_driver(id: String, country, num) -> void:
+func set_driver(id: String, country: Variant, num: Variant) -> void:
 	drivers[id] = {"country": country, "num": num}
 
 func draw_map(dots: Array, me_x: float, me_z: float, fx: float, fz: float) -> void:
@@ -409,7 +409,7 @@ func set_relative(rows: Array, left: bool, right: bool) -> void:
 func update_damage(d: DamageState, hold: bool) -> void:
 	damage_panel.update_damage(d, hold)
 
-static func fmt_time(ms) -> String:
+static func fmt_time(ms: Variant) -> String:
 	if ms == null or is_nan(float(ms)):
 		return "--:--.---"
 	var neg: bool = ms < 0.0
@@ -454,7 +454,7 @@ func update_state(s: Dictionary) -> void:
 	_cur.text = fmt_time(s.currentLapMs)
 	_best.text = fmt_time(s.bestLapMs)
 	_last.text = fmt_time(s.lastLapMs)
-	var d = s.liveDelta if s.liveDelta != null else s.sectorDelta
+	var d: Variant = s.liveDelta if s.liveDelta != null else s.sectorDelta
 	if d == null:
 		_delta.text = ""
 	else:
@@ -492,7 +492,7 @@ func update_state(s: Dictionary) -> void:
 	var key := "%s|%s|%s|%s|%s|%s|%s|%s" % [hs.scale, hs.opacity, hs.timing, hs.lapInfo, hs.tyres, hs.revLights, hs.messages, hs.map]
 	if key != _hud_key:
 		_hud_key = key
-		for c in [_tl, _tr, _bc, _br, _bl, damage_panel]:
+		for c: Control in [_tl, _tr, _bc, _br, _bl, damage_panel]:
 			c.modulate.a = float(hs.opacity)
 		_board.get_parent().visible = hs.timing
 		_times_grid.visible = hs.lapInfo
@@ -547,7 +547,7 @@ func _tower_rows(list: Array, me: String) -> Array:
 	for k in range(i - 2, i + 3):
 		if k >= 0 and k < list.size():
 			keep[k] = true
-	var idx: Array = keep.keys().filter(func(k): return k < list.size())
+	var idx: Array = keep.keys().filter(func(k: int) -> bool: return k < list.size())
 	idx.sort()
 	var out: Array = []
 	for j in idx.size():
@@ -563,7 +563,7 @@ func _chip_row(id: String) -> HBoxContainer:
 	chip.color = Color(colors.get(id, "#888888"))
 	chip.custom_minimum_size = Vector2(3, 14)
 	row.add_child(chip)
-	var d = drivers.get(id)
+	var d: Variant = drivers.get(id)
 	if d != null and d.num:
 		var plate := PanelContainer.new()
 		plate.add_theme_stylebox_override("panel", UIKit.box(Color("f2f2f2"), Color(0, 0, 0, 0), 0, 3, Vector2(3, 0)))
@@ -589,7 +589,7 @@ func _board_row(pos_text: String, id: String, name_text: String, extra: Array, e
 	mid.add_theme_constant_override("separation", 4)
 	mid.add_child(_chip_row(id))
 	mid.add_child(UIKit.label(name_text, 14, Color.WHITE, false, 500))
-	for e in extra:
+	for e: Control in extra:
 		mid.add_child(e)
 	row.add_child(mid)
 	row.add_child(UIKit.label(em_text, 12, Color("c77dff") if p1 else UIKit.MUTED, false, 700 if p1 else 500))
@@ -606,13 +606,13 @@ func set_board(list: Array, me: String, names: Dictionary) -> void:
 		_set_race_board(list, me, names)
 		return
 	var rows := _tower_rows(list, me)
-	var key := "|".join(rows.map(func(r): return "-" if r == null else "%s%s%s%s%s%s%s%s" % [r.id, r.position, r.bestLapMs, r.finishedMs, r.dnf, r.inPit, r.outLap, r.lapPenaltyMs]))
+	var key := "|".join(rows.map(func(r: Variant) -> String: return "-" if r == null else "%s%s%s%s%s%s%s%s" % [r.id, r.position, r.bestLapMs, r.finishedMs, r.dnf, r.inPit, r.outLap, r.lapPenaltyMs]))
 	if key == _board_key:
 		return
 	_board_key = key
 	for c in _board.get_children():
 		c.queue_free()
-	for r in rows:
+	for r: Variant in rows:
 		if r == null:
 			var gap := ColorRect.new()
 			gap.color = Color(1, 1, 1, 0.18)
@@ -645,13 +645,13 @@ func _set_race_board(list: Array, me: String, names: Dictionary) -> void:
 		if leader_laps - r.laps >= 2 or (leader_laps - r.laps == 1 and (r.gapMs if r.gapMs != null else 0.0) > 60000.0):
 			return "+%d %s" % [leader_laps - r.laps, I18n.t("LAP")]
 		return "+%.1f" % ((r.gapMs if r.gapMs != null else 0.0) / 1000.0)
-	var key := "|".join(rows.map(func(r): return "-" if r == null else "%s%s%s%s" % [r.id, r.position, text_of.call(r), r.inPit]))
+	var key := "|".join(rows.map(func(r: Variant) -> String: return "-" if r == null else "%s%s%s%s" % [r.id, r.position, text_of.call(r), r.inPit]))
 	if key == _board_key:
 		return
 	_board_key = key
 	for c in _board.get_children():
 		c.queue_free()
-	for r in rows:
+	for r: Variant in rows:
 		if r == null:
 			var gap := ColorRect.new()
 			gap.color = Color(1, 1, 1, 0.18)

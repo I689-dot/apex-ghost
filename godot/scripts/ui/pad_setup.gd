@@ -40,7 +40,7 @@ func _init(pad: GamepadInput) -> void:
 	add_child(row)
 	var wrow := UIW.hbox(8)
 	wrow.add_child(UIKit.button(I18n.t("Skip"), _next))
-	wrow.add_child(UIKit.button(I18n.t("Cancel"), func(): _finish(false)))
+	wrow.add_child(UIKit.button(I18n.t("Cancel"), func() -> void: _finish(false)))
 	_wizard.add_child(_prompt)
 	_wizard.add_child(wrow)
 	_wizard.visible = false
@@ -104,7 +104,7 @@ func _begin() -> void:
 	_device = d
 	_key = PadMap.pad_key(Input.get_joy_name(d))
 	# skipped steps keep what the pad does now
-	var cur = Settings.data.pad.layouts.get(_key, null)
+	var cur: Variant = Settings.data.pad.layouts.get(_key, null)
 	if cur != null:
 		_layout = cur.duplicate(true)
 	else:
@@ -150,7 +150,7 @@ func _process(_dt: float) -> void:
 	for k in rb.size():
 		if rb[k]:
 			raw_b.append(str(k))
-	var raw_a := _raw_axes(d).map(func(x): return "%.2f" % x)
+	var raw_a := _raw_axes(d).map(func(x: float) -> String: return "%.2f" % x)
 	_live.text = "%s %.2f · %s %.2f · %s %.2f — %s: %s · %s: %s" % [
 		I18n.t("Throttle"), v.buttons[7].value, I18n.t("Brake"), v.buttons[6].value, I18n.t("Steer"), v.axes[0],
 		I18n.t("raw buttons"), " ".join(raw_b) if not raw_b.is_empty() else "–", I18n.t("axes"), " ".join(raw_a)]
@@ -165,7 +165,7 @@ func _learn(d: int) -> void:
 			return
 		if _held.has("a") and absf(a[_held.a] - _held.from) < 0.5:
 			return
-		if b.any(func(x): return x):
+		if b.any(func(x: bool) -> bool: return x):
 			return
 		var moving := false
 		for k in a.size():
@@ -177,7 +177,7 @@ func _learn(d: int) -> void:
 			return
 		# rest: a trigger on an axis rests at ±1, a stick or a hat at 0
 		var rest: Array = []
-		for v in a:
+		for v: float in a:
 			rest.append(signf(v) if absf(v) > 0.8 else (0.0 if absf(v) < 0.2 else v))
 		_base = {"b": b, "a": rest}
 		_wait_release = false
