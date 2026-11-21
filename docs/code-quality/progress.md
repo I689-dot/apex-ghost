@@ -5,8 +5,19 @@ together with `git log`.
 
 ## State
 
-- **Phase:** batch 3 (typing) is in progress (2026-11-21). Done: input, physics, audio, net, shared, ui. Left:
-  game/ (486 places, 163 of them in race_session.gd) and app/ (about 795, most of them lambdas). Then check-in 2.
+- **Phase:** batch 3 (typing) is in progress (2026-11-21). Done: input, physics, audio, net, shared, ui, game.
+  Left: app/ (about 795 places, most of them lambdas). Then check-in 2.
+- **Found while checking game/'s typing** (not fixed, for check-in 2):
+  - **A bot can stay in its pit box until the end of the race**, with pitWindow, raceControl, contact and fuel on
+    (Zandvoort, 4 laps). It happened both after the typing and with game/ as it was before it, so it is not the
+    typing.
+  - **race_test's "finishers in order of their race time" check ignores laps.** A finisher a lap down has a lower
+    total, so the check fails whenever a car is lapped (it failed after the typing, passed before by chance). It is
+    a test, so it is the user's call.
+  - **My car dedupe (0cf4ad1) broke the safety car's middle model.** aston_martin_vantage_safety_car in
+    data/cars.json still points at vantage_gt3_evo_heart_of_racing/lod1.glb, which the dedupe removed ("Resource
+    file not found" in every race with a safety car). The fix is in godot/data (outside this job): point it at
+    lod0.glb, as the Vantage's own entry does.
 - **Typing rules used (keep them for game/ and app/):**
   - A precise type only where the value's type is certain from the code. A JSON value, a "TS number|null" field or
     an optional argument is an explicit `Variant`.
@@ -24,6 +35,14 @@ together with `git log`.
   - `93b5344` input, physics, audio (2,433 → 2,383).
   - `fb6fc0b` net, shared (→ 2,133).
   - `8e8a302` ui (→ 1,934).
+  - `6b8761f` game/, the mechanical part (→ 1,814).
+  - `18a79a4` game/'s smaller scripts (→ 1,659).
+  - `9cf08aa` race_session, car_visual, track_scene, spa_look (→ 1,449).
+- **Kept Variant on purpose:**
+  - A loop over objects that may already be freed. The replay's saved visuals are checked with is_instance_valid,
+    and a typed variable refuses a freed object.
+  - car_visual's `_inside`: null until set_inside() first runs. As a bool it would start false and skip the first
+    call.
 - **audiotest's bus count is not deterministic.** The engine voices' buses are freed on real-time timers: once
   under load it printed 8, otherwise 9. compare.sh leaves it out (`754efb1`).
 - **Size and warnings after batch 2:**
