@@ -51,7 +51,7 @@ static func _pct(v: float) -> String:
 	return "%d %%" % roundi(v * 100.0)
 
 static func _group_of(page: String) -> Array:
-	for g in GROUPS:
+	for g: Array in GROUPS:
 		if (g[2] as Array).has(page):
 			return g
 	return GROUPS[0]
@@ -112,15 +112,15 @@ static func build(app: App, on_change: Callable) -> Control:
 	var bar := {}
 	# (a lambda captures by value: it reaches itself through this dictionary, else it calls an empty Callable)
 	var _self := {}
-	_self.show = func(key: String):
+	_self.show = func(key: String) -> void:
 		_tab = key
 		var grp := _group_of(key)
-		for b in (bar.tabs.get_children() if bar.has("tabs") and bar.tabs != null else []):
+		for b: UIW.TabButton in (bar.tabs.get_children() if bar.has("tabs") and bar.tabs != null else []):
 			b.set_active(b.get_meta("key") == grp[0])
 		for c in sub_row.get_children():
 			c.queue_free()
 		if (grp[2] as Array).size() > 1:
-			sub_row.add_child(UIW.tabs((grp[2] as Array).map(func(k): return [k, page_label[k]]), key, func(k): _self.show.call(k), true))
+			sub_row.add_child(UIW.tabs((grp[2] as Array).map(func(k: String) -> Array: return [k, page_label[k]]), key, func(k: String) -> void: _self.show.call(k), true))
 		for c in holder.get_children():
 			c.queue_free()
 		_help_title.text = String(page_label[key]).to_upper()
@@ -163,13 +163,13 @@ static func build(app: App, on_change: Callable) -> Control:
 		var sc := UIW.scroll(UIW.margins(col, 0, 0, 14, 12))
 		holder.add_child(sc)
 	var on_group := func(g: String) -> void:
-		for grp in GROUPS:
+		for grp: Array in GROUPS:
 			if grp[0] == g:
 				_self.show.call(grp[2][0])
 				UIW.focus_first.call_deferred(holder)
 	var top := UIW.top_bar({
 		"title": I18n.t("Settings"), "back": close,
-		"tabs": GROUPS.map(func(g): return [g[0], I18n.t(g[1])]), "tab": "", "on_tab": on_group, "tabs_left": touch,
+		"tabs": GROUPS.map(func(g: Array) -> Array: return [g[0], I18n.t(g[1])]), "tab": "", "on_tab": on_group, "tabs_left": touch,
 	})
 	# the tab row is the bar's own: found once to light the current group
 	bar.tabs = _find_tabs(top)
@@ -191,7 +191,7 @@ static func build(app: App, on_change: Callable) -> Control:
 	root.add_child(scr)
 	var start: String = RENAMED.get(_tab, _tab)
 	var ok := false
-	for g in GROUPS:
+	for g: Array in GROUPS:
 		if (g[2] as Array).has(start):
 			ok = true
 	_self.show.call(start if ok else "graphics")
@@ -250,7 +250,7 @@ static func _row(label: String, ctrl: Control, hint: String = "") -> Control:
 			p.add_theme_stylebox_override("panel", normal)
 	p.mouse_entered.connect(on)
 	p.mouse_exited.connect(off)
-	for c in _focusables(ctrl):
+	for c: Control in _focusables(ctrl):
 		c.focus_entered.connect(on)
 		c.focus_exited.connect(off)
 	return p
@@ -265,14 +265,14 @@ static func _focusables(c: Control) -> Array:
 	return out
 
 static func _toggle(col: Control, label: String, hint: String, d: Dictionary, key: String, changed: Callable) -> void:
-	var sw := UIW.switch(d[key], func(v): d[key] = v; changed.call())
+	var sw := UIW.switch(d[key], func(v: bool) -> void: d[key] = v; changed.call())
 	col.add_child(_row(label, sw, hint))
 
 static func _range(col: Control, label: String, hint: String, d: Dictionary, key: String, lo: float, hi: float, step: float, fmt: Callable, changed: Callable) -> void:
 	var out := UIKit.label(fmt.call(d[key]), 16, UIKit.TEXT, false, 600)
 	out.custom_minimum_size = Vector2(76, 0)
 	out.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	var s := UIW.slider(d[key], lo, hi, step, func(v): d[key] = v; out.text = fmt.call(v); changed.call())
+	var s := UIW.slider(d[key], lo, hi, step, func(v: float) -> void: d[key] = v; out.text = fmt.call(v); changed.call())
 	s.custom_minimum_size = Vector2(240, 30)
 	var box := UIW.hbox(10)
 	box.add_child(s)
@@ -280,8 +280,8 @@ static func _range(col: Control, label: String, hint: String, d: Dictionary, key
 	col.add_child(_row(label, box, hint))
 
 static func _select(col: Control, label: String, hint: String, d: Dictionary, key: String, options: Array, changed: Callable, cast: Callable = Callable()) -> void:
-	var cur = d[key]
-	var o := UIW.stepper(str(cur), options, func(v): d[key] = cast.call(v) if cast.is_valid() else v; changed.call())
+	var cur: Variant = d[key]
+	var o := UIW.stepper(str(cur), options, func(v: Variant) -> void: d[key] = cast.call(v) if cast.is_valid() else v; changed.call())
 	col.add_child(_row(label, o, hint))
 
 ## A section's heading (a gap above all but the first).
@@ -295,7 +295,7 @@ static func _head(col: Control, text: String) -> void:
 ## Buttons under a section, on the left.
 static func _buttons(col: Control, buttons: Array) -> void:
 	var row := UIW.hbox(8)
-	for b in buttons:
+	for b: Control in buttons:
 		row.add_child(b)
 	col.add_child(UIW.margins(row, 0, 10, 0, 4))
 
@@ -307,7 +307,7 @@ static func _levels() -> Array:
 ## A graphics override row: "Preset" follows the preset; any other level takes that preset's values for the group.
 static func _override(col: Control, label: String, hint: String, key: String, options: Array, cast: Callable, changed: Callable) -> void:
 	var g: Dictionary = Settings.data.graphics
-	col.add_child(_row(label, UIW.stepper(str(g.get(key, "")), options, func(v):
+	col.add_child(_row(label, UIW.stepper(str(g.get(key, "")), options, func(v: Variant) -> void:
 		if v == "":
 			g.erase(key)
 		else:
@@ -334,20 +334,20 @@ static func _graphics(col: Control, changed: Callable, show: Callable) -> void:
 	_buttons(col, [UIKit.button(I18n.t("Back to the preset"), func() -> void:
 		S.graphics = {}
 		changed.call()
-		show.call("graphics")), UIKit.button(I18n.t("Detect for this device"), func():
+		show.call("graphics")), UIKit.button(I18n.t("Detect for this device"), func() -> void:
 		S.quality = Settings.detect_quality()
 		S.graphics = {}
 		changed.call()
 		show.call("graphics"))])
-	for sec in SECTIONS:
+	for sec: Array in SECTIONS:
 		_head(col, I18n.t(sec[0]))
-		for grp in sec[1]:
+		for grp: Array in sec[1]:
 			_override(col, I18n.t(grp[1]), I18n.t(grp[2]), grp[0], _levels(), Callable(), on_change)
 		if sec[0] == "Image quality":
 			_override(col, I18n.t("Anti-aliasing"), I18n.t("TAA smooths jagged distant edges, fences and shimmering textures best"), "antialias",
 				[["", I18n.t("Preset")], ["native", I18n.t("MSAA (fast)")], ["msaa", I18n.t("MSAA 4×")], ["smaa", I18n.t("SMAA")], ["taa", I18n.t("TAA (smoothest)")]], Callable(), on_change)
 			_override(col, I18n.t("Supersampling"), I18n.t("Renders above your screen resolution and scales down: the sharpest, cleanest picture, at a big cost"), "superSample",
-				[["", I18n.t("Preset")], ["1", I18n.t("Off")], ["1.25", "1.25×"], ["1.5", "1.5×"], ["2", I18n.t("2× (4 × the pixels)")]], func(v): return float(v), on_change)
+				[["", I18n.t("Preset")], ["1", I18n.t("Off")], ["1.25", "1.25×"], ["1.5", "1.5×"], ["2", I18n.t("2× (4 × the pixels)")]], func(v: Variant) -> float: return float(v), on_change)
 		if sec[0] == "Your car":
 			_toggle(col, I18n.t("Rear-view mirror"), I18n.t("What is behind you, at the top of the screen"), S, "mirror", changed)
 		if sec[0] == "Other cars":
@@ -373,28 +373,28 @@ static func _display(col: Control, changed: Callable) -> void:
 			for i in DisplayServer.get_screen_count():
 				var sz := DisplayServer.screen_get_size(i)
 				screens.append([str(i), I18n.t("Screen {n} ({w} × {h})", {"n": i + 1, "w": sz.x, "h": sz.y})])
-			_select(col, I18n.t("Monitor"), I18n.t("Which screen the game opens on"), d, "screen", screens, changed, func(v): return int(v))
+			_select(col, I18n.t("Monitor"), I18n.t("Which screen the game opens on"), d, "screen", screens, changed, func(v: Variant) -> int: return int(v))
 			_head(col, I18n.t("Triple screens"))
 			_select(col, I18n.t("Side screens"), I18n.t("While racing, the monitors beside the game's carry the view on, each a window of its own (from the next race)"), d, "sideScreens", [["off", I18n.t("Off")], ["both", I18n.t("Left and right")], ["left", I18n.t("Left only")], ["right", I18n.t("Right only")]], changed)
 			var angles: Array = [["0", I18n.t("Automatic (views meet edge to edge)")]]
 			for a in range(30, 95, 5):
 				angles.append([str(a), "%d°" % a])
-			_select(col, I18n.t("Side screen angle"), I18n.t("How far round each side view is turned: match how your side monitors are angled"), d, "sideAngle", angles, changed, func(v): return int(v))
+			_select(col, I18n.t("Side screen angle"), I18n.t("How far round each side view is turned: match how your side monitors are angled"), d, "sideAngle", angles, changed, func(v: Variant) -> int: return int(v))
 	_head(col, I18n.t("Frame rate"))
 	var caps: Array = [["0", I18n.t("No limit")]]
 	for r: int in [30, 45, 60, 90, 120, 144, 165, 240]:
 		if r <= maxi(hz, 60) + 2 or r == 30:
 			caps.append([str(r), "%d fps" % r])
-	_select(col, I18n.t("Frame rate limit"), I18n.t("Lower: cooler and quieter, longer on a battery"), d, "maxFps", caps, changed, func(v): return int(v))
+	_select(col, I18n.t("Frame rate limit"), I18n.t("Lower: cooler and quieter, longer on a battery"), d, "maxFps", caps, changed, func(v: Variant) -> int: return int(v))
 	var rates: Array = [[str(45), "45 fps"], [str(60), "60 fps"]]
 	for r: int in [90, 120, 144]:
 		if hz >= r - 2:
 			rates.append([str(r), "%d fps" % r])
 	_toggle(col, I18n.t("Dynamic resolution"), I18n.t("Lowers the resolution for a moment when the frame rate falls under the target"), S, "dynamicResolution", changed)
-	_select(col, I18n.t("Dynamic resolution target"), "", S, "refreshRate", rates, changed, func(v): return int(v))
+	_select(col, I18n.t("Dynamic resolution target"), "", S, "refreshRate", rates, changed, func(v: Variant) -> int: return int(v))
 	_head(col, I18n.t("Resolution"))
 	_range(col, I18n.t("Resolution scale"), I18n.t("The 3D picture's resolution against the screen's (the HUD stays sharp)"), S, "resolutionScale", 0.5, 1.0, 0.05, _pct, changed)
-	_select(col, I18n.t("Upscaling"), I18n.t("How a picture under 100 % is brought to the screen: FSR keeps it sharper"), d, "upscaler", Graphics.upscalers().map(func(o): return [o[0], I18n.t(o[1])]), changed)
+	_select(col, I18n.t("Upscaling"), I18n.t("How a picture under 100 % is brought to the screen: FSR keeps it sharper"), d, "upscaler", Graphics.upscalers().map(func(o: Array) -> Array: return [o[0], I18n.t(o[1])]), changed)
 	_head(col, I18n.t("Menus"))
 	if not d.has("menuLayout"):
 		d.menuLayout = "auto"
@@ -425,7 +425,7 @@ static func _view(col: Control, changed: Callable) -> void:
 	_range(col, I18n.t("Camera shake"), I18n.t("Kerbs, bumps and a flat-spotted tyre"), S, "cameraShake", 0.0, 1.0, 0.05, _pct, changed)
 	_range(col, I18n.t("Look to apex"), I18n.t("The cockpit view turns into corners with the steering"), S, "lookToApex", 0.0, 2.0, 0.1, _pct, changed)
 	_head(col, I18n.t("Field of view"))
-	_range(col, I18n.t("Field of view"), I18n.t("Vertical, as iRacing and ACC count it: lower is more realistic on a desk monitor"), S, "fov", 25, 95, 1, func(v): return "%d°" % int(v), changed)
+	_range(col, I18n.t("Field of view"), I18n.t("Vertical, as iRacing and ACC count it: lower is more realistic on a desk monitor"), S, "fov", 25, 95, 1, func(v: float) -> String: return "%d°" % int(v), changed)
 	# the calculator: the vertical angle the screen really covers from the eyes (16:9 assumed from its width)
 	var sc: Dictionary = S.screen
 	var result := UIW.muted("", 13)
@@ -435,7 +435,7 @@ static func _view(col: Control, changed: Callable) -> void:
 		return rad_to_deg(2.0 * atan(h / 2.0 / maxf(1.0, float(sc.distanceCm))))
 	var upd := func() -> void:
 		result.text = I18n.t("Your screen covers {v}° of your view vertically.", {"v": "%.0f" % calc.call()})
-	var cm := func(v): return "%d cm" % int(v)
+	var cm := func(v: float) -> String: return "%d cm" % int(v)
 	_range(col, I18n.t("Screen width"), I18n.t("The picture's visible width"), sc, "widthCm", 20, 200, 1, cm, func() -> void: changed.call(); upd.call())
 	_range(col, I18n.t("Eyes to screen"), "", sc, "distanceCm", 30, 200, 1, cm, func() -> void: changed.call(); upd.call())
 	col.add_child(UIW.margins(result, 10, 8, 10, 0))
@@ -445,8 +445,8 @@ static func _view(col: Control, changed: Callable) -> void:
 		changed.call()
 		result.text = I18n.t("Field of view set to {v}°.", {"v": "%d" % int(S.fov)}))])
 	_head(col, I18n.t("Seat"))
-	_range(col, I18n.t("Seat height"), I18n.t("Raise the cockpit camera to see more road"), S, "seatHeight", -0.1, 0.2, 0.01, func(v): return "%s%d cm" % ["+" if v >= 0 else "", roundi(v * 100)], changed)
-	_range(col, I18n.t("Seat position"), I18n.t("Forward / back"), S, "seatForward", -0.25, 0.25, 0.01, func(v): return "%s%d cm" % ["+" if v >= 0 else "", roundi(v * 100)], changed)
+	_range(col, I18n.t("Seat height"), I18n.t("Raise the cockpit camera to see more road"), S, "seatHeight", -0.1, 0.2, 0.01, func(v: float) -> String: return "%s%d cm" % ["+" if v >= 0 else "", roundi(v * 100)], changed)
+	_range(col, I18n.t("Seat position"), I18n.t("Forward / back"), S, "seatForward", -0.25, 0.25, 0.01, func(v: float) -> String: return "%s%d cm" % ["+" if v >= 0 else "", roundi(v * 100)], changed)
 	_head(col, I18n.t("Chase camera"))
 	_range(col, I18n.t("Distance"), "", S.chase, "distance", 0.7, 1.6, 0.05, _pct, changed)
 	_range(col, I18n.t("Height"), "", S.chase, "height", 0.5, 2.0, 0.05, _pct, changed)
@@ -458,7 +458,7 @@ static func _driving(col: Control, changed: Callable, refresh: Callable = Callab
 	col.add_child(_row(I18n.t("Level"), SettingsPages.assist_row(changed, refresh if refresh.is_valid() else func() -> void: pass), I18n.t("Casual: every assist and the full racing line. Standard: ABS, some traction control, braking zones. Expert: as the real car, manual gears, no line. Change any one below for Custom.")))
 	_head(col, I18n.t("Assists"))
 	_toggle(col, I18n.t("ABS"), "", S.assists, "abs", changed)
-	_select(col, I18n.t("Traction control"), "", S.assists, "tc", [["0", I18n.t("Off")], ["1", I18n.t("Low")], ["2", I18n.t("High")]], changed, func(v): return int(v))
+	_select(col, I18n.t("Traction control"), "", S.assists, "tc", [["0", I18n.t("Off")], ["1", I18n.t("Low")], ["2", I18n.t("High")]], changed, func(v: Variant) -> int: return int(v))
 	_toggle(col, I18n.t("Stability control"), "", S.assists, "stability", changed)
 	_toggle(col, I18n.t("Steering assist"), I18n.t("Automatic counter-steer"), S.assists, "steering", changed)
 	_toggle(col, I18n.t("Manual gearbox"), "", S, "manualGearbox", changed)
@@ -523,7 +523,7 @@ static func _controls(col: Control, changed: Callable, show: Callable) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Controls"))
 	col.add_child(UIW.margins(UIW.muted(I18n.t("Click a key, then press the new one. Two keys per action.")), 10, 8, 10, 6))
-	for a in ACTION_LABEL:
+	for a: String in ACTION_LABEL:
 		var keys := UIW.hbox(6)
 		var codes: Array = S.bindings[a]
 		for idx in codes.size():
@@ -539,21 +539,21 @@ static func _controls(col: Control, changed: Callable, show: Callable) -> void:
 static func _key_button(action: String, idx: int, text: String, S: Dictionary, changed: Callable, show: Callable) -> Button:
 	var b := UIKit.button(text)
 	b.custom_minimum_size = Vector2(78, 0)
-	b.pressed.connect(func():
+	b.pressed.connect(func() -> void:
 		b.text = "…"
 		var listener := KeyCapture.new()
 		b.add_child(listener)
-		listener.captured.connect(func(code: String):
+		listener.captured.connect(func(code: String) -> void:
 			listener.queue_free()
 			if code != "":
-				for other in S.bindings:
-					S.bindings[other] = S.bindings[other].filter(func(k): return k != code)
+				for other: String in S.bindings:
+					S.bindings[other] = S.bindings[other].filter(func(k: String) -> bool: return k != code)
 				var list: Array = S.bindings[action].duplicate()
 				if idx < list.size():
 					list[idx] = code
 				else:
 					list.append(code)
-				S.bindings[action] = list.filter(func(k): return k != "")
+				S.bindings[action] = list.filter(func(k: String) -> bool: return k != "")
 			changed.call()
 			show.call("controls")))
 	return b
@@ -570,21 +570,21 @@ class KeyCapture:
 static func _touch(col: Control) -> void:
 	_head(col, I18n.t("Touch"))
 	var steer: Dictionary = {"steer": TouchPrefs.get_pref("steer")}
-	col.add_child(_row(I18n.t("Steering"), UIW.stepper(steer.steer, [["buttons", I18n.t("Arrow buttons")], ["slider", I18n.t("Slider")], ["tilt", I18n.t("Tilt the phone")]], func(v): TouchPrefs.set_pref("steer", v))))
+	col.add_child(_row(I18n.t("Steering"), UIW.stepper(steer.steer, [["buttons", I18n.t("Arrow buttons")], ["slider", I18n.t("Slider")], ["tilt", I18n.t("Tilt the phone")]], func(v: Variant) -> void: TouchPrefs.set_pref("steer", v))))
 	var tr := {"v": TouchPrefs.get_pref("tiltRange")}
 	var out := UIKit.label("%d°" % int(tr.v), 15, UIKit.MUTED)
-	var s := UIW.slider(tr.v, 10, 50, 1, func(v): TouchPrefs.set_pref("tiltRange", v); out.text = "%d°" % int(v))
+	var s := UIW.slider(tr.v, 10, 50, 1, func(v: float) -> void: TouchPrefs.set_pref("tiltRange", v); out.text = "%d°" % int(v))
 	var r := UIW.hbox(8)
 	r.add_child(s)
 	r.add_child(out)
 	col.add_child(_row(I18n.t("Tilt range"), r, I18n.t("Tilt angle that gives full steering")))
-	var inv := UIW.switch(TouchPrefs.get_pref("tiltInvert"), func(v): TouchPrefs.set_pref("tiltInvert", v))
+	var inv := UIW.switch(TouchPrefs.get_pref("tiltInvert"), func(v: bool) -> void: TouchPrefs.set_pref("tiltInvert", v))
 	col.add_child(_row(I18n.t("Invert tilt"), inv, I18n.t("Swap the tilt direction")))
-	var sz := UIW.slider(TouchPrefs.get_pref("size"), 0.8, 1.3, 0.05, func(v): TouchPrefs.set_pref("size", v))
+	var sz := UIW.slider(TouchPrefs.get_pref("size"), 0.8, 1.3, 0.05, func(v: float) -> void: TouchPrefs.set_pref("size", v))
 	col.add_child(_row(I18n.t("Pedal size"), sz))
-	var op := UIW.slider(TouchPrefs.get_pref("opacity"), 0.25, 1.0, 0.05, func(v): TouchPrefs.set_pref("opacity", v))
+	var op := UIW.slider(TouchPrefs.get_pref("opacity"), 0.25, 1.0, 0.05, func(v: float) -> void: TouchPrefs.set_pref("opacity", v))
 	col.add_child(_row(I18n.t("Controls opacity"), op))
-	var hp := UIW.switch(TouchPrefs.get_pref("haptics"), func(v): TouchPrefs.set_pref("haptics", v))
+	var hp := UIW.switch(TouchPrefs.get_pref("haptics"), func(v: bool) -> void: TouchPrefs.set_pref("haptics", v))
 	col.add_child(_row(I18n.t("Vibration"), hp, I18n.t("Short vibration on gear shifts and button presses")))
 
 static func _controller(col: Control, changed: Callable, app: App = null) -> void:
@@ -598,32 +598,32 @@ static func _controller(col: Control, changed: Callable, app: App = null) -> voi
 	_head(col, I18n.t("Steering wheel"))
 	col.add_child(UIW.margins(UIW.muted(I18n.t("Logitech, Thrustmaster, Fanatec, Moza, Simucube and Simagic wheels are recognised. Set the wheel to 900° in its own software and the same here: each car then turns as its real lock allows."), 13), 10, 8, 10, 6))
 	_select(col, I18n.t("Device"), "", S.wheel, "mode", [["auto", I18n.t("Recognise wheels automatically")], ["wheel", I18n.t("Always a steering wheel")], ["pad", I18n.t("Always a gamepad")]], changed)
-	_range(col, I18n.t("Wheel rotation"), I18n.t("Lock to lock, as set on the wheel base: the car's own lock is used within it"), S.wheel, "rotationDeg", 180, 1080, 10, func(v): return "%d°" % int(v), changed)
-	_range(col, I18n.t("Brake pedal curve"), I18n.t("1 = linear; higher = more travel near the locking point (load-cell pedals: about 1)"), S.wheel, "brakeCurve", 0.6, 2.4, 0.1, func(v): return "%.1f" % v, changed)
+	_range(col, I18n.t("Wheel rotation"), I18n.t("Lock to lock, as set on the wheel base: the car's own lock is used within it"), S.wheel, "rotationDeg", 180, 1080, 10, func(v: float) -> String: return "%d°" % int(v), changed)
+	_range(col, I18n.t("Brake pedal curve"), I18n.t("1 = linear; higher = more travel near the locking point (load-cell pedals: about 1)"), S.wheel, "brakeCurve", 0.6, 2.4, 0.1, func(v: float) -> String: return "%.1f" % v, changed)
 	_head(col, I18n.t("Gamepad"))
 	var p: Dictionary = S.pad
-	_range(col, I18n.t("Steering curve"), I18n.t("Higher = finer near the centre, same full lock"), p, "steerCurve", 1.0, 3.0, 0.1, func(v): return "%.1f" % v, changed)
+	_range(col, I18n.t("Steering curve"), I18n.t("Higher = finer near the centre, same full lock"), p, "steerCurve", 1.0, 3.0, 0.1, func(v: float) -> String: return "%.1f" % v, changed)
 	_range(col, I18n.t("Steering speed"), I18n.t("How fast the front wheels follow the stick"), p, "steerSpeed", 0.5, 1.6, 0.05, _pct, changed)
 	_range(col, I18n.t("Speed sensitivity"), I18n.t("Calmer steering at high speed"), p, "speedSens", 0.0, 1.0, 0.05, _pct, changed)
 	_range(col, I18n.t("Stick dead zone"), I18n.t("Raise it if the car drifts with the stick centred"), p, "deadzone", 0.0, 0.25, 0.01, _pct, changed)
-	_range(col, I18n.t("Brake curve"), I18n.t("Higher = more trigger travel near the locking point"), p, "brakeCurve", 1.0, 2.5, 0.1, func(v): return "%.1f" % v, changed)
+	_range(col, I18n.t("Brake curve"), I18n.t("Higher = more trigger travel near the locking point"), p, "brakeCurve", 1.0, 2.5, 0.1, func(v: float) -> String: return "%.1f" % v, changed)
 	_toggle(col, I18n.t("Vibration"), "", p, "vibration", changed)
 	_head(col, I18n.t("Pedals"))
 	_select(col, I18n.t("Pedals on"), "", p, "pedals", [["triggers", I18n.t("Triggers")], ["rightStick", I18n.t("Right stick (up / down)")]], changed)
 	_range(col, I18n.t("Throttle dead zone"), "", p, "throttleDeadzone", 0.0, 0.3, 0.01, _pct, changed)
 	_range(col, I18n.t("Throttle saturation"), I18n.t("Where the trigger reaches 100 %"), p, "throttleSaturation", 0.5, 1.0, 0.01, _pct, changed)
-	_range(col, I18n.t("Throttle curve"), I18n.t("1 = linear; higher = finer at the start"), p, "throttleCurve", 0.6, 2.5, 0.1, func(v): return "%.1f" % v, changed)
+	_range(col, I18n.t("Throttle curve"), I18n.t("1 = linear; higher = finer at the start"), p, "throttleCurve", 0.6, 2.5, 0.1, func(v: float) -> String: return "%.1f" % v, changed)
 	_range(col, I18n.t("Brake dead zone"), "", p, "brakeDeadzone", 0.0, 0.3, 0.01, _pct, changed)
 	_range(col, I18n.t("Brake saturation"), "", p, "brakeSaturation", 0.5, 1.0, 0.01, _pct, changed)
 	_range(col, I18n.t("Steering saturation"), I18n.t("Stick travel for full lock"), p, "steerSaturation", 0.6, 1.0, 0.01, _pct, changed)
-	_range(col, I18n.t("On / off triggers ramp"), I18n.t("Triggers with no travel (Switch Pro): held, they reach full over this time"), p, "digitalRamp", 0.1, 2.0, 0.05, func(v): return "%.2f s" % v, changed)
+	_range(col, I18n.t("On / off triggers ramp"), I18n.t("Triggers with no travel (Switch Pro): held, they reach full over this time"), p, "digitalRamp", 0.1, 2.0, 0.05, func(v: float) -> String: return "%.2f s" % v, changed)
 	_head(col, I18n.t("Keyboard"))
 	var k: Dictionary = S.keyboard
-	_range(col, I18n.t("Throttle ramp"), I18n.t("Time from nothing to full throttle: longer, a tap gives part throttle"), k, "throttleRamp", 0.05, 1.5, 0.05, func(v): return "%.2f s" % v, changed)
-	_range(col, I18n.t("Brake ramp"), I18n.t("Time from nothing to full brake"), k, "brakeRamp", 0.05, 1.5, 0.05, func(v): return "%.2f s" % v, changed)
+	_range(col, I18n.t("Throttle ramp"), I18n.t("Time from nothing to full throttle: longer, a tap gives part throttle"), k, "throttleRamp", 0.05, 1.5, 0.05, func(v: float) -> String: return "%.2f s" % v, changed)
+	_range(col, I18n.t("Brake ramp"), I18n.t("Time from nothing to full brake"), k, "brakeRamp", 0.05, 1.5, 0.05, func(v: float) -> String: return "%.2f s" % v, changed)
 	_range(col, I18n.t("Steering speed"), "", k, "steerSpeed", 0.5, 1.6, 0.05, _pct, changed)
 	_buttons(col, [UIKit.button(I18n.t("Reset the controller settings"), func() -> void:
-		var layouts = S.pad.layouts
+		var layouts: Dictionary = S.pad.layouts
 		S.pad = Settings.default_settings().pad
 		S.pad.layouts = layouts
 		changed.call())])
@@ -634,7 +634,7 @@ static func _packs(col: Control) -> void:
 	_head(col, I18n.t("Downloaded circuits"))
 	if Packs.manifest.is_empty():
 		Packs.refresh()
-	for id in Packs.PROBES:
+	for id: String in Packs.PROBES:
 		var status := UIKit.label("", 15, UIKit.SOFT)
 		var btn := UIKit.button("")
 		var rm := UIKit.button(I18n.t("Remove"))

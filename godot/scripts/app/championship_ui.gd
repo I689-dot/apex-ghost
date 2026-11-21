@@ -54,7 +54,7 @@ static func open(app: App, read_nick: Callable) -> void:
 				main = x
 		picks[main.id] = true
 		var id: String = main.id
-		var sw := UIW.switch(true, func(on): if on: picks[id] = true else: picks.erase(id))
+		var sw := UIW.switch(true, func(on: bool) -> void: if on: picks[id] = true else: picks.erase(id))
 		list.add_child(UIW.row("%s · %.2f km" % [I18n.t(LobbyScreen.CIRCUIT_NAME.get(key, main.name)), float(main.length) / 1000.0], sw))
 	body.add_child(list)
 	var laps := [5]

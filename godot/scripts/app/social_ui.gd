@@ -180,7 +180,7 @@ static func _sign_in_form(body: VBoxContainer, on_done: Callable, on_unreachable
 	var submit := UIKit.button(I18n.t("Sign in").to_upper(), Callable(), false)
 	body.add_child(UIW.field(I18n.t("Nickname"), nick))
 	body.add_child(UIW.field(I18n.t("Password"), pw))
-	body.add_child(UIW.row(I18n.t("Show password"), UIW.switch(false, func(on): pw.secret = not on)))
+	body.add_child(UIW.row(I18n.t("Show password"), UIW.switch(false, func(on: bool) -> void: pw.secret = not on)))
 	body.add_child(err)
 	var go := func() -> void:
 		err.text = ""

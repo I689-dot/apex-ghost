@@ -36,10 +36,10 @@ static func back_page() -> bool:
 	return true
 
 static func _cars(app: App) -> Array:
-	return app.cars.cars.filter(func(c): return c.role != "safety")
+	return app.cars.cars.filter(func(c: Dictionary) -> bool: return c.role != "safety")
 
 static func _car_by_id(cars: Array, id: Variant) -> Dictionary:
-	for c in cars:
+	for c: Dictionary in cars:
 		if c.id == id:
 			return c
 	return {}
@@ -55,7 +55,7 @@ static func ensure_car(app: App) -> void:
 	var cars := _cars(app)
 	var pick := ""
 	var last: String = str(Settings.data.get("lastCar", ""))
-	for c in [_car_by_id(cars, last)] + cars:
+	for c: Dictionary in [_car_by_id(cars, last)] + cars:
 		if c.is_empty():
 			continue
 		var owner: Variant = room.carLocks.get(c.id)
@@ -121,17 +121,17 @@ static func _frame(app: App, room: Dictionary, mine: Dictionary, cars: Array, is
 	var opts := {
 		"title": I18n.t("Race weekend") if not UIKit.touch() else "", "back": app.leave if _page == "hub" else func() -> void: _go(app, "hub"),
 		"tabs": [["hub", I18n.t("Overview")], ["circuit", I18n.t("Circuit")], ["car", I18n.t("Car")], ["paint", I18n.t("Paint")], ["event", I18n.t("Event")], ["drivers", I18n.t("Drivers")]],
-		"tab": tab, "on_tab": func(k): _go(app, "session" if k == "event" else k), "tabs_left": UIKit.touch(), "right": right,
+		"tab": tab, "on_tab": func(k: String) -> void: _go(app, "session" if k == "event" else k), "tabs_left": UIKit.touch(), "right": right,
 	}
 	if tab == "event":
 		opts.sub_tabs = [["session", I18n.t("Session")], ["conditions", I18n.t("Conditions")], ["rules", I18n.t("Rules")]]
 		opts.sub_tab = _page
-		opts.on_sub = func(k): _go(app, k)
+		opts.on_sub = func(k: String) -> void: _go(app, k)
 	var top := UIW.top_bar(opts)
 	var act := _main_action(app, room, mine, _car_by_id(cars, mine.get("carId")), is_host)
 	# one solid white action per screen: a page's own primary (Select this car) turns the start into an outlined one
 	var primary_taken := false
-	for e in extra:
+	for e: Control in extra:
 		if e is Button and e.get_theme_stylebox("normal").bg_color == Color("f2f4f7"):
 			primary_taken = true
 	if primary_taken:
@@ -150,8 +150,8 @@ static func _frame(app: App, room: Dictionary, mine: Dictionary, cars: Array, is
 static func _main_action(app: App, room: Dictionary, mine: Dictionary, car: Dictionary, is_host: bool) -> Dictionary:
 	var hint := UIKit.label("", 16, UIKit.SOFT)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var connected: Array = room.players.filter(func(p): return p.connected)
-	var others_ready := connected.all(func(p): return p.id == app.me or (p.carId != null and p.ready))
+	var connected: Array = room.players.filter(func(p: Dictionary) -> bool: return p.connected)
+	var others_ready := connected.all(func(p: Dictionary) -> bool: return p.id == app.me or (p.carId != null and p.ready))
 	var is_ready: bool = mine.get("ready", false)
 	var act := UIW.action("", Callable(), true)
 	act.custom_minimum_size = Vector2(250, 0)
@@ -305,7 +305,7 @@ static func _hub(app: App, room: Dictionary, cars: Array, mine: Dictionary) -> C
 		track = app.track_index[0]
 	var plan := Weather.plan_weather(int(c.seed), c)
 	var rules: Dictionary = room.get("rules", {})
-	var rules_on := ["contact", "pitWindow", "fuel", "raceControl"].filter(func(k): return rules.get(k, false)).size()
+	var rules_on := ["contact", "pitWindow", "fuel", "raceControl"].filter(func(k: String) -> bool: return rules.get(k, false)).size()
 	var car := _car_by_id(cars, mine.get("carId"))
 
 	var left := UIW.vbox(14 if touch else 18)
@@ -474,7 +474,7 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 	left.add_child(ol)
 	top.add_child(left)
 	# the layouts of this circuit, as the references' Circuit Layout list
-	var layouts: Array = tracks.filter(func(t): return circuit_of(t) == circuit_of(track))
+	var layouts: Array = tracks.filter(func(t: Dictionary) -> bool: return circuit_of(t) == circuit_of(track))
 	var lp := PanelContainer.new()
 	lp.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NAVY_SOLID, 0.9), Color(1, 1, 1, 0.14), 1, 4, Vector2(6, 6)))
 	lp.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -482,7 +482,7 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 	var lc := UIW.vbox(2)
 	lc.add_child(UIW.margins(UIKit.label(I18n.t("Circuit layout"), 16, UIKit.SOFT, false, 600), 8, 4, 8, 6))
 	lc.add_child(UIW.hair())
-	for t in layouts:
+	for t: Dictionary in layouts:
 		var on: bool = t.id == track.id
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_ALL
@@ -510,12 +510,12 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 	# every circuit in a strip at the bottom, the current one outlined
 	var strip := UIW.hbox(8)
 	var seen := {}
-	for t in tracks:
+	for t: Dictionary in tracks:
 		var key := circuit_of(t)
 		if seen.has(key):
 			continue
 		seen[key] = true
-		var group: Array = tracks.filter(func(x): return circuit_of(x) == key)
+		var group: Array = tracks.filter(func(x: Dictionary) -> bool: return circuit_of(x) == key)
 		var on := circuit_of(track) == key
 		var shown: Dictionary = track if on else group[0]
 		var b := UIW.card_button(on, 4)
@@ -586,7 +586,7 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 		if mine.get("carId") == shown.id:
 			tags.add_child(UIW.tag("✓ " + I18n.t("Your car"), UIKit.GOOD))
 		elif owner != null and owner != app.me:
-			for p in room.players:
+			for p: Dictionary in room.players:
 				if p.id == owner:
 					tags.add_child(UIW.tag(p.nick, UIKit.ACCENT_2, true, UIKit.INK))
 		left.add_child(tags)
@@ -632,21 +632,21 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 	col.add_child(top)
 	# the classes and the cars as the references' strip
 	var cats: Array = []
-	for c in cars:
+	for c: Dictionary in cars:
 		if not cats.has(c.category):
 			cats.append(c.category)
-	var filters := UIW.chips(_car_filter, [["", I18n.t("All")]] + cats.map(func(x): return [x, x]), func(v): _car_filter = v; app.render_lobby())
+	var filters := UIW.chips(_car_filter, [["", I18n.t("All")]] + cats.map(func(x: String) -> Array: return [x, x]), func(v: Variant) -> void: _car_filter = v; app.render_lobby())
 	col.add_child(filters)
 	if not editable:
 		col.add_child(UIKit.label(I18n.t("A race is in progress. You will join the next one."), 15, UIKit.ACCENT_2))
 	var strip := UIW.hbox(8)
-	for c in cars:
+	for c: Dictionary in cars:
 		if _car_filter != "" and c.category != _car_filter:
 			continue
 		var owner: Variant = room.carLocks.get(c.id)
 		var taken := ""
 		if owner != null and owner != app.me:
-			for p in room.players:
+			for p: Dictionary in room.players:
 				if p.id == owner:
 					taken = p.nick
 		var chosen: bool = mine.get("carId") == c.id
@@ -711,24 +711,24 @@ static func _paint_page(app: App, cars: Array, mine: Dictionary, extra: Array) -
 		preview.set_livery(lv)
 		app.send({"t": "setLivery", "livery": lv.duplicate()})
 	col.add_child(UIW.section(I18n.t("Body")))
-	col.add_child(UIW.row(I18n.t("Colour"), _swatches(lv.base, CarPaint.PALETTE, func(c): changed.call("base", c))))
-	col.add_child(UIW.row(I18n.t("Finish"), _live_chips(lv.finish, [["gloss", I18n.t("Gloss")], ["metallic", I18n.t("Metallic")], ["matte", I18n.t("Matte")], ["pearl", I18n.t("Pearl")]], func(v): changed.call("finish", v))))
+	col.add_child(UIW.row(I18n.t("Colour"), _swatches(lv.base, CarPaint.PALETTE, func(c: String) -> void: changed.call("base", c))))
+	col.add_child(UIW.row(I18n.t("Finish"), _live_chips(lv.finish, [["gloss", I18n.t("Gloss")], ["metallic", I18n.t("Metallic")], ["matte", I18n.t("Matte")], ["pearl", I18n.t("Pearl")]], func(v: Variant) -> void: changed.call("finish", v))))
 	col.add_child(UIW.section(I18n.t("Design")))
-	col.add_child(UIW.row(I18n.t("Design"), _live_chips(lv.design, [["plain", I18n.t("Plain")], ["stripes", I18n.t("Stripes")], ["twotone", I18n.t("Two-tone")], ["fade", I18n.t("Fade")], ["side", I18n.t("Side stripe")], ["hoop", I18n.t("Hoop")], ["center", I18n.t("Centre stripe")], ["chevron", I18n.t("Chevron")], ["pinstripe", I18n.t("Pinstripes")], ["split", I18n.t("Split")]], func(v): changed.call("design", v))))
-	col.add_child(UIW.row(I18n.t("Second colour"), _swatches(lv.accent, CarPaint.PALETTE, func(c): changed.call("accent", c))))
-	col.add_child(UIW.row(I18n.t("Aero"), _live_chips(lv.get("aero", "carbon"), [["carbon", I18n.t("Carbon")], ["body", I18n.t("Body colour")], ["accent", I18n.t("Second colour")]], func(v): changed.call("aero", v))))
+	col.add_child(UIW.row(I18n.t("Design"), _live_chips(lv.design, [["plain", I18n.t("Plain")], ["stripes", I18n.t("Stripes")], ["twotone", I18n.t("Two-tone")], ["fade", I18n.t("Fade")], ["side", I18n.t("Side stripe")], ["hoop", I18n.t("Hoop")], ["center", I18n.t("Centre stripe")], ["chevron", I18n.t("Chevron")], ["pinstripe", I18n.t("Pinstripes")], ["split", I18n.t("Split")]], func(v: Variant) -> void: changed.call("design", v))))
+	col.add_child(UIW.row(I18n.t("Second colour"), _swatches(lv.accent, CarPaint.PALETTE, func(c: String) -> void: changed.call("accent", c))))
+	col.add_child(UIW.row(I18n.t("Aero"), _live_chips(lv.get("aero", "carbon"), [["carbon", I18n.t("Carbon")], ["body", I18n.t("Body colour")], ["accent", I18n.t("Second colour")]], func(v: Variant) -> void: changed.call("aero", v))))
 	col.add_child(UIW.section(I18n.t("Race number")))
 	var nums: Array = []
 	for n in range(1, 100):
 		nums.append([str(n), str(n)])
 	var num_row := UIW.hbox(12)
-	num_row.add_child(UIW.stepper(str(int(lv.number)), nums, func(v): changed.call("number", int(v))))
-	num_row.add_child(UIW.switch(bool(lv.showNumber), func(on): changed.call("showNumber", on)))
+	num_row.add_child(UIW.stepper(str(int(lv.number)), nums, func(v: Variant) -> void: changed.call("number", int(v))))
+	num_row.add_child(UIW.switch(bool(lv.showNumber), func(on: bool) -> void: changed.call("showNumber", on)))
 	col.add_child(UIW.row(I18n.t("Number"), num_row))
-	col.add_child(UIW.row(I18n.t("Number colour"), _swatches(lv.numberColor, ["#ffffff", "#111214", "#ffd60a", "#c8102e", "#0a3d91", "#00843d"], func(c): changed.call("numberColor", c))))
+	col.add_child(UIW.row(I18n.t("Number colour"), _swatches(lv.numberColor, ["#ffffff", "#111214", "#ffd60a", "#c8102e", "#0a3d91", "#00843d"], func(c: String) -> void: changed.call("numberColor", c))))
 	col.add_child(UIW.section(I18n.t("Wheels")))
-	col.add_child(UIW.row(I18n.t("Rims"), _swatches(lv.rims, ["#1c1c1e", "#9a9fa5", "#f2f2f2", "#c9a227", "#c8102e", "#0a3d91"], func(c): changed.call("rims", c))))
-	col.add_child(UIW.row(I18n.t("Calipers"), _swatches(lv.calipers, ["#ffd60a", "#c8102e", "#1c1c1e", "#0a84ff", "#30d158", "#f2f2f2"], func(c): changed.call("calipers", c))))
+	col.add_child(UIW.row(I18n.t("Rims"), _swatches(lv.rims, ["#1c1c1e", "#9a9fa5", "#f2f2f2", "#c9a227", "#c8102e", "#0a3d91"], func(c: String) -> void: changed.call("rims", c))))
+	col.add_child(UIW.row(I18n.t("Calipers"), _swatches(lv.calipers, ["#ffd60a", "#c8102e", "#1c1c1e", "#0a84ff", "#30d158", "#f2f2f2"], func(c: String) -> void: changed.call("calipers", c))))
 	var right := UIW.scroll(col)
 	right.custom_minimum_size = Vector2(380 if touch else 520, 0)
 	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -744,7 +744,7 @@ static func _live_chips(current: Variant, options: Array, on: Callable) -> Contr
 	var fill := func(cur: Variant, again: Callable) -> void:
 		for c in holder.get_children():
 			c.queue_free()
-		holder.add_child(UIW.chips(cur, options, func(v):
+		holder.add_child(UIW.chips(cur, options, func(v: Variant) -> void:
 			on.call(v)
 			again.call(v, again)))
 	fill.call(current, fill)
@@ -760,7 +760,7 @@ static func _swatches(current: String, colours: Array, on: Callable) -> Control:
 			var on_it: bool = c.to_html(false) == Color(sel).to_html(false)
 			for st: String in ["normal", "hover", "pressed", "focus"]:
 				b.add_theme_stylebox_override(st, UIKit.box(c, Color.WHITE if on_it else Color(1, 1, 1, 0.18), 3 if on_it else 1, 6))
-	for hex in colours:
+	for hex: String in colours:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(30, 30)
 		b.set_meta("colour", hex)
@@ -806,14 +806,14 @@ static func _event_page(app: App, room: Dictionary, page: String, edit: bool) ->
 		"rules":
 			col.add_child(UIW.section(I18n.t("Rules")))
 			var rules: Dictionary = room.get("rules", {})
-			for r in [
+			for r: Array in [
 				["contact", I18n.t("Car contact"), I18n.t("Cars collide and take damage (off: ghost cars that pass through each other)")],
 				["pitWindow", I18n.t("Mandatory pit stop"), I18n.t("Race: one stop with a driver change inside the pit window, as in GT World Challenge Sprint")],
 				["fuel", I18n.t("Fuel and refuelling"), I18n.t("Engines burn fuel, you choose your fuel load, stops can refuel (endurance)")],
 				["raceControl", I18n.t("Race control"), I18n.t("Yellow flags, full-course yellow, the safety car, blue flags and drive-through penalties")],
 			]:
 				var k: String = r[0]
-				col.add_child(UIW.row(r[1], UIW.switch(rules.get(k, false), (func(v): app.send({"t": "setRules", "rules": {k: v}})) if edit else null), r[2]))
+				col.add_child(UIW.row(r[1], UIW.switch(rules.get(k, false), (func(v: bool) -> void: app.send({"t": "setRules", "rules": {k: v}})) if edit else null), r[2]))
 		_:
 			_session_pane(col, app, room, edit)
 	var body := UIW.hbox(36)
@@ -833,14 +833,14 @@ static func _event_page(app: App, room: Dictionary, page: String, edit: bool) ->
 static func _conditions_pane(col: Control, c: Dictionary, edit: bool, send: Callable) -> void:
 	col.add_child(UIW.section(I18n.t("Conditions")))
 	var weather_opts: Array = [["random", I18n.t("Random")]]
-	for k in Weather.KINDS:
+	for k: String in Weather.KINDS:
 		weather_opts.append([k, I18n.t(Weather.LABEL[k])])
-	col.add_child(UIW.row(I18n.t("Weather"), UIW.stepper(c.weather, weather_opts, func(v): send.call({"weather": v}), edit)))
+	col.add_child(UIW.row(I18n.t("Weather"), UIW.stepper(c.weather, weather_opts, func(v: Variant) -> void: send.call({"weather": v}), edit)))
 	var time_opts: Array = []
-	for k in Weather.TIME_LABEL:
+	for k: String in Weather.TIME_LABEL:
 		time_opts.append([k, I18n.t(Weather.TIME_LABEL[k])])
-	col.add_child(UIW.row(I18n.t("Time of day"), UIW.stepper(c.time, time_opts, func(v): send.call({"time": v}), edit)))
-	col.add_child(UIW.row(I18n.t("Weather changes"), UIW.stepper(c.changes, [["random", I18n.t("Possible")], ["off", I18n.t("Stable")], ["on", I18n.t("Changing")]], func(v): send.call({"changes": v}), edit)))
+	col.add_child(UIW.row(I18n.t("Time of day"), UIW.stepper(c.time, time_opts, func(v: Variant) -> void: send.call({"time": v}), edit)))
+	col.add_child(UIW.row(I18n.t("Weather changes"), UIW.stepper(c.changes, [["random", I18n.t("Possible")], ["off", I18n.t("Stable")], ["on", I18n.t("Changing")]], func(v: Variant) -> void: send.call({"changes": v}), edit)))
 
 ## The forecast beside the conditions: the symbol, the weather and hour, the track, the temperatures, a new roll.
 static func _forecast_panel(plan: Dictionary, w0: Dictionary, temp0: Dictionary, edit: bool, send: Callable) -> Control:
@@ -883,18 +883,18 @@ static func _session_pane(col: Control, app: App, room: Dictionary, edit: bool) 
 	if local:
 		formats.append(["trial", I18n.t("Time trial"), 0, 30, 0, 0, true])
 	var fmt_now := ""
-	for f in formats:
+	for f: Array in formats:
 		var rm: int = int(room.get("raceMinutes", 0))
 		var streak_now: bool = room.get("rules", {}).get("cleanStreak", false)
 		if int(room.get("practiceMinutes", 0)) == f[2] and room.sessionMinutes == f[3] and ((rm == f[5]) if f[5] > 0 else (rm == 0 and room.raceLaps == f[4])) \
 				and (f.size() < 7 or streak_now == f[6]):
 			fmt_now = f[0]
-	var fmt_opts: Array = formats.map(func(f): return [f[0], f[1]])
+	var fmt_opts: Array = formats.map(func(f: Array) -> Array: return [f[0], f[1]])
 	if fmt_now == "":
 		fmt_opts.push_front(["", I18n.t("Custom")])
 	col.add_child(UIW.section(I18n.t("Format")))
-	col.add_child(UIW.row(I18n.t("Format"), UIW.stepper(fmt_now, fmt_opts, func(v):
-		for f in formats:
+	col.add_child(UIW.row(I18n.t("Format"), UIW.stepper(fmt_now, fmt_opts, func(v: Variant) -> void:
+		for f: Array in formats:
 			if f[0] == v:
 				app.send({"t": "setPractice", "minutes": f[2]})
 				app.send({"t": "setSession", "minutes": f[3]})
@@ -910,19 +910,19 @@ static func _session_pane(col: Control, app: App, room: Dictionary, edit: bool) 
 	var pm := int(room.get("practiceMinutes", 0))
 	gap.call()
 	col.add_child(UIW.section(I18n.t("Free practice"), I18n.t("{m} min", {"m": pm}) if pm > 0 else ""))
-	col.add_child(UIW.row(I18n.t("Practice length"), UIW.stepper(pm, Const.PRACTICE_MINUTE_CHOICES.map(func(m): return [m, I18n.t("No practice") if m == 0 else I18n.t("{m} min", {"m": m})]), func(v): app.send({"t": "setPractice", "minutes": int(v)}), edit)))
+	col.add_child(UIW.row(I18n.t("Practice length"), UIW.stepper(pm, Const.PRACTICE_MINUTE_CHOICES.map(func(m: int) -> Array: return [m, I18n.t("No practice") if m == 0 else I18n.t("{m} min", {"m": m})]), func(v: Variant) -> void: app.send({"t": "setPractice", "minutes": int(v)}), edit)))
 	gap.call()
 	col.add_child(UIW.section(I18n.t("Qualifying"), I18n.t("{m} min", {"m": int(room.sessionMinutes)})))
-	col.add_child(UIW.row(I18n.t("Qualifying length"), UIW.stepper(int(room.sessionMinutes), Const.SESSION_MINUTES.map(func(m): return [m, I18n.t("{m} min", {"m": m})]), func(v): app.send({"t": "setSession", "minutes": int(v)}), edit)))
+	col.add_child(UIW.row(I18n.t("Qualifying length"), UIW.stepper(int(room.sessionMinutes), Const.SESSION_MINUTES.map(func(m: int) -> Array: return [m, I18n.t("{m} min", {"m": m})]), func(v: Variant) -> void: app.send({"t": "setSession", "minutes": int(v)}), edit)))
 	var race_opts: Array = []
-	for n in Const.RACE_LAP_CHOICES:
+	for n: int in Const.RACE_LAP_CHOICES:
 		race_opts.append(["L%d" % n, _race_label("L%d" % n)])
-	for m in Const.RACE_MINUTE_CHOICES:
+	for m: int in Const.RACE_MINUTE_CHOICES:
 		if m > 0:
 			race_opts.append(["T%d" % m, _race_label("T%d" % m)])
 	gap.call()
 	col.add_child(UIW.section(I18n.t("Race")))
-	col.add_child(UIW.row(I18n.t("Race length"), UIW.stepper(_race_key(room), race_opts, func(v):
+	col.add_child(UIW.row(I18n.t("Race length"), UIW.stepper(_race_key(room), race_opts, func(v: Variant) -> void:
 		var n := int(String(v).substr(1))
 		if String(v)[0] == "T":
 			app.send({"t": "setRaceMinutes", "minutes": n})
@@ -932,7 +932,7 @@ static func _session_pane(col: Control, app: App, room: Dictionary, edit: bool) 
 	if not LocalRoom.is_local_code(room.code):
 		gap.call()
 		col.add_child(UIW.section(I18n.t("Room")))
-		col.add_child(UIW.row(I18n.t("Public room"), UIW.switch(room.isPublic, (func(v): app.send({"t": "setPublic", "isPublic": v})) if edit else null), I18n.t("Public: listed, anyone can join or watch")))
+		col.add_child(UIW.row(I18n.t("Public room"), UIW.switch(room.isPublic, (func(v: bool) -> void: app.send({"t": "setPublic", "isPublic": v})) if edit else null), I18n.t("Public: listed, anyone can join or watch")))
 
 # --------------------------------------------------------------- drivers ---
 
@@ -946,7 +946,7 @@ static func _drivers_page(app: App, room: Dictionary, can_edit: bool, extra: Arr
 	col.add_child(head)
 	var list := UIW.vbox(0)
 	var i := 0
-	for p in room.players:
+	for p: Dictionary in room.players:
 		i += 1
 		list.add_child(_player_row(app, p, can_edit, i))
 	col.add_child(UIW.scroll(list))
@@ -1035,7 +1035,7 @@ static func build_briefing(app: App) -> Control:
 	var top := UIW.top_bar({
 		"title": I18n.t("Briefing") if not touch else "",
 		"tabs": [["setup", I18n.t("Setup")], ["advanced", I18n.t("Advanced")], ["saved", I18n.t("Saved setups")]],
-		"tab": _brief_tab, "on_tab": func(k): _brief_tab = k; app.render_briefing(), "tabs_left": touch,
+		"tab": _brief_tab, "on_tab": func(k: String) -> void: _brief_tab = k; app.render_briefing(), "tabs_left": touch,
 		"right": [chip],
 	})
 	# the headline: the circuit, the driver in hollow capitals, the forecast on the right
@@ -1081,7 +1081,7 @@ static func build_briefing(app: App) -> Control:
 		side.custom_minimum_size = Vector2(250, 0)
 		side.add_child(UIKit.label(I18n.t("Drivers").to_upper(), 22, UIKit.DIM, true, 600))
 		side.add_child(UIW.hair())
-		for p in room.players:
+		for p: Dictionary in room.players:
 			if p.carId == null or not (p.connected or p.bot) or p.waiting:
 				continue
 			var r := UIW.hbox(8)
@@ -1171,9 +1171,9 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	var wing_opts: Array = []
 	for k: String in ["low", "medium", "high"]:
 		wing_opts.append([k, I18n.t(CarSetup.WING[k].label)])
-	rcol.add_child(UIW.row(I18n.t("Rear wing"), UIW.stepper(cs.wing, wing_opts, func(v): cs.wing = v; save.call())))
+	rcol.add_child(UIW.row(I18n.t("Rear wing"), UIW.stepper(cs.wing, wing_opts, func(v: Variant) -> void: cs.wing = v; save.call())))
 	var bias_out := UIKit.label(I18n.t("{pct} % front", {"pct": roundi(cs.brakeBias * 100)}), 15, UIKit.TEXT, false, 600)
-	var bias := UIW.slider(cs.brakeBias, 0.54, 0.66, 0.01, func(v):
+	var bias := UIW.slider(cs.brakeBias, 0.54, 0.66, 0.01, func(v: float) -> void:
 		cs.brakeBias = v
 		bias_out.text = I18n.t("{pct} % front", {"pct": roundi(v * 100)})
 		Settings.save())
@@ -1212,7 +1212,7 @@ static func _setup_library(app: App, cs: Dictionary, save: Callable) -> Control:
 		CarSetup.save_named(name_in.text, cs)
 		app.render_briefing(), true))
 	box.add_child(row)
-	for nm in CarSetup.saved_names():
+	for nm: String in CarSetup.saved_names():
 		var r := UIW.hbox(8)
 		var lb := UIKit.label(String(nm), 16, UIKit.TEXT, false, 600)
 		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1240,7 +1240,7 @@ static func _setup_library(app: App, cs: Dictionary, save: Callable) -> Control:
 		DisplayServer.clipboard_set(CarSetup.to_code(cs))
 		status.text = I18n.t("Code copied: send it to a friend")))
 	io.add_child(UIKit.button(I18n.t("Paste a friend's code"), func() -> void:
-		var imported = CarSetup.from_code(DisplayServer.clipboard_get())
+		var imported: Variant = CarSetup.from_code(DisplayServer.clipboard_get())
 		if imported == null:
 			status.text = I18n.t("The clipboard doesn't hold a setup code")
 			return
@@ -1261,14 +1261,14 @@ static func _tyre_guide() -> Control:
 	var ids := ["soft", "medium", "hard", "wet"]
 	var max_life := 0.0
 	var max_warm := 0.0
-	for i in ids:
+	for i: String in ids:
 		max_life = maxf(max_life, 1.0 / Tyres.COMPOUNDS[i].wear)
 		max_warm = maxf(max_warm, 1.0 / Tyres.COMPOUNDS[i].heatCap)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 12)
-	for id in ids:
+	for id: String in ids:
 		var cm: Dictionary = Tyres.COMPOUNDS[id]
 		var card := UIW.vbox(3)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1300,11 +1300,11 @@ static func _fuel_row(room: Dictionary, track_m: float, cs: Dictionary) -> Contr
 	var per_lap := (track_m / 1000.0) * VehicleConsts.FUEL.perKm
 	var timed: bool = int(room.get("raceMinutes", 0)) > 0
 	var laps: int = (ceili((room.raceMinutes * 60.0) / (track_m / 43.0)) + 1) if timed else int(room.raceLaps)
-	var need = mini(int(VehicleConsts.FUEL.tankL), ceili((laps + 1) * per_lap)) if laps > 0 else null
+	var need: Variant = mini(int(VehicleConsts.FUEL.tankL), ceili((laps + 1) * per_lap)) if laps > 0 else null
 	var out := UIKit.label("", 15, UIKit.TEXT, false, 600)
 	var show := func() -> void: out.text = I18n.t("{l} l · ~{laps} laps · {kg} kg", {"l": cs.fuelL, "laps": "%.1f" % (cs.fuelL / per_lap), "kg": roundi(cs.fuelL * VehicleConsts.FUEL.kgPerL)})
 	show.call()
-	var slider := UIW.slider(cs.fuelL, 10, VehicleConsts.FUEL.tankL, 1, func(v): cs.fuelL = int(v); show.call(); Settings.save())
+	var slider := UIW.slider(cs.fuelL, 10, VehicleConsts.FUEL.tankL, 1, func(v: float) -> void: cs.fuelL = int(v); show.call(); Settings.save())
 	slider.custom_minimum_size = Vector2(150, 30)
 	var row := UIW.hbox(10)
 	row.add_child(slider)
@@ -1338,14 +1338,14 @@ static func _advanced(app: App, cs: Dictionary, air_c: float) -> Control:
 	var body := UIW.vbox(0)
 	var auto: bool = cs.pressure == null
 	body.add_child(UIW.section(I18n.t("Advanced setup")))
-	body.add_child(UIW.row(I18n.t("Crew sets the tyre pressures ({p} psi cold → {hot} psi hot)", {"p": "%.1f" % ideal, "hot": P.targetPsi}), UIW.switch(auto, func(v):
+	body.add_child(UIW.row(I18n.t("Crew sets the tyre pressures ({p} psi cold → {hot} psi hot)", {"p": "%.1f" % ideal, "hot": P.targetPsi}), UIW.switch(auto, func(v: bool) -> void:
 		cs.pressure = null if v else [ideal, ideal]
 		Settings.save()
 		app.render_briefing())))
 	var slider := func(value: float, lo: float, hi: float, step: float, fmt: Callable, on: Callable) -> Control:
 		var out := UIKit.label(fmt.call(value), 14, UIKit.TEXT, false, 600)
 		out.custom_minimum_size = Vector2(150, 0)
-		var s := UIW.slider(value, lo, hi, step, func(v): on.call(v); out.text = fmt.call(v); Settings.save())
+		var s := UIW.slider(value, lo, hi, step, func(v: float) -> void: on.call(v); out.text = fmt.call(v); Settings.save())
 		s.custom_minimum_size = Vector2(150, 30)
 		var r := UIW.hbox(8)
 		r.add_child(s)
@@ -1355,41 +1355,41 @@ static func _advanced(app: App, cs: Dictionary, air_c: float) -> Control:
 		for axle in 2:
 			body.add_child(UIW.row("%s · %s" % [label, I18n.t("Front") if axle == 0 else I18n.t("Rear")], make.call(axle)))
 	if not auto:
-		pair.call(I18n.t("Tyre pressure (cold)"), func(axle): return slider.call(
+		pair.call(I18n.t("Tyre pressure (cold)"), func(axle: int) -> Control: return slider.call(
 			(cs.pressure if cs.pressure != null else [ideal, ideal])[axle], P.minColdPsi, P.maxColdPsi, 0.1,
-			func(v): return I18n.t("{p} psi → ~{hot} hot", {"p": "%.1f" % v, "hot": "%.1f" % hot.call(v)}),
-			func(v):
+			func(v: float) -> String: return I18n.t("{p} psi → ~{hot} hot", {"p": "%.1f" % v, "hot": "%.1f" % hot.call(v)}),
+			func(v: float) -> void:
 				if cs.pressure == null:
 					cs.pressure = [ideal, ideal]
 				cs.pressure[axle] = v))
-	pair.call(I18n.t("Ride height"), func(axle): return slider.call(cs.ride[axle], -CarSetup.SETUP.rideMm, CarSetup.SETUP.rideMm, 1,
-		func(v): return I18n.t("baseline") if int(v) == 0 else "%s%d mm" % ["+" if v > 0 else "", int(v)], func(v): cs.ride[axle] = int(v)))
+	pair.call(I18n.t("Ride height"), func(axle: int) -> Control: return slider.call(cs.ride[axle], -CarSetup.SETUP.rideMm, CarSetup.SETUP.rideMm, 1,
+		func(v: float) -> String: return I18n.t("baseline") if int(v) == 0 else "%s%d mm" % ["+" if v > 0 else "", int(v)], func(v: float) -> void: cs.ride[axle] = int(v)))
 	var clicks := func(key: String, soft: String, stiff: String) -> Callable:
-		return func(axle): return slider.call(cs[key][axle], 1, CarSetup.SETUP.clicks, 1,
-			func(v): return "%d%s" % [int(v), (" (%s)" % I18n.t("baseline")) if int(v) == CarSetup.SETUP.baseline else (" · " + soft if v < CarSetup.SETUP.baseline else " · " + stiff)],
-			func(v): cs[key][axle] = int(v))
+		return func(axle: int) -> Control: return slider.call(cs[key][axle], 1, CarSetup.SETUP.clicks, 1,
+			func(v: float) -> String: return "%d%s" % [int(v), (" (%s)" % I18n.t("baseline")) if int(v) == CarSetup.SETUP.baseline else (" · " + soft if v < CarSetup.SETUP.baseline else " · " + stiff)],
+			func(v: float) -> void: cs[key][axle] = int(v))
 	pair.call(I18n.t("Anti-roll bar"), clicks.call("arb", I18n.t("soft"), I18n.t("stiff")))
 	pair.call(I18n.t("Dampers: bump"), clicks.call("bump", I18n.t("soft"), I18n.t("stiff")))
 	pair.call(I18n.t("Dampers: rebound"), clicks.call("rebound", I18n.t("soft"), I18n.t("stiff")))
 	pair.call(I18n.t("Springs"), clicks.call("springs", I18n.t("soft"), I18n.t("stiff")))
 	# alignment
 	body.add_child(UIW.section(I18n.t("Alignment")))
-	pair.call(I18n.t("Camber"), func(axle): return slider.call(float(cs.camber[axle]), CarSetup.SETUP.camber[axle][0], CarSetup.SETUP.camber[axle][1], 0.1,
-		func(v): return "%.1f°" % v, func(v): cs.camber[axle] = snappedf(v, 0.1)))
-	pair.call(I18n.t("Toe"), func(axle): return slider.call(float(cs.toe[axle]), CarSetup.SETUP.toe[axle][0], CarSetup.SETUP.toe[axle][1], 0.01,
-		func(v): return ("%.2f° " % absf(v)) + (I18n.t("out") if v < 0.0 else (I18n.t("in") if v > 0.0 else "")), func(v): cs.toe[axle] = snappedf(v, 0.01)))
+	pair.call(I18n.t("Camber"), func(axle: int) -> Control: return slider.call(float(cs.camber[axle]), CarSetup.SETUP.camber[axle][0], CarSetup.SETUP.camber[axle][1], 0.1,
+		func(v: float) -> String: return "%.1f°" % v, func(v: float) -> void: cs.camber[axle] = snappedf(v, 0.1)))
+	pair.call(I18n.t("Toe"), func(axle: int) -> Control: return slider.call(float(cs.toe[axle]), CarSetup.SETUP.toe[axle][0], CarSetup.SETUP.toe[axle][1], 0.01,
+		func(v: float) -> String: return ("%.2f° " % absf(v)) + (I18n.t("out") if v < 0.0 else (I18n.t("in") if v > 0.0 else "")), func(v: float) -> void: cs.toe[axle] = snappedf(v, 0.01)))
 	# differential, brakes, gearing, engine
 	var one := func(key: String, lo: float, hi: float, step: float, fmt: Callable) -> Control:
-		return slider.call(float(cs[key]), lo, hi, step, fmt, func(v): cs[key] = v if step < 1.0 else int(v))
+		return slider.call(float(cs[key]), lo, hi, step, fmt, func(v: float) -> void: cs[key] = v if step < 1.0 else int(v))
 	body.add_child(UIW.section(I18n.t("Differential")))
-	body.add_child(UIW.row(I18n.t("Preload"), one.call("diffPreload", CarSetup.SETUP.preload[0], CarSetup.SETUP.preload[1], 5.0, func(v): return "%d Nm" % int(v))))
-	body.add_child(UIW.row(I18n.t("Locking on power"), one.call("diffLock", 1, CarSetup.SETUP.clicks, 1.0, func(v): return "%d / %d" % [int(v), CarSetup.SETUP.clicks])))
-	body.add_child(UIW.row(I18n.t("Locking off power"), one.call("diffCoast", 1, CarSetup.SETUP.clicks, 1.0, func(v): return "%d / %d" % [int(v), CarSetup.SETUP.clicks])))
+	body.add_child(UIW.row(I18n.t("Preload"), one.call("diffPreload", CarSetup.SETUP.preload[0], CarSetup.SETUP.preload[1], 5.0, func(v: float) -> String: return "%d Nm" % int(v))))
+	body.add_child(UIW.row(I18n.t("Locking on power"), one.call("diffLock", 1, CarSetup.SETUP.clicks, 1.0, func(v: float) -> String: return "%d / %d" % [int(v), CarSetup.SETUP.clicks])))
+	body.add_child(UIW.row(I18n.t("Locking off power"), one.call("diffCoast", 1, CarSetup.SETUP.clicks, 1.0, func(v: float) -> String: return "%d / %d" % [int(v), CarSetup.SETUP.clicks])))
 	body.add_child(UIW.section(I18n.t("Brakes and engine")))
-	body.add_child(UIW.row(I18n.t("Brake pressure"), one.call("brakePressure", CarSetup.SETUP.brakePressure[0], CarSetup.SETUP.brakePressure[1], 0.01, func(v): return "%d %%" % roundi(v * 100.0))))
-	body.add_child(UIW.row(I18n.t("Brake ducts"), one.call("brakeDucts", 1, 5, 1.0, func(v): return "%d / 5%s" % [int(v), " · " + I18n.t("cooler") if v > 3 else (" · " + I18n.t("hotter") if v < 3 else "")])))
-	body.add_child(UIW.row(I18n.t("Final drive"), one.call("finalDrive", -CarSetup.SETUP.finalDriveSteps, CarSetup.SETUP.finalDriveSteps, 1.0, func(v): return I18n.t("baseline") if int(v) == 0 else ("%+d %% · %s" % [int(v) * 2, I18n.t("shorter") if v > 0 else I18n.t("longer")]))))
-	body.add_child(UIW.row(I18n.t("Engine map"), one.call("engineMap", 1, 3, 1.0, func(v): return "%d · %s" % [int(v), I18n.t(CarSetup.SETUP.maps[int(v) - 1].label)])))
+	body.add_child(UIW.row(I18n.t("Brake pressure"), one.call("brakePressure", CarSetup.SETUP.brakePressure[0], CarSetup.SETUP.brakePressure[1], 0.01, func(v: float) -> String: return "%d %%" % roundi(v * 100.0))))
+	body.add_child(UIW.row(I18n.t("Brake ducts"), one.call("brakeDucts", 1, 5, 1.0, func(v: float) -> String: return "%d / 5%s" % [int(v), " · " + I18n.t("cooler") if v > 3 else (" · " + I18n.t("hotter") if v < 3 else "")])))
+	body.add_child(UIW.row(I18n.t("Final drive"), one.call("finalDrive", -CarSetup.SETUP.finalDriveSteps, CarSetup.SETUP.finalDriveSteps, 1.0, func(v: float) -> String: return I18n.t("baseline") if int(v) == 0 else ("%+d %% · %s" % [int(v) * 2, I18n.t("shorter") if v > 0 else I18n.t("longer")]))))
+	body.add_child(UIW.row(I18n.t("Engine map"), one.call("engineMap", 1, 3, 1.0, func(v: float) -> String: return "%d · %s" % [int(v), I18n.t(CarSetup.SETUP.maps[int(v) - 1].label)])))
 	body.add_child(UIW.margins(UIW.muted(I18n.t("Hot target {p} psi: too low runs hot and soft, too high loses grip. Lower = more downforce but it bottoms over kerbs; rear higher than front moves grip to the front. A stiffer anti-roll bar takes grip from its axle (stiff front = understeer). Stiffer dampers react faster but skip over bumps. Stiffer springs: sharper, less grip over bumps. More negative camber: more grip in long corners, too much costs braking. Front toe-out: quicker turn-in; rear toe-in: a stable rear. More diff locking: better traction, more understeer on the way in. Bigger ducts cool the brakes and tyres. A shorter final drive accelerates harder, tops out sooner. Leaner maps save fuel for a little power.", {"p": P.targetPsi}), 13), 10, 10, 10, 6))
 	var reset := UIKit.button(I18n.t("Reset to baseline"), func() -> void:
 		cs.pressure = null
@@ -1414,7 +1414,7 @@ static func build_watch(app: App) -> Control:
 	var col := UIW.vbox(10)
 	col.add_child(UIW.section(I18n.t("Watching room {code}", {"code": room.get("code", "")})))
 	col.add_child(UIW.muted(I18n.t("Watching this room: the next session will show here.")))
-	for p in room.get("players", []):
+	for p: Dictionary in room.get("players", []):
 		var r := UIW.hbox(8)
 		r.add_child(UIKit.label(p.nick, 18, UIKit.TEXT, false, 600))
 		if p.bot:

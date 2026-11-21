@@ -290,7 +290,7 @@ static func _delete_modal(app: App) -> void:
 	# (a guest's proof is its device key, a Play Games player's the Play Games sign-in: only the first accounts type it)
 	if Account.kind() == "password":
 		body.add_child(UIW.field(I18n.t("Your password"), pw))
-	var sure := UIW.row(I18n.t("I understand it cannot be undone"), UIW.switch(false, func(_on): pass))
+	var sure := UIW.row(I18n.t("I understand it cannot be undone"), UIW.switch(false, func(_on: bool) -> void: pass))
 	body.add_child(sure)
 	var err := UIKit.label("", 15, UIKit.BAD)
 	body.add_child(err)
