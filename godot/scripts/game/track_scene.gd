@@ -37,7 +37,7 @@ var lawn_materials: Array = []
 ## Every ground surface (grass, gravel, terrain, paving): not structures.
 var ground_materials: Array = []
 var ground_query: GroundQuery = null
-var forest = null
+var forest: Forest = null
 ## Spa's hills past the model's terrain (SpaFar), or null.
 var far: SpaFar = null
 var _hint := -1
@@ -59,10 +59,10 @@ func _init(track_data: Dictionary) -> void:
 ## smoothed road patches. Returns self.
 func load_scene() -> TrackScene:
 	var files: Array = []
-	for c in data.chunks:
+	for c: Dictionary in data.chunks:
 		if not files.has(c.file):
 			files.append(c.file)
-	for f in files:
+	for f: String in files:
 		var packed := Assets.scene(f)
 		if packed == null:
 			push_error("track model missing: %s" % f)
@@ -70,7 +70,7 @@ func load_scene() -> TrackScene:
 		var scene := packed.instantiate() as Node3D
 		# a layout can take some chunks of a file and replace others: drop the chunk nodes this layout does not list
 		var listed := {}
-		for c in data.chunks:
+		for c: Dictionary in data.chunks:
 			if c.file == f:
 				listed[c.node] = true
 		for child in scene.get_children():
@@ -78,7 +78,7 @@ func load_scene() -> TrackScene:
 				scene.remove_child(child)
 				child.queue_free()
 		add_child(scene)
-	for c in data.chunks:
+	for c: Dictionary in data.chunks:
 		var obj := find_child(c.node, true, false) as Node3D
 		if obj == null:
 			continue
@@ -119,7 +119,7 @@ func _pull_ground_pieces() -> void:
 			if m0 != null and _match(GROUND_PIECE_RE, m0.resource_name):
 				pieces.append(n)
 	add_child(ground)
-	for p in pieces:
+	for p: MeshInstance3D in pieces:
 		var tr := _rel(p)
 		p.reparent(ground, false)
 		p.transform = tr
@@ -210,7 +210,7 @@ const DECAL_LAYERS := [["(?i)^(lines|redline|box_decal|nurb_decal)", 0.035], ["(
 
 func _lift_decals() -> void:
 	var res: Array = []
-	for d in DECAL_LAYERS:
+	for d: Array in DECAL_LAYERS:
 		res.append(RegEx.create_from_string(d[0]))
 	for n: Node in CarVisual._walk(self):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null or not ((n as MeshInstance3D).mesh is ArrayMesh):
@@ -265,9 +265,9 @@ func update_visibility(cam_pos: Vector3, q: Dictionary) -> void:
 			continue
 		var max_d: float = q.treeDistance if c.kind == "trees" else q.sceneryDistance
 		c.object.visible = c.center.distance_to(cam_pos) - c.radius < max_d
-	for d in _details:
+	for d: Dictionary in _details:
 		d.mesh.visible = d.center.distance_to(cam_pos) - d.radius < q.detailDistance
-	for d in _barriers:
+	for d: Dictionary in _barriers:
 		d.mesh.visible = d.center.distance_to(cam_pos) - d.radius < q.barrierDistance
 	if forest != null:
 		forest.update(cam_pos, q)
@@ -276,30 +276,30 @@ func update_visibility(cam_pos: Vector3, q: Dictionary) -> void:
 func show_all() -> void:
 	for c: Chunk in chunks:
 		c.object.visible = true
-	for d in _details:
+	for d: Dictionary in _details:
 		d.mesh.visible = true
-	for d in _barriers:
+	for d: Dictionary in _barriers:
 		d.mesh.visible = true
 
 ## Darker, glossier asphalt as the track gets wet.
 func apply_wetness(w: float) -> void:
-	for r in road_materials:
+	for r: Dictionary in road_materials:
 		var col: Color = r.color
 		var k := 1.0 - 0.38 * w
 		r.mat.albedo_color = Color(col.r * k, col.g * k, col.b * k, col.a)
 		r.mat.roughness = r.roughness * (1.0 - 0.62 * w)
 
 func set_night(night_factor: float) -> void:
-	for m in light_materials:
+	for m: StandardMaterial3D in light_materials:
 		m.emission_enabled = true
 		m.emission_energy_multiplier = 0.3 + 4.0 * night_factor
 
 ## Start lights: red or green lit.
 func set_start_lights(red: bool, green: bool) -> void:
-	for m in start_lights.red:
+	for m: StandardMaterial3D in start_lights.red:
 		m.emission_enabled = true
 		m.emission_energy_multiplier = 6.0 if red else 0.05
-	for m in start_lights.green:
+	for m: StandardMaterial3D in start_lights.green:
 		m.emission_enabled = true
 		m.emission_energy_multiplier = 6.0 if green else 0.05
 
@@ -340,7 +340,7 @@ func point_at(s: float) -> Dictionary:
 ## places. Returns [{x, y, z, h, spruce}].
 func extract_card_trees() -> Array:
 	var out: Array = []
-	for c: Chunk in chunks.filter(func(ch): return ch.kind == "trees"):
+	for c: Chunk in chunks.filter(func(ch: Chunk) -> bool: return ch.kind == "trees"):
 		for n: Node in CarVisual._walk(c.object):
 			if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 				continue
@@ -354,7 +354,7 @@ func extract_card_trees() -> Array:
 				_card_trees_of_surface(mi, s, pine, out)
 		c.object.get_parent().remove_child(c.object)
 		c.object.queue_free()
-	chunks = chunks.filter(func(ch): return ch.kind != "trees")
+	chunks = chunks.filter(func(ch: Chunk) -> bool: return ch.kind != "trees")
 	if SpaLook.use(data):
 		SpaLook.card_trees(out)
 	return out
@@ -406,7 +406,7 @@ func _card_trees_of_surface(mi: MeshInstance3D, s: int, pine: bool, out: Array) 
 			b[5] = maxf(b[5], v.z)
 	# pieces far wider than a card or a row of them: one tree per cluster of their vertices
 	var big := {}
-	for r in box:
+	for r: int in box:
 		var b2: Array = box[r]
 		if Vector2(b2[3] - b2[0], b2[5] - b2[2]).length() > 40.0:
 			big[r] = true
@@ -426,13 +426,13 @@ func _card_trees_of_surface(mi: MeshInstance3D, s: int, pine: bool, out: Array) 
 				c[1] = minf(c[1], v2.y)
 				c[3] = maxf(c[3], v2.y)
 				c[4] += 1
-		for c in cells.values():
+		for c: Array in cells.values():
 			var h: float = c[3] - c[1]
 			if h >= 1.5 and c[4] >= 3:
 				out.append({"x": c[0] / c[4], "y": c[1], "z": c[2] / c[4], "h": h, "spruce": pine})
-		for r in big:
+		for r: int in big:
 			box.erase(r)
-	for b3 in box.values():
+	for b3: Array in box.values():
 		var h2: float = b3[4] - b3[1]
 		var wx: float = b3[3] - b3[0]
 		var wz: float = b3[5] - b3[2]

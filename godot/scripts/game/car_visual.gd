@@ -81,7 +81,8 @@ var brake_on := false
 ## Your own car with the cockpit model: that model inside, the normal LOD0 seen from outside (set_inside).
 var _inside_root: Node3D = null
 var _outside_root: Node3D = null
-var _inside = null
+## null until set_inside() first runs (so its first call always applies)
+var _inside: Variant = null
 ## True while the cockpit model's materials are prepared (InteriorLook applies to those only).
 var _cockpit_pass := false
 
@@ -301,11 +302,11 @@ func detach(part: String, car_velocity: Vector3, push: Vector3, scene_root: Node
 	body.angular_velocity = Vector3(randf_range(-6, 6), randf_range(-8, 8), randf_range(-6, 6))
 	_debris.append(body)
 	while _debris.size() > MAX_DEBRIS:
-		var old = _debris.pop_front()
+		var old: Variant = _debris.pop_front()
 		if is_instance_valid(old):
 			old.queue_free()
 	var tree := get_tree()
-	tree.create_timer(DEBRIS_LIFE).timeout.connect(func():
+	tree.create_timer(DEBRIS_LIFE).timeout.connect(func() -> void:
 		if is_instance_valid(body):
 			_debris.erase(body)
 			body.queue_free())
@@ -313,7 +314,7 @@ func detach(part: String, car_velocity: Vector3, push: Vector3, scene_root: Node
 ## The parts back on (a reset, a repair in the pits).
 func restore_parts() -> void:
 	detached.clear()
-	for key in _parts:
+	for key: String in _parts:
 		for mi: MeshInstance3D in _parts[key]:
 			mi.visible = true
 
@@ -454,7 +455,7 @@ func _setup_head(sm: StandardMaterial3D, nm: String) -> void:
 func _rig(root: Node3D) -> LevelRig:
 	var rig := LevelRig.new()
 	rig.root = root
-	for k in WHEELS:
+	for k: String in WHEELS:
 		var hub := root.find_child("wheel_%s" % k, true, false) as Node3D
 		if hub == null:
 			continue
@@ -584,8 +585,8 @@ func simplify_for_cockpit() -> void:
 	for n: Node in _walk(self):
 		if not (n is MeshInstance3D) or n.mesh == null:
 			continue
-		for s in n.mesh.get_surface_count():
-			var m = n.get_surface_override_material(s)
+		for s: int in n.mesh.get_surface_count():
+			var m: Material = n.get_surface_override_material(s)
 			if m is StandardMaterial3D and not m.resource_name.begins_with("LIGHT_"):
 				if m.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED and _is_glass(m.resource_name):
 					n.set_surface_override_material(s, tint)
@@ -611,7 +612,7 @@ func add_headlights(shadows: bool) -> void:
 		headlights.append(l)
 
 ## Update visual state: steer = road-wheel angle (rad), rot_f / rot_r wheel angles, susp = per-wheel compression delta from static (m).
-func set_pose(steer: float, rot_f: float, rot_r: float, susp) -> void:
+func set_pose(steer: float, rot_f: float, rot_r: float, susp: Array) -> void:
 	pose_steer = steer
 	pose_rot_f = rot_f
 	pose_rot_r = rot_r
@@ -637,14 +638,14 @@ func set_lights(brake: bool, headlights_on: bool, night: float) -> void:
 		headlights_on = test_lights == "tail"
 	brake_on = brake
 	var tail := (TAIL_ON if headlights_on or night > 0.3 else 0.0) + (BRAKE_ADD if brake else 0.0)
-	for t in _tail_mats:
+	for t: Array in _tail_mats:
 		(t[0] as StandardMaterial3D).emission_energy_multiplier = tail * float(t[1])
 	# your own lamps seen from the seat do not glow (the driver never sees them: lit, through the bloom, they were
 	# white smears along the wings at night, the user 2026-11-18); their beams light the road all the same
 	var lamps_seen: bool = not (local and _inside == true)
-	for h in _head_mats:
+	for h: Array in _head_mats:
 		(h[0] as StandardMaterial3D).emission_energy_multiplier = float(h[2] if headlights_on and lamps_seen else (h[1] if lamps_seen else 0.0))
-	for l in headlights:
+	for l: SpotLight3D in headlights:
 		l.light_energy = HEAD_BEAM if headlights_on else 0.0
 	if _pool != null:
 		_pool.visible = headlights_on
@@ -652,11 +653,11 @@ func set_lights(brake: bool, headlights_on: bool, night: float) -> void:
 
 ## Glass seen from inside the cockpit is dark (sun strips and lettering are printed on the outside of the texture).
 func update_cockpit_glass(v: float) -> void:
-	for gm in _glass_mats:
+	for gm: Array in _glass_mats:
 		var m: StandardMaterial3D = gm[0]
 		var base: Color = gm[1]
 		m.albedo_color = Color(lerpf(base.r, base.r * 0.12 + 0.01, v), lerpf(base.g, base.g * 0.12 + 0.01, v), lerpf(base.b, base.b * 0.12 + 0.01, v), base.a)
-	for sm in _strip_mats:
+	for sm: Array in _strip_mats:
 		var m2: StandardMaterial3D = sm[0]
 		var base2: Color = sm[1]
 		m2.albedo_color = Color(base2.r, base2.g, base2.b, base2.a * lerpf(1.0, 0.28, v))
@@ -666,7 +667,7 @@ func set_opacity(a: float) -> void:
 	if absf(a - _opacity) < 0.01:
 		return
 	_opacity = a
-	for m in _fade_mats:
+	for m: StandardMaterial3D in _fade_mats:
 		var c: Color = m.albedo_color
 		c.a = a * (0.5 if m.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA else 1.0)
 		m.albedo_color = c
@@ -683,7 +684,7 @@ func dent(local_point: Vector3, direction: Vector3, amount: float) -> void:
 	var radius := 0.45 + amount * 0.6
 	var depth := minf(0.09, amount * 0.12)
 	var dir := direction.normalized()
-	for d in dents:
+	for d: Array in dents:
 		var p0 := Vector3(d[0].x, d[0].y, d[0].z)
 		if p0.distance_to(local_point) < float(d[0].w) * 0.6:
 			d[0].w = maxf(float(d[0].w), radius)
@@ -731,7 +732,7 @@ func reset_damage() -> void:
 ## Engine smoke at high damage. scene_root: where the sprites live (the world).
 func update_smoke(dt: float, engine_damage: float, scene_root: Node) -> void:
 	if engine_damage < 0.55:
-		for s in _smoke:
+		for s: Sprite3D in _smoke:
 			s.visible = false
 		return
 	if _smoke.is_empty():
@@ -759,13 +760,13 @@ func update_smoke(dt: float, engine_damage: float, scene_root: Node) -> void:
 	_smoke_t -= dt
 	if _smoke_t <= 0.0:
 		_smoke_t = 0.12 / engine_damage
-		for sp in _smoke:
+		for sp: Sprite3D in _smoke:
 			if sp.get_meta("age") > 2.2:
 				sp.set_meta("age", 0.0)
 				sp.global_position = global_transform * Vector3(0, 0.9, float(entry.dims.length) * 0.32)
 				sp.visible = true
 				break
-	for sp in _smoke:
+	for sp: Sprite3D in _smoke:
 		if not sp.visible:
 			continue
 		var age: float = sp.get_meta("age") + dt
@@ -777,7 +778,7 @@ func update_smoke(dt: float, engine_damage: float, scene_root: Node) -> void:
 			sp.visible = false
 
 func dispose() -> void:
-	for sp in _smoke:
+	for sp: Sprite3D in _smoke:
 		sp.queue_free()
 	queue_free()
 

@@ -121,7 +121,7 @@ var numbers := {}
 var standings: Array = []
 var running := false
 var step_count := 0
-var start_at = null
+var start_at: Variant = null
 var seq := 0
 var pending: Array = [CarState.new(), CarState.new()]
 var pending_count := 0
@@ -142,14 +142,14 @@ var air: Dictionary = {"airC": 20.0, "trackC": 25.0, "airDensity": 1.2}
 # my race progress (from server events)
 var my_laps := 0
 var lap_times: Array = []
-var best_lap = null
+var best_lap: Variant = null
 var best_sectors: Array = []
-var sector_delta = null
+var sector_delta: Variant = null
 var sector_delta_until := 0.0
-var finished_ms = null
+var finished_ms: Variant = null
 var limits := TrackLimits.new()
 var lap_delta: LapDelta = null
-var live_delta = null
+var live_delta: Variant = null
 ## Something spoiled the sector being driven (a penalty, a reset, the pits): it can't become a best sector.
 var sector_dirty := false
 ## Text chat (rooms this game hosts): the panel, and whether its input line is open (the car then gets no input).
@@ -182,18 +182,18 @@ var message_kind := "info"
 ## Race control's flags and course state (from the server).
 var rc: Dictionary = RaceControl.green_state(0)
 var green_until := 0.0
-var sc_path = null
-var sc_park = null
-var sc = null # {visual, body, s, speed, vel, visible, solid}
+var sc_path: Variant = null
+var sc_park: Variant = null
+var sc: Variant = null # {visual, body, s, speed, vel, visible, solid, look}
 var last_contact := {}
 var hit_at := {}
 var fuel_per_lap := 0.0
-var fuel_at_lap = null
+var fuel_at_lap: Variant = null
 var flagged := false
 var pit: PitLaneMonitor = null
-var pit_menu = null
+var pit_menu: PitMenu = null
 var pit_hold := false
-var service = null
+var service: Variant = null
 var jack_lift := 0.0
 var loc := {"s": 0.0, "dot": 1.0, "index": 0, "lateral": 0.0}
 var map_timer := 0.0
@@ -209,23 +209,23 @@ var pit_cam_on := false
 var pit_cam_t := 0.0
 
 # optional subsystems, attached by their modules
-var cinematic = null
-var snd = null
-var tv = null
+var cinematic: Cinematic = null
+var snd: SessionAudio = null
+var tv: TvCameras = null
 var tv_on := false
-var racing_line = null
-var road_wear = null
-var mirror = null
-var windshield = null
-var dash = null
-var crash_fx = null
-var forest = null
-var shells = null
+var racing_line: RacingLineFx = null
+var road_wear: RoadWear = null
+var mirror: RearMirror = null
+var windshield: WindshieldFx = null
+var dash: DashDisplays = null
+var crash_fx: CrashFx = null
+var forest: Forest = null
+var shells: GrassShells = null
 ## Puddles on a wet track (felt by every car's tyres) and the spray behind each car.
 var wet_fx: WetFx = null
 var sprays := {}
 var _in_water := false
-var blades = null
+var blades: GrassBlades = null
 var timing: TimingScreen
 
 var _ui_acc := 0.0
@@ -242,13 +242,13 @@ func _init(race_setup: Dictionary, room_snapshot: Dictionary, my_id: String, car
 	spectator = watching
 	name = "race_session"
 	kb = KeyboardInput.new(Settings.data.bindings)
-	for p in room.players:
+	for p: Dictionary in room.players:
 		names[p.id] = p.nick
 		if p.get("num") != null:
 			numbers[p.id] = p.num
 	contact = bool(race.get("rules", {}).get("contact", false)) and not spectator
 
-func car_number(id: String):
+func car_number(id: String) -> Variant:
 	return numbers.get(id)
 
 ## An incident (iRacing's points: off track 1, a wall 2, contact or a reset 4).
@@ -271,14 +271,14 @@ func race_laps() -> int:
 	return maxi(1, ceili(ms / lap_ms) + 1)
 
 ## A timed race's pit window (server ms, when the pit entry must be crossed), or null.
-func pit_window_ms():
+func pit_window_ms() -> Variant:
 	var ms: float = race.get("raceMs", 0)
 	if ms == 0.0 or start_at == null or not race.get("rules", {}).get("pitWindow", false):
 		return null
 	return {"open": start_at + ms * RaceTracker.PIT_WINDOW.timedOpenShare, "close": start_at + ms * RaceTracker.PIT_WINDOW.timedCloseShare}
 
 func remote_by_id(id: String) -> Remote:
-	for r in remotes.values():
+	for r: Remote in remotes.values():
 		if r.id == id:
 			return r
 	return null
@@ -296,27 +296,27 @@ func load_session(progress: Callable) -> void:
 	CarVisual.car_lod_scale = float(Settings.quality_config().carLodScale)
 	track_data = Assets.load_track_file(race.trackId)
 	var entries := {}
-	for c in cars_file.cars:
+	for c: Dictionary in cars_file.cars:
 		entries[c.id] = c
-	var racers: Array = race.grid.map(func(id): return {"id": id, "player": _player(id)})
+	var racers: Array = race.grid.map(func(id: String) -> Dictionary: return {"id": id, "player": _player(id)})
 	# a car the app no longer has (a web player's pick in a shared room): the closest one it has (CarsDb.FALLBACK)
-	for r in racers:
-		var pl = r.player
+	for r: Dictionary in racers:
+		var pl: Variant = r.player
 		if pl != null and pl.carId != null and not entries.has(pl.carId):
 			var alt := CarsDb.resolve(str(pl.carId))
 			if not alt.is_empty():
 				entries[pl.carId] = alt
 	var my_car_id: Variant = null
 	if spectator:
-		for r in racers:
-			var pl = r.player
+		for r: Dictionary in racers:
+			var pl: Variant = r.player
 			if pl != null and pl.carId != null and entries.has(pl.carId):
 				my_car_id = pl.carId
 				break
 		if my_car_id == null:
 			my_car_id = cars_file.cars[0].id
 	else:
-		var mp = _player(me)
+		var mp: Variant = _player(me)
 		my_car_id = mp.carId if mp != null else null
 	if my_car_id == null or not entries.has(my_car_id):
 		push_error("Your car is not available.")
@@ -374,7 +374,7 @@ func load_session(progress: Callable) -> void:
 		vehicle.set_fuel(Settings.data.carSetup.fuelL)
 	var with_cockpit: bool = bool(q.cockpitDetail) and my_entry.get("cockpit") != null
 	var my_model := Assets.load_car_model(my_entry, 1, bool(q.cockpitDetail))
-	var outside = Assets.load_car_model(my_entry, 1, false).lods[0] if with_cockpit else null
+	var outside: PackedScene = Assets.load_car_model(my_entry, 1, false).lods[0] if with_cockpit else null
 	my_visual = CarVisual.new(my_entry, my_model, true, outside)
 	vehicle.add_child(my_visual)
 	CarPaint.apply(my_visual, Settings.data.livery)
@@ -406,10 +406,10 @@ func load_session(progress: Callable) -> void:
 	pit_cam.far = 9000.0
 
 	# the other drivers' cars
-	for r in racers:
+	for r: Dictionary in racers:
 		if r.id == me:
 			continue
-		var pl = r.player
+		var pl: Variant = r.player
 		if pl == null or pl.carId == null or not entries.has(pl.carId):
 			continue
 		var entry: Dictionary = entries[pl.carId]
@@ -427,7 +427,7 @@ func load_session(progress: Callable) -> void:
 		CarPaint.apply(rem.visual, livery_of(r.id))
 		remotes[rem.slot] = rem
 	await step.call(I18n.t("Bringing out the other drivers"))
-	var line = await RacingLinePrep.finish(line_task)
+	var line: Variant = await RacingLinePrep.finish(line_task)
 	if line != null:
 		AiDriver.prime_racing_line(track_data, line)
 	_create_local_bots(entries)
@@ -455,7 +455,7 @@ func load_session(progress: Callable) -> void:
 	for r: Remote in remotes.values():
 		hud.colors[r.id] = r.entry.color
 	hud.timed_race = race.kind == "race" and race.get("raceMs", 0) > 0
-	for p in room.players:
+	for p: Dictionary in room.players:
 		hud.set_driver(p.id, p.get("country"), p.get("num"))
 	timing = hud.timing
 	if LocalRoom.is_local_code(conn.code):
@@ -465,7 +465,7 @@ func load_session(progress: Callable) -> void:
 		chat.offset_left = 16.0
 		chat.offset_bottom = -240.0
 		chat.submitted.connect(func(text: String) -> void: conn.send_json({"t": "chat", "text": text}))
-		chat.closed.connect(func():
+		chat.closed.connect(func() -> void:
 			chat_open = false
 			chat_closed_frame = Engine.get_process_frames())
 		hud.add_child(chat)
@@ -491,13 +491,13 @@ func load_session(progress: Callable) -> void:
 
 ## A driver's paint: the room's when it carries one (a player's choice), else one made from their id and number.
 func livery_of(id: String) -> Dictionary:
-	var p = _player(id)
+	var p: Variant = _player(id)
 	if p != null and p.get("livery") is Dictionary and not (p.livery as Dictionary).is_empty():
 		return p.livery
 	return CarPaint.livery_for(id, int(p.num) if p != null and p.get("num") != null else -1)
 
-func _player(id: String):
-	for p in room.players:
+func _player(id: String) -> Variant:
+	for p: Dictionary in room.players:
 		if p.id == id:
 			return p
 	return null
@@ -525,7 +525,7 @@ func set_start_at(t: float) -> void:
 
 func update_room(snapshot: Dictionary) -> void:
 	room = snapshot
-	for p in snapshot.players:
+	for p: Dictionary in snapshot.players:
 		names[p.id] = p.nick
 		if hud != null:
 			hud.set_driver(p.id, p.get("country"), p.get("num"))
@@ -534,7 +534,7 @@ func update_room(snapshot: Dictionary) -> void:
 	# hide cars of players who left the room
 	for r: Remote in remotes.values():
 		var present := false
-		for p in snapshot.players:
+		for p: Dictionary in snapshot.players:
 			if p.id == r.id:
 				present = true
 		if not present:
@@ -557,7 +557,7 @@ func make_tracker(start_ms: float) -> RaceTracker:
 			tr.add_player(r.id)
 	return tr
 
-func toggle_pause(open = null) -> void:
+func toggle_pause(open: Variant = null) -> void:
 	paused = (not paused) if open == null else bool(open)
 	if cb.has("on_pause_toggle"):
 		cb.on_pause_toggle.call(paused)
@@ -649,7 +649,7 @@ func _attach_world_extras(q: Dictionary) -> void:
 	wet_fx = WetFx.new()
 	add_child(wet_fx)
 	var gq: GroundQuery = track.ground_query
-	wet_fx.build(track_data, func(x, yt, z, md): return gq.height_below(x, yt, z, md), hash(str(track_data.id)))
+	wet_fx.build(track_data, func(x: float, yt: float, z: float, md: float) -> Variant: return gq.height_below(x, yt, z, md), hash(str(track_data.id)))
 	shells = GrassShells.build(track, track.lawn_materials, track_data, mask)
 	if shells != null:
 		add_child(shells)
@@ -683,8 +683,8 @@ func _attach_line_extras(tuned: Dictionary) -> void:
 
 func _build_cinematic(entries: Dictionary) -> void:
 	var entrants: Array = []
-	for id in race.grid:
-		var p = _player(id)
+	for id: String in race.grid:
+		var p: Variant = _player(id)
 		var e: Variant = entries.get(p.carId) if p != null and p.carId != null else null
 		if p == null or e == null:
 			continue
@@ -827,7 +827,7 @@ func _on_my_lap(m: Dictionary) -> void:
 		best_lap = m.lapMs
 		best_sectors = m.sectors.duplicate()
 	var session_best := true
-	for s in standings:
+	for s: Dictionary in standings:
 		if s.id != me and s.bestLapMs != null and s.bestLapMs <= m.lapMs:
 			session_best = false
 	var tag := ""
@@ -874,7 +874,7 @@ func _on_binary(buf: PackedByteArray) -> void:
 	var r: Remote = remotes.get(dec.slot)
 	if r == null:
 		return
-	for i in dec.count:
+	for i: int in dec.count:
 		r.buffer.push(_relay_scratch[i], (dec.seq * Const.STATES_PER_PACKET + i) & 0xffff)
 
 ## Start of my current lap (server clock), from the local mirror of the lap logic.
@@ -888,7 +888,7 @@ func update_timing() -> void:
 	if timing == null or not timing.visible:
 		return
 	timing.update_list(standings, me, func(id: String) -> Dictionary:
-		var p = _player(id)
+		var p: Variant = _player(id)
 		var car := CarsDb.resolve(p.carId) if p != null and p.carId != null else {}
 		return {"nick": names.get(id, "?"), "car": car.get("name", ""), "colour": car.get("color", "#888888"), "bot": p != null and p.get("bot", false)})
 
@@ -1034,11 +1034,11 @@ func simulated() -> Array:
 
 ## The host simulates every bot: a Vehicle + AiDriver in this physics world.
 func _create_local_bots(entries: Dictionary) -> void:
-	var mp = _player(me)
+	var mp: Variant = _player(me)
 	if mp == null or not mp.get("host", false):
 		return
 	for r: Remote in remotes.values():
-		var p = _player(r.id)
+		var p: Variant = _player(r.id)
 		if p == null or not p.get("bot", false) or p.carId == null:
 			continue
 		var entry: Variant = entries.get(p.carId)
@@ -1084,7 +1084,7 @@ func _create_local_bots(entries: Dictionary) -> void:
 ## Distance to the circuit's walls (collision), horizontally from 0.8 m above (x, y, z): where the garages are.
 var _wall_query := PhysicsRayQueryParameters3D.new()
 
-func wall_probe(x: float, y: float, z: float, dx: float, dz: float, max_d: float):
+func wall_probe(x: float, y: float, z: float, dx: float, dz: float, max_d: float) -> Variant:
 	_wall_query.collision_mask = VehicleConsts.LAYER_WALL
 	_wall_query.from = Vector3(x, y + 0.8, z)
 	_wall_query.to = Vector3(x + dx * max_d, y + 0.8, z + dz * max_d)
@@ -1170,7 +1170,7 @@ func tear_parts(visual: CarVisual, zones: PackedFloat32Array, before: PackedFloa
 	if not visual.detached.is_empty() and zones[0] < 0.05 and zones[1] < 0.05:
 		visual.restore_parts()
 		return
-	for part in TEAR_AT:
+	for part: String in TEAR_AT:
 		if visual.detached.has(part):
 			continue
 		var z: int = TEAR_AT[part][0]
@@ -1183,7 +1183,7 @@ func tear_parts(visual: CarVisual, zones: PackedFloat32Array, before: PackedFloa
 ## through the others, and they through it; it is solid again once out of the lane and clear of every car (it never
 ## turns solid inside another).
 func pit_lane_contact() -> void:
-	for sv in simulated():
+	for sv: Array in simulated():
 		var id: String = sv[0]
 		var v: Vehicle = sv[1]
 		var in_lane := false
@@ -1204,12 +1204,12 @@ func pit_lane_contact() -> void:
 
 ## A remote driver is in the pit lane (from the standings): their proxy body is not solid there.
 func remote_in_pit(id: String) -> bool:
-	var o = _standing(id)
+	var o: Variant = _standing(id)
 	return o != null and bool(o.get("inPit", false))
 
 ## No car (simulated here, or another driver's) within r (m) of (x, z), apart from `skip`.
 func cars_clear_of_except(x: float, z: float, r: float, skip: Node3D) -> bool:
-	for sv in simulated():
+	for sv: Array in simulated():
 		var v: Node3D = sv[1]
 		if v == skip:
 			continue
@@ -1226,7 +1226,7 @@ func cars_clear_of_except(x: float, z: float, r: float, skip: Node3D) -> bool:
 
 ## No car simulated here within r (m) of (x, z).
 func clear_of_mine(x: float, z: float, r: float) -> bool:
-	for sv in simulated():
+	for sv: Array in simulated():
 		var p: Vector3 = sv[1].global_position
 		if (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z) < r * r:
 			return false
@@ -1247,7 +1247,7 @@ func cars_clear_of(x: float, z: float, r: float) -> bool:
 ## stand-ins took from them is added to the bump for their owners.
 func after_contacts() -> void:
 	var now := Time.get_ticks_msec() as float
-	for sv in simulated():
+	for sv: Array in simulated():
 		var v: Vehicle = sv[1]
 		if v._touching_car():
 			hit_at[sv[0]] = now
@@ -1260,7 +1260,7 @@ func after_contacts() -> void:
 		var dz := v.z - r.set_v.z
 		if dx * dx + dz * dz < 0.0025:
 			continue
-		for sv in simulated():
+		for sv: Array in simulated():
 			var veh: Vehicle = sv[1]
 			var touching := false
 			for b in body.get_colliding_bodies():
@@ -1329,7 +1329,7 @@ func _on_bump(m: Dictionary) -> void:
 
 ## Cars sunk under the road are put back on it (mine and the bots I run).
 func rescue_cars() -> void:
-	for sv in simulated():
+	for sv: Array in simulated():
 		sv[1].rescue_below_ground()
 
 ## Touched by another car in the last second (FLAG_HIT: the tracker waives what follows a hit).
@@ -1338,10 +1338,10 @@ func recently_hit(id: String) -> bool:
 
 ## Contact force events -> damage on my car.
 func drain_contacts() -> void:
-	for ev in vehicle.consume_impacts():
+	for ev: Dictionary in vehicle.consume_impacts():
 		# only walls and barriers damage the car; touching the road or grass never does (with the contact rule, other
 		# cars too: a box that can't give way hits harder than a car that would, so less)
-		var other = ev.other
+		var other: Variant = ev.other
 		var is_car: bool = other is Vehicle or (other is CollisionObject3D and (other.collision_layer & VehicleConsts.LAYER_PROXY) != 0)
 		var is_wall: bool = other != null and other.has_meta("surface") and other.get_meta("surface") == "wall"
 		if not is_car and not is_wall:
@@ -1437,7 +1437,7 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 	if tr.lap_invalid or tr.lap_penalty_ms > 0 or tr.in_pit or tr.out_lap:
 		sector_dirty = true
 	var lap_dist_now: float = tr.race_dist - tr.laps * float(track_data.length)
-	for e in ev:
+	for e: Dictionary in ev:
 		if e.type == "sector" and e.playerId == me:
 			d.end_sector(int(e.sector), float(track_data.length) if int(e.sector) >= 2 else lap_dist_now, float(e.ms), not sector_dirty)
 			sector_dirty = tr.lap_invalid or tr.in_pit
@@ -1560,7 +1560,8 @@ func close_replay() -> void:
 	if not replay_open:
 		return
 	replay_open = false
-	for v in _replay_saved:
+	# (Variant: a saved visual may be freed by now, which a typed variable would refuse)
+	for v: Variant in _replay_saved:
 		if is_instance_valid(v):
 			v.top_level = false
 			v.transform = _replay_saved[v]
@@ -1655,7 +1656,7 @@ func _replay_update(dt: float) -> Camera3D:
 	if replay_cam_mode == 1 and tv_cameras() != null:
 		_tv_hint = TrackMath.nearest_centerline_index(track_data, p.pos.x, p.pos.y, p.pos.z, _tv_hint, 40)
 		var s := TrackMath.progress_at(track_data, _tv_hint, p.pos.x, p.pos.z)
-		var cams = tv_cameras()
+		var cams: TvCameras = tv_cameras()
 		if cams.update(dt, p.pos, vel, s):
 			return cams.camera
 	if replay_cam_mode == 2:
@@ -1726,8 +1727,8 @@ func cycle_delta_mode() -> void:
 ## grid order) instead of all launching side by side onto the same line, and they keep their distance behind a car
 ## directly ahead.
 func step_bots(race_t: float) -> void:
-	var bots: Array = remotes.values().filter(func(r): return r.bot != null)
-	bots.sort_custom(func(a, b): return a.slot < b.slot)
+	var bots: Array = remotes.values().filter(func(r: Remote) -> bool: return r.bot != null)
+	bots.sort_custom(func(a: Remote, b: Remote) -> bool: return a.slot < b.slot)
 	for order in bots.size():
 		var r: Remote = bots[order]
 		var b := r.bot
@@ -1862,7 +1863,7 @@ func sample_bots(server_now: float) -> void:
 ## A yellow flag waved at lap distance s.
 func in_yellow(s: float) -> bool:
 	var L: float = track_data.length
-	for y in rc.yellows:
+	for y: Array in rc.yellows:
 		if TrackMath.wrap_delta(y[0], s, L) >= 0.0 and TrackMath.wrap_delta(s, y[1], L) >= 0.0:
 			return true
 	return false
@@ -1968,7 +1969,7 @@ func _process_inner(dt: float) -> void:
 		pit_cam_on = true
 	elif pit_cam_on:
 		pit_cam_on = false
-	var cine = cinematic
+	var cine: Cinematic = cinematic
 	if cine != null:
 		if cine.update(dt, null if start_at == null else start_at - server_now):
 			view_cam = cine.camera
@@ -1982,8 +1983,8 @@ func _process_inner(dt: float) -> void:
 			hud.visible = true
 	# the trackside TV cameras: watching, after the flag, or asked for (T)
 	if cinematic == null and not pit_cam_on and tv_wanted():
-		var tt = tv_target()
-		var cams = tv_cameras() if tt != null else null
+		var tt: Variant = tv_target()
+		var cams: TvCameras = tv_cameras() if tt != null else null
 		if tt != null and cams != null and cams.update(dt, tt.pos, tt.vel, tt.s):
 			view_cam = cams.camera
 			cam_pos = cams.camera.global_position
@@ -2150,7 +2151,7 @@ func handle_keys(server_now: float) -> void:
 		vehicle.frozen = false
 		freeze_until = 0.0
 
-func update_countdown(ms_left) -> void:
+func update_countdown(ms_left: Variant) -> void:
 	var text := ""
 	var sub := ""
 	if ms_left == null:
@@ -2284,7 +2285,7 @@ func update_wake() -> void:
 			wake_cars.append({"pos": r.visual.global_position, "vel": r.vel})
 	wake_cars.append({"pos": vehicle.global_position, "vel": vehicle.linear_velocity})
 	var apply := func(v: Vehicle, pos: Vector3, vel: Vector3) -> void:
-		var others: Array = wake_cars.filter(func(c): return c.pos != pos)
+		var others: Array = wake_cars.filter(func(c: Dictionary) -> bool: return c.pos != pos)
 		var s := BestLapGhost.wake_strength(pos, vel, others)
 		v.wake.strength += (s - v.wake.strength) * 0.2
 		# research: the follower loses drag in the wake and, right behind, some downforce (dirty air)
@@ -2341,12 +2342,12 @@ func toggle_tv() -> void:
 	flash(I18n.t("TV cameras") if tv_view else I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0, "osd")
 
 ## Placed the first time they are wanted: a sightline check per tower against the circuit's collision.
-func tv_cameras():
+func tv_cameras() -> TvCameras:
 	if tv != null:
 		return tv
 	if not ResourceLoader.exists("res://scripts/game/tv_cameras.gd"):
 		return null
-	var cast_sight := func(a: Vector3, b: Vector3):
+	var cast_sight := func(a: Vector3, b: Vector3) -> Variant:
 		var d := a.distance_to(b)
 		if d < 0.01:
 			return null
@@ -2357,7 +2358,7 @@ func tv_cameras():
 		if forest != null and forest.blocks(a, b):
 			return d / 2.0
 		return null
-	var ground_at := func(x: float, z: float, from_y: float):
+	var ground_at := func(x: float, z: float, from_y: float) -> Variant:
 		var q := PhysicsRayQueryParameters3D.create(Vector3(x, from_y, z), Vector3(x, from_y - 600.0, z), VehicleConsts.RAY_MASK)
 		var hit := get_viewport().world_3d.direct_space_state.intersect_ray(q)
 		return null if hit.is_empty() else hit.position.y
@@ -2368,7 +2369,7 @@ func tv_cameras():
 var _tv_hint := -1
 
 ## The car the TV cameras follow: watching, the watched car; driving, yours. Returns {pos, vel, s} or null.
-func tv_target():
+func tv_target() -> Variant:
 	if not spectator:
 		return {"pos": vehicle.global_position, "vel": vehicle.linear_velocity, "s": loc.s}
 	var r := remote_by_id(spec_target)
@@ -2384,8 +2385,8 @@ func _on_spectator_key(e: InputEventKey) -> void:
 	var have := {}
 	for r: Remote in remotes.values():
 		have[r.id] = true
-	var src: Array = standings.map(func(s): return s.id) if standings.size() > 0 else race.grid
-	var ids: Array = src.filter(func(id): return have.has(id))
+	var src: Array = standings.map(func(s: Dictionary) -> String: return s.id) if standings.size() > 0 else race.grid
+	var ids: Array = src.filter(func(id: String) -> bool: return have.has(id))
 	if ids.is_empty():
 		return
 	var i := ids.find(spec_target)
@@ -2473,7 +2474,7 @@ func _load_safety_car() -> void:
 func update_safety_car(server_now: float, dt: float) -> void:
 	if sc == null or sc_path == null:
 		return
-	var d = rc.sc
+	var d: Variant = rc.sc
 	var on: bool = d != null and server_now >= d.t0 and (d.inAt == null or server_now < d.inAt)
 	sc.visible = on
 	if sc.get("look") != null:
@@ -2492,7 +2493,7 @@ func update_safety_car(server_now: float, dt: float) -> void:
 			# beside the lane line, not on it: towards the garages, clear of the wall there, else the other way
 			var away := pit.away_at(i) if pit != null else Vector2.ZERO
 			var room := func(sx: float) -> float:
-				var h = wall_probe(p[0], p[1], p[2], away.x * sx, away.y * sx, 12.0)
+				var h: Variant = wall_probe(p[0], p[1], p[2], away.x * sx, away.y * sx, 12.0)
 				return 12.0 if h == null else h
 			var side := 1.0 if room.call(1.0) >= 5.5 else (-1.0 if room.call(-1.0) >= 5.5 else (1.0 if room.call(1.0) >= room.call(-1.0) else -1.0))
 			var off := maxf(0.0, minf(4.2, room.call(side) - 1.3))
@@ -2538,10 +2539,10 @@ func update_limiters(server_now: float) -> void:
 func driver_change_state() -> String:
 	if not race.get("rules", {}).get("pitWindow", false) or race.kind != "race":
 		return ""
-	for s in standings:
+	for s: Dictionary in standings:
 		if s.id == me and s.stopDone:
 			return "done"
-	var wt = pit_window_ms()
+	var wt: Variant = pit_window_ms()
 	if wt != null:
 		# by the clock, from the pit entry: the stop has started when the car is in the lane
 		var t: float = conn.server_now()
@@ -2561,7 +2562,7 @@ func update_bot_pits(server_now: float) -> void:
 	var now := Time.get_ticks_msec() as float
 	var rules: Dictionary = race.get("rules", {})
 	var win := RaceTracker.pit_window_laps(race_laps())
-	var wt = pit_window_ms()
+	var wt: Variant = pit_window_ms()
 	for r: Remote in remotes.values():
 		var b := r.bot
 		var tr: RaceTracker.PlayerRaceState = local_tracker.players.get(r.id) if local_tracker != null else null
@@ -2583,13 +2584,13 @@ func update_bot_pits(server_now: float) -> void:
 		elif b.pit_sent and not b.ai.in_pit_lane:
 			b.pit_sent = false
 			conn.send_json({"t": "pit", "in": false, "id": r.id})
-			var exit_s = track_data.pitLane.exitS if track_data.get("pitLane") != null else 0.0
+			var exit_s: float = track_data.pitLane.exitS if track_data.get("pitLane") != null else 0.0
 			local_tracker.pit_out(r.id, exit_s, server_now)
 			b.exit_at = now
 		if race.kind != "race" or tr.finished_ms != null or tr.dnf:
 			continue
 		var lap := tr.laps + 1
-		var st = _standing(r.id)
+		var st: Variant = _standing(r.id)
 		var laps_left := race_laps() - tr.laps
 		var per_lap: float = (float(track_data.length) / 1000.0) * VehicleConsts.FUEL.perKm
 		# the mandatory stop: on its lap of the window, or (a timed race) at its moment in the window's 10 minutes
@@ -2630,7 +2631,7 @@ func update_bot_pits(server_now: float) -> void:
 			r.visual.wheel_out = pose.wheelOut
 			b.lift = pose.lift
 		elif b.service_end > 0.0 and now >= b.service_end:
-			var plan2 = b.service_plan
+			var plan2: Variant = b.service_plan
 			if plan2 != null and plan2.tyres != null:
 				v.fit_tyres(Tyres.COMPOUNDS[plan2.tyres], v.ambient_c + 12.0)
 				v.weather_grip = Tyres.compound_grip(v.compound, weather.wetness, weather.rain)
@@ -2643,18 +2644,18 @@ func update_bot_pits(server_now: float) -> void:
 			r.visual.wheel_out = [0.0, 0.0, 0.0, 0.0]
 			b.ai.pit_served()
 
-func _standing(id: String):
-	for s in standings:
+func _standing(id: String) -> Variant:
+	for s: Dictionary in standings:
 		if s.id == id:
 			return s
 	return null
 
 ## Race control's flag for me (the light panel on the HUD) and the fuel readout.
 func race_control_hud(server_now: float) -> Dictionary:
-	var me_s = _standing(me)
+	var me_s: Variant = _standing(me)
 	var flag := ""
 	var flag_text := ""
-	var sc_in = rc.sc.inAt if rc.sc != null and rc.sc.inAt != null else 0.0
+	var sc_in: float = rc.sc.inAt if rc.sc != null and rc.sc.inAt != null else 0.0
 	if rc.course == "sc" or (rc.course == "sc-in" and sc_in > server_now):
 		flag = "sc"
 		flag_text = I18n.t("SAFETY CAR IN THIS LAP") if rc.course == "sc-in" else I18n.t("SAFETY CAR · NO OVERTAKING")
@@ -2698,7 +2699,7 @@ func session_text(server_now: float) -> String:
 	if race.kind == "race":
 		if finished_ms != null:
 			return I18n.t("FINISHED")
-		for x in standings:
+		for x: Dictionary in standings:
 			if x.finishedMs != null:
 				return I18n.t("CHEQUERED FLAG · LAST LAP")
 		# a timed race: the clock, then the leader's last lap
@@ -2721,11 +2722,11 @@ var _tris := PackedFloat32Array()
 var _tri_grid := {}
 
 ## Height of the visible road at (x, z) under top (the highest surface below the probe), from the triangles near the pit lane.
-func _road_height(x: float, z: float, top: float):
+func _road_height(x: float, z: float, top: float) -> Variant:
 	const G := 2.0
 	var best: Variant = null
 	var k := int(floorf(x / G)) * 65536 + int(floorf(z / G))
-	for t in _tri_grid.get(k, []):
+	for t: int in _tri_grid.get(k, []):
 		var ax := _tris[t]
 		var ay := _tris[t + 1]
 		var az := _tris[t + 2]
@@ -2790,13 +2791,13 @@ func _build_pit_lane() -> void:
 	var near := {}
 	const CELL := 8.0
 	var key := func(x: float, z: float) -> int: return int(floorf(x / CELL)) * 65536 + int(floorf(z / CELL))
-	for p in lane.points:
+	for p: Array in lane.points:
 		for dx in range(-5, 6):
 			for dz in range(-5, 6):
 				near[key.call(p[0] + dx * CELL, p[2] + dz * CELL)] = true
 	var lo := Vector3(INF, INF, INF)
 	var hi := Vector3(-INF, -INF, -INF)
-	for p in lane.points:
+	for p: Array in lane.points:
 		lo = Vector3(minf(lo.x, p[0]), minf(lo.y, p[1]), minf(lo.z, p[2]))
 		hi = Vector3(maxf(hi.x, p[0]), maxf(hi.y, p[1]), maxf(hi.z, p[2]))
 	var pit_box := AABB(lo - Vector3(45, 45, 45), (hi - lo) + Vector3(90, 90, 90))
@@ -2851,14 +2852,14 @@ func _build_pit_lane() -> void:
 		t += 9
 	var gq := track.ground_query
 	var paint_ground := func(x: float, z: float, y: float) -> float:
-		var h = _road_height(x, z, y + 2.5)
+		var h: Variant = _road_height(x, z, y + 2.5)
 		if h != null:
 			return h
 		var hit: Dictionary = gq.cast(Vector3(x, y + 2.5, z), Vector3.DOWN, 6.0)
 		return hit.pos.y if not hit.is_empty() else y
 	if PIT_SURFACE_MAPS.has(track_data.get("map", "")):
 		add_child(pit.build_surface(paint_ground, wall_probe))
-	var mine = null if spectator else {"slot": race.slots.get(me, 0), "name": names.get(me, "")}
+	var mine: Variant = null if spectator else {"slot": race.slots.get(me, 0), "name": names.get(me, "")}
 	add_child(pit.build_markings(paint_ground, mine))
 
 ## Pit lane: limiter, pit-in/out for the lap logic, the service box.
@@ -2881,7 +2882,7 @@ func update_pit(server_now: float) -> void:
 	elif ev == "box" and not pit_hold and finished_ms == null:
 		open_pit_menu()
 	# service running
-	var sv = service
+	var sv: Variant = service
 	if sv != null and pit_menu != null:
 		var now := Time.get_ticks_msec() as float
 		var secs: float = (now - sv.start) / 1000.0
@@ -2905,14 +2906,14 @@ func open_pit_menu() -> void:
 	var v := vehicle
 	pit_hold = true
 	v.frozen = true
-	var wear: Array = v.wheels.map(func(w): return w.wear)
+	var wear: Array = v.wheels.map(func(w: Wheel) -> float: return w.wear)
 	var avg_wear := 0.0
-	for w in wear:
+	for w: float in wear:
 		avg_wear += w
 	avg_wear /= 4.0
 	# the race: fuel to the finish (and a lap more); the mandatory stop when the window is open
-	var laps_left = maxi(0, race_laps() - my_laps) if race.kind == "race" else null
-	var fuel_need = (laps_left + 1) * fuel_per_lap if laps_left != null else null
+	var laps_left: Variant = maxi(0, race_laps() - my_laps) if race.kind == "race" else null
+	var fuel_need: Variant = (laps_left + 1) * fuel_per_lap if laps_left != null else null
 	var fuel_add := 0.0
 	if v.fuel_l >= 0.0 and fuel_need != null:
 		fuel_add = ceilf(minf(VehicleConsts.FUEL.tankL - v.fuel_l, maxf(0.0, fuel_need - v.fuel_l)))
@@ -2922,12 +2923,12 @@ func open_pit_menu() -> void:
 	if damage.punctured.has(true) and plan.tyres == null:
 		plan.tyres = v.compound.id
 	var opts := {
-		"current": v.compound.id, "wear": wear, "temps": v.wheels.map(func(w): return w.temp), "zones": damage.zones,
+		"current": v.compound.id, "wear": wear, "temps": v.wheels.map(func(w: Wheel) -> float: return w.temp), "zones": damage.zones,
 		"wetness": weather.wetness, "plan": plan,
 		"fuel": null if v.fuel_l < 0.0 else {"litres": v.fuel_l, "tank": VehicleConsts.FUEL.tankL, "perLap": fuel_per_lap, "need": fuel_need},
 		"driverChange": driver if driver != "" else null,
 	}
-	pit_menu = PitMenu.new(opts, func(p, seconds):
+	pit_menu = PitMenu.new(opts, func(p: Dictionary, seconds: float) -> void:
 		var now := Time.get_ticks_msec() as float
 		service = {"plan": p, "start": now, "end": now + seconds * 1000.0, "events": PitCrew.stop_timeline(p, damage.zones), "fired": 0},
 		func() -> void: release_from_box())
@@ -2984,7 +2985,7 @@ func stop_event(e: Dictionary, v: Vehicle, plan: Dictionary, audible: bool) -> v
 
 func update_spectator_ui(server_now: float, dt: float) -> void:
 	var r := remote_by_id(spec_target)
-	var st = _standing(spec_target)
+	var st: Variant = _standing(spec_target)
 	var nm: String = names.get(spec_target, "")
 	if standings.size() > 0:
 		hud.set_board(standings, spec_target, names)
@@ -3032,7 +3033,7 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 	var stuck: bool = (tel.speed < 1.0 and race_t > 2000.0 and not v.frozen) or up_y < 0.3 or tel.airborne > 2.0
 	stuck_time = stuck_time + dt if stuck else 0.0
 
-	var me_s = _standing(me)
+	var me_s: Variant = _standing(me)
 	var position: int = me_s.position if me_s != null else race.slots.get(me, 0) + 1
 	var now_ms := Time.get_ticks_msec() as float
 	if now_ms > message_until:
@@ -3059,8 +3060,8 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 		"lastLapMs": lap_times.back() if not lap_times.is_empty() else null, "sectorDelta": sector_delta, "damage": damage.total(),
 		"wrongWay": wrong_way_time > 1.2, "abs": tel.absActive, "tc": tel.tcActive, "message": message, "messageKind": message_kind, "mirrorOn": mirror != null and mirror.visible, "sessionText": session_text(server_now),
 		"pitText": I18n.t("PIT BOX") if pit_hold else (I18n.t("PIT LANE · LIMITER {n}", {"n": int(pit.lane.speedLimitKmh)}) if pit != null and pit.in_lane else ""),
-		"compound": v.compound.id, "tyreWear": v.wheels.map(func(w): return w.wear), "brakeTemps": v.wheels.map(func(w): return w.brake_temp),
-		"slipstream": v.wake.strength, "resetHint": stuck_time > 3.0, "tyreTemps": v.wheels.map(func(w): return w.temp),
+		"compound": v.compound.id, "tyreWear": v.wheels.map(func(w: Wheel) -> float: return w.wear), "brakeTemps": v.wheels.map(func(w: Wheel) -> float: return w.brake_temp),
+		"slipstream": v.wake.strength, "resetHint": stuck_time > 3.0, "tyreTemps": v.wheels.map(func(w: Wheel) -> float: return w.temp),
 		"damageZones": damage.zones, "headlights": headlights_on, "throttle": v.pedals.throttle, "brake": v.pedals.brake, "steer": v.steer_angle / v.max_steer,
 	}
 	state.merge(rc_hud)
@@ -3074,7 +3075,7 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 			"lapMs": cur_lap, "lastMs": lap_times.back() if not lap_times.is_empty() else null, "bestMs": best_lap,
 			"deltaMs": live_delta if my_laps > 0 and finished_ms == null else null, "position": position, "total": race.grid.size(),
 			"tc": v.assists.tc, "abs": v.assists.abs, "bias": float(v.specs.brakeBiasFront), "fuelL": v.fuel_l if v.fuel_l >= 0.0 else null,
-			"psi": v.wheels.map(func(w): return w.pressure), "temps": v.wheels.map(func(w): return w.temp), "pitLimiter": pit != null and pit.in_lane,
+			"psi": v.wheels.map(func(w: Wheel) -> float: return w.pressure), "temps": v.wheels.map(func(w: Wheel) -> float: return w.temp), "pitLimiter": pit != null and pit.in_lane,
 		})
 	# minimap at ~10 Hz
 	map_timer -= dt
@@ -3101,9 +3102,9 @@ func update_relative(p: Vector3, fx: float, fz: float) -> void:
 		rel_hints[id] = i
 		return td.cumS[i]
 	var my_s: float = lap_s.call(me, p.x, p.y, p.z)
-	var ref = best_lap if best_lap != null else (lap_times.back() if not lap_times.is_empty() else null)
+	var ref: Variant = best_lap if best_lap != null else (lap_times.back() if not lap_times.is_empty() else null)
 	var v_ref: float = L / (ref / 1000.0) if ref != null else 42.0
-	var mine = _standing(me)
+	var mine: Variant = _standing(me)
 	var rows: Array = []
 	var left := false
 	var right := false
@@ -3126,7 +3127,7 @@ func update_relative(p: Vector3, fx: float, fz: float) -> void:
 			d -= L
 		if d < -L / 2.0:
 			d += L
-		var o = _standing(r.id)
+		var o: Variant = _standing(r.id)
 		# a lap or more apart in the race (from the classification's distances)
 		var laps_apart := 0
 		if race.kind == "race" and o != null and mine != null:
@@ -3137,12 +3138,12 @@ func update_relative(p: Vector3, fx: float, fz: float) -> void:
 			"inPit": o != null and o.inPit, "me": false,
 		})
 	# three ahead and three behind on the road, nearest first, you in the middle
-	var ahead: Array = rows.filter(func(r): return r.gapS >= 0.0)
-	ahead.sort_custom(func(a, b): return a.gapS < b.gapS)
+	var ahead: Array = rows.filter(func(r: Dictionary) -> bool: return r.gapS >= 0.0)
+	ahead.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.gapS < b.gapS)
 	ahead = ahead.slice(0, 3)
 	ahead.reverse()
-	var behind: Array = rows.filter(func(r): return r.gapS < 0.0)
-	behind.sort_custom(func(a, b): return a.gapS > b.gapS)
+	var behind: Array = rows.filter(func(r: Dictionary) -> bool: return r.gapS < 0.0)
+	behind.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.gapS > b.gapS)
 	behind = behind.slice(0, 3)
 	var me_row := {
 		"id": me, "name": names.get(me, ""), "color": my_visual.entry.color, "position": mine.position if mine != null else 0,
@@ -3151,12 +3152,12 @@ func update_relative(p: Vector3, fx: float, fz: float) -> void:
 	hud.set_relative(ahead + [me_row] + behind, left, right)
 	# the circuit map: every car, numbered (its car number, else its position), you on yellow
 	var map_cars: Array = []
-	for r in rows:
+	for r: Dictionary in rows:
 		var rem := remote_by_id(r.id)
 		var pos := rem.visual.global_position if rem != null else Vector3.ZERO
-		var num = car_number(r.id)
+		var num: Variant = car_number(r.id)
 		map_cars.append({"x": pos.x, "z": pos.z, "label": str(num) if num != null else (str(r.position) if r.position != 0 else ""), "me": false, "lap": r.lap, "inPit": r.inPit})
-	var my_num = car_number(me)
+	var my_num: Variant = car_number(me)
 	map_cars.append({"x": p.x, "z": p.z, "label": str(my_num) if my_num != null else (str(mine.position) if mine != null and mine.position != 0 else ""), "me": true, "lap": "same", "inPit": pit != null and pit.in_lane})
 	hud.set_map_cars(map_cars)
 
@@ -3170,7 +3171,7 @@ func _update_spray(dt: float, cam_pos: Vector3) -> void:
 	var visuals: Array = [my_visual]
 	for r: Remote in remotes.values():
 		visuals.append(r.visual)
-	for vis in visuals:
+	for vis: CarVisual in visuals:
 		if vis == null or not is_instance_valid(vis):
 			continue
 		var sp: CarSpray = sprays.get(vis)

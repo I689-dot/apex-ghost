@@ -143,7 +143,7 @@ static func _paint(m: StandardMaterial3D) -> void:
 			_painted[t] = t
 		else:
 			var mean := sum / paint.size()
-			for p in paint:
+			for p: Array in paint:
 				var k: float = clampf(p[2] / mean, 0.6, 1.4)
 				var pg: Color = _p("paint_green", PAINT_GREEN)
 				var c := Color(pg.r * k, pg.g * k, pg.b * k).linear_to_srgb()
@@ -246,14 +246,14 @@ static func _kerb(m: StandardMaterial3D) -> void:
 				groups[key].append([x, y, lum])
 				sums[key] += lum
 	var changed := false
-	for key in groups:
+	for key: String in groups:
 		var g: Array = groups[key]
 		if g.is_empty():
 			continue
 		changed = true
 		var mean: float = sums[key] / g.size()
 		var want: Color = _p("kerb_red", KERB_RED) if key == "red" else _p("kerb_yellow", KERB_YELLOW)
-		for p in g:
+		for p: Array in g:
 			var k: float = clampf(p[2] / mean, 0.7, 1.3)
 			var c := Color(want.r * k, want.g * k, want.b * k).linear_to_srgb()
 			c.a = img.get_pixel(p[0], p[1]).a
@@ -301,7 +301,7 @@ const ROAD_RE := "^asph_spa_(base|base2|new|pit|pit2)$"
 ## 4K on the PC, 2K on phones (the phone's pack carries only the 2K set: tools/godot/build-track-pack.py); whichever
 ## is there.
 static func _road_file(map: String) -> String:
-	for res in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
+	for res: String in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
 		var p := "res://assets/textures/spa/asphalt_track_%s_%s.jpg" % [map, res]
 		if ResourceLoader.exists(p):
 			return p
@@ -339,7 +339,7 @@ static func _road_surface(m: StandardMaterial3D) -> void:
 const SCAN_MEAN := {"gravel_floor": Color(0.376, 0.2505, 0.1432)}
 
 static func _scan_file(scan: String, map: String) -> String:
-	for res in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
+	for res: String in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
 		var p := "res://assets/textures/spa/%s_%s_%s.jpg" % [scan, map, res]
 		if ResourceLoader.exists(p):
 			return p
@@ -409,22 +409,22 @@ static func tints() -> Array:
 ## Tints of what draws its own shared textures, not the circuit's materials: "@lawn" (the 3D grass shells and blades),
 ## "@forest" (the forest's trees and impostors).
 static func global_tint(key: String) -> Vector3:
-	for t in tints():
+	for t: Array in tints():
 		if t[0] == key:
 			return Vector3(t[1][0], t[1][1], t[1][2])
 	return Vector3.ONE
 
 static func apply(track: TrackScene) -> void:
 	var res := []
-	for d in _p("draw", DRAW):
+	for d: Array in _p("draw", DRAW):
 		res.append([RegEx.create_from_string(d[0]), d[1]])
 	var tint_res := []
-	for t in tints():
+	for t: Array in tints():
 		if String(t[0]).begins_with("@"):
 			continue
 		tint_res.append([RegEx.create_from_string(t[0]), Color(t[1][0], t[1][1], t[1][2], t[1][3] if t[1].size() > 3 else 1.0)])
 	var target_res := []
-	for t in _p("target", TARGET):
+	for t: Array in _p("target", TARGET):
 		target_res.append([RegEx.create_from_string(t[0]), Color(t[1][0], t[1][1], t[1][2])])
 	var road_re := RegEx.create_from_string(_p("road_re", ROAD_RE))
 	var lawn_re := RegEx.create_from_string(_p("lawn_re", LAWN_RE))
@@ -432,7 +432,7 @@ static func apply(track: TrackScene) -> void:
 	var kerb_re := RegEx.create_from_string(_p("kerb_re", KERB_RE))
 	var fence_re := RegEx.create_from_string(_p("fence_re", "^fence_spa$"))
 	var scan_res := []
-	for sc in _p("scans", []):
+	for sc: Array in _p("scans", []):
 		scan_res.append([RegEx.create_from_string(sc[0]), sc[1], float(sc[2])])
 	var seen := {}
 	var counts := {}
@@ -447,7 +447,7 @@ static func apply(track: TrackScene) -> void:
 				continue
 			seen[m] = true
 			var how := ""
-			for r in res:
+			for r: Array in res:
 				if (r[0] as RegEx).search(m.resource_name) != null:
 					how = r[1]
 					break
@@ -484,11 +484,11 @@ static func apply(track: TrackScene) -> void:
 			if kerb_re.search(m.resource_name) != null:
 				_kerb(m)
 			var scanned := ""
-			for sc in scan_res:
+			for sc: Array in scan_res:
 				if (sc[0] as RegEx).search(m.resource_name) != null and _scan_surface(m, sc[1], sc[2]):
 					scanned = sc[1]
 					break
-			for t in target_res:
+			for t: Array in target_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
 					var mean := ROAD_TEX_MEAN if m.albedo_texture != null and m.albedo_texture.resource_path.begins_with("res://assets/textures/spa/asphalt_track_diff") else texture_mean(m.albedo_texture)
 					if scanned != "":
@@ -496,11 +496,11 @@ static func apply(track: TrackScene) -> void:
 					var want: Color = t[1]
 					# albedo_color is an sRGB colour (the shader takes it to linear): the linear factor target / mean goes in encoded
 					m.albedo_color = Color(_enc(want.r / maxf(mean.r, 0.002)), _enc(want.g / maxf(mean.g, 0.002)), _enc(want.b / maxf(mean.b, 0.002)), m.albedo_color.a)
-					for r in track.road_materials:
+					for r: Dictionary in track.road_materials:
 						if r.mat == m:
 							r.color = m.albedo_color
 					break
-			for t in tint_res:
+			for t: Array in tint_res:
 				if (t[0] as RegEx).search(m.resource_name) != null:
 					var c: Color = t[1]
 					m.albedo_color = Color(m.albedo_color.r * c.r, m.albedo_color.g * c.g, m.albedo_color.b * c.b, m.albedo_color.a * c.a)
@@ -508,7 +508,7 @@ static func apply(track: TrackScene) -> void:
 					if m.albedo_color.a <= 0.0:
 						off.append(m)
 					# the wet-track darkening restores the dry colour it saved: save the tinted one
-					for r in track.road_materials:
+					for r: Dictionary in track.road_materials:
 						if r.mat == m:
 							r.color = m.albedo_color
 					break
@@ -516,13 +516,13 @@ static func apply(track: TrackScene) -> void:
 	_painted.clear()
 	if Settings.data.quality == "high" or Settings.data.quality == "ultra":
 		var det_res := []
-		for d in _p("detail", DETAIL):
+		for d: Array in _p("detail", DETAIL):
 			det_res.append([RegEx.create_from_string(d[0]), d[1], d[2]])
-		for mm in seen:
+		for mm: Material in seen:
 			var sm := mm as StandardMaterial3D
 			if sm == null or sm.detail_enabled:
 				continue
-			for d in det_res:
+			for d: Array in det_res:
 				if (d[0] as RegEx).search(sm.resource_name) != null:
 					_detail(sm, d[1], d[2])
 					break
@@ -568,7 +568,7 @@ const CARD_TREE_MAX := 30.0
 const CARD_BROADLEAF := 0.35
 
 static func card_trees(out: Array) -> void:
-	for e in out:
+	for e: Dictionary in out:
 		if float(e.h) < 4.0:
 			continue
 		e.h = minf(float(e.h) * CARD_TREE_SCALE, CARD_TREE_MAX)
