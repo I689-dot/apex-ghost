@@ -5,7 +5,31 @@ together with `git log`.
 
 ## State
 
-- **Phase:** phase 2 (guardrails) is done (2026-11-20). Next: batch 2, the dead code (F1, F2 as answered).
+- **Phase:** batch 2 (dead code) is done (2026-11-21). Next: batch 3, typing; then check-in 2.
+- **Size and warnings after batch 2:**
+  - Scripts and lines: 151 scripts (152 at the start), 34,138 lines (35,232 at the start, −1,094).
+  - Warnings: 2,488 (2,591 after the guardrails). No unused-name warning is left.
+- **Batch 2 commits.** Each one compiled, passed the full headless suite through `compare.sh` (PASS: identical to the
+  baseline), and passed the rendered features_test, a session, and, for the UI, rendered menu_test, the phone shots
+  and a HUD shot.
+  - `7d6d3aa` race_session: the radio and the never-read members (−214 lines).
+  - `90fdf4b` the pit crews: pit_crews.gd deleted, as the user answered (−596 lines).
+  - `3b6a423` shared, net, physics, input, audio (−83 lines).
+  - `73d82cb` game/, and the dev knobs the user asked to remove (−167 lines).
+  - `babdb41` app/ and ui/ (−48 lines).
+  - `f4b84b6` **Fix** (behaviour): the phone's Paint button opened the Car page, which the new
+    `tests/phone_paint_test.gd` shows; plus two out-of-date texts.
+- **Kept after checking**, where the audit's lead did not hold:
+  - `LocalRoom._next_id`: read through the class name, which the warning does not see; now marked with
+    `@warning_ignore`.
+  - `TireModel.force()`: the reference that the inlined fast path's comment points to.
+  - hud.gd's two `circuit_map.visible` writes: one only on touch, before a re-layout.
+  - the one-line `[look] materials` load summary (a deliberate trace, like `[boot]`).
+  - the career's `owned` and `daily` save keys, which are no longer read.
+- **Pre-existing, noted:** a rendered session prints the same leak counts at exit before and after (66 text shapes,
+  9 textures, 178 objects). That is for the Later list.
+- **The scratchpad was wiped overnight** (2026-11-21). `baseline.sh` and `compare.sh` live in this folder; the
+  `inventory.py` script must be written again when phase 4 moves it to `tools/godot/`.
 - **After the bug fixes, the headless baseline is unchanged.** A third run, after the fixes, matches the first. The
   only difference was the order of two menu_test lines, which are printed asynchronously; compare that test's lines
   sorted.
