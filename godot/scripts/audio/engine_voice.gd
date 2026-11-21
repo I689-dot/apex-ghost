@@ -144,7 +144,7 @@ func _process(dt: float) -> void:
 			a.burst("bandpass", randf_range(700.0, 2200.0), 1.4, randf_range(0.02, 0.05), 0.2 * _gain * strength, "Engine", _pan)
 			_next_pop = now + randf_range(40.0, 220.0) / maxf(0.3, float(p.get("pops", 0.6)))
 	if not bank.is_empty():
-		_update_engine(cut, rn)
+		_update_engine(cut)
 	# straight-cut sequential gearbox: the GT3 whine, loudest off-throttle
 	if _gear_ratio > 0.0:
 		_whine.pitch_scale = clampf(minf(6000.0, ((_raw_rpm / 60.0) * 38.0 * _doppler) / maxf(0.6, _gear_ratio / 3.0)) / 1000.0, 0.02, 8.0)
@@ -164,7 +164,7 @@ func _process(dt: float) -> void:
 		_motor.volume_db = _db(_gain * 0.02 * rn * (0.4 + _load))
 	_last_load = _load
 
-func _update_engine(cut: float, rn: float) -> void:
+func _update_engine(cut: float) -> void:
 	var loops: Array = bank.loops
 	var r := maxf(300.0, _rpm * float(profile.cyl) / float(bank.cyl) * float(profile.get("pitch", 1.0)))
 	var k := 0

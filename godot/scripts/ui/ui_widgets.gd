@@ -32,13 +32,6 @@ static func panel(child: Control = null, solid: bool = false) -> PanelContainer:
 		p.add_child(child)
 	return p
 
-static func margin(child: Control, m: int = 16) -> MarginContainer:
-	var c := MarginContainer.new()
-	for s in ["left", "top", "right", "bottom"]:
-		c.add_theme_constant_override("margin_" + s, m)
-	c.add_child(child)
-	return c
-
 ## Margins per side (left, top, right, bottom).
 static func margins(child: Control, l: int, t: int, r: int, b: int) -> MarginContainer:
 	var c := MarginContainer.new()
@@ -146,20 +139,6 @@ static func chips(current: Variant, options: Array, on: Callable, enabled: bool 
 		b.pressed.connect(func(): if enabled: on.call(val))
 		flow.add_child(b)
 	return flow
-
-## A labelled on/off row with a help line.
-static func toggle(label: String, help: String, value: bool, on: Variant) -> Control:
-	var row := UIW.hbox(12)
-	var col := UIW.vbox(2)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(UIKit.label(label, 17, UIKit.TEXT, false, 600))
-	if help != "":
-		col.add_child(UIW.muted(help, 14))
-	row.add_child(col)
-	var sw := UIW.switch(value, on)
-	sw.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(sw)
-	return row
 
 ## A pill switch (blue when on); on(bool) when flipped, or null for a read-only one.
 static func switch(value: bool, on: Variant) -> Switch:

@@ -95,11 +95,9 @@ static func _mode_card(title: String, photo: String, sub: String, cb: Callable, 
 # ---------------------------------------------------------------- career ---
 
 static func _career(app: App, cards: HBoxContainer) -> void:
-	var total := Progression.total_trophies()
 	for c in Progression.CUPS:
 		var id: String = c[0]
 		var open := Progression.cup_open(id)
-		var races: Array = c[3]
 		var b := _cup_card(app, c, open)
 		cards.add_child(b)
 

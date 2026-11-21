@@ -11,6 +11,8 @@ static var room: RoomCore = null
 static var _timer: SceneTreeTimer = null
 ## The code of the race this device hosts for other players (P2P), or "".
 static var hosted_code := ""
+# (read by LocalSocket as LocalRoom._next_id, which the unused-variable check does not see)
+@warning_ignore("unused_private_class_variable")
 static var _next_id := 0
 
 ## The room runs in this game: solo, or a race this device hosts.

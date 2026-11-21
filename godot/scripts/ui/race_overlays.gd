@@ -80,7 +80,7 @@ class DeltaBar:
 ## The spotter: a band on the side of the screen where a car is alongside.
 class SpotBand:
 	extends ColorRect
-	func _init(left: bool) -> void:
+	func _init(_left: bool) -> void:
 		color = Color(1, 0.6, 0.0, 0.0)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		custom_minimum_size = Vector2(14, 0)
@@ -92,8 +92,6 @@ var inputs := InputsWidget.new()
 var mirror_delta := Label.new()
 var spot_l := SpotBand.new(true)
 var spot_r := SpotBand.new(false)
-## Drivers' countries and numbers: {id: {country, num}} (set by the HUD).
-var drivers := {}
 var _rel_key := ""
 var _trace_t := 0.0
 var _last_md := ""

@@ -442,7 +442,7 @@ func load_session(progress: Callable) -> void:
 	await step.call(I18n.t("Drawing the racing line"))
 	_attach_line_extras(tuned)
 	if track_data.get("pitLane") != null:
-		_build_pit_lane(entries)
+		_build_pit_lane()
 	local_tracker = make_tracker(0.0)
 
 	await step.call(I18n.t("Preparing the TV intro"))
@@ -2779,7 +2779,7 @@ func _build_garage_wall(monitor: PitLaneMonitor) -> void:
 	add_child(body)
 
 ## Pit lane: markings and the smoothed surface where the map's own is rough.
-func _build_pit_lane(entries: Dictionary) -> void:
+func _build_pit_lane() -> void:
 	var lane: Dictionary = track_data.pitLane
 	pit = PitLaneMonitor.new(track_data)
 	pit.measure_boxes(wall_probe)

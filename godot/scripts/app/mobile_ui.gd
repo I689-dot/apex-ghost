@@ -5,7 +5,6 @@ extends RefCounted
 ## actions, the currencies as pills, vector icons drawn in code (no icon font: Barlow has no pictograms).
 
 const GLASS := Color(0.02, 0.03, 0.06, 0.78)
-const GLASS_HI := Color(0.06, 0.08, 0.14, 0.9)
 const STRIP := Color(0, 0, 0, 0.72)
 const GOLD := Color("f5c542")
 const PURPLE := Color("7b3fe4")

@@ -12,7 +12,6 @@ var me := ""
 var session: RaceSession = null
 var screen := "menu"
 var spectating := false
-var browsing := ""
 var pending_race: Dictionary = {}
 ## Where back goes from a screen of the mobile layout (screens named "m_..."): MobileModes, MobilePass, the store.
 var back_to: Callable = Callable()
@@ -792,7 +791,7 @@ func _autotest() -> void:
 	print("autotest done, screen=", screen)
 	get_tree().quit()
 
-## The intro when the game opens (once per install and after updates; a tap or a key skips it): the logo over a short reel of
+## The intro when the game opens (Settings › introCinematic; a tap or a key skips it): the logo over a short reel of
 ## the circuit and a car, then the menu (port of playIntro in main.ts).
 func _play_intro() -> void:
 	var intro_cars := ["ferrari_296_gt3_verstappen", "corvette_z06_gt3r", "mclaren_720s_gt3_inception_racing", "lamborghini_huracan_gt3_evo2", "2025_bmw_m4_gt3_evo_g82", "2024_porsche_992_gt3_r"]
@@ -828,8 +827,6 @@ func _play_intro() -> void:
 	var over := intro.overlay()
 	overlay_layer.add_child(over)
 	intro.finished.connect(func():
-		Settings.data.introSeen = true
-		Settings.save()
 		bg.visible = true
 		ui.visible = true
 		ui.modulate.a = 0.0

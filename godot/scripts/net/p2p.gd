@@ -64,7 +64,7 @@ class Handshake:
 			sdp = s
 			pc.set_local_description(t, s)
 			created = true)
-		pc.ice_candidate_created.connect(func(media, index, name): candidates.append("a=%s" % name))
+		pc.ice_candidate_created.connect(func(_media, _index, name): candidates.append("a=%s" % name))
 
 	## Waits for the local description and the candidates.
 	func complete() -> String:

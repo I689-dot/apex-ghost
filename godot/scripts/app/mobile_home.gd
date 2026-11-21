@@ -127,7 +127,6 @@ static func build(app: App) -> Control:
 
 	# the bottom bar
 	root.add_child(_bottom_bar(app, rerender))
-	# the pass and the contracts waiting: a toast once a session
 	return root
 
 ## The bar along the bottom: Shop, Cars, Paint, Contracts and RACE.

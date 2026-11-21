@@ -5,7 +5,7 @@ extends Control
 ## instrument and the damage report, and the race overlays. Built from Controls; update_state() every frame.
 
 var _lap := Label.new()
-var _lap_tag := Label.new()
+var _lap_tag: Label
 var _pos := Label.new()
 var _cur := Label.new()
 var _best := Label.new()
@@ -135,7 +135,7 @@ func _build() -> void:
 	_style(_cur, 22, 700)
 	_style(_best, 22, 700)
 	_style(_last, 22, 700)
-	_lap_tag = _lap_tag # the LAP tag of the lap block doubles as the penalty tag
+	# (_lap_tag, the LAP tag of the lap block, doubles as the penalty tag)
 	var cur_lbl := _small(I18n.t("LAP"))
 	_times_grid.add_child(cur_lbl)
 	_times_grid.add_child(_cur)
@@ -388,7 +388,6 @@ func set_spectating(on: bool) -> void:
 
 func set_driver(id: String, country, num) -> void:
 	drivers[id] = {"country": country, "num": num}
-	overlays.drivers = drivers
 
 func draw_map(dots: Array, me_x: float, me_z: float, fx: float, fz: float) -> void:
 	mini_map.draw_map(dots, me_x, me_z, fx, fz)
@@ -499,7 +498,6 @@ func update_state(s: Dictionary) -> void:
 		_times_grid.visible = hs.lapInfo
 		_bl.visible = hs.tyres and not _spectating
 		dial.show_ring = hs.revLights
-		_msg_panel.get_parent()
 		_br.visible = hs.map
 		_layout()
 	overlays.update(s.throttle, s.brake, s.steer, s.liveDelta, s.gear, v, "mph" if mph else "km/h")
@@ -538,7 +536,6 @@ func _flag_box(kind: String) -> StyleBoxFlat:
 			return UIKit.box(Color("111111"), Color.WHITE, 2, 4, Vector2(10, 1))
 	return UIKit.box(Color("ffd60a"), Color(0, 0, 0, 0), 0, 4, Vector2(10, 1))
 
-## Timing screen around the player's position: best lap for the leader, gaps for the others.
 ## The tower's rows: the top three, then you with two cars either side, a divider where rows are skipped.
 func _tower_rows(list: Array, me: String) -> Array:
 	var i := 0

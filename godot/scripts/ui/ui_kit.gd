@@ -6,8 +6,6 @@ extends RefCounted
 ## photo, condensed capitals, hairline rows, outlined white buttons and one solid white action per screen.
 
 const BG := Color("050506")
-const PANEL := Color(7 / 255.0, 8 / 255.0, 10 / 255.0, 0.86)
-const PANEL_SOLID := Color("0b0c0f")
 const LINE := Color(1, 1, 1, 0.1)
 const TEXT := Color("f2f3f5")
 const MUTED := Color("8b9099")
@@ -232,11 +230,3 @@ static func full(c: Control) -> void:
 static func fmt_lap(ms: float) -> String:
 	var m := int(ms / 60000.0)
 	return "%d:%06.3f" % [m, (ms - m * 60000.0) / 1000.0]
-
-## Gap with sign: +1.234 / -0.120.
-static func fmt_gap(ms: float) -> String:
-	return "%s%.3f" % ["+" if ms >= 0.0 else "-", absf(ms) / 1000.0]
-
-static func fmt_clock(ms: float) -> String:
-	var total := maxi(0, int(ms / 1000.0))
-	return "%d:%02d" % [total / 60, total % 60]

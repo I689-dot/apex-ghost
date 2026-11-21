@@ -18,7 +18,6 @@ static var _page := "hub"
 static var _preview := ""
 static var _car_filter := ""
 static var _car_sent_for := ""
-static var _adv_open := false
 ## The briefing's page: setup, advanced or saved.
 static var _brief_tab := "setup"
 
@@ -92,9 +91,9 @@ static func build(app: App) -> Control:
 		"paint":
 			body = _paint_page(app, cars, mine, extra)
 		"session", "conditions", "rules":
-			body = _event_page(app, room, _page, edit, is_host)
+			body = _event_page(app, room, _page, edit)
 		"drivers":
-			body = _drivers_page(app, room, cars, is_host and room.phase == "lobby", extra)
+			body = _drivers_page(app, room, is_host and room.phase == "lobby", extra)
 		_:
 			body = _hub(app, room, cars, mine)
 	return _frame(app, room, mine, cars, is_host, body, extra)
@@ -256,9 +255,7 @@ static func _car_stats(car: Dictionary) -> Control:
 	col.add_child(_stat_bar(I18n.t("Weight"), "%d kg" % s.massKg, float(s.massKg) / 1600.0))
 	return col
 
-static var _hero_rects: Dictionary = {}
 
-## The car's menu picture without its empty margins (data/car_hero_rects.json, from tools/godot/make-car-bbox.py).
 ## The car's picture (CarStudio: brand-free, in your paint; the shipped photos showed the real liveries).
 static func _car_image(car: Dictionary, size: Vector2) -> TextureRect:
 	return CarStudio.picture_rect(car, CarStudio.my_livery(), size)
@@ -788,7 +785,7 @@ static func _swatches(current: String, colours: Array, on: Callable) -> Control:
 
 # ----------------------------------------------------------------- event ---
 
-static func _event_page(app: App, room: Dictionary, page: String, edit: bool, is_host: bool) -> Control:
+static func _event_page(app: App, room: Dictionary, page: String, edit: bool) -> Control:
 	var c: Dictionary = room.conditions
 	var tracks: Array = app.track_index
 	var track: Dictionary = app.track_entry(c.trackId)
@@ -939,7 +936,7 @@ static func _session_pane(col: Control, app: App, room: Dictionary, edit: bool) 
 
 # --------------------------------------------------------------- drivers ---
 
-static func _drivers_page(app: App, room: Dictionary, cars: Array, can_edit: bool, extra: Array) -> Control:
+static func _drivers_page(app: App, room: Dictionary, can_edit: bool, extra: Array) -> Control:
 	var col := UIW.vbox(8)
 	var head := UIW.hbox(10)
 	var t := UIKit.label(I18n.t("Entry list").to_upper(), 30, UIKit.TEXT, true, 600)
@@ -951,7 +948,7 @@ static func _drivers_page(app: App, room: Dictionary, cars: Array, can_edit: boo
 	var i := 0
 	for p in room.players:
 		i += 1
-		list.add_child(_player_row(app, p, cars, can_edit, i))
+		list.add_child(_player_row(app, p, can_edit, i))
 	col.add_child(UIW.scroll(list))
 	if can_edit:
 		var add := UIKit.button("+ " + I18n.t("Add bot"), func(): app.send({"t": "addBot"}))
@@ -961,7 +958,7 @@ static func _drivers_page(app: App, room: Dictionary, cars: Array, can_edit: boo
 	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	return p
 
-static func _player_row(app: App, p: Dictionary, all_cars: Array, can_remove: bool, n: int) -> Control:
+static func _player_row(app: App, p: Dictionary, can_remove: bool, n: int) -> Control:
 	var touch := UIKit.touch()
 	var pc := PanelContainer.new()
 	var st := UIKit.box(Color(1, 1, 1, 0.06) if p.id == app.me else Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0, 0, Vector2(8, 4 if not touch else 6))

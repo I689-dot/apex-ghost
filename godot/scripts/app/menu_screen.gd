@@ -147,7 +147,7 @@ static func build(app: App, error: String = "") -> Control:
 			"tabs": [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")], ["career", I18n.t("Career")], ["store", I18n.t("Store")]],
 			"tab": _tab, "on_tab": on_tab, "tabs_left": UIKit.touch(),
 			# the coins (the store, a preview for now) beside the driver
-			"right": [StoreScreen.balance_chip(func(): _tab = "store"; _self.render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick, sign_in),
+			"right": [StoreScreen.balance_chip(func(): _tab = "store"; _self.render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick),
 		})
 		var scr := UIW.screen(top, body)
 		UIKit.full(scr)
@@ -161,7 +161,7 @@ static func build(app: App, error: String = "") -> Control:
 
 ## The driver at the top right: licence and Safety Rating, the name, rank and level (a button to the career), the
 ## account's actions and the gear to the settings.
-static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Callable, sign_in: Callable) -> Array:
+static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Callable) -> Array:
 	var out: Array = []
 	var career := CareerData.load_career()
 	var lic: String = career.licence
@@ -195,11 +195,9 @@ static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Call
 	pm.resized.connect(func(): prof.custom_minimum_size = pm.get_combined_minimum_size())
 	prof.pressed.connect(app.show_career)
 	out.append(prof)
-	if signed_in != null:
-		# the profile, the password and signing out are in Settings › Account (the gear)
-		pass
-	else:
-		# offline (or a server without accounts): the nickname is this device's
+	# signed in, the profile and signing out are in Settings › Account (the gear); offline (or a server without
+	# accounts), the nickname is this device's
+	if signed_in == null:
 		out.append(_icon_button("✎", I18n.t("Your nickname"), edit_nick))
 	out.append(_icon_button("⚙", I18n.t("Settings"), app.open_settings))
 	return out

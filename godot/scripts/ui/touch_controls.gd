@@ -8,8 +8,6 @@ extends Control
 ##    key events, exactly like a key press.
 ## Multi-touch: every finger is tracked by its touch index.
 
-const ICON_LEFT := "<"
-const ICON_RIGHT := ">"
 
 class Widget:
 	extends RefCounted

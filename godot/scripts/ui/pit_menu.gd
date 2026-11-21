@@ -12,7 +12,6 @@ var _on_leave: Callable
 var _total := Label.new()
 var _breakdown := VBoxContainer.new()
 var _tyre_btns := {} # compound id or "keep" -> Button
-var _repair_boxes: Array = []
 var _clock := Label.new()
 var _card := PanelContainer.new()
 var _col := VBoxContainer.new()
@@ -161,7 +160,6 @@ func _repair(label: String, dmg: float, key: String) -> Control:
 	box.button_pressed = plan[key]
 	box.disabled = dmg < 0.005
 	box.toggled.connect(func(on): plan[key] = on; _refresh())
-	_repair_boxes.append(box)
 	row.add_child(box)
 	var l := UIKit.label(label, 15, UIKit.TEXT)
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
