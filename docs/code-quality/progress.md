@@ -5,7 +5,27 @@ together with `git log`.
 
 ## State
 
-- **Phase:** batch 2 (dead code) is done (2026-11-21). Next: batch 3, typing; then check-in 2.
+- **Phase:** batch 3 (typing) is in progress (2026-11-21). Done: input, physics, audio, net, shared, ui. Left:
+  game/ (486 places, 163 of them in race_session.gd) and app/ (about 795, most of them lambdas). Then check-in 2.
+- **Typing rules used (keep them for game/ and app/):**
+  - A precise type only where the value's type is certain from the code. A JSON value, a "TS number|null" field or
+    an optional argument is an explicit `Variant`.
+  - **Before typing a parameter, read what every caller passes**, `null` included. `_launch(race_grid: Array)` broke
+    on a caller's literal `null`; the full suite caught it, and it is `Variant` now.
+  - A variable's type comes from how it is used, not from its first value: `var x = 0` that later takes `+= 0.5` is a
+    float.
+  - An inner class is written with its class (`TireModel.TireParams`, `RaceTracker.PlayerRaceState`).
+  - Two scratchpad tools (not kept):
+    - `untyped.py` lists the places from compile_all's `--debug` output, with the source line.
+    - `autotype.py` types only two safe forms, and prints every change: a statement lambda, typed `-> void`; a loop
+      over a written-out list of one kind of literal.
+  - Each folder: the full headless suite through compare.sh, plus the rendered checks for the code it touches.
+- **Typing commits:**
+  - `93b5344` input, physics, audio (2,433 → 2,383).
+  - `fb6fc0b` net, shared (→ 2,133).
+  - `8e8a302` ui (→ 1,934).
+- **audiotest's bus count is not deterministic.** The engine voices' buses are freed on real-time timers: once
+  under load it printed 8, otherwise 9. compare.sh leaves it out (`754efb1`).
 - **Size and warnings after batch 2:**
   - Scripts and lines: 151 scripts (152 at the start), 34,138 lines (35,232 at the start, −1,094).
   - Warnings: **2,433 distinct**, counted by the corrected compile_all (`fe65a16`). The 2,488 and 2,591 reported
