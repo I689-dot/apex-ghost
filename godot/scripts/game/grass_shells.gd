@@ -27,7 +27,7 @@ static func build(track_root: Node3D, lawn: Array, track: Dictionary, mask: Gras
 	if lawn.is_empty():
 		return null
 	var lawn_set := {}
-	for m in lawn:
+	for m: Material in lawn:
 		lawn_set[m] = true
 	# cells within NEAR_TRACK of the centreline
 	var near := {}
@@ -81,7 +81,7 @@ static func build(track_root: Node3D, lawn: Array, track: Dictionary, mask: Gras
 	out._mat.set_shader_parameter("lawn", load("res://assets/textures/lawn_spa.jpg"))
 	out._mat.set_shader_parameter("blades", load("res://assets_static/ground/blades.png"))
 	out._mat.render_priority = 1
-	for k in by_cell:
+	for k: int in by_cell:
 		var g: Dictionary = by_cell[k]
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)

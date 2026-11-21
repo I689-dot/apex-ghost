@@ -38,8 +38,8 @@ static func build(parent: Node3D, track: Dictionary, res_root: String = "res://"
 	var files: Array = [track.collision.file]
 	files.append_array(track.collision.get("extra", []))
 	var bodies: Array[StaticBody3D] = []
-	for file in files:
-		for m in read_file(res_root + file, track.collision.surfaces):
+	for file: String in files:
+		for m: Dictionary in read_file(res_root + file, track.collision.surfaces):
 			var idx: PackedInt32Array = m.indices
 			if m.surface == "wall":
 				idx = WallCut.cut(m.positions, idx, track.centerline)

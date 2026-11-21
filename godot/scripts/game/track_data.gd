@@ -24,9 +24,9 @@ static func load_layout(layout: Dictionary) -> Dictionary:
 	t.collision.file = strip_query(t.collision.file)
 	if t.collision.has("extra"):
 		t.collision.extra = (t.collision.extra as Array).map(strip_query)
-	for k in t.files:
+	for k: String in t.files:
 		t.files[k] = strip_query(t.files[k])
-	for c in t.chunks:
+	for c: Dictionary in t.chunks:
 		c.file = strip_query(c.file)
 	if t.has("forest") and t.forest != null:
 		t.forest.file = strip_query(t.forest.file)

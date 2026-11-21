@@ -98,7 +98,7 @@ static func today() -> String:
 # ------------------------------------------------------------------ cups ---
 
 static func cup(id: String) -> Array:
-	for c in CUPS:
+	for c: Array in CUPS:
 		if c[0] == id:
 			return c
 	return []
@@ -114,13 +114,13 @@ static func cup_results(id: String) -> Array:
 
 static func cup_trophies(id: String) -> int:
 	var n := 0
-	for t in cup_results(id):
+	for t: int in cup_results(id):
 		n += int(t)
 	return n
 
 static func total_trophies() -> int:
 	var n := 0
-	for c in CUPS:
+	for c: Array in CUPS:
 		n += cup_trophies(c[0])
 	return n
 
@@ -240,19 +240,19 @@ static func _daily() -> void:
 		if not picked.has(k):
 			picked.append(k)
 	d.contracts = []
-	for k in picked:
+	for k: int in picked:
 		var c: Array = CONTRACTS[k]
 		var n := rng.randi_range(c[2][0], c[2][1])
 		d.contracts.append({"kind": c[0], "target": n, "progress": 0, "claimed": false})
 
 static func contract_text(c: Dictionary) -> String:
-	for k in CONTRACTS:
+	for k: Array in CONTRACTS:
 		if k[0] == c.kind:
 			return I18n.t(k[1], {"n": int(c.target)})
 	return ""
 
 static func contract_reward(c: Dictionary) -> Array:
-	for k in CONTRACTS:
+	for k: Array in CONTRACTS:
 		if k[0] == c.kind:
 			return [k[3], k[4]]
 	return [0, 0]
@@ -270,7 +270,7 @@ static func claim_contract(i: int) -> Array:
 
 static func contracts_ready() -> int:
 	var n := 0
-	for c in data().contracts:
+	for c: Dictionary in data().contracts:
 		if not c.claimed and int(c.progress) >= int(c.target):
 			n += 1
 	return n

@@ -124,7 +124,7 @@ static func _achieved(id: String, c: Dictionary, s: Dictionary) -> bool:
 		"km_100": return c.km >= 100.0
 		"km_1000": return c.km >= 1000.0
 		# (an achievement once earned stays: a circuit added later does not take it back)
-		"all_circuits": return ["nurburgring", "spa", "zandvoort", "silverstone", "barcelona", "shanghai"].all(func(m): return c.circuits.has(m))
+		"all_circuits": return ["nurburgring", "spa", "zandvoort", "silverstone", "barcelona", "shanghai"].all(func(m: String) -> bool: return c.circuits.has(m))
 		"win_spa": return race and s.position == 1 and s.field > 1 and map == "spa"
 		"win_zandvoort": return race and s.position == 1 and s.field > 1 and map == "zandvoort"
 		"win_nurburgring": return race and s.position == 1 and s.field > 1 and (map == "nurburgring" or map == "nordschleife")
@@ -170,7 +170,7 @@ static func add_session(s: Dictionary) -> Dictionary:
 	if s.kind == "qualifying" and s.position == 1 and s.field > 1:
 		add.call("Pole position", 150.0)
 	var xp := 0
-	for l in lines:
+	for l: Array in lines:
 		xp += l[1]
 	# coins, as Gran Turismo's prize money and Forza's credits
 	var coin_lines: Array = []
@@ -189,11 +189,11 @@ static func add_session(s: Dictionary) -> Dictionary:
 	pay.call("Distance", s.km * 120.0)
 	if s.kind == "race" and s.position > 0 and s.incidents == 0 and s.laps > 0:
 		var base := 0
-		for l in coin_lines:
+		for l: Array in coin_lines:
 			base += l[1]
 		coin_lines.append(["Clean race bonus", roundi(base * 0.05) * 10])
 	var coins := 0
-	for l in coin_lines:
+	for l: Array in coin_lines:
 		coins += l[1]
 	c.coins += coins
 	var before := {"level": level_of(c.xp).level, "licence": c.licence, "sr": c.sr, "rating": c.rating}
@@ -226,7 +226,7 @@ static func add_session(s: Dictionary) -> Dictionary:
 		c.sr = 2.5
 	# achievements: each once, its XP on top (and a new level from them counts)
 	var unlocked: Array = []
-	for a in ACHIEVEMENTS:
+	for a: Array in ACHIEVEMENTS:
 		if not c.achievements.has(a[0]) and _achieved(a[0], c, s):
 			c.achievements.append(a[0])
 			unlocked.append(a)

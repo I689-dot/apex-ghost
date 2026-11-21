@@ -30,12 +30,12 @@ func _place(sight: Callable, ground: Callable) -> void:
 	var length := _len
 	# where the cameras look from: every corner (outside of it), the long straights filled in every ~380 m
 	var spots: Array = []
-	for c in CircuitMap.find_corners(td, td.get("turns", null)):
+	for c: Dictionary in CircuitMap.find_corners(td, td.get("turns", null)):
 		var p := TrackMath.point_at_distance(td, c.s)
 		# which side is outside: the corner's "out" direction against the track's left normal (cos yaw, -sin yaw)
 		var left: float = cos(p.yaw) * c.out[0] - sin(p.yaw) * c.out[1]
 		spots.append({"s": c.s, "side": 1 if left > 0.0 else -1})
-	spots.sort_custom(func(a, b): return a.s < b.s)
+	spots.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.s < b.s)
 	if spots.is_empty():
 		spots.append({"s": 0.0, "side": 1})
 	var filled: Array = []
@@ -49,7 +49,7 @@ func _place(sight: Callable, ground: Callable) -> void:
 		var extra := int(floorf(gap / 380.0))
 		for k in range(1, extra + 1):
 			filled.append({"s": fposmod(a.s + gap * k / (extra + 1), length), "side": -a.side if k % 2 == 1 else a.side})
-	filled.sort_custom(func(a, b): return a.s < b.s)
+	filled.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.s < b.s)
 	# each camera covers from 45 % of the way after the previous one to 45 % of the way to the next:
 	# the car is shown coming towards it (the long-lens head-on shot) and going away for a short while
 	var n := filled.size()
@@ -80,7 +80,7 @@ func _best_spot(spot: Dictionary, from: float, to: float, sight: Callable, groun
 		targets.append(Vector3(q.x, q.y + 1.0, q.z))
 	var best := Vector3.ZERO
 	var best_seen := -1.0
-	for side in [spot.side, -spot.side]:
+	for side: float in [spot.side, -spot.side]:
 		# [offset from the track edge, height]; a crane over the trees is the last resort
 		for oh: Array in [[14.0, 6.0], [24.0, 9.0], [38.0, 14.0], [8.0, 4.0], [16.0, 24.0]]:
 			var off: float = oh[0]
@@ -93,7 +93,7 @@ func _best_spot(spot: Dictionary, from: float, to: float, sight: Callable, groun
 			var g: Variant = ground.call(x, z, pt.y + 200.0)
 			var y: float = maxf(pt.y, g if g != null else pt.y) + up
 			var seen := 0
-			for tg in targets:
+			for tg: Vector3 in targets:
 				if sight.call(Vector3(x, y, z), tg) == null:
 					seen += 1
 			# prefer the outside of the corner and the nearer towers when they see as much

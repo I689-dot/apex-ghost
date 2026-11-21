@@ -38,7 +38,7 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(DIR)
 	state = _read(DIR + "state.json")
 	manifest = _read(DIR + "manifest.json")
-	for id in state.keys():
+	for id: String in state.keys():
 		_mount(id)
 	# APEX_PACKS_AUTO=<id>: fetch the manifest and download that pack straight away (end-to-end tests of a build)
 	var auto := OS.get_environment("APEX_PACKS_AUTO")
@@ -95,7 +95,7 @@ func refresh() -> void:
 		return
 	_req = HTTPRequest.new()
 	add_child(_req)
-	_req.request_completed.connect(func(result: int, code: int, _h, body: PackedByteArray) -> void:
+	_req.request_completed.connect(func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray) -> void:
 		_req.queue_free()
 		_req = null
 		if result == HTTPRequest.RESULT_SUCCESS and code == 200:
@@ -103,7 +103,7 @@ func refresh() -> void:
 			if m is Dictionary and m.has("packs"):
 				manifest = m
 				_write(DIR + "manifest.json", manifest)
-				for id in (manifest.packs as Dictionary):
+				for id: String in (manifest.packs as Dictionary):
 					changed.emit(id))
 	_req.request(base_url() + "packs.json")
 

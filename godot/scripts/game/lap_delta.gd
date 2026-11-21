@@ -40,7 +40,7 @@ func end_sector(index: int, lap_dist_m: float, ms: float, clean: bool) -> void:
 	var start_ms := _sector_start_ms
 	_sector_from = to
 	_sector_start_ms = start_ms + ms
-	var old = _secs[index]
+	var old: Variant = _secs[index]
 	if not clean or (old != null and old.ms <= ms):
 		return
 	var rel := PackedFloat32Array()
@@ -51,15 +51,15 @@ func end_sector(index: int, lap_dist_m: float, ms: float, clean: bool) -> void:
 	_build_optimal()
 
 func _build_optimal() -> void:
-	for sec in _secs:
+	for sec: Variant in _secs:
 		if sec == null:
 			return
 	var out := PackedFloat32Array()
 	out.resize(_cur.size())
 	out.fill(NAN)
 	var acc := 0.0
-	for sec in _secs:
-		for i in sec.rel.size():
+	for sec: Variant in _secs:
+		for i: int in sec.rel.size():
 			out[sec.from + i] = acc + sec.rel[i]
 		acc += sec.ms
 	_optimal = out
@@ -87,12 +87,12 @@ func delta(lap_dist_m: float, lap_ms: float, mode: String = "best") -> Variant:
 	var ref: PackedFloat32Array = _best if mode == "best" else _optimal
 	if not has(mode):
 		return null
-	var here = _at(ref, lap_dist_m / _bin)
+	var here: Variant = _at(ref, lap_dist_m / _bin)
 	if here == null:
 		return null
 	if mode != "sectors":
 		return lap_ms - here
-	var start = _at(ref, float(_sector_from))
+	var start: Variant = _at(ref, float(_sector_from))
 	if start == null:
 		return null
 	return lap_ms - _sector_start_ms - (here - start)

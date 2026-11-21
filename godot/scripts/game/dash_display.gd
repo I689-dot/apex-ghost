@@ -86,9 +86,9 @@ func _init(root: Node3D) -> void:
 			new_mesh = rebuilt
 		if new_mesh != null:
 			mi.mesh = new_mesh
-			for s in lits:
+			for s: int in lits:
 				mi.set_surface_override_material(s, lits[s])
-	if not screens.is_empty() and screens.any(func(sc): return sc.kind == "dash"):
+	if not screens.is_empty() and screens.any(func(sc: Dictionary) -> bool: return sc.kind == "dash"):
 		for mi: MeshInstance3D in meshes:
 			for s in mi.mesh.get_surface_count():
 				var m := mi.get_surface_override_material(s)
@@ -108,7 +108,7 @@ func _add_overlays(root: Node3D) -> void:
 	var cockpit := car.cockpit_root()
 	if cockpit == null:
 		return
-	for o in OVERLAYS.get(CarVisual.model_id(car.entry), []):
+	for o: Dictionary in OVERLAYS.get(CarVisual.model_id(car.entry), []):
 		var sc := _make_screen(o.kind, o.view)
 		screens.append(sc)
 		var n: Vector3 = (o.normal as Vector3).normalized()
@@ -227,7 +227,7 @@ func update_dash(dt: float, d: Dictionary) -> void:
 	if _t < 1.0 / 15.0:
 		return
 	_t = 0.0
-	for sc in screens:
+	for sc: Dictionary in screens:
 		sc.ctl.data = d
 		sc.ctl.queue_redraw()
 		sc.view.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -241,7 +241,7 @@ class DashScreen:
 	func _init(k: String) -> void:
 		kind = k
 
-	static func fmt(ms) -> String:
+	static func fmt(ms: Variant) -> String:
 		if ms == null or ms <= 0:
 			return "-:--.---"
 		var m := int(ms / 60000.0)

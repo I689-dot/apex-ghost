@@ -64,7 +64,7 @@ static func wake_strength(pos: Vector3, vel: Vector3, others: Array) -> float:
 		return 0.0
 	var dir := vel / speed
 	var best := 0.0
-	for o in others:
+	for o: Dictionary in others:
 		var rel: Vector3 = o.pos - pos
 		var along := rel.dot(dir)
 		if along < 3.0 or along > 45.0:

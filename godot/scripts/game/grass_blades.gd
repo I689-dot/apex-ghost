@@ -72,7 +72,7 @@ static func tuft_mesh(n: int, seed_value: int, h0: float, h1: float) -> ArrayMes
 			var nx := -fz
 			var nz := fx
 			var sides: Array = [0.5] if k == SEG else [0.0, 1.0]
-			for side in sides:
+			for side: float in sides:
 				var sgn: float = 0.0 if side == 0.5 else side * 2.0 - 1.0
 				pos.append(Vector3(ox + fx * hw * sgn, y, oz + fz * hw * sgn))
 				var round: float = 0.45 * sgn

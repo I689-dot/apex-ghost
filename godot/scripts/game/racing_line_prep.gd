@@ -11,14 +11,14 @@ class Task:
 
 static func start(track: Dictionary) -> Task:
 	var t := Task.new()
-	t.thread.start(func():
+	t.thread.start(func() -> void:
 		# the layout's optimised line when it has one (data/racelines), else the minimum curvature one
 		var f := AiDriver.line_from_file(track)
 		t.result = f if not f.is_empty() else AiDriver.build_racing_line(track)
 		t.done = true)
 	return t
 
-static func finish(t: Task):
+static func finish(t: Task) -> Variant:
 	var tree := Engine.get_main_loop() as SceneTree
 	while not t.done:
 		await tree.process_frame

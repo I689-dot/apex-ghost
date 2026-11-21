@@ -75,8 +75,8 @@ class CrackLayer:
 
 	func _draw() -> void:
 		var k := Vector2(size.x / 1024.0, size.y / 512.0)
-		for l in _lines:
+		for l: Array in _lines:
 			var pts := PackedVector2Array()
-			for p in l[0]:
+			for p: Vector2 in l[0]:
 				pts.append(p * k)
 			draw_polyline(pts, Color(0.92, 0.94, 0.96, 0.75), l[1] * maxf(1.0, k.x), true)

@@ -9,7 +9,7 @@ static func path(p: String) -> String:
 
 ## A PackedScene from a data path ("assets/cars/x/lod0.glb?v=..."), or null.
 static func scene(p: String) -> PackedScene:
-	var res = load(path(p))
+	var res: Resource = load(path(p))
 	return res if res is PackedScene else null
 
 ## Starts loading in a thread; poll with scene_ready / get with scene_result.
@@ -20,7 +20,7 @@ static func scene_ready(p: String) -> bool:
 	return ResourceLoader.load_threaded_get_status(path(p)) != ResourceLoader.THREAD_LOAD_IN_PROGRESS
 
 static func scene_result(p: String) -> PackedScene:
-	var res = ResourceLoader.load_threaded_get(path(p))
+	var res: Resource = ResourceLoader.load_threaded_get(path(p))
 	return res if res is PackedScene else null
 
 ## The track index (the lobby list).
@@ -31,11 +31,11 @@ static func load_track_index() -> Array:
 static func load_track_file(track_id: String = "") -> Dictionary:
 	var index := load_track_index()
 	var entry: Dictionary = {}
-	for e in index:
+	for e: Dictionary in index:
 		if e.id == track_id:
 			entry = e
 	if entry.is_empty():
-		for e in index:
+		for e: Dictionary in index:
 			if e.get("default", false):
 				entry = e
 	var d := TrackData.load_layout(entry)
@@ -69,7 +69,7 @@ static func load_car_model(entry: Dictionary, lods_wanted: int = 3, cockpit: boo
 	if _models.has(key):
 		return _models[key]
 	var lods: Array = []
-	for f in files.slice(first, lods_wanted):
+	for f: String in files.slice(first, lods_wanted):
 		lods.append(scene(f))
 	var m := {"entry": entry, "lods": lods, "first_level": first}
 	_models[key] = m

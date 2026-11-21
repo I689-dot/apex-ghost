@@ -48,7 +48,7 @@ func _process(dt: float) -> void:
 	var recv := 0
 	var lost := 0
 	if remotes.is_valid():
-		for b in remotes.call():
+		for b: RemoteCarBuffer in remotes.call():
 			recv += b.recv_count
 			lost += b.loss_count
 	var mem := OS.get_static_memory_usage() / 1048576.0

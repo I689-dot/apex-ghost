@@ -63,7 +63,7 @@ static func _move_old_user_dir() -> void:
 	if d == null:
 		return
 	var names := Array(d.get_files()) + Array(d.get_directories())
-	for n in names:
+	for n: String in names:
 		if n in ["logs", "shader_cache", "vulkan", "objectdb_snapshots"]:
 			continue
 		if DirAccess.rename_absolute(old.path_join(n), now.path_join(n)) != OK:
@@ -75,7 +75,7 @@ static func wanted_screen() -> int:
 	if OS.get_environment("APEX_SCREEN") != "":
 		return int(OS.get_environment("APEX_SCREEN"))
 	if Engine.get_main_loop() != null and (Engine.get_main_loop() as SceneTree).root.has_node("Settings"):
-		var st = (Engine.get_main_loop() as SceneTree).root.get_node("Settings")
+		var st: Node = (Engine.get_main_loop() as SceneTree).root.get_node("Settings")
 		return int(st.data.get("display", {}).get("screen", -1))
 	return -1
 
@@ -130,7 +130,7 @@ static func default_settings() -> Dictionary:
 ## Recursively lays `over` on `base` for dictionaries (arrays and scalars replace).
 static func merge_deep(base: Dictionary, over: Dictionary) -> Dictionary:
 	var out := base.duplicate(true)
-	for k in over:
+	for k: String in over:
 		if out.has(k) and typeof(out[k]) == TYPE_DICTIONARY and typeof(over[k]) == TYPE_DICTIONARY and k != "layouts" and k != "graphics":
 			out[k] = merge_deep(out[k], over[k])
 		else:
@@ -210,17 +210,17 @@ func quality_config() -> Dictionary:
 	var gk: Variant = o.get("ao", data.quality)
 	q.merge(GODOT_PRESET_KEYS.get(gk if GODOT_PRESET_KEYS.has(gk) else data.quality, GODOT_PRESET_KEYS.low), true)
 	var groups: Dictionary = _quality().groups
-	for g in groups:
+	for g: String in groups:
 		var from: Variant = o.get(g)
 		if from == null or not presets().has(from):
 			continue
-		for k in groups[g]:
+		for k: String in groups[g]:
 			q[k] = presets()[from][k]
-	for g in EXTRA_GROUPS:
+	for g: String in EXTRA_GROUPS:
 		var from: Variant = o.get(g)
 		if from == null or not presets().has(from):
 			continue
-		for k in EXTRA_GROUPS[g]:
+		for k: String in EXTRA_GROUPS[g]:
 			q[k] = presets()[from][k]
 	if o.has("antialias"):
 		q.antialias = o.antialias

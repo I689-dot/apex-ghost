@@ -15,7 +15,7 @@ static func load_saved() -> Variant:
 	return v if typeof(v) == TYPE_DICTIONARY else null
 
 ## Save, or delete the saved championship with null.
-static func save(c) -> void:
+static func save(c: Variant) -> void:
 	if c == null:
 		if FileAccess.file_exists(SAVE_PATH):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
@@ -28,7 +28,7 @@ static func create(rounds: Array, race_laps: int, quali_minutes: int, bots: int)
 	return {"rounds": rounds, "done": 0, "raceLaps": race_laps, "qualiMinutes": quali_minutes, "bots": bots, "drivers": {}, "lastScored": ""}
 
 ## Scores a race: order = classification [{nick, carId, classified}], fastest = the fastest lap's nick (or null).
-static func score_race(c: Dictionary, race_key: String, order: Array, fastest) -> void:
+static func score_race(c: Dictionary, race_key: String, order: Array, fastest: Variant) -> void:
 	if c.lastScored == race_key:
 		return
 	c.lastScored = race_key
@@ -57,7 +57,7 @@ static func score_race(c: Dictionary, race_key: String, order: Array, fastest) -
 ## The table: points, then wins, then best results (count-back), as the FIA ties are broken.
 static func standings(c: Dictionary) -> Array:
 	var list: Array = c.drivers.values()
-	list.sort_custom(func(a, b):
+	list.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if a.points != b.points:
 			return a.points > b.points
 		if a.wins != b.wins:

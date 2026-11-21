@@ -41,11 +41,11 @@ static func cut(positions: PackedVector3Array, indices: PackedInt32Array, center
 		var tri := [positions[indices[t]], positions[indices[t + 1]], positions[indices[t + 2]]]
 		var hit := false
 		var seen := {}
-		for v in tri:
+		for v: Vector3 in tri:
 			var list: Variant = grid.get(_key(v.x, v.z))
 			if list == null:
 				continue
-			for i in list:
+			for i: int in list:
 				if seen.has(i):
 					continue
 				seen[i] = true

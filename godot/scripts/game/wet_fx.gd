@@ -136,7 +136,7 @@ func depth_at(x: float, z: float) -> float:
 		return 0.0
 	var l: Array = _cells.get(Vector2i(floori(x / CELL), floori(z / CELL)), [])
 	var best := 0.0
-	for k in l:
+	for k: int in l:
 		var p: Puddle = puddles[k]
 		var dx := x - p.x
 		var dz := z - p.z

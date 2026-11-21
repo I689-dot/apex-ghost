@@ -48,9 +48,9 @@ static func apply_generic(car_id: String, sm: StandardMaterial3D) -> void:
 	if not enabled or (LOOKS.get(car_id, {}) as Dictionary).has(sm.resource_name):
 		return
 	if _generic_re.is_empty():
-		for g in GENERIC:
+		for g: Array in GENERIC:
 			_generic_re.append([RegEx.create_from_string(g[0]), g[1]])
-	for g in _generic_re:
+	for g: Array in _generic_re:
 		if (g[0] as RegEx).search(sm.resource_name) != null:
 			if (g[1] as Dictionary).get("untextured", false) and sm.albedo_texture != null:
 				return

@@ -73,7 +73,7 @@ func _process(_dt: float) -> void:
 	if main == null:
 		return
 	var yaw := side_yaw(main)
-	for e in _windows:
+	for e: Array in _windows:
 		var cam: Camera3D = e[1]
 		var side: int = e[2]
 		# left: turned left round the camera's own up (a positive turn about +Y looks left)

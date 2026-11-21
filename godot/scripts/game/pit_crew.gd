@@ -14,7 +14,7 @@ const JACK_M := 0.07
 
 ## The events of a stop, in order. Its total matches service_time: refuelling (and the driver change) first, then the
 ## jacks, the work (tyres alongside the repairs), the jacks down.
-static func stop_timeline(plan: Dictionary, zones) -> Array:
+static func stop_timeline(plan: Dictionary, zones: Array) -> Array:
 	var ev: Array = []
 	var total: float = PitService.service_time(plan, zones).total
 	var fuel: float = plan.fuelL / PitService.REFUEL_LPS if plan.fuelL > 0.0 else 0.0
@@ -34,7 +34,7 @@ static func stop_timeline(plan: Dictionary, zones) -> Array:
 			for kind: String in ["gunOff", "wheelOff", "wheelOn", "gunOn"]:
 				ev.append({"at": t0 + WHEEL[kind] * per, "kind": kind, "wheel": wk[0]})
 	ev.append({"at": total - jack * 0.8, "kind": "jackDown", "wheel": 0})
-	ev.sort_custom(func(a, b): return a.at < b.at)
+	ev.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.at < b.at)
 	return ev
 
 ## The state of the car at time u of a stop: {wheelOut: [4 floats], lift}.
@@ -44,7 +44,7 @@ static func stop_pose(ev: Array, u: float) -> Dictionary:
 	var down: Variant = null
 	var off := [-1.0, -1.0, -1.0, -1.0]
 	var on := [-1.0, -1.0, -1.0, -1.0]
-	for e in ev:
+	for e: Dictionary in ev:
 		if e.kind == "jackUp":
 			up = e.at
 		elif e.kind == "jackDown":

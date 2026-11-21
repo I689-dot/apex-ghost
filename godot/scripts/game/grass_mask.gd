@@ -37,7 +37,7 @@ static func _key(ix: int, iz: int) -> int:
 static func build(chunks: Array, track: Dictionary, ground: Array) -> GrassMask:
 	var mask := GrassMask.new()
 	var ground_set := {}
-	for g in ground:
+	for g: Material in ground:
 		ground_set[g] = true
 	var ground_re := RegEx.create_from_string("(?i)grass|turf|terrain|ground|top\\d|fill|sand|gravel|asph|road|soil|dirt")
 	var near := {}
@@ -48,7 +48,7 @@ static func build(chunks: Array, track: Dictionary, ground: Array) -> GrassMask:
 		for dx in range(-reach, reach + 1):
 			for dz in range(-reach, reach + 1):
 				near[int(floorf((cl[i] + dx * cs) / cs)) * 100003 + int(floorf((cl[i + 2] + dz * cs) / cs))] = true
-	for ch in chunks:
+	for ch: TrackScene.Chunk in chunks:
 		if ch.kind != "scenery":
 			continue
 		for n: Node in CarVisual._walk(ch.object):

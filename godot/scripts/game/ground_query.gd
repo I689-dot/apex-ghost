@@ -36,7 +36,7 @@ func cast(origin: Vector3, dir: Vector3, max_dist: float) -> Dictionary:
 	return out
 
 ## Ground height under (x, z) from y_top down at most max_d (null: no ground, or a wall): for RoadPatches.build.
-func height_below(x: float, y_top: float, z: float, max_d: float):
+func height_below(x: float, y_top: float, z: float, max_d: float) -> Variant:
 	var space := _world.direct_space_state
 	_query.from = Vector3(x, y_top, z)
 	_query.to = Vector3(x, y_top - max_d, z)

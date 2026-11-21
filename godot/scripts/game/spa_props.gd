@@ -42,14 +42,14 @@ const REPAINT := [
 static func build(track: TrackScene) -> SpaProps:
 	var out := SpaProps.new()
 	out.name = "spa-props"
-	for rp in REPAINT:
+	for rp: Array in REPAINT:
 		_repaint(track, rp)
-	for c in COPIES:
+	for c: Dictionary in COPIES:
 		var parts := _cut(track, c)
 		if parts.is_empty():
 			continue
 		var src := _frame(track, c.from_s)
-		for to in c.to:
+		for to: Array in c.to:
 			var xf: Transform3D = _frame(track, to[0]) * src.affine_inverse()
 			for k in parts.size():
 				var mi := MeshInstance3D.new()
@@ -149,7 +149,7 @@ func _place_props() -> void:
 	var rows: Variant = JSON.parse_string(FileAccess.get_file_as_string(PLACES))
 	if not (rows is Array):
 		return
-	for row in rows:
+	for row: Array in rows:
 		var mesh: Mesh = meshes.get(row[0])
 		if mesh == null:
 			continue
@@ -171,7 +171,7 @@ static func _cut(track: TrackScene, c: Dictionary) -> Array:
 	var lo := Vector3(b[0], b[1], b[2])
 	var hi := Vector3(b[3], b[4], b[5])
 	var out := []
-	for part in c.parts:
+	for part: Array in c.parts:
 		var re := RegEx.create_from_string(part[0])
 		var top: float = part[1]
 		var pos := PackedVector3Array()

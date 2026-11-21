@@ -61,7 +61,7 @@ func measure_boxes(probe: Callable) -> void:
 		return
 	var pts: Array = lane.points
 	var raw: Array = []
-	for ab in boxes():
+	for ab: Array in boxes():
 		var d: Array = []
 		for i in range(ab[0], ab[1] + 1):
 			var j := mini(pts.size() - 1, i + 1)
@@ -86,9 +86,9 @@ func measure_boxes(probe: Callable) -> void:
 	# a post or a sign in front of one box is not the garage front: the median of each box and its neighbours
 	var shift: Array = []
 	for k in raw.size():
-		var x = raw[k]
+		var x: Variant = raw[k]
 		var from := maxi(0, mini(k - 1, raw.size() - 3))
-		var w: Array = raw.slice(from, from + 3).filter(func(v): return v != null)
+		var w: Array = raw.slice(from, from + 3).filter(func(v: Variant) -> bool: return v != null)
 		if x == null or w.is_empty():
 			shift.append(null if x == null else minf(15.0, maxf(0.0, x - GARAGE_GAP - HALF)))
 			continue
@@ -97,7 +97,7 @@ func measure_boxes(probe: Callable) -> void:
 	# a box with no wall found takes its neighbours' (garage fronts run in a smooth line)
 	var out: Array = []
 	for k in shift.size():
-		var x2 = shift[k]
+		var x2: Variant = shift[k]
 		if x2 != null:
 			out.append(x2)
 			continue
@@ -107,8 +107,8 @@ func measure_boxes(probe: Callable) -> void:
 			lo -= 1
 		while hi < shift.size() and shift[hi] == null:
 			hi += 1
-		var l = shift[lo] if lo >= 0 else null
-		var r = shift[hi] if hi < shift.size() else null
+		var l: Variant = shift[lo] if lo >= 0 else null
+		var r: Variant = shift[hi] if hi < shift.size() else null
 		if l != null and r != null:
 			out.append(l + ((r - l) * (k - lo)) / float(hi - lo))
 		else:
@@ -117,7 +117,7 @@ func measure_boxes(probe: Callable) -> void:
 
 ## The box shift (m towards the garages) at lane point i (0 outside the boxes or before measure_boxes).
 func shift_at(i: int) -> float:
-	var sh = _geo.boxShift
+	var sh: Variant = _geo.boxShift
 	if sh == null:
 		return 0.0
 	var bx := boxes()
@@ -129,7 +129,7 @@ func shift_at(i: int) -> float:
 ## The garage fronts along the boxes: [points, away directions] per run of boxes, where measure_boxes found the wall
 ## (a box's outer edge GARAGE_GAP in front of it); away points from the lane into the garages. Empty before then.
 func garage_front() -> Array:
-	var sh = _geo.boxShift
+	var sh: Variant = _geo.boxShift
 	if sh == null:
 		return []
 	var pts: Array = lane.points
@@ -241,7 +241,7 @@ func _mesh_from(pos: PackedVector3Array, idx: PackedInt32Array, mat: Material, u
 ## The pit boxes painted along the whole garage row: a white outline in front of every garage, the driver's own box
 ## in yellow with their name on a board above it, and a PIT SERVICE board where the row starts. ground(x, z, y) -> y.
 ## mine: {slot, name} or null.
-func build_markings(ground: Callable, mine) -> Node3D:
+func build_markings(ground: Callable, mine: Variant) -> Node3D:
 	var g := Node3D.new()
 	g.name = "pit-markings"
 	var pts: Array = lane.points
@@ -358,7 +358,7 @@ func build_surface(ground: Callable, probe: Callable) -> Node3D:
 	for i in n:
 		var w: Array = raw.slice(maxi(0, i - 3), mini(n, i + 4))
 		var med := func(kk: int) -> float:
-			var v: Array = w.map(func(x): return x[kk])
+			var v: Array = w.map(func(x: Variant) -> Variant: return x[kk])
 			v.sort()
 			return v[int(floorf(v.size() / 2.0))]
 		edge.append([med.call(0), -med.call(1)])

@@ -11,17 +11,17 @@ const REFUEL_LPS := 2.7
 static func driver_change_s() -> float:
 	return RaceTracker.PIT_WINDOW.minStopMs / 1000.0
 
-static func body_time(z) -> float:
+static func body_time(z: Array) -> float:
 	return 4.0 + 26.0 * maxf(maxf(z[0], z[1]), maxf(z[2], z[3]))
 
-static func suspension_time(z) -> float:
+static func suspension_time(z: Array) -> float:
 	return 6.0 + 34.0 * z[5]
 
-static func engine_time(z) -> float:
+static func engine_time(z: Array) -> float:
 	return 8.0 + 52.0 * z[4]
 
 ## Returns {total, parts: [{label, seconds}]}.
-static func service_time(plan: Dictionary, z) -> Dictionary:
+static func service_time(plan: Dictionary, z: Array) -> Dictionary:
 	var parts: Array = []
 	var repairs := 0.0
 	if plan.body:
@@ -49,7 +49,7 @@ static func service_time(plan: Dictionary, z) -> Dictionary:
 	return {"total": maxf(fuel, driver) + (work + JACKS if work > 0.0 else 0.0), "parts": parts}
 
 ## Sensible default: repair what is damaged, fresh tyres of the right kind when worn or the weather changed.
-static func default_plan(z, avg_wear: float, current: String, wetness: float, fuel_l: float = 0.0, driver_change: bool = false) -> Dictionary:
+static func default_plan(z: Array, avg_wear: float, current: String, wetness: float, fuel_l: float = 0.0, driver_change: bool = false) -> Dictionary:
 	var want_wet := wetness > 0.35
 	var right_kind: bool = current == "wet" if want_wet else current != "wet"
 	var tyres: Variant = null

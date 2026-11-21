@@ -56,13 +56,13 @@ func _init(track_data: Dictionary, entrants: Array, info: Dictionary) -> void:
 	# grid frame: forward from the pole slot's yaw, the middle of the two columns
 	var g0: Dictionary = track.grid[0]
 	_grid_fwd = Vector3(sin(g0.yaw), 0, cos(g0.yaw))
-	var used := entrants.map(func(e): return track.grid[e.slot] if e.slot < track.grid.size() else g0)
-	for g in used:
+	var used := entrants.map(func(e: Dictionary) -> Dictionary: return track.grid[e.slot] if e.slot < track.grid.size() else g0)
+	for g: Dictionary in used:
 		_grid_mid += Vector3(g.p[0], g.p[1], g.p[2])
 	_grid_mid /= maxf(1.0, used.size())
 	# back of the grid first, pole last
 	order = entrants.duplicate()
-	order.sort_custom(func(a, b): return a.slot > b.slot)
+	order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.slot > b.slot)
 	_build_ui(entrants, info)
 
 func _build_ui(entrants: Array, info: Dictionary) -> void:
@@ -89,7 +89,7 @@ func _build_ui(entrants: Array, info: Dictionary) -> void:
 	tcol.add_child(UIKit.label(I18n.t(info.trackName), 60, UIKit.TEXT, true, 700))
 	var facts := HBoxContainer.new()
 	facts.add_theme_constant_override("separation", 18)
-	for f in info.facts:
+	for f: String in info.facts:
 		facts.add_child(UIKit.label(f, 18, UIKit.MUTED))
 	tcol.add_child(facts)
 	tcol.add_child(UIKit.label(info.format, 17, UIKit.MUTED))
@@ -106,8 +106,8 @@ func _build_ui(entrants: Array, info: Dictionary) -> void:
 	_map.custom_minimum_size = Vector2(250, 170)
 	side.add_child(_map)
 	var sorted := entrants.duplicate()
-	sorted.sort_custom(func(a, b): return a.slot < b.slot)
-	for e in sorted:
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.slot < b.slot)
+	for e: Dictionary in sorted:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
 		row.add_child(UIKit.label("P%d" % (e.slot + 1), 14, UIKit.ACCENT_2 if e.me else UIKit.MUTED, true, 700))
@@ -171,7 +171,7 @@ func _grid_ms() -> float:
 
 ## ms_to_start: milliseconds until the green light, or null while drivers are still loading.
 ## Returns true while the cinematic owns the camera.
-func update(dt: float, ms_to_start) -> bool:
+func update(dt: float, ms_to_start: Variant) -> bool:
 	if not active:
 		return false
 	_t += dt

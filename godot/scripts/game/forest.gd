@@ -120,7 +120,7 @@ func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 			var meta: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(meta_path))
 			var all := FileAccess.get_file_as_bytes(bin_path).to_float32_array()
 			grid = {"cell": float(meta.cell), "ox": float(meta.origin[0]), "oz": float(meta.origin[1]), "nx": int(meta.nx), "nz": int(meta.nz)}
-			for c in meta.cells:
+			for c: Array in meta.cells:
 				var first: int = c[1]
 				var count: int = c[2]
 				cells[int(c[0])] = all.slice(first * STRIDE, (first + count) * STRIDE)
@@ -145,7 +145,7 @@ func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 func _grid_for(extra: Array) -> Dictionary:
 	var lo := Vector2(INF, INF)
 	var hi := Vector2(-INF, -INF)
-	for e in extra:
+	for e: Dictionary in extra:
 		lo = lo.min(Vector2(e.x, e.z))
 		hi = hi.max(Vector2(e.x, e.z))
 	var cell := 128.0
@@ -160,7 +160,7 @@ func cell_of(x: float, z: float) -> int:
 func _merge_extra(extra: Array) -> void:
 	var by_cell := {}
 	var i := 0
-	for e in extra:
+	for e: Dictionary in extra:
 		var c := cell_of(e.x, e.z)
 		if not by_cell.has(c):
 			by_cell[c] = PackedFloat32Array()
@@ -170,7 +170,7 @@ func _merge_extra(extra: Array) -> void:
 		var cw := cos(yaw) * s
 		var sw := sin(yaw) * s
 		by_cell[c].append_array(PackedFloat32Array([cw, 0, sw, e.x, 0, s, 0, e.y + 0.2 - 0.4, -sw, 0, cw, e.z, 0.9, 0.9, 0.9, 0.0 if e.spruce else float(SPRUCES)]))
-	for c in by_cell:
+	for c: int in by_cell:
 		var add: PackedFloat32Array = by_cell[c]
 		var old: PackedFloat32Array = cells.get(c, PackedFloat32Array())
 		var merged := add.duplicate()
@@ -185,7 +185,7 @@ func _merge_extra(extra: Array) -> void:
 
 ## Spruces and maple from the models, with the baked occlusion; impostor cards baked from them.
 func _make_species() -> void:
-	var scene = load(species_file)
+	var scene: PackedScene = load(species_file)
 	# the old models' textures needed a tint; the new species carry their real colours (the circuit's look tints them)
 	var own := species_file != "res://assets/vegetation/trees.glb"
 	if not (scene is PackedScene):
@@ -196,7 +196,7 @@ func _make_species() -> void:
 		specs.append(["spruce_%d" % k, SPRUCE_H, Color.WHITE if own else SPRUCE_TINT, NEAR_SHARE[k]])
 	# a circuit's own broadleaf (Spa's oak: its far model holds up) stands as a model further out than the old maple
 	specs.append(["maple", BEECH_H, Color.WHITE if own else MAPLE_TINT, 0.5 if own else NEAR_SHARE[3]])
-	for sp in specs:
+	for sp: Array in specs:
 		var node := root.find_child(sp[0], true, false) as MeshInstance3D
 		if node == null:
 			continue
@@ -229,7 +229,7 @@ func _species_from(node: MeshInstance3D, height: float, tint: Color, near_share:
 		var arrays := src.surface_get_arrays(s)
 		# only what the tree shader uses: other channels a model brings (custom data, a second UV set, skinning) can
 		# be in formats add_surface_from_arrays refuses (Spa's scanned species)
-		for k in [Mesh.ARRAY_TANGENT, Mesh.ARRAY_COLOR, Mesh.ARRAY_TEX_UV2, Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3, Mesh.ARRAY_BONES, Mesh.ARRAY_WEIGHTS]:
+		for k: int in [Mesh.ARRAY_TANGENT, Mesh.ARRAY_COLOR, Mesh.ARRAY_TEX_UV2, Mesh.ARRAY_CUSTOM0, Mesh.ARRAY_CUSTOM1, Mesh.ARRAY_CUSTOM2, Mesh.ARRAY_CUSTOM3, Mesh.ARRAY_BONES, Mesh.ARRAY_WEIGHTS]:
 			arrays[k] = null
 		var m := src.surface_get_material(s)
 		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
@@ -243,7 +243,7 @@ func _species_from(node: MeshInstance3D, height: float, tint: Color, near_share:
 		var leaf: bool = m is BaseMaterial3D and (m as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED
 		parts.append({"arrays": arrays, "leaf": leaf, "mat": m})
 	# bark first, then leaves
-	parts.sort_custom(func(a, b): return int(a.leaf) < int(b.leaf))
+	parts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.leaf) < int(b.leaf))
 	_shade_tree(parts)
 	var out := ArrayMesh.new()
 	var mats: Array = []
@@ -283,7 +283,7 @@ func _species_from(node: MeshInstance3D, height: float, tint: Color, near_share:
 func _shade_tree(parts: Array) -> void:
 	var lo := Vector3(INF, INF, INF)
 	var hi := Vector3(-INF, -INF, -INF)
-	for p in parts:
+	for p: Dictionary in parts:
 		if p.leaf:
 			for v in (p.arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array):
 				lo = lo.min(v)
@@ -293,7 +293,7 @@ func _shade_tree(parts: Array) -> void:
 	var rad := maxf(size.x, size.z) / 2.0
 	if rad <= 0.0:
 		rad = 1.0
-	for p in parts:
+	for p: Dictionary in parts:
 		var verts: PackedVector3Array = p.arrays[Mesh.ARRAY_VERTEX]
 		var nors: PackedVector3Array = p.arrays[Mesh.ARRAY_NORMAL]
 		var col := PackedColorArray()
@@ -397,7 +397,7 @@ func _build_far() -> void:
 	quad.center_offset = Vector3(0, 0.5, 0)
 	quad.material = _far_mat
 	var cell: float = grid.cell
-	for c in cells:
+	for c: int in cells:
 		var data: PackedFloat32Array = cells[c]
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -448,7 +448,7 @@ func set_quality(q: Dictionary) -> void:
 		near_r[k] = near_range(q) * (species[k] as Species).near_share
 	_far_mat.set_shader_parameter("near_r", near_r)
 	_far_mat.set_shader_parameter("near_band", FAR_BAND if fades else 0.0)
-	for c in _far_nodes:
+	for c: int in _far_nodes:
 		var mmi: MultiMeshInstance3D = _far_nodes[c]
 		var count: int = (cells[c] as PackedFloat32Array).size() / STRIDE
 		var keep := maxi(int(pinned[c]), ceili(count * dens))
@@ -595,7 +595,7 @@ func blocks(a: Vector3, b: Vector3) -> bool:
 	var dx := b.x - a.x
 	var dz := b.z - a.z
 	var d2 := maxf(dx * dx + dz * dz, 1e-6)
-	for c in seen:
+	for c: int in seen:
 		if not cells.has(c):
 			continue
 		var data: PackedFloat32Array = cells[c]

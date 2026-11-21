@@ -27,7 +27,7 @@ const SETUP := {
 static func _clamp_click(c: float) -> int:
 	return clampi(roundi(c), 1, SETUP.clicks)
 
-static func _pair(arr, i: int, default_value: float) -> float:
+static func _pair(arr: Variant, i: int, default_value: float) -> float:
 	if arr == null or arr.size() <= i or arr[i] == null:
 		return default_value
 	return float(arr[i])
@@ -54,7 +54,7 @@ static func apply_setup(entry: Dictionary, setup: Dictionary) -> Dictionary:
 
 ## The part of the setup the vehicle applies itself (pressures, ride height on the springs, dampers).
 static func vehicle_setup(setup: Dictionary) -> Dictionary:
-	var damper := func(arr, i: int) -> float:
+	var damper := func(arr: Variant, i: int) -> float:
 		return 1.0 + SETUP.damperPerClick * (_clamp_click(_pair(arr, i, 4.0)) - SETUP.baseline)
 	var ride := func(i: int) -> float:
 		return clampf(_pair(setup.get("ride"), i, 0.0), -SETUP.rideMm, SETUP.rideMm) / 1000.0
@@ -140,18 +140,18 @@ static func sanitize(raw: Variant) -> Variant:
 	}
 
 ## A number from a setup code, kept within [lo, hi], else the default.
-static func _one(v, range_: Array, def: float) -> float:
+static func _one(v: Variant, range_: Array, def: float) -> float:
 	if typeof(v) == TYPE_FLOAT or typeof(v) == TYPE_INT:
 		return clampf(float(v), float(range_[0]), float(range_[1]))
 	return def
 
-static func _num_in(arr, i: int, range_: Array, def: float) -> float:
+static func _num_in(arr: Variant, i: int, range_: Array, def: float) -> float:
 	if typeof(arr) == TYPE_ARRAY and arr.size() > i:
 		return _one(arr[i], range_, def)
 	return def
 
 static func to_code(setup: Dictionary) -> String:
-	var clean = sanitize(setup)
+	var clean: Variant = sanitize(setup)
 	return CODE_PREFIX + Marshalls.raw_to_base64(JSON.stringify(clean).to_utf8_buffer())
 
 ## The setup in a code, or null for anything that isn't a valid one.
@@ -172,7 +172,7 @@ static func from_code(code: String) -> Variant:
 ## The saved setups' names, sorted.
 static func saved_names() -> Array:
 	var names: Array = Settings.data.get("savedSetups", {}).keys()
-	names.sort_custom(func(a, b): return String(a).naturalnocasecmp_to(String(b)) < 0)
+	names.sort_custom(func(a: Variant, b: Variant) -> bool: return String(a).naturalnocasecmp_to(String(b)) < 0)
 	return names
 
 static func save_named(name: String, setup: Dictionary) -> void:
@@ -190,8 +190,8 @@ static func delete_named(name: String) -> void:
 
 ## Copies a saved (or any) setup into the live one, keeping the dictionary the UI holds.
 static func load_into(target: Dictionary, setup: Dictionary) -> void:
-	var s = sanitize(setup)
+	var s: Variant = sanitize(setup)
 	if s == null:
 		return
-	for k in s:
+	for k: String in s:
 		target[k] = s[k]

@@ -99,7 +99,7 @@ func _build_wheel(car_object: Node3D, st: Dictionary) -> void:
 	screen.material_override = sm
 	screen.position = Vector3(0, r * 0.05, -0.017)
 	screen.rotation.y = PI
-	for m in [rim, grip_l, grip_r, plate, screen]:
+	for m: MeshInstance3D in [rim, grip_l, grip_r, plate, screen]:
 		spin.add_child(m)
 		(m as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var holder := Node3D.new()
@@ -156,7 +156,7 @@ func _build_dash() -> void:
 	g.add_child(dash)
 	g.add_child(hood)
 	g.add_child(wheel)
-	for m in [dash, hood, rim, hub]:
+	for m: MeshInstance3D in [dash, hood, rim, hub]:
 		(m as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_anchor.add_child(g)
 	_dash = g
@@ -205,7 +205,7 @@ func auto_seat(car: Node3D) -> void:
 			tris.append([tm, car.global_transform.affine_inverse() * mi.global_transform])
 	var ray_hits := func(from: Vector3, dir: Vector3, far: float) -> float:
 		var best := INF
-		for t in tris:
+		for t: Array in tris:
 			var inv: Transform3D = (t[1] as Transform3D).affine_inverse()
 			var hit: Dictionary = (t[0] as TriangleMesh).intersect_ray(inv * from, inv.basis * dir)
 			if not hit.is_empty():

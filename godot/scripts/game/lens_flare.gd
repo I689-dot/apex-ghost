@@ -95,7 +95,7 @@ func _draw() -> void:
 	draw_texture_rect(_glow, Rect2(_pos - Vector2(h * 1.1, h * 0.018), Vector2(h * 2.2, h * 0.036)), false, Color(1, 0.92, 0.82, a * 0.55))
 	# the ghosts
 	var c := r.size * 0.5
-	for gh in GHOSTS:
+	for gh: Array in GHOSTS:
 		var p: Vector2 = _pos.lerp(c, float(gh[0]))
 		var s: float = h * float(gh[1])
 		var col: Color = gh[2]

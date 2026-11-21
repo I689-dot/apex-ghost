@@ -241,7 +241,7 @@ static func line_from_file(track: Dictionary) -> Dictionary:
 	var lo := PackedFloat32Array()
 	var hi := PackedFloat32Array()
 	var alt := PackedFloat32Array()
-	for arr in [off, x, z, lo, hi, alt]:
+	for arr: PackedFloat32Array in [off, x, z, lo, hi, alt]:
 		arr.resize(n)
 	for i in n:
 		var a := ((i - 1 + n) % n) * 3

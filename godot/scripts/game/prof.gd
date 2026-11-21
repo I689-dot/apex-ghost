@@ -55,11 +55,11 @@ static func frame() -> void:
 		var now_us := Time.get_ticks_usec()
 		if _frame_us > 0 and now_us - _frame_us > spike_ms * 1000.0:
 			var items: Array = []
-			for k in _cur:
+			for k: String in _cur:
 				if _cur[k] >= 500:
 					items.append([k, _cur[k]])
-			items.sort_custom(func(a, b): return a[1] > b[1])
-			print("SPIKE %.1f ms (physics steps %d): %s" % [(now_us - _frame_us) / 1000.0, _cur.get("#steps", 0), ", ".join(items.map(func(it): return "%s %.1f" % [it[0], it[1] / 1000.0]))])
+			items.sort_custom(func(a: Array, b: Array) -> bool: return a[1] > b[1])
+			print("SPIKE %.1f ms (physics steps %d): %s" % [(now_us - _frame_us) / 1000.0, _cur.get("#steps", 0), ", ".join(items.map(func(it: Array) -> String: return "%s %.1f" % [it[0], it[1] / 1000.0]))])
 		_frame_us = now_us
 		_cur.clear()
 	_frames += 1
@@ -68,9 +68,9 @@ static func frame() -> void:
 		return
 	_last = now
 	var items: Array = []
-	for k in _acc:
+	for k: String in _acc:
 		items.append([k, _acc[k] / float(maxi(1, _frames))])
-	items.sort_custom(func(a, b): return a[1] > b[1])
+	items.sort_custom(func(a: Array, b: Array) -> bool: return a[1] > b[1])
 	top = ""
 	for i in mini(7, items.size()):
 		top += "%s %.2f ms\n" % [items[i][0], items[i][1] / 1000.0]

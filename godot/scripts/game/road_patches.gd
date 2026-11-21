@@ -34,7 +34,7 @@ static func build(td: Dictionary, ground: Callable) -> RoadPatches:
 		r._add(td, ground, lane.points, 9.0, 4, 0.15, true)
 	var cl: Array = td.centerline
 	var n := cl.size() / 3
-	for pair in td.get("smoothRoad", []):
+	for pair: Array in td.get("smoothRoad", []):
 		var from: float = pair[0]
 		var to: float = pair[1]
 		var pts: Array = []
