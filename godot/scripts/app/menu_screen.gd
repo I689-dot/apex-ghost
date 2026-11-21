@@ -32,7 +32,7 @@ static func build(app: App, error: String = "") -> Control:
 	var edit_nick := func() -> void:
 		var m := UIW.modal(app.overlay_layer, 460)
 		var b: VBoxContainer = m.body
-		UIW.modal_head(b, I18n.t("Your nickname"), func(): m.root.queue_free())
+		UIW.modal_head(b, I18n.t("Your nickname"), func() -> void: m.root.queue_free())
 		var le := LineEdit.new()
 		le.max_length = 16
 		le.placeholder_text = I18n.t("Your nickname")
@@ -44,8 +44,8 @@ static func build(app: App, error: String = "") -> Control:
 		b.add_child(msg)
 		var row := UIW.hbox(10)
 		row.alignment = BoxContainer.ALIGNMENT_END
-		row.add_child(UIKit.button(I18n.t("Cancel"), func(): m.root.queue_free()))
-		var save := func():
+		row.add_child(UIKit.button(I18n.t("Cancel"), func() -> void: m.root.queue_free()))
+		var save := func() -> void:
 			var r := Validation.sanitize_nickname(le.text)
 			if not r.ok:
 				msg.text = r.error
@@ -107,14 +107,14 @@ static func build(app: App, error: String = "") -> Control:
 				return r.error
 			return await app.join(r.code, n))
 	# (no sign-in here: the game opens on the sign-in screen. Signed out only when playing offline: back to it)
-	var sign_in := func(): app.offline = false; app.show_start()
+	var sign_in := func() -> void: app.offline = false; app.show_start()
 
 	var frame := Control.new()
 	UIKit.full(frame)
 	root.add_child(frame)
 	# (a lambda captures by value: it reaches itself through this dictionary, else it calls an empty Callable)
 	var _self := {}
-	_self.render = func():
+	_self.render = func() -> void:
 		# the error line, the code box and the nickname are shared by the tabs: detach them before the old tab is freed
 		for shared in [err, code, nick_label]:
 			if shared.get_parent() != null:
@@ -136,8 +136,8 @@ static func build(app: App, error: String = "") -> Control:
 			holder.add_child(body)
 			body = holder
 		else:
-			body = _play_tab(app, online, err, solo, create, read_nick, sign_in, func(): _tab = "online"; _self.render.call())
-		var on_tab := func(k: String):
+			body = _play_tab(app, online, err, solo, create, read_nick, sign_in, func() -> void: _tab = "online"; _self.render.call())
+		var on_tab := func(k: String) -> void:
 			if k == "career":
 				app.show_career()
 				return
@@ -147,7 +147,7 @@ static func build(app: App, error: String = "") -> Control:
 			"tabs": [["play", I18n.t("Play")], ["online", I18n.t("Online")], ["friends", I18n.t("Friends")], ["career", I18n.t("Career")], ["store", I18n.t("Store")]],
 			"tab": _tab, "on_tab": on_tab, "tabs_left": UIKit.touch(),
 			# the coins (the store, a preview for now) beside the driver
-			"right": [StoreScreen.balance_chip(func(): _tab = "store"; _self.render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick),
+			"right": [StoreScreen.balance_chip(func() -> void: _tab = "store"; _self.render.call())] + _driver_chip(app, signed_in, nick_label, edit_nick),
 		})
 		var scr := UIW.screen(top, body)
 		UIKit.full(scr)
@@ -155,7 +155,7 @@ static func build(app: App, error: String = "") -> Control:
 		UIW.focus_first.call_deferred(body)
 	_self.render.call()
 	# the coins beside the driver: the server's balance (refreshed now and then)
-	StoreScreen.refresh(func(): if is_instance_valid(frame) and app.screen == "menu": _self.render.call())
+	StoreScreen.refresh(func() -> void: if is_instance_valid(frame) and app.screen == "menu": _self.render.call())
 	UIKit.full(root)
 	return root
 
@@ -170,7 +170,7 @@ static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Call
 	var prof := Button.new()
 	prof.focus_mode = Control.FOCUS_ALL
 	prof.tooltip_text = I18n.t("Career")
-	for st in ["normal", "disabled"]:
+	for st: String in ["normal", "disabled"]:
 		prof.add_theme_stylebox_override(st, UIKit.box(Color(0.02, 0.035, 0.08, 0.55), Color(1, 1, 1, 0.18), 1, 4))
 	prof.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.12), Color(1, 1, 1, 0.5), 1, 4))
 	prof.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.22), Color.WHITE, 1, 4))
@@ -192,7 +192,7 @@ static func _driver_chip(app: App, signed_in, nick_label: Label, edit_nick: Call
 	UIW.pass_mouse(pm)
 	prof.add_child(pm)
 	prof.custom_minimum_size = pm.get_combined_minimum_size()
-	pm.resized.connect(func(): prof.custom_minimum_size = pm.get_combined_minimum_size())
+	pm.resized.connect(func() -> void: prof.custom_minimum_size = pm.get_combined_minimum_size())
 	prof.pressed.connect(app.show_career)
 	out.append(prof)
 	# signed in, the profile and signing out are in Settings › Account (the gear); offline (or a server without
@@ -210,7 +210,7 @@ static func _icon_button(glyph: String, tip: String, cb: Callable) -> Button:
 	b.add_theme_font_size_override("font_size", 20)
 	var s := 46.0 if UIKit.touch() else 38.0
 	b.custom_minimum_size = Vector2(s, s)
-	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+	for st: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		var base: StyleBoxFlat = b.get_theme_stylebox(st).duplicate()
 		base.content_margin_left = 4
 		base.content_margin_right = 4
@@ -270,7 +270,7 @@ static func _play_tab(app: App, online: bool, err: Label, solo: Callable, create
 	var champ_stats: Array = [[I18n.t("Round"), "%d/%d" % [champ.done + 1, champ.rounds.size()]], [I18n.t("Points"), "25 · 18 · 15"]] if champ != null else [[I18n.t("Rounds"), str(circuits.size())], [I18n.t("Points"), "25 · 18 · 15"]]
 	cards.add_child(_card("photo_aerial_spa.webp", [[I18n.t("OFFLINE"), UIKit.SOFT], [I18n.t("Season"), UIKit.ACCENT_2]],
 		I18n.t("Championship · round {n}/{m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("Championship"),
-		I18n.t("A season against the AI on every circuit, points as in F1."), champ_stats, func(): ChampionshipUI.open(app, read_nick), ""))
+		I18n.t("A season against the AI on every circuit, points as in F1."), champ_stats, func() -> void: ChampionshipUI.open(app, read_nick), ""))
 	cards.add_child(_card("photo_pole_zandvoort.webp", [[I18n.t("ONLINE"), UIKit.CRIMSON]], I18n.t("Join friends"), I18n.t("A room code from a friend, or a live public session."),
 		[[I18n.t("Room code"), "5"], [I18n.t("Watch"), I18n.t("Live")]], to_online if online else sign_in, lock))
 	col.add_child(cards)
@@ -309,7 +309,7 @@ static func _card(photo: String, tags: Array, title: String, sub: String, stats:
 			g.add_child(UIW.stat(st[0], st[1], 28 if touch else 32))
 		col.add_child(g)
 	var content: MarginContainer = b.get_node("content")
-	for side in ["left", "right"]:
+	for side: String in ["left", "right"]:
 		content.add_theme_constant_override("margin_" + side, 16 if touch else 20)
 	content.add_theme_constant_override("margin_top", 16)
 	content.add_theme_constant_override("margin_bottom", 16)
@@ -324,16 +324,16 @@ static func _card(photo: String, tags: Array, title: String, sub: String, stats:
 	UIW.pass_mouse(content)
 	b.pressed.connect(on)
 	# it answers the pointer: a little lift on hover, a dip when pressed (a PC menu: the cards felt dead)
-	b.resized.connect(func(): b.pivot_offset = b.size * 0.5)
+	b.resized.connect(func() -> void: b.pivot_offset = b.size * 0.5)
 	var to := func(k: float, t: float) -> void:
 		var tw := b.create_tween()
 		tw.tween_property(b, "scale", Vector2(k, k), t).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	b.mouse_entered.connect(func(): to.call(1.025, 0.12))
-	b.mouse_exited.connect(func(): to.call(1.0, 0.15))
-	b.focus_entered.connect(func(): to.call(1.025, 0.12))
-	b.focus_exited.connect(func(): to.call(1.0, 0.15))
-	b.button_down.connect(func(): to.call(0.99, 0.06))
-	b.button_up.connect(func(): to.call(1.025 if b.is_hovered() else 1.0, 0.1))
+	b.mouse_entered.connect(func() -> void: to.call(1.025, 0.12))
+	b.mouse_exited.connect(func() -> void: to.call(1.0, 0.15))
+	b.focus_entered.connect(func() -> void: to.call(1.025, 0.12))
+	b.focus_exited.connect(func() -> void: to.call(1.0, 0.15))
+	b.button_down.connect(func() -> void: to.call(0.99, 0.06))
+	b.button_up.connect(func() -> void: to.call(1.025 if b.is_hovered() else 1.0, 0.1))
 	return b
 
 # ----------------------------------------------------------------- online ---
@@ -348,8 +348,8 @@ static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join
 		var r := UIW.hbox(8)
 		code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		r.add_child(code)
-		r.add_child(UIW.default_focus(UIKit.button(I18n.t("Join"), func(): join_it.call(false), true)))
-		r.add_child(UIKit.button(I18n.t("Watch"), func(): join_it.call(true)))
+		r.add_child(UIW.default_focus(UIKit.button(I18n.t("Join"), func() -> void: join_it.call(false), true)))
+		r.add_child(UIKit.button(I18n.t("Watch"), func() -> void: join_it.call(true)))
 		join_p.add_child(r)
 		join_p.add_child(err)
 		var cr := UIKit.button(I18n.t("Create room"), create)
@@ -363,7 +363,7 @@ static func _online_tab(app: App, online: bool, code: LineEdit, err: Label, join
 		var jr := UIW.hbox(8)
 		code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		jr.add_child(code)
-		jr.add_child(UIKit.button(I18n.t("Join"), func(): join_it.call(false), true))
+		jr.add_child(UIKit.button(I18n.t("Join"), func() -> void: join_it.call(false), true))
 		join_p.add_child(jr)
 		join_p.add_child(err)
 		left.add_child(UIW.panel(join_p))

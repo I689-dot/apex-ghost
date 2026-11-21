@@ -103,7 +103,7 @@ func _build_layers() -> void:
 	backdrop.modulate = Color(1, 1, 1, 0.8)
 	bg.add_child(backdrop)
 	# the photo drifts slowly behind the menus (one looping tween, no per-frame script)
-	backdrop.resized.connect(func(): backdrop.pivot_offset = backdrop.size * 0.5)
+	backdrop.resized.connect(func() -> void: backdrop.pivot_offset = backdrop.size * 0.5)
 	var drift := backdrop.create_tween().set_loops()
 	drift.tween_property(backdrop, "scale", Vector2(1.07, 1.07), 26.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	drift.tween_property(backdrop, "scale", Vector2.ONE, 26.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -162,7 +162,7 @@ func toast(text: String, ms: float = 2500.0) -> void:
 	p.add_child(l)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	toasts.add_child(p)
-	get_tree().create_timer(ms / 1000.0).timeout.connect(func(): if is_instance_valid(p): p.queue_free())
+	get_tree().create_timer(ms / 1000.0).timeout.connect(func() -> void: if is_instance_valid(p): p.queue_free())
 
 func set_ui(c: Control) -> void:
 	var key := "%s/%s/%s/%s" % [screen, LobbyScreen._page, MenuScreen._tab, CareerScreen._tab]
@@ -260,7 +260,7 @@ func show_sign_in() -> void:
 	screen = "signin"
 	teardown_connection()
 	set_backdrop("hero")
-	set_ui(SocialUI.sign_in_screen(self, func(): show_menu(), func(): offline = true; show_menu()))
+	set_ui(SocialUI.sign_in_screen(self, func() -> void: show_menu(), func() -> void: offline = true; show_menu()))
 	# a server that keeps no accounts: nobody signs in, straight on
 	var on: bool = await Account.probe_accounts()
 	if not on and screen == "signin":
@@ -298,7 +298,7 @@ func mobile_layout() -> bool:
 func show_classic_menu(tab: String) -> void:
 	MenuScreen._tab = tab
 	screen = "m_classic"
-	back_to = func(): show_menu()
+	back_to = func() -> void: show_menu()
 	set_ui(MenuScreen.build(self))
 
 ## The solo career's page (rank, licence, Driver Rating, record, achievements).
@@ -552,7 +552,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	col.add_child(bar)
 	col.add_child(label)
 	var root := Control.new()
-	var my_car = null
+	var my_car: Variant = null
 	for c in cars.cars:
 		if c.id == my_info().get("carId"):
 			my_car = {"url": CarStudio.picture(c, CarStudio.my_livery(), true), "name": c.name}
@@ -603,7 +603,7 @@ func start_loading(race: Dictionary, start_at) -> void:
 	hud_layer.move_child(countdown, -1)
 	touch = TouchControls.new()
 	touch.key_action.connect(_touch_key)
-	touch.skip_intro.connect(func(): _key_event(KEY_ENTER, true); _key_event(KEY_ENTER, false))
+	touch.skip_intro.connect(func() -> void: _key_event(KEY_ENTER, true); _key_event(KEY_ENTER, false))
 	touch.spectator_key.connect(func(code): var k := KeyMap.key_of(code); _key_event(k, true); _key_event(k, false))
 	touch_layer.add_child(touch)
 	touch.spectating = spectating
@@ -645,17 +645,17 @@ func set_pause(open: bool) -> void:
 	var m := UIW.modal(overlay_layer, 440)
 	pause_ui = m.root
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Paused"), func(): if session != null: session.toggle_pause(false))
+	UIW.modal_head(b, I18n.t("Paused"), func() -> void: if session != null: session.toggle_pause(false))
 	# the session's own Esc closes the pause menu: App.go_back leaves it alone
 	pause_ui.remove_meta("modal")
 	pause_ui.remove_meta("close")
 	b.add_child(UIW.muted(I18n.t("The race keeps running.")))
-	b.add_child(UIW.default_focus(UIKit.button(I18n.t("Resume"), func(): if session != null: session.toggle_pause(false), true)))
+	b.add_child(UIW.default_focus(UIKit.button(I18n.t("Resume"), func() -> void: if session != null: session.toggle_pause(false), true)))
 	if session != null and session.replay.size() >= 40:
-		b.add_child(UIKit.button(I18n.t("Replay"), func():
+		b.add_child(UIKit.button(I18n.t("Replay"), func() -> void:
 			session.toggle_pause(false)
 			session.open_replay()))
-	b.add_child(UIKit.button(I18n.t("Reset to track (+5 s penalty)"), func():
+	b.add_child(UIKit.button(I18n.t("Reset to track (+5 s penalty)"), func() -> void:
 		if session != null:
 			session.toggle_pause(false)
 			session.request_reset()))
@@ -673,26 +673,26 @@ func set_replay(open: bool) -> void:
 	overlay_layer.add_child(replay_ui)
 
 func open_settings() -> void:
-	var panel := SettingsPanel.build(self, func():
+	var panel := SettingsPanel.build(self, func() -> void:
 		if session != null:
 			session.apply_settings()
 		audio.set_levels(Settings.data.audio)
 		graphics.apply_quality())
 	# back on the screen under it, the pad's focus returns there
-	panel.tree_exited.connect(func(): if is_instance_valid(ui) and is_inside_tree() and screen != "race": UIW.focus_first(ui))
+	panel.tree_exited.connect(func() -> void: if is_instance_valid(ui) and is_inside_tree() and screen != "race": UIW.focus_first(ui))
 
 # --------------------------------------------------------------- results ---
 
 func show_results(m: Dictionary) -> void:
 	set_pause(false)
-	var gain = null
+	var gain: Variant = null
 	var prog := {}
 	var ev_result := {}
 	var stats := {}
 	if session != null:
 		stats = session.career_stats()
 	if not stats.is_empty() and conn != null and LocalRoom.is_local_code(conn.code) and not spectating:
-		var mine = null
+		var mine: Variant = null
 		for r in m.rows:
 			if r.id == me:
 				mine = r
@@ -730,7 +730,7 @@ func app_event_track(ev: Dictionary) -> String:
 
 ## Dev: APEX_AUTO=solo plays through menu → lobby → briefing → race by itself (SHOT_DIR saves a screenshot per step).
 func _autotest() -> void:
-	var shot := func(n: String):
+	var shot := func(n: String) -> void:
 		var dir := OS.get_environment("SHOT_DIR")
 		if dir != "":
 			await get_tree().process_frame
@@ -743,7 +743,7 @@ func _autotest() -> void:
 		send({"t": "setConditions", "trackId": OS.get_environment("TRACK")})
 	await get_tree().create_timer(0.6).timeout
 	await shot.call("lobby_hub")
-	for step in ["circuit", "conditions", "session", "rules", "car", "drivers"]:
+	for step: String in ["circuit", "conditions", "session", "rules", "car", "drivers"]:
 		LobbyScreen._page = step
 		render_lobby()
 		await get_tree().create_timer(0.3).timeout
@@ -826,7 +826,7 @@ func _play_intro() -> void:
 	add_child(intro)
 	var over := intro.overlay()
 	overlay_layer.add_child(over)
-	intro.finished.connect(func():
+	intro.finished.connect(func() -> void:
 		bg.visible = true
 		ui.visible = true
 		ui.modulate.a = 0.0
@@ -837,7 +837,7 @@ func _play_intro() -> void:
 	intro.play()
 
 func _shots_only() -> void:
-	for t in [1.0, 2.6, 4.2, 6.8, 9.6]:
+	for t: float in [1.0, 2.6, 4.2, 6.8, 9.6]:
 		await get_tree().create_timer(t).timeout
 		get_viewport().get_texture().get_image().save_png("%s/intro_%d.png" % [OS.get_environment("SHOT_DIR"), int(t)])
 	get_tree().quit()
@@ -846,10 +846,10 @@ func _shots_only() -> void:
 ## lobby's pages and the briefing of a solo room, and a results screen from made-up rows (nothing is saved).
 func _ui_shots() -> void:
 	var dir := OS.get_environment("SHOT_DIR")
-	var shot := func(n: String):
+	var shot := func(n: String) -> void:
 		await get_tree().create_timer(0.7).timeout
 		get_viewport().get_texture().get_image().save_png("%s/ui_%s.png" % [dir, n])
-	var clear := func():
+	var clear := func() -> void:
 		for c in overlay_layer.get_children():
 			if c != toasts and c != perf:
 				c.queue_free()
@@ -861,12 +861,12 @@ func _ui_shots() -> void:
 	pad.pressed = true
 	Input.parse_input_event(pad)
 	await shot.call("menu_pad_focus")
-	for t in ["online", "friends"]:
+	for t: String in ["online", "friends"]:
 		MenuScreen._tab = t
 		show_menu()
 		await shot.call("menu_" + t)
 	MenuScreen._tab = "play"
-	for t in ["profile", "achievements", "ranks"]:
+	for t: String in ["profile", "achievements", "ranks"]:
 		CareerScreen._tab = t
 		show_career()
 		await shot.call("career_" + t)
@@ -880,15 +880,15 @@ func _ui_shots() -> void:
 	SocialUI.records_modal(self)
 	await shot.call("records")
 	clear.call()
-	for tab in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller"]:
+	for tab: String in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller"]:
 		SettingsPanel._tab = tab
-		var panel := SettingsPanel.build(self, func(): pass)
+		var panel := SettingsPanel.build(self, func() -> void: pass)
 		await shot.call("settings_" + tab)
 		panel.queue_free()
 	# a solo room: every lobby page, then the briefing's pages
 	await join(LocalRoom.create(), "Max")
 	await get_tree().create_timer(0.6).timeout
-	for step in ["hub", "circuit", "car", "session", "conditions", "rules", "drivers"]:
+	for step: String in ["hub", "circuit", "car", "session", "conditions", "rules", "drivers"]:
 		LobbyScreen._page = step
 		render_lobby()
 		await shot.call("lobby_" + step)
@@ -899,7 +899,7 @@ func _ui_shots() -> void:
 	send({"t": "ready", "ready": true})
 	send({"t": "start"})
 	await get_tree().create_timer(0.8).timeout
-	for t in ["setup", "advanced", "saved"]:
+	for t: String in ["setup", "advanced", "saved"]:
 		LobbyScreen._brief_tab = t
 		render_briefing()
 		await shot.call("briefing_" + t)

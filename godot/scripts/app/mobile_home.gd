@@ -10,7 +10,7 @@ static func build(app: App) -> Control:
 	var root := Control.new()
 	UIKit.full(root)
 	var p := Progression.data()
-	var rerender := func(): if app.screen == "menu": app.show_menu()
+	var rerender := func() -> void: if app.screen == "menu": app.show_menu()
 
 	# the car, large, in its studio light over the dimmed photo
 	var shade := ColorRect.new()
@@ -31,12 +31,12 @@ static func build(app: App) -> Control:
 	root.add_child(_place(_driver(app), Control.PRESET_TOP_LEFT, Vector2(16, 12)))
 	# top right: icons and currencies
 	var tr := UIW.hbox(8)
-	tr.add_child(MobileUI.icon_button("list", I18n.t("Contracts"), func(): contracts(app, rerender), Progression.contracts_ready() > 0))
-	tr.add_child(MobileUI.icon_button("people", I18n.t("Friends"), func(): app.show_classic_menu("friends")))
+	tr.add_child(MobileUI.icon_button("list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0))
+	tr.add_child(MobileUI.icon_button("people", I18n.t("Friends"), func() -> void: app.show_classic_menu("friends")))
 	# (as the classic menu: a change applies at once to the audio, the graphics and a session)
-	tr.add_child(MobileUI.icon_button("gear", I18n.t("Settings"), func(): app.open_settings()))
-	tr.add_child(MobileUI.currency("credit", Progression.credits(), func(): open_store(app, "coins")))
-	tr.add_child(MobileUI.currency("coin", StoreScreen.coins(), func(): open_store(app, "coins")))
+	tr.add_child(MobileUI.icon_button("gear", I18n.t("Settings"), func() -> void: app.open_settings()))
+	tr.add_child(MobileUI.currency("credit", Progression.credits(), func() -> void: open_store(app, "coins")))
+	tr.add_child(MobileUI.currency("coin", StoreScreen.coins(), func() -> void: open_store(app, "coins")))
 	root.add_child(_place(tr, Control.PRESET_TOP_RIGHT, Vector2(-16, 12)))
 
 	# left column: pass, featured event, offer
@@ -56,8 +56,8 @@ static func build(app: App) -> Control:
 	var tiles := UIW.hbox(8)
 	tiles.alignment = BoxContainer.ALIGNMENT_END
 	var left_s := Progression.free_bonus_left_s()
-	tiles.add_child(_tile("tv", I18n.t("Free"), Progression.fmt_left(left_s) if left_s > 0 else I18n.t("Watch"), left_s <= 0, func(): free_bonus(app, rerender)))
-	tiles.add_child(_tile("chest", I18n.t("Chests"), "×%d" % int(p.chests), int(p.chests) > 0, func():
+	tiles.add_child(_tile("tv", I18n.t("Free"), Progression.fmt_left(left_s) if left_s > 0 else I18n.t("Watch"), left_s <= 0, func() -> void: free_bonus(app, rerender)))
+	tiles.add_child(_tile("chest", I18n.t("Chests"), "×%d" % int(p.chests), int(p.chests) > 0, func() -> void:
 		var r := Progression.open_chest()
 		if r.is_empty():
 			app.toast(I18n.t("Win races to fill the daily chests."))
@@ -69,11 +69,11 @@ static func build(app: App) -> Control:
 	champ.text = I18n.t("Championship").to_upper()
 	champ.add_theme_font_override("font", UIKit.font(true, 700, true))
 	champ.add_theme_font_size_override("font_size", 22)
-	for st in ["normal", "hover", "pressed"]:
+	for st: String in ["normal", "hover", "pressed"]:
 		var sb := UIKit.box(MobileUI.PURPLE.darkened(0.15 if st == "normal" else 0.0), Color(1, 1, 1, 0.3), 1, 4, Vector2(18, 8))
 		sb.skew = Vector2(0.22, 0)
 		champ.add_theme_stylebox_override(st, sb)
-	champ.pressed.connect(func(): ChampionshipUI.open(app, func(): return nick()))
+	champ.pressed.connect(func() -> void: ChampionshipUI.open(app, func(): return nick()))
 	right.add_child(champ)
 	var wins := UIW.vbox(4)
 	var wl := UIW.hbox(8)
@@ -99,7 +99,7 @@ static func build(app: App) -> Control:
 	if not car.is_empty():
 		var cn := UIW.hbox(14)
 		cn.alignment = BoxContainer.ALIGNMENT_CENTER
-		var prev := MobileUI.icon_button("back", I18n.t("Previous car"), func(): _cycle_car(-1); rerender.call())
+		var prev := MobileUI.icon_button("back", I18n.t("Previous car"), func() -> void: _cycle_car(-1); rerender.call())
 		cn.add_child(prev)
 		var cc := UIW.vbox(2)
 		var nm := UIKit.label(str(car.name).to_upper(), 24, UIKit.TEXT, true, 700)
@@ -113,7 +113,7 @@ static func build(app: App) -> Control:
 			tags.add_child(UIW.tag("%d hp" % LobbyScreen.hp(kw), Color(0, 0, 0, 0.6)))
 		cc.add_child(tags)
 		cn.add_child(cc)
-		var nxt := MobileUI.icon_button("play", I18n.t("Next car"), func(): _cycle_car(1); rerender.call())
+		var nxt := MobileUI.icon_button("play", I18n.t("Next car"), func() -> void: _cycle_car(1); rerender.call())
 		cn.add_child(nxt)
 		var holder := CenterContainer.new()
 		holder.anchor_left = 0.25
@@ -136,15 +136,15 @@ static func _bottom_bar(app: App, rerender: Callable) -> Control:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_top = -76
 	var row := UIW.hbox(6)
-	for it in [["cart", I18n.t("Shop"), func(): open_store(app, "items"), false],
-			["car", I18n.t("Cars"), func(): cars(app, rerender), false],
-			["brush", I18n.t("Paint"), func(): paint(app), false],
-			["list", I18n.t("Contracts"), func(): contracts(app, rerender), Progression.contracts_ready() > 0]]:
+	for it in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "items"), false],
+			["car", I18n.t("Cars"), func() -> void: cars(app, rerender), false],
+			["brush", I18n.t("Paint"), func() -> void: paint(app), false],
+			["list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0]]:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_ALL
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.custom_minimum_size = Vector2(0, 60)
-		for st in ["normal", "hover", "pressed"]:
+		for st: String in ["normal", "hover", "pressed"]:
 			b.add_theme_stylebox_override(st, UIKit.box(Color(1, 1, 1, 0.0 if st == "normal" else 0.1), Color(0, 0, 0, 0), 0, 4))
 		var c := UIW.hbox(8)
 		c.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -158,7 +158,7 @@ static func _bottom_bar(app: App, rerender: Callable) -> Control:
 		b.pressed.connect(it[2])
 		row.add_child(b)
 		row.add_child(UIW.hair(true, Color(1, 1, 1, 0.12)))
-	var race := MobileUI.race_button(I18n.t("Race"), func(): MobileModes.show(app))
+	var race := MobileUI.race_button(I18n.t("Race"), func() -> void: MobileModes.show(app))
 	race.custom_minimum_size = Vector2(260, 60)
 	row.add_child(UIW.default_focus(race))
 	bar.add_child(row)
@@ -169,7 +169,7 @@ static func _place(c: Control, preset: int, offset: Vector2) -> Control:
 	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.set_anchors_preset(preset)
 	holder.add_child(c)
-	var put := func():
+	var put := func() -> void:
 		var s2 := c.get_combined_minimum_size().max(c.size)
 		if preset == Control.PRESET_TOP_RIGHT:
 			c.position = Vector2(offset.x - s2.x, offset.y)
@@ -191,7 +191,7 @@ static func _driver(app: App) -> Control:
 	var lic: String = on.licence if not on.is_empty() else career.licence
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_ALL
-	for st in ["normal", "hover", "pressed"]:
+	for st: String in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(st, UIKit.box(Color(0, 0, 0, 0.6 if st == "normal" else 0.8), Color(1, 1, 1, 0.15), 1, 6, Vector2(8, 6)))
 	var row := UIW.hbox(10)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -215,7 +215,7 @@ static func _driver(app: App) -> Control:
 	b.add_child(row)
 	b.custom_minimum_size = row.get_combined_minimum_size() + Vector2(16, 12)
 	row.position = Vector2(8, 6)
-	b.pressed.connect(func(): app.show_career())
+	b.pressed.connect(func() -> void: app.show_career())
 	return b
 
 static func _pass_card(app: App) -> Control:
@@ -248,7 +248,7 @@ static func _pass_card(app: App) -> Control:
 	col.add_child(l)
 	col.add_child(MobileUI.bar(Progression.pass_into() / float(Progression.PASS_TIER_XP)))
 	body.add_child(col)
-	b.pressed.connect(func(): MobilePass.show(app))
+	b.pressed.connect(func() -> void: MobilePass.show(app))
 	return b
 
 ## The week's featured event: a cup race on the week's circuit, double credits (MobileModes.weekly()).
@@ -273,7 +273,7 @@ static func _event_card(app: App) -> Control:
 	col.add_child(fill)
 	col.add_child(UIKit.label(str(w.name).to_upper(), 20, UIKit.TEXT, true, 700))
 	body.add_child(col)
-	b.pressed.connect(func(): MobileModes.show(app, "events"))
+	b.pressed.connect(func() -> void: MobileModes.show(app, "events"))
 	return b
 
 static func _offer_card(app: App) -> Control:
@@ -290,14 +290,14 @@ static func _offer_card(app: App) -> Control:
 	row.add_child(col)
 	row.add_child(MobileUI.badge("-35%", UIKit.BAD))
 	body.add_child(row)
-	b.pressed.connect(func(): open_store(app, "offers"))
+	b.pressed.connect(func() -> void: open_store(app, "offers"))
 	return b
 
 static func _tile(icon: String, title: String, sub: String, hot: bool, cb: Callable) -> Button:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_ALL
 	b.custom_minimum_size = Vector2(86, 86)
-	for st in ["normal", "hover", "pressed"]:
+	for st: String in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(st, UIKit.box(Color(0, 0, 0, 0.6 if st == "normal" else 0.8), MobileUI.GOLD if hot else Color(1, 1, 1, 0.15), 2 if hot else 1, 6))
 	var col := UIW.vbox(0)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -307,7 +307,7 @@ static func _tile(icon: String, title: String, sub: String, hot: bool, cb: Calla
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ic.add_child(MobileUI.Icon.make(icon, 34, MobileUI.GOLD if hot else UIKit.TEXT))
 	col.add_child(ic)
-	for t in [[title.to_upper(), 14, UIKit.TEXT], [sub, 13, MobileUI.GOLD if hot else UIKit.SOFT]]:
+	for t: Array in [[title.to_upper(), 14, UIKit.TEXT], [sub, 13, MobileUI.GOLD if hot else UIKit.SOFT]]:
 		var l := UIKit.label(t[0], t[1], t[2], true, 600)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		col.add_child(l)
@@ -353,10 +353,10 @@ static func free_bonus(app: App, rerender: Callable) -> void:
 		return
 	var m := UIW.modal(app.overlay_layer, 520)
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Free bonus"), func(): m.root.queue_free())
+	UIW.modal_head(b, I18n.t("Free bonus"), func() -> void: m.root.queue_free())
 	b.add_child(UIKit.label(I18n.t("Watch a video to claim all the rewards."), 17, UIKit.SOFT))
 	var row := UIW.hbox(10)
-	for r in [["credit", "5,000"], ["star", I18n.t("150 XP")]]:
+	for r: Array in [["credit", "5,000"], ["star", I18n.t("150 XP")]]:
 		var t := PanelContainer.new()
 		t.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.5), Color(1, 1, 1, 0.15), 1, 6, Vector2(14, 10)))
 		var c := UIW.vbox(4)
@@ -367,7 +367,7 @@ static func free_bonus(app: App, rerender: Callable) -> void:
 		t.add_child(c)
 		row.add_child(t)
 	b.add_child(row)
-	var go := UIKit.button(I18n.t("Get free"), func():
+	var go := UIKit.button(I18n.t("Get free"), func() -> void:
 		m.root.queue_free()
 		MobileAds.rewarded(app, I18n.t("5,000 credits and 150 pass XP"), func(ok):
 			if not ok:
@@ -384,7 +384,7 @@ static func free_bonus(app: App, rerender: Callable) -> void:
 static func contracts(app: App, rerender: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 620)
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Contracts"), func(): m.root.queue_free(), I18n.t("Today"))
+	UIW.modal_head(b, I18n.t("Contracts"), func() -> void: m.root.queue_free(), I18n.t("Today"))
 	var list: Array = Progression.data().contracts
 	for i in list.size():
 		var c: Dictionary = list[i]
@@ -406,7 +406,7 @@ static func contracts(app: App, rerender: Callable) -> void:
 			row.add_child(UIKit.label(I18n.t("Claimed"), 17, UIKit.GOOD, true, 700))
 		else:
 			var idx := i
-			var claim := UIKit.button(I18n.t("Claim"), func():
+			var claim := UIKit.button(I18n.t("Claim"), func() -> void:
 				var r := Progression.claim_contract(idx)
 				if not r.is_empty():
 					m.root.queue_free()
@@ -421,7 +421,7 @@ static func contracts(app: App, rerender: Callable) -> void:
 static func cars(app: App, rerender: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 980, true)
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Cars"), func(): m.root.queue_free())
+	UIW.modal_head(b, I18n.t("Cars"), func() -> void: m.root.queue_free())
 	var grid := GridContainer.new()
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 10)
@@ -436,7 +436,7 @@ static func cars(app: App, rerender: Callable) -> void:
 		col.add_child(UIKit.label(str(c.name).to_upper(), 16, UIKit.TEXT, true, 600))
 		card.get_node("content").add_child(UIW.margins(col, 8, 4, 8, 4))
 		var id: String = c.id
-		card.pressed.connect(func():
+		card.pressed.connect(func() -> void:
 			Settings.data.lastCar = id
 			Settings.save()
 			m.root.queue_free()
@@ -458,15 +458,15 @@ static func paint(app: App) -> void:
 static func open_store(app: App, tab: String) -> void:
 	StoreScreen._tab = tab
 	app.screen = "m_store"
-	app.back_to = func(): app.show_menu()
+	app.back_to = func() -> void: app.show_menu()
 	var holder := Control.new()
 	UIKit.full(holder)
 	var _self := {}
-	_self.render = func():
+	_self.render = func() -> void:
 		for c in holder.get_children():
 			c.queue_free()
-		var top := UIW.top_bar({"title": I18n.t("Store"), "back": func(): app.show_menu(),
-			"right": [MobileUI.currency("credit", Progression.credits(), func(): pass), MobileUI.currency("coin", StoreScreen.coins(), func(): pass)]})
+		var top := UIW.top_bar({"title": I18n.t("Store"), "back": func() -> void: app.show_menu(),
+			"right": [MobileUI.currency("credit", Progression.credits(), func() -> void: pass), MobileUI.currency("coin", StoreScreen.coins(), func() -> void: pass)]})
 		var scr := UIW.screen(top, StoreScreen.build(app, _self.render))
 		UIKit.full(scr)
 		holder.add_child(scr)
@@ -495,14 +495,14 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> vo
 		lines.append([I18n.t("Daily wins chest"), "+1"])
 	var m := UIW.modal(app.overlay_layer, 560)
 	var b: VBoxContainer = m.body
-	var close_all := func(doubled: bool):
+	var close_all := func(doubled: bool) -> void:
 		m.root.queue_free()
 		var won: bool = not ev.is_empty() and int(ev.trophies) == 3
 		if won and Progression.rate_prompt_due():
 			_rate(app)
 		elif not doubled:
-			MobileAds.interstitial(app, func(): pass)
-	UIW.modal_head(b, I18n.t("Total rewards"), func(): close_all.call(false))
+			MobileAds.interstitial(app, func() -> void: pass)
+	UIW.modal_head(b, I18n.t("Total rewards"), func() -> void: close_all.call(false))
 	if not ev.is_empty():
 		var tr := CenterContainer.new()
 		tr.add_child(MobileUI.trophies(int(ev.trophies), 3, 44))
@@ -517,14 +517,14 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> vo
 	var acts := UIW.hbox(10)
 	acts.alignment = BoxContainer.ALIGNMENT_END
 	if credits > 0:
-		var dbl := UIKit.button(I18n.t("Double credits · watch video"), func():
+		var dbl := UIKit.button(I18n.t("Double credits · watch video"), func() -> void:
 			m.root.queue_free()
 			MobileAds.rewarded(app, I18n.t("{n} more credits", {"n": StoreScreen.fmt(credits)}), func(ok):
 				if ok:
 					Progression.add_credits(credits)
 					MobileUI.reward_popup(app, I18n.t("Credits doubled"), [I18n.t("{n} credits", {"n": StoreScreen.fmt(credits)})])))
 		acts.add_child(dbl)
-	var ok := UIKit.button(I18n.t("Continue"), func(): close_all.call(false), true)
+	var ok := UIKit.button(I18n.t("Continue"), func() -> void: close_all.call(false), true)
 	acts.add_child(ok)
 	b.add_child(acts)
 	ok.grab_focus.call_deferred()
@@ -532,7 +532,7 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain) -> vo
 static func _rate(app: App) -> void:
 	var m := UIW.modal(app.overlay_layer, 520)
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Enjoying GridCorsa?"), func(): Progression.rate_prompt_answered(false); m.root.queue_free())
+	UIW.modal_head(b, I18n.t("Enjoying GridCorsa?"), func() -> void: Progression.rate_prompt_answered(false); m.root.queue_free())
 	var stars := UIW.hbox(6)
 	stars.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in 5:
@@ -541,7 +541,7 @@ static func _rate(app: App) -> void:
 	b.add_child(UIKit.label(I18n.t("Your rating helps other drivers find the game."), 17, UIKit.SOFT))
 	var acts := UIW.hbox(10)
 	acts.alignment = BoxContainer.ALIGNMENT_END
-	acts.add_child(UIKit.button(I18n.t("Later"), func(): Progression.rate_prompt_answered(false); m.root.queue_free()))
+	acts.add_child(UIKit.button(I18n.t("Later"), func() -> void: Progression.rate_prompt_answered(false); m.root.queue_free()))
 	# (the store page opens here once the game is published: OS.shell_open with its listing)
-	acts.add_child(UIKit.button(I18n.t("Rate it"), func(): Progression.rate_prompt_answered(true); m.root.queue_free(); app.toast(I18n.t("Thank you!")), true))
+	acts.add_child(UIKit.button(I18n.t("Rate it"), func() -> void: Progression.rate_prompt_answered(true); m.root.queue_free(); app.toast(I18n.t("Thank you!")), true))
 	b.add_child(acts)

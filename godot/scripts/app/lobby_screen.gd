@@ -58,7 +58,7 @@ static func ensure_car(app: App) -> void:
 	for c in [_car_by_id(cars, last)] + cars:
 		if c.is_empty():
 			continue
-		var owner = room.carLocks.get(c.id)
+		var owner: Variant = room.carLocks.get(c.id)
 		if owner == null or owner == app.me:
 			pick = c.id
 			break
@@ -85,7 +85,7 @@ static func build(app: App) -> Control:
 	match _page:
 		"circuit":
 			body = _circuit_page(app, room, edit)
-			extra.append(UIKit.button(I18n.t("Continue") + "  ›", func(): _go(app, "car")))
+			extra.append(UIKit.button(I18n.t("Continue") + "  ›", func() -> void: _go(app, "car")))
 		"car":
 			body = _car_page(app, room, cars, mine, extra)
 		"paint":
@@ -114,12 +114,12 @@ static func _frame(app: App, room: Dictionary, mine: Dictionary, cars: Array, is
 	if not solo:
 		var code_tag := UIW.tag((I18n.t("HOSTED ON THIS DEVICE") + " · " if LocalRoom.is_hosted_code(room.code) else "") + I18n.t("ROOM CODE") + " " + room.code, Color(1, 1, 1, 0.9), true, UIKit.INK)
 		right.append(code_tag)
-		right.append(UIKit.button(I18n.t("Copy"), func():
+		right.append(UIKit.button(I18n.t("Copy"), func() -> void:
 			DisplayServer.clipboard_set(room.code)
 			app.toast(I18n.t("Room code copied"))))
 	right.append(MenuScreen._icon_button("⚙", I18n.t("Settings"), app.open_settings))
 	var opts := {
-		"title": I18n.t("Race weekend") if not UIKit.touch() else "", "back": app.leave if _page == "hub" else func(): _go(app, "hub"),
+		"title": I18n.t("Race weekend") if not UIKit.touch() else "", "back": app.leave if _page == "hub" else func() -> void: _go(app, "hub"),
 		"tabs": [["hub", I18n.t("Overview")], ["circuit", I18n.t("Circuit")], ["car", I18n.t("Car")], ["paint", I18n.t("Paint")], ["event", I18n.t("Event")], ["drivers", I18n.t("Drivers")]],
 		"tab": tab, "on_tab": func(k): _go(app, "session" if k == "event" else k), "tabs_left": UIKit.touch(), "right": right,
 	}
@@ -135,9 +135,9 @@ static func _frame(app: App, room: Dictionary, mine: Dictionary, cars: Array, is
 		if e is Button and e.get_theme_stylebox("normal").bg_color == Color("f2f4f7"):
 			primary_taken = true
 	if primary_taken:
-		for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+		for st: String in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 			act.button.remove_theme_stylebox_override(st)
-		for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
+		for k: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color"]:
 			act.button.remove_theme_color_override(k)
 	var actions: Array = extra.duplicate()
 	actions.append(act.button)
@@ -165,19 +165,19 @@ static func _main_action(app: App, room: Dictionary, mine: Dictionary, car: Dict
 		hint.text = I18n.t("A race is in progress. You will join the next one.")
 	elif car.is_empty():
 		act.text = I18n.t("Pick a car").to_upper()
-		act.pressed.connect(func(): _go(app, "car"))
+		act.pressed.connect(func() -> void: _go(app, "car"))
 	elif is_host:
 		act.text = I18n.t("Start race").to_upper()
 		act.disabled = not others_ready
 		hint.text = "" if others_ready else I18n.t("Waiting for everyone to be ready")
-		act.pressed.connect(func():
+		act.pressed.connect(func() -> void:
 			if not is_ready:
 				app.send({"t": "ready", "ready": true})
 			app.send({"t": "start"}))
 	else:
 		act.text = (I18n.t("Ready") + " ✓" if is_ready else I18n.t("Ready")).to_upper()
 		hint.text = I18n.t("Waiting for the host to start") if is_ready else ""
-		act.pressed.connect(func(): app.send({"t": "ready", "ready": not is_ready}))
+		act.pressed.connect(func() -> void: app.send({"t": "ready", "ready": not is_ready}))
 	# a newer version of the circuit's pack: said, not forced (the race runs on the installed one)
 	if hint.text == "" and Packs.pack_of(track_id) != "" and Packs.update_available(Packs.pack_of(track_id)):
 		hint.text = I18n.t("An update of this circuit is ready: Settings › Gameplay › Interface.")
@@ -215,7 +215,7 @@ static func _download_action(app: App, act: Button, hint: Label, id: String) -> 
 					act.disabled = false
 					hint.text = I18n.t("This circuit is a separate download. Once installed it works offline.")
 	show.call()
-	act.pressed.connect(func(): Packs.download(id))
+	act.pressed.connect(func() -> void: Packs.download(id))
 	var on_change := func(changed_id: String) -> void:
 		if changed_id != id or not is_instance_valid(act):
 			return
@@ -224,7 +224,7 @@ static func _download_action(app: App, act: Button, hint: Label, id: String) -> 
 			return
 		show.call()
 	Packs.changed.connect(on_change)
-	act.tree_exiting.connect(func(): if Packs.changed.is_connected(on_change): Packs.changed.disconnect(on_change))
+	act.tree_exiting.connect(func() -> void: if Packs.changed.is_connected(on_change): Packs.changed.disconnect(on_change))
 	if Packs.remote(id).is_empty():
 		Packs.refresh()
 	return {"button": act, "hint": hint}
@@ -321,7 +321,7 @@ static func _hub(app: App, room: Dictionary, cars: Array, mine: Dictionary) -> C
 	# the sessions, as the references' session cards: what runs, how long, the forecast
 	var sh := UIW.hbox(12)
 	sh.add_child(UIKit.label(I18n.t("Session settings").to_upper(), 22, UIKit.TEXT, true, 600))
-	var adv := UIKit.button(I18n.t("Change"), func(): _go(app, "session"))
+	var adv := UIKit.button(I18n.t("Change"), func() -> void: _go(app, "session"))
 	sh.add_child(adv)
 	left.add_child(sh)
 	var cards := UIW.hbox(12)
@@ -337,21 +337,21 @@ static func _hub(app: App, room: Dictionary, cars: Array, mine: Dictionary) -> C
 	var strip := PanelContainer.new()
 	strip.add_theme_stylebox_override("panel", UIKit.box(Color(0.02, 0.04, 0.1, 0.72), Color(0, 0, 0, 0), 0, 4, Vector2(10, 6)))
 	var facts := UIW.hbox(6)
-	facts.add_child(_fact(I18n.t("Weather"), I18n.t(Weather.LABEL[plan.kind]), func(): _go(app, "conditions")))
-	facts.add_child(_fact(I18n.t("Start time"), Weather.format_hour(plan.startHour), func(): _go(app, "conditions")))
-	facts.add_child(_fact(I18n.t("Rules"), (I18n.t("{n} of {max} on", {"n": rules_on, "max": 4}) if rules_on > 0 else I18n.t("Ghost cars")), func(): _go(app, "rules")))
-	facts.add_child(_fact(I18n.t("Drivers"), "%d / %d" % [room.players.size(), Const.MAX_PLAYERS], func(): _go(app, "drivers")))
+	facts.add_child(_fact(I18n.t("Weather"), I18n.t(Weather.LABEL[plan.kind]), func() -> void: _go(app, "conditions")))
+	facts.add_child(_fact(I18n.t("Start time"), Weather.format_hour(plan.startHour), func() -> void: _go(app, "conditions")))
+	facts.add_child(_fact(I18n.t("Rules"), (I18n.t("{n} of {max} on", {"n": rules_on, "max": 4}) if rules_on > 0 else I18n.t("Ghost cars")), func() -> void: _go(app, "rules")))
+	facts.add_child(_fact(I18n.t("Drivers"), "%d / %d" % [room.players.size(), Const.MAX_PLAYERS], func() -> void: _go(app, "drivers")))
 	strip.add_child(facts)
 	strip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	left.add_child(strip)
 
 	# the car on the right, as the references' entry: the make, the name, the team, the picture
-	var right := UIKit.button("", func(): _go(app, "car"))
+	var right := UIKit.button("", func() -> void: _go(app, "car"))
 	right.custom_minimum_size = Vector2(300 if touch else 400, 0)
 	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.disabled = room.phase != "lobby"
 	var empty := StyleBoxEmpty.new()
-	for st in ["normal", "disabled"]:
+	for st: String in ["normal", "disabled"]:
 		right.add_theme_stylebox_override(st, empty)
 	right.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.06), Color(1, 1, 1, 0.3), 1, 8))
 	right.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.12), Color.WHITE, 1, 8))
@@ -411,13 +411,13 @@ static func _session_card(app: App, title: String, on: bool, length: String, pla
 	var l := UIW.stat(I18n.t("Length"), length, 22 if touch else 24, Color.WHITE if on else Color(1, 1, 1, 0.5))
 	col.add_child(l)
 	var content: MarginContainer = b.get_node("content")
-	for s in ["left", "right"]:
+	for s: String in ["left", "right"]:
 		content.add_theme_constant_override("margin_" + s, 14)
 	content.add_theme_constant_override("margin_top", 10)
 	content.add_theme_constant_override("margin_bottom", 10)
 	content.add_child(col)
 	UIW.pass_mouse(content)
-	b.pressed.connect(func(): _go(app, "session"))
+	b.pressed.connect(func() -> void: _go(app, "session"))
 	return b
 
 ## One fact of the bottom strip: a small label over the value, pressable.
@@ -433,7 +433,7 @@ static func _fact(label: String, value: String, on: Callable) -> Button:
 	UIW.pass_mouse(m)
 	b.add_child(m)
 	b.custom_minimum_size = m.get_combined_minimum_size()
-	m.resized.connect(func(): b.custom_minimum_size = m.get_combined_minimum_size())
+	m.resized.connect(func() -> void: b.custom_minimum_size = m.get_combined_minimum_size())
 	b.pressed.connect(on)
 	return b
 
@@ -460,7 +460,7 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 	var track: Dictionary = app.track_entry(room.conditions.trackId)
 	if track.is_empty():
 		track = tracks[0]
-	var send := func(patch: Dictionary): var m := {"t": "setConditions"}; m.merge(patch); app.send(m)
+	var send := func(patch: Dictionary) -> void: var m := {"t": "setConditions"}; m.merge(patch); app.send(m)
 	var col := UIW.vbox(12)
 	var top := UIW.hbox(20)
 	var left := UIW.vbox(10)
@@ -501,7 +501,7 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 		b.add_theme_color_override("font_color", Color.WHITE if on else UIKit.SOFT)
 		b.disabled = not edit
 		var id: String = t.id
-		b.pressed.connect(func(): if edit and not on: send.call({"trackId": id}))
+		b.pressed.connect(func() -> void: if edit and not on: send.call({"trackId": id}))
 		lc.add_child(b)
 	lp.add_child(lc)
 	top.add_child(lp)
@@ -533,7 +533,7 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 		info.add_child(UIKit.label(I18n.t("{n} layouts", {"n": group.size()}) if group.size() > 1 else "%.2f km" % (float(shown.length) / 1000.0), 13, UIKit.SOFT))
 		r.add_child(info)
 		var content: MarginContainer = b.get_node("content")
-		for s in ["left", "right", "top", "bottom"]:
+		for s: String in ["left", "right", "top", "bottom"]:
 			content.add_theme_constant_override("margin_" + s, 8)
 		content.add_child(r)
 		UIW.pass_mouse(content)
@@ -541,7 +541,7 @@ static func _circuit_page(app: App, room: Dictionary, edit: bool) -> Control:
 		if on:
 			UIW.default_focus(b)
 		var first: String = group[0].id
-		b.pressed.connect(func(): if edit and not on: send.call({"trackId": first}))
+		b.pressed.connect(func() -> void: if edit and not on: send.call({"trackId": first}))
 		strip.add_child(b)
 	var sp := PanelContainer.new()
 	sp.add_theme_stylebox_override("panel", UIKit.box(Color(0.02, 0.04, 0.1, 0.6), Color(0, 0, 0, 0), 0, 4, Vector2(8, 8)))
@@ -582,7 +582,7 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 		tags.add_child(UIW.tag(shown.category, _class_colour(shown.category)))
 		if shown.get("year"):
 			tags.add_child(UIW.tag(str(int(shown.year)), Color(1, 1, 1, 0.8), false))
-		var owner = room.carLocks.get(shown.id)
+		var owner: Variant = room.carLocks.get(shown.id)
 		if mine.get("carId") == shown.id:
 			tags.add_child(UIW.tag("✓ " + I18n.t("Your car"), UIKit.GOOD))
 		elif owner != null and owner != app.me:
@@ -621,14 +621,14 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 			var take := UIW.action(I18n.t("Select this car"), Callable(), true)
 			take.disabled = not editable or (owner != null and owner != app.me)
 			var cid: String = shown.id
-			take.pressed.connect(func():
+			take.pressed.connect(func() -> void:
 				Settings.data["lastCar"] = cid
 				Settings.save()
 				app.send({"t": "selectCar", "carId": cid})
 				_go(app, "hub"))
 			extra.append(take)
 		else:
-			extra.append(UIKit.button(I18n.t("Continue") + "  ›", func(): _go(app, "session")))
+			extra.append(UIKit.button(I18n.t("Continue") + "  ›", func() -> void: _go(app, "session")))
 	col.add_child(top)
 	# the classes and the cars as the references' strip
 	var cats: Array = []
@@ -643,7 +643,7 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 	for c in cars:
 		if _car_filter != "" and c.category != _car_filter:
 			continue
-		var owner = room.carLocks.get(c.id)
+		var owner: Variant = room.carLocks.get(c.id)
 		var taken := ""
 		if owner != null and owner != app.me:
 			for p in room.players:
@@ -672,14 +672,14 @@ static func _car_page(app: App, room: Dictionary, cars: Array, mine: Dictionary,
 		if taken != "":
 			cc.add_child(UIKit.label(taken, 12, UIKit.ACCENT_2))
 		var content: MarginContainer = b.get_node("content")
-		for s in ["left", "right", "top", "bottom"]:
+		for s: String in ["left", "right", "top", "bottom"]:
 			content.add_theme_constant_override("margin_" + s, 7)
 		content.add_child(cc)
 		UIW.pass_mouse(content)
 		if looking:
 			UIW.default_focus(b)
 		var cid: String = c.id
-		b.pressed.connect(func(): _preview = cid; app.render_lobby())
+		b.pressed.connect(func() -> void: _preview = cid; app.render_lobby())
 		strip.add_child(b)
 	var sp := PanelContainer.new()
 	sp.add_theme_stylebox_override("panel", UIKit.box(Color(0.02, 0.04, 0.1, 0.6), Color(0, 0, 0, 0), 0, 4, Vector2(8, 8)))
@@ -733,7 +733,7 @@ static func _paint_page(app: App, cars: Array, mine: Dictionary, extra: Array) -
 	right.custom_minimum_size = Vector2(380 if touch else 520, 0)
 	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.add_child(right)
-	extra.append(UIKit.button(I18n.t("Continue") + "  ›", func(): _go(app, "session")))
+	extra.append(UIKit.button(I18n.t("Continue") + "  ›", func() -> void: _go(app, "session")))
 	return row
 
 ## Chips that show the new choice themselves (the page is not rebuilt for each change: the turning car stays).
@@ -758,7 +758,7 @@ static func _swatches(current: String, colours: Array, on: Callable) -> Control:
 		for b: Button in buttons:
 			var c := Color(b.get_meta("colour"))
 			var on_it: bool = c.to_html(false) == Color(sel).to_html(false)
-			for st in ["normal", "hover", "pressed", "focus"]:
+			for st: String in ["normal", "hover", "pressed", "focus"]:
 				b.add_theme_stylebox_override(st, UIKit.box(c, Color.WHITE if on_it else Color(1, 1, 1, 0.18), 3 if on_it else 1, 6))
 	for hex in colours:
 		var b := Button.new()
@@ -766,7 +766,7 @@ static func _swatches(current: String, colours: Array, on: Callable) -> Control:
 		b.set_meta("colour", hex)
 		b.focus_mode = Control.FOCUS_ALL
 		b.tooltip_text = hex
-		b.pressed.connect(func():
+		b.pressed.connect(func() -> void:
 			mark.call(hex)
 			on.call(hex))
 		buttons.append(b)
@@ -776,7 +776,7 @@ static func _swatches(current: String, colours: Array, on: Callable) -> Control:
 	pick.color = Color(current)
 	pick.edit_alpha = false
 	pick.tooltip_text = I18n.t("Any colour")
-	pick.color_changed.connect(func(c: Color):
+	pick.color_changed.connect(func(c: Color) -> void:
 		mark.call(c.to_html(false))
 		on.call("#" + c.to_html(false)))
 	box.add_child(pick)
@@ -794,7 +794,7 @@ static func _event_page(app: App, room: Dictionary, page: String, edit: bool) ->
 	var plan := Weather.plan_weather(int(c.seed), c)
 	var w0 := Weather.weather_at(plan, 0.0)
 	var temp0 := Weather.temperatures(plan, w0, track.get("map", "nurburgring"))
-	var send := func(patch: Dictionary): var m := {"t": "setConditions"}; m.merge(patch); app.send(m)
+	var send := func(patch: Dictionary) -> void: var m := {"t": "setConditions"}; m.merge(patch); app.send(m)
 	var col := UIW.vbox(0)
 	if not edit:
 		col.add_child(UIW.margins(UIKit.label(I18n.t("Only the host can change this"), 15, UIKit.ACCENT_2), 0, 0, 0, 10))
@@ -863,7 +863,7 @@ static func _forecast_panel(plan: Dictionary, w0: Dictionary, temp0: Dictionary,
 	temps.add_child(UIW.stat(I18n.t("Track"), "%d °C" % roundi(temp0.trackC), 30))
 	fc.add_child(temps)
 	if edit:
-		var b := UIKit.button(I18n.t("New forecast"), func(): send.call({"reroll": true}))
+		var b := UIKit.button(I18n.t("New forecast"), func() -> void: send.call({"reroll": true}))
 		b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		fc.add_child(b)
 	var p := UIW.panel(fc)
@@ -903,7 +903,7 @@ static func _session_pane(col: Control, app: App, room: Dictionary, edit: bool) 
 					app.send({"t": "setRaceLaps", "laps": f[4]})
 				if local:
 					app.send({"t": "setRules", "rules": {"cleanStreak": f.size() > 6 and f[6]}}), edit)))
-	var gap := func():
+	var gap := func() -> void:
 		var g := Control.new()
 		g.custom_minimum_size = Vector2(0, 18)
 		col.add_child(g)
@@ -951,7 +951,7 @@ static func _drivers_page(app: App, room: Dictionary, can_edit: bool, extra: Arr
 		list.add_child(_player_row(app, p, can_edit, i))
 	col.add_child(UIW.scroll(list))
 	if can_edit:
-		var add := UIKit.button("+ " + I18n.t("Add bot"), func(): app.send({"t": "addBot"}))
+		var add := UIKit.button("+ " + I18n.t("Add bot"), func() -> void: app.send({"t": "addBot"}))
 		add.disabled = room.players.size() >= Const.MAX_PLAYERS
 		extra.append(add)
 	var p := UIW.panel(col)
@@ -1008,7 +1008,7 @@ static func _player_row(app: App, p: Dictionary, can_remove: bool, n: int) -> Co
 	state.custom_minimum_size = Vector2(76, 0)
 	row.add_child(state)
 	if p.bot and can_remove:
-		row.add_child(UIW.close_button(func(): app.send({"t": "removeBot", "id": p.id})))
+		row.add_child(UIW.close_button(func() -> void: app.send({"t": "removeBot", "id": p.id})))
 	pc.add_child(row)
 	return pc
 
@@ -1068,7 +1068,7 @@ static func build_briefing(app: App) -> Control:
 		"advanced":
 			main = UIW.scroll(_advanced(app, Settings.data.carSetup, temp0.airC))
 		"saved":
-			main = UIW.scroll(_setup_library(app, Settings.data.carSetup, func(): Settings.save(); app.render_briefing()))
+			main = UIW.scroll(_setup_library(app, Settings.data.carSetup, func() -> void: Settings.save(); app.render_briefing()))
 		_:
 			main = prep_panel(app, room)
 	var col := UIW.vbox(12)
@@ -1099,7 +1099,7 @@ static func build_briefing(app: App) -> Control:
 	row.add_child(main)
 	col.add_child(row)
 	var done: bool = mine.get("briefed", false)
-	var btn := UIW.action(I18n.t("Ready") if done else I18n.t("Ready to go"), func(): app.send({"t": "briefed"}), not done)
+	var btn := UIW.action(I18n.t("Ready") if done else I18n.t("Ready to go"), func() -> void: app.send({"t": "briefed"}), not done)
 	btn.disabled = done
 	btn.custom_minimum_size = Vector2(250, 0)
 	UIW.default_focus(btn)
@@ -1115,14 +1115,14 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	var track := app.track_entry(c.trackId)
 	var rec := CarSetup.recommend_setup(plan)
 	var cs: Dictionary = Settings.data.carSetup
-	var save := func(): Settings.save(); app.render_briefing()
+	var save := func() -> void: Settings.save(); app.render_briefing()
 	var row := UIW.hbox(14)
 	# tyres: the engineer's call first (one press sets the tyre and wing), then the four compounds
 	var tyres_col := UIW.vbox(10)
 	tyres_col.add_child(UIKit.label(I18n.t("Tyres").to_upper(), 22, UIKit.TEXT, true, 600))
 	var note := UIW.muted(I18n.t("Engineer: {note}.", {"note": rec.note}), 14)
 	tyres_col.add_child(note)
-	var use := UIKit.button(I18n.t("Use {tyre} + {wing} wing", {"tyre": I18n.t(Tyres.COMPOUNDS[rec.tyre].name), "wing": I18n.t(CarSetup.WING[rec.wing].label).split(" (")[0].to_lower()}), func():
+	var use := UIKit.button(I18n.t("Use {tyre} + {wing} wing", {"tyre": I18n.t(Tyres.COMPOUNDS[rec.tyre].name), "wing": I18n.t(CarSetup.WING[rec.wing].label).split(" (")[0].to_lower()}), func() -> void:
 		cs.tyre = rec.tyre
 		cs.wing = rec.wing
 		app.send({"t": "setTyre", "tyre": rec.tyre})
@@ -1134,7 +1134,7 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	tg.columns = 2
 	tg.add_theme_constant_override("h_separation", 8)
 	tg.add_theme_constant_override("v_separation", 8)
-	for id in ["soft", "medium", "hard", "wet"]:
+	for id: String in ["soft", "medium", "hard", "wet"]:
 		var comp: Dictionary = Tyres.COMPOUNDS[id]
 		var on: bool = cs.tyre == id
 		var b := UIW.card_button(on, 6)
@@ -1149,14 +1149,14 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 		if on:
 			r.add_child(UIKit.label("✓", 18, Color.WHITE, false, 700))
 		var content: MarginContainer = b.get_node("content")
-		for s in ["left", "right", "top", "bottom"]:
+		for s: String in ["left", "right", "top", "bottom"]:
 			content.add_theme_constant_override("margin_" + s, 8)
 		content.add_child(r)
 		UIW.pass_mouse(content)
 		if on:
 			UIW.default_focus(b)
 		var tid: String = id
-		b.pressed.connect(func():
+		b.pressed.connect(func() -> void:
 			cs.tyre = tid
 			app.send({"t": "setTyre", "tyre": tid})
 			save.call())
@@ -1169,7 +1169,7 @@ static func prep_panel(app: App, room: Dictionary) -> Control:
 	var rcol := UIW.vbox(0)
 	rcol.add_child(UIKit.label(I18n.t("Aero and brakes").to_upper(), 22, UIKit.TEXT, true, 600))
 	var wing_opts: Array = []
-	for k in ["low", "medium", "high"]:
+	for k: String in ["low", "medium", "high"]:
 		wing_opts.append([k, I18n.t(CarSetup.WING[k].label)])
 	rcol.add_child(UIW.row(I18n.t("Rear wing"), UIW.stepper(cs.wing, wing_opts, func(v): cs.wing = v; save.call())))
 	var bias_out := UIKit.label(I18n.t("{pct} % front", {"pct": roundi(cs.brakeBias * 100)}), 15, UIKit.TEXT, false, 600)
@@ -1205,7 +1205,7 @@ static func _setup_library(app: App, cs: Dictionary, save: Callable) -> Control:
 	name_in.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var row := UIW.hbox(8)
 	row.add_child(name_in)
-	row.add_child(UIKit.button(I18n.t("Save"), func():
+	row.add_child(UIKit.button(I18n.t("Save"), func() -> void:
 		if name_in.text.strip_edges().is_empty():
 			status.text = I18n.t("Type a name first")
 			return
@@ -1218,14 +1218,14 @@ static func _setup_library(app: App, cs: Dictionary, save: Callable) -> Control:
 		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		r.add_child(lb)
 		var key: String = nm
-		r.add_child(UIKit.button(I18n.t("Load"), func():
+		r.add_child(UIKit.button(I18n.t("Load"), func() -> void:
 			CarSetup.load_into(cs, Settings.data.savedSetups[key])
 			app.send({"t": "setTyre", "tyre": cs.tyre})
 			save.call()))
-		r.add_child(UIKit.button(I18n.t("Share"), func():
+		r.add_child(UIKit.button(I18n.t("Share"), func() -> void:
 			DisplayServer.clipboard_set(CarSetup.to_code(Settings.data.savedSetups[key]))
 			status.text = I18n.t("Code copied: send it to a friend")))
-		r.add_child(UIKit.button(I18n.t("Delete"), func():
+		r.add_child(UIKit.button(I18n.t("Delete"), func() -> void:
 			CarSetup.delete_named(key)
 			app.render_briefing()))
 		var rp := PanelContainer.new()
@@ -1236,10 +1236,10 @@ static func _setup_library(app: App, cs: Dictionary, save: Callable) -> Control:
 		rp.add_child(r)
 		box.add_child(rp)
 	var io := UIW.hbox(8)
-	io.add_child(UIKit.button(I18n.t("Copy code of the current setup"), func():
+	io.add_child(UIKit.button(I18n.t("Copy code of the current setup"), func() -> void:
 		DisplayServer.clipboard_set(CarSetup.to_code(cs))
 		status.text = I18n.t("Code copied: send it to a friend")))
-	io.add_child(UIKit.button(I18n.t("Paste a friend's code"), func():
+	io.add_child(UIKit.button(I18n.t("Paste a friend's code"), func() -> void:
 		var imported = CarSetup.from_code(DisplayServer.clipboard_get())
 		if imported == null:
 			status.text = I18n.t("The clipboard doesn't hold a setup code")
@@ -1273,7 +1273,7 @@ static func _tyre_guide() -> Control:
 		var card := UIW.vbox(3)
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		card.add_child(UIKit.label(I18n.t(cm.name).to_upper(), 17, UIKit.TEXT, true, 600))
-		for bar in [[I18n.t("Dry grip"), (cm.grip - 0.8) / 0.25], [I18n.t("Wet grip"), cm.wetGrip / 0.8], [I18n.t("Life"), 1.0 / cm.wear / max_life], [I18n.t("Warm-up"), 1.0 / cm.heatCap / max_warm]]:
+		for bar: Array in [[I18n.t("Dry grip"), (cm.grip - 0.8) / 0.25], [I18n.t("Wet grip"), cm.wetGrip / 0.8], [I18n.t("Life"), 1.0 / cm.wear / max_life], [I18n.t("Warm-up"), 1.0 / cm.heatCap / max_warm]]:
 			var row := UIW.hbox(6)
 			var lb := UIKit.label(bar[0], 12, UIKit.SOFT)
 			lb.custom_minimum_size = Vector2(62, 0)
@@ -1302,7 +1302,7 @@ static func _fuel_row(room: Dictionary, track_m: float, cs: Dictionary) -> Contr
 	var laps: int = (ceili((room.raceMinutes * 60.0) / (track_m / 43.0)) + 1) if timed else int(room.raceLaps)
 	var need = mini(int(VehicleConsts.FUEL.tankL), ceili((laps + 1) * per_lap)) if laps > 0 else null
 	var out := UIKit.label("", 15, UIKit.TEXT, false, 600)
-	var show := func(): out.text = I18n.t("{l} l · ~{laps} laps · {kg} kg", {"l": cs.fuelL, "laps": "%.1f" % (cs.fuelL / per_lap), "kg": roundi(cs.fuelL * VehicleConsts.FUEL.kgPerL)})
+	var show := func() -> void: out.text = I18n.t("{l} l · ~{laps} laps · {kg} kg", {"l": cs.fuelL, "laps": "%.1f" % (cs.fuelL / per_lap), "kg": roundi(cs.fuelL * VehicleConsts.FUEL.kgPerL)})
 	show.call()
 	var slider := UIW.slider(cs.fuelL, 10, VehicleConsts.FUEL.tankL, 1, func(v): cs.fuelL = int(v); show.call(); Settings.save())
 	slider.custom_minimum_size = Vector2(150, 30)
@@ -1320,7 +1320,7 @@ static func _fuel_row(room: Dictionary, track_m: float, cs: Dictionary) -> Contr
 		note += " " + I18n.t("Mandatory stop: into the pit lane between {a} and {b} min.", {"a": roundi(room.raceMinutes * RaceTracker.PIT_WINDOW.timedOpenShare), "b": roundi(room.raceMinutes * RaceTracker.PIT_WINDOW.timedCloseShare)})
 	col.add_child(UIW.muted(note, 13))
 	if need != null:
-		var b := UIKit.button(I18n.t("Fuel for the whole race ({l} l)", {"l": need}), func():
+		var b := UIKit.button(I18n.t("Fuel for the whole race ({l} l)", {"l": need}), func() -> void:
 			cs.fuelL = need
 			slider.value = need
 			Settings.save())
@@ -1391,14 +1391,14 @@ static func _advanced(app: App, cs: Dictionary, air_c: float) -> Control:
 	body.add_child(UIW.row(I18n.t("Final drive"), one.call("finalDrive", -CarSetup.SETUP.finalDriveSteps, CarSetup.SETUP.finalDriveSteps, 1.0, func(v): return I18n.t("baseline") if int(v) == 0 else ("%+d %% · %s" % [int(v) * 2, I18n.t("shorter") if v > 0 else I18n.t("longer")]))))
 	body.add_child(UIW.row(I18n.t("Engine map"), one.call("engineMap", 1, 3, 1.0, func(v): return "%d · %s" % [int(v), I18n.t(CarSetup.SETUP.maps[int(v) - 1].label)])))
 	body.add_child(UIW.margins(UIW.muted(I18n.t("Hot target {p} psi: too low runs hot and soft, too high loses grip. Lower = more downforce but it bottoms over kerbs; rear higher than front moves grip to the front. A stiffer anti-roll bar takes grip from its axle (stiff front = understeer). Stiffer dampers react faster but skip over bumps. Stiffer springs: sharper, less grip over bumps. More negative camber: more grip in long corners, too much costs braking. Front toe-out: quicker turn-in; rear toe-in: a stable rear. More diff locking: better traction, more understeer on the way in. Bigger ducts cool the brakes and tyres. A shorter final drive accelerates harder, tops out sooner. Leaner maps save fuel for a little power.", {"p": P.targetPsi}), 13), 10, 10, 10, 6))
-	var reset := UIKit.button(I18n.t("Reset to baseline"), func():
+	var reset := UIKit.button(I18n.t("Reset to baseline"), func() -> void:
 		cs.pressure = null
 		cs.ride = [0, 0]
 		cs.arb = [4, 4]
 		cs.bump = [4, 4]
 		cs.rebound = [4, 4]
 		var d: Dictionary = Settings.default_settings().carSetup
-		for k in ["springs", "camber", "toe", "diffPreload", "diffLock", "diffCoast", "brakePressure", "brakeDucts", "finalDrive", "engineMap"]:
+		for k: String in ["springs", "camber", "toe", "diffPreload", "diffLock", "diffCoast", "brakePressure", "brakeDucts", "finalDrive", "engineMap"]:
 			cs[k] = d[k] if typeof(d[k]) != TYPE_ARRAY else (d[k] as Array).duplicate()
 		Settings.save()
 		app.render_briefing())

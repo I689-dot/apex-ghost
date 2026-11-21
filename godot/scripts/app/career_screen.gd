@@ -21,12 +21,12 @@ static func build(app: App) -> Control:
 		_:
 			body = _profile(c)
 			# the online licence: the server's wallet (fetched at most every 20 s), shown once it is in
-			StoreScreen.refresh(func(): if app.screen == "career" and _tab == "profile": app.show_career())
+			StoreScreen.refresh(func() -> void: if app.screen == "career" and _tab == "profile": app.show_career())
 	var top := UIW.top_bar({
 		"title": I18n.t("Career"), "back": app.show_menu,
 		"tabs": [["profile", I18n.t("Profile")], ["achievements", I18n.t("Achievements")], ["ranks", I18n.t("Ranks")], ["ranking", I18n.t("Ranking")]],
 		"tab": _tab, "on_tab": func(k): _tab = k; app.show_career(), "tabs_left": UIKit.touch(),
-		"right": [UIKit.button(I18n.t("Lap records"), func(): SocialUI.records_modal(app))],
+		"right": [UIKit.button(I18n.t("Lap records"), func() -> void: SocialUI.records_modal(app))],
 	})
 	return UIW.screen(top, body)
 
@@ -84,7 +84,7 @@ static func _profile(c: Dictionary) -> Control:
 	cs.add_child(UIKit.label(I18n.t("Career stats").to_upper(), 24, UIKit.TEXT, true, 600))
 	var nums := UIW.hbox(10)
 	nums.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	for st in [[str(int(c.races)), I18n.t("Races")], [str(int(c.wins)), I18n.t("Wins")], [str(int(c.podiums)), I18n.t("Podiums")]]:
+	for st: Array in [[str(int(c.races)), I18n.t("Races")], [str(int(c.wins)), I18n.t("Wins")], [str(int(c.podiums)), I18n.t("Podiums")]]:
 		var b := UIW.big_stat(st[0], st[1], 56 if touch else 68)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -108,7 +108,7 @@ static func _profile(c: Dictionary) -> Control:
 		var otarget := 3.0 if olic == "R" else 4.0
 		var orow := UIW.hbox(18 if touch else 28)
 		orow.add_child(_rank_tile(I18n.t("Licence"), olic, clampf(float(on.sr) / otarget, 0.0, 1.0), I18n.t(CareerData.LICENCE_NAME[olic]), Color(CareerData.LICENCE_COLOUR[olic])))
-		var last = on.get("srLast")
+		var last: Variant = on.get("srLast")
 		orow.add_child(_rank_tile(I18n.t("Safety Rating"), "%.2f" % float(on.sr), clampf(float(on.sr) / otarget, 0.0, 1.0),
 			(I18n.t("Last session {d}", {"d": "%+.2f" % float(last)}) if last != null else I18n.t("Promotion at {sr}", {"sr": "%.2f" % otarget})), Color("dfe7f2")))
 		col.add_child(orow)
@@ -287,7 +287,7 @@ static func _ranking(app: App) -> Control:
 		if not r.ok:
 			table.add_child(UIW.muted(I18n.t(str(r.error))))
 			return
-		var me = r.data.get("me")
+		var me: Variant = r.data.get("me")
 		if me != null:
 			mine.text = "%s  #%d · DR %d · %s" % [I18n.t("You").to_upper(), int(me.rank), int(me.rating), I18n.t("{n} races", {"n": int(me.races)})]
 		var rows: Array = r.data.get("rows", [])
@@ -296,7 +296,7 @@ static func _ranking(app: App) -> Control:
 			return
 		var my_nick: String = str(Account.account().user.nick) if Account.account() != null else ""
 		var head_row := UIW.hbox(12)
-		for h in [["#", 50], [I18n.t("Driver"), 0], [I18n.t("Country"), 90], [I18n.t("Licence"), 110], [I18n.t("Races"), 90], ["DR", 90]]:
+		for h: Array in [["#", 50], [I18n.t("Driver"), 0], [I18n.t("Country"), 90], [I18n.t("Licence"), 110], [I18n.t("Races"), 90], ["DR", 90]]:
 			var l := UIKit.label(String(h[0]).to_upper(), 14, UIKit.DIM, true, 600)
 			if int(h[1]) > 0:
 				l.custom_minimum_size = Vector2(h[1], 0)

@@ -7,7 +7,7 @@ extends RefCounted
 
 static func show(app: App) -> void:
 	app.screen = "m_pass"
-	app.back_to = func(): app.show_menu()
+	app.back_to = func() -> void: app.show_menu()
 	app.set_backdrop("straight", "spa")
 	var holder := Control.new()
 	UIKit.full(holder)
@@ -15,7 +15,7 @@ static func show(app: App) -> void:
 	shade.color = Color(0.0, 0.01, 0.03, 0.66)
 	UIKit.full(shade)
 	holder.add_child(shade)
-	var top := UIW.top_bar({"title": I18n.t("Season pass"), "back": func(): app.show_menu(),
+	var top := UIW.top_bar({"title": I18n.t("Season pass"), "back": func() -> void: app.show_menu(),
 		"right": [MobileUI.badge(I18n.t("Season ends in {t}", {"t": Progression.fmt_left(Progression.pass_season_left_s())}), Color(0, 0, 0, 0.7), UIKit.TEXT, "clock")]})
 	var col := UIW.vbox(14)
 	# the headline: the tier, the XP to the next, the premium offer
@@ -36,7 +36,7 @@ static func show(app: App) -> void:
 	prem.add_theme_stylebox_override("panel", UIKit.box(Color(MobileUI.PURPLE, 0.85), Color(1, 1, 1, 0.3), 1, 8, Vector2(18, 12)))
 	var pc := UIW.vbox(6)
 	pc.add_child(UIKit.label(I18n.t("Premium pass").to_upper(), 26, Color.WHITE, true, 800))
-	for line in [I18n.t("Twice the credits on every tier"), I18n.t("Exclusive paint designs"), I18n.t("Coins on the last tiers")]:
+	for line: String in [I18n.t("Twice the credits on every tier"), I18n.t("Exclusive paint designs"), I18n.t("Coins on the last tiers")]:
 		var r := UIW.hbox(6)
 		r.add_child(MobileUI.Icon.make("star", 14, MobileUI.GOLD))
 		r.add_child(UIKit.label(line, 15, Color.WHITE))
@@ -44,8 +44,8 @@ static func show(app: App) -> void:
 	if premium:
 		pc.add_child(UIKit.label(I18n.t("Unlocked"), 18, UIKit.GOOD, true, 700))
 	else:
-		pc.add_child(UIKit.button(I18n.t("Unlock · {p}", {"p": StoreScreen.money(9.99)}), func():
-			StoreScreen._checkout(app, I18n.t("Premium pass"), [I18n.t("This season's premium track"), I18n.t("Rewards of the tiers already reached at once")], 9.99, func(): pass), true))
+		pc.add_child(UIKit.button(I18n.t("Unlock · {p}", {"p": StoreScreen.money(9.99)}), func() -> void:
+			StoreScreen._checkout(app, I18n.t("Premium pass"), [I18n.t("This season's premium track"), I18n.t("Rewards of the tiers already reached at once")], 9.99, func() -> void: pass), true))
 	prem.add_child(pc)
 	head.add_child(prem)
 	col.add_child(head)
@@ -83,7 +83,7 @@ static func _reward(app: App, t: int, premium: bool) -> Control:
 	b.custom_minimum_size = Vector2(132, 120)
 	var bg := Color(MobileUI.PURPLE, 0.55) if premium else Color(0, 0, 0, 0.6)
 	var border := MobileUI.GOLD if claimable else Color(1, 1, 1, 0.14)
-	for st in ["normal", "hover", "pressed"]:
+	for st: String in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(st, UIKit.box(bg.lightened(0.08 if st != "normal" else 0.0), border, 2 if claimable else 1, 6))
 	var col := UIW.vbox(4)
 	col.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -115,7 +115,7 @@ static func _reward(app: App, t: int, premium: bool) -> Control:
 		var lk := MobileUI.Icon.make("lock", 18, Color(1, 1, 1, 0.7))
 		lk.position = Vector2(8, 8)
 		b.add_child(lk)
-	b.pressed.connect(func():
+	b.pressed.connect(func() -> void:
 		if not claimable:
 			return
 		var got := Progression.claim_pass(t, premium)

@@ -119,7 +119,7 @@ static func balance_chip(on: Callable) -> Control:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_ALL if on.is_valid() else Control.FOCUS_NONE
 	b.tooltip_text = I18n.t("Coins") + " (" + I18n.t("preview") + ")"
-	for st in ["normal", "disabled"]:
+	for st: String in ["normal", "disabled"]:
 		b.add_theme_stylebox_override(st, UIKit.box(Color(0.02, 0.035, 0.08, 0.55), Color(GOLD, 0.55), 1, 4))
 	b.add_theme_stylebox_override("hover", UIKit.box(Color(1, 1, 1, 0.12), GOLD, 1, 4))
 	b.add_theme_stylebox_override("pressed", UIKit.box(Color(1, 1, 1, 0.22), GOLD, 1, 4))
@@ -130,7 +130,7 @@ static func balance_chip(on: Callable) -> Control:
 	UIW.pass_mouse(m)
 	b.add_child(m)
 	b.custom_minimum_size = m.get_combined_minimum_size()
-	m.resized.connect(func(): b.custom_minimum_size = m.get_combined_minimum_size())
+	m.resized.connect(func() -> void: b.custom_minimum_size = m.get_combined_minimum_size())
 	if on.is_valid():
 		b.pressed.connect(on)
 	else:
@@ -224,7 +224,7 @@ static func _pack_card(app: App, pack: Dictionary, tier: int, rerender: Callable
 	c.add_child(price)
 	(b.get_node("content") as Control).add_child(c)
 	UIW.pass_mouse(c)
-	b.pressed.connect(func(): _checkout(app, I18n.t("{n} coins", {"n": fmt(pack.coins + pack.bonus)}), [
+	b.pressed.connect(func() -> void: _checkout(app, I18n.t("{n} coins", {"n": fmt(pack.coins + pack.bonus)}), [
 		[I18n.t("{n} coins", {"n": fmt(pack.coins)}), ""],
 		[I18n.t("Bonus coins"), "+" + fmt(pack.bonus)] if pack.bonus > 0 else null,
 		[I18n.t("First purchase: coins doubled"), "+" + fmt(pack.coins + pack.bonus)] if not _owned.has("first") else null,
@@ -235,7 +235,7 @@ static func _pack_card(app: App, pack: Dictionary, tier: int, rerender: Callable
 static func _checkout(app: App, title: String, lines: Array, price: float, _rerender: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 620)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t("Checkout"), close, title)
 	body.add_child(_preview_banner())
 	# the order
@@ -352,14 +352,14 @@ static func _item_card(app: App, it: Dictionary, car: Dictionary, rerender: Call
 	(b.get_node("content") as Control).add_child(c)
 	UIW.pass_mouse(c)
 	if not owned:
-		b.pressed.connect(func(): _spend(app, it, rerender))
+		b.pressed.connect(func() -> void: _spend(app, it, rerender))
 	return b
 
 ## Spending coins: the item, the balance before and after (the preview's own balance: nothing is saved).
 static func _spend(app: App, it: Dictionary, rerender: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 480)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t(it.name), close, I18n.t("Unlock"))
 	if signed_in():
 		# the real balance is not spent before the store opens: until then everything on the Paint page is free
@@ -373,7 +373,7 @@ static func _spend(app: App, it: Dictionary, rerender: Callable) -> void:
 		return
 	var after: int = preview_coins - int(it.price)
 	var rows := UIW.vbox(4)
-	for r in [[I18n.t("Your coins"), fmt(preview_coins)], [I18n.t("Price"), "−" + fmt(it.price)], [I18n.t("Left after"), fmt(after)]]:
+	for r: Array in [[I18n.t("Your coins"), fmt(preview_coins)], [I18n.t("Price"), "−" + fmt(it.price)], [I18n.t("Left after"), fmt(after)]]:
 		var row := UIW.hbox(8)
 		var l := UIKit.label(r[0], 17, UIKit.TEXT)
 		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -385,13 +385,13 @@ static func _spend(app: App, it: Dictionary, rerender: Callable) -> void:
 	row.alignment = BoxContainer.ALIGNMENT_END
 	row.add_child(UIKit.button(I18n.t("Cancel"), close))
 	if after >= 0:
-		row.add_child(UIKit.button(I18n.t("Unlock for {n} coins", {"n": fmt(it.price)}), func():
+		row.add_child(UIKit.button(I18n.t("Unlock for {n} coins", {"n": fmt(it.price)}), func() -> void:
 			preview_coins = after
 			_owned[it.name] = true
 			close.call()
 			rerender.call(), true))
 	else:
-		row.add_child(UIKit.button(I18n.t("Get coins"), func(): _tab = "coins"; close.call(); rerender.call(), true))
+		row.add_child(UIKit.button(I18n.t("Get coins"), func() -> void: _tab = "coins"; close.call(); rerender.call(), true))
 	body.add_child(row)
 
 # ---------------------------------------------------------------- offers ---
@@ -415,7 +415,7 @@ static func _offers(app: App, rerender: Callable) -> Control:
 	t.add_child(UIKit.label(money(WELCOME.price), 34, GOLD, true, 700))
 	w.add_child(t)
 	w.add_child(UIW.muted(I18n.t("Once per account, in your first {d} days · {left} left", {"d": WELCOME.days, "left": I18n.t("6 days")}), 14))
-	w.add_child(UIKit.button(I18n.t("Get the starter pack"), func(): _checkout(app, I18n.t("Starter pack"), [
+	w.add_child(UIKit.button(I18n.t("Get the starter pack"), func() -> void: _checkout(app, I18n.t("Starter pack"), [
 		[I18n.t("{n} coins", {"n": fmt(WELCOME.coins)}), ""], [I18n.t("Ghost Pearl paint"), ""], [I18n.t("Double XP, 3 days"), ""]], WELCOME.price, rerender), true))
 	var wt := UIW.tile(w, Vector2(22, 18))
 	wt.custom_minimum_size = Vector2(440, 0)
@@ -526,13 +526,13 @@ static func _invite() -> Control:
 	var cr := UIW.hbox(10)
 	var cl := UIKit.label(code, 44, GOLD, true, 700)
 	cr.add_child(cl)
-	cr.add_child(UIKit.button(I18n.t("Copy code"), func(): DisplayServer.clipboard_set(code)))
+	cr.add_child(UIKit.button(I18n.t("Copy code"), func() -> void: DisplayServer.clipboard_set(code)))
 	a.add_child(cr)
 	var lr := UIW.hbox(10)
 	var ll := UIKit.label(link, 16, UIKit.SOFT)
 	ll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lr.add_child(ll)
-	lr.add_child(UIKit.button(I18n.t("Copy link"), func(): DisplayServer.clipboard_set(link)))
+	lr.add_child(UIKit.button(I18n.t("Copy link"), func() -> void: DisplayServer.clipboard_set(link)))
 	a.add_child(lr)
 	var at := UIW.tile(a, Vector2(22, 18))
 	at.custom_minimum_size = Vector2(520, 0)

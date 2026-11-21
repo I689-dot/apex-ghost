@@ -109,16 +109,16 @@ static func presets(col: Control, app: App, changed: Callable, refresh: Callable
 	for n in names:
 		var r := UIW.hbox(8)
 		var nn: String = n
-		r.add_child(UIKit.button(I18n.t("Load"), func():
+		r.add_child(UIKit.button(I18n.t("Load"), func() -> void:
 			load_profile(profiles()[nn])
 			changed.call()
 			app.toast(I18n.t("Loaded: {n}", {"n": nn}))
 			refresh.call(), true))
-		r.add_child(UIKit.button(I18n.t("Update"), func():
+		r.add_child(UIKit.button(I18n.t("Update"), func() -> void:
 			profiles()[nn] = snapshot()
 			changed.call()
 			app.toast(I18n.t("Saved: {n}", {"n": nn}))))
-		r.add_child(UIKit.button(I18n.t("Delete"), func():
+		r.add_child(UIKit.button(I18n.t("Delete"), func() -> void:
 			profiles().erase(nn)
 			changed.call()
 			refresh.call()))
@@ -126,7 +126,7 @@ static func presets(col: Control, app: App, changed: Callable, refresh: Callable
 	SettingsPanel._head(col, I18n.t("Starting points"))
 	for st in STARTERS:
 		var s: Array = st
-		col.add_child(SettingsPanel._row(I18n.t(s[0]), UIKit.button(I18n.t("Use"), func():
+		col.add_child(SettingsPanel._row(I18n.t(s[0]), UIKit.button(I18n.t("Use"), func() -> void:
 			load_profile(s[2])
 			changed.call()
 			app.toast(I18n.t("Set: {n}", {"n": I18n.t(s[0])}))
@@ -167,8 +167,8 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 	card.add_child(who)
 	col.add_child(UIW.margins(card, 10, 6, 0, 10))
 	SettingsPanel._head(col, I18n.t("Driver profile"))
-	col.add_child(SettingsPanel._row(I18n.t("Flag, number, code, helmet"), UIKit.button(I18n.t("Edit"), func(): SocialUI.profile_modal(app, refresh)), I18n.t("How you appear on the timing screens.")))
-	col.add_child(SettingsPanel._row(I18n.t("Driver name"), UIKit.button(I18n.t("Change"), func(): _rename_modal(app, refresh)), I18n.t("The name on the timing screens and in friends' lists.")))
+	col.add_child(SettingsPanel._row(I18n.t("Flag, number, code, helmet"), UIKit.button(I18n.t("Edit"), func() -> void: SocialUI.profile_modal(app, refresh)), I18n.t("How you appear on the timing screens.")))
+	col.add_child(SettingsPanel._row(I18n.t("Driver name"), UIKit.button(I18n.t("Change"), func() -> void: _rename_modal(app, refresh)), I18n.t("The name on the timing screens and in friends' lists.")))
 	SettingsPanel._head(col, I18n.t("Sign-in"))
 	var kind := Account.kind()
 	var how: String = {"playGames": I18n.t("Google Play Games"), "guest": I18n.t("Guest on this device")}.get(kind, I18n.t("Nickname and password"))
@@ -176,7 +176,7 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 	col.add_child(SettingsPanel._row(I18n.t("Signed in as"), UIKit.label(how, 16, UIKit.TEXT, true, 600), how_tip))
 	if kind != "playGames" and PlayGames.available():
 		var link := UIKit.button(I18n.t("Link"), Callable(), true)
-		link.pressed.connect(func():
+		link.pressed.connect(func() -> void:
 			link.disabled = true
 			var code: String = await PlayGames.auth_code()
 			var r: Dictionary = await Account.play_games(code) if code != "" else {"ok": false, "error": "Google Play Games did not sign you in."}
@@ -188,7 +188,7 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 				refresh.call())
 		col.add_child(SettingsPanel._row(I18n.t("Google Play Games"), link, I18n.t("Your driver, coins and records on any phone you sign in to Play Games with.")))
 	if kind == "password":
-		col.add_child(SettingsPanel._row(I18n.t("Password"), UIKit.button(I18n.t("Change"), func(): _password_modal(app)), I18n.t("Your other devices are signed out when it changes.")))
+		col.add_child(SettingsPanel._row(I18n.t("Password"), UIKit.button(I18n.t("Change"), func() -> void: _password_modal(app)), I18n.t("Your other devices are signed out when it changes.")))
 	col.add_child(SettingsPanel._row(I18n.t("Sign out"), UIKit.button(I18n.t("Sign out"), func():
 		var close: Callable = app.overlay_layer.get_children().filter(func(c): return c.has_meta("close")).back().get_meta("close")
 		close.call()
@@ -206,12 +206,12 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 		S["privacy"] = {"showOnline": true}
 	SettingsPanel._toggle(col, I18n.t("Show friends where I am"), I18n.t("Off: you appear offline to your friends (menu, lobby or racing)."), S.privacy, "showOnline", changed)
 	SettingsPanel._head(col, I18n.t("Delete account"))
-	col.add_child(SettingsPanel._row(I18n.t("Delete my account"), UIKit.button(I18n.t("Delete…"), func(): _delete_modal(app)), I18n.t("Your account, laps, results and friends are deleted for good.")))
+	col.add_child(SettingsPanel._row(I18n.t("Delete my account"), UIKit.button(I18n.t("Delete…"), func() -> void: _delete_modal(app)), I18n.t("Your account, laps, results and friends are deleted for good.")))
 
 static func _rename_modal(app: App, refresh: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 460)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t("Driver name"), close)
 	var nick := LineEdit.new()
 	nick.max_length = 16
@@ -221,7 +221,7 @@ static func _rename_modal(app: App, refresh: Callable) -> void:
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(err)
 	var go := UIKit.button(I18n.t("Save"), Callable(), true)
-	var save := func():
+	var save := func() -> void:
 		go.disabled = true
 		var r: Dictionary = await Account.rename(nick.text)
 		if not is_instance_valid(go):
@@ -241,7 +241,7 @@ static func _rename_modal(app: App, refresh: Callable) -> void:
 static func _password_modal(app: App) -> void:
 	var m := UIW.modal(app.overlay_layer, 460)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t("New password"), close)
 	var old := LineEdit.new()
 	old.secret = true
@@ -259,7 +259,7 @@ static func _password_modal(app: App) -> void:
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.add_child(err)
 	var go := UIKit.button(I18n.t("Change password"), Callable(), true)
-	go.pressed.connect(func():
+	go.pressed.connect(func() -> void:
 		if nw.text != again.text:
 			err.text = I18n.t("The new passwords are not the same.")
 			return
@@ -279,7 +279,7 @@ static func _password_modal(app: App) -> void:
 static func _delete_modal(app: App) -> void:
 	var m := UIW.modal(app.overlay_layer, 480)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t("Delete account"), close, str(Account.account().user.nick))
 	var t := UIW.muted(I18n.t("Your account, your laps and results on the leaderboards and your friends list are deleted from the server for good. This cannot be undone."))
 	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

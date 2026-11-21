@@ -37,9 +37,9 @@ static func card(title: String, photo_path: String = "", tint: float = 0.95) -> 
 	body.name = "body"
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for s in ["left", "right"]:
+	for s: String in ["left", "right"]:
 		body.add_theme_constant_override("margin_" + s, 10)
-	for s in ["top", "bottom"]:
+	for s: String in ["top", "bottom"]:
 		body.add_theme_constant_override("margin_" + s, 6)
 	col.add_child(body)
 	b.get_node("content").add_child(col)
@@ -93,7 +93,7 @@ static func _slant(c: Color) -> StyleBoxFlat:
 static func currency(kind: String, amount: int, on_plus: Callable) -> Control:
 	var b := Button.new()
 	b.focus_mode = Control.FOCUS_ALL
-	for st in ["normal", "hover", "pressed"]:
+	for st: String in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(st, UIKit.box(Color(0, 0, 0, 0.55 if st == "normal" else 0.75), Color(1, 1, 1, 0.18), 1, 16, Vector2(10, 3)))
 	var row := UIW.hbox(6)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -115,7 +115,7 @@ static func icon_button(kind: String, tip: String, cb: Callable, dot: bool = fal
 	b.focus_mode = Control.FOCUS_ALL
 	b.tooltip_text = tip
 	b.custom_minimum_size = Vector2(42, 42)
-	for st in ["normal", "hover", "pressed"]:
+	for st: String in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(st, UIKit.box(Color(0, 0, 0, 0.4 if st == "normal" else 0.7), Color(1, 1, 1, 0.12), 1, 21))
 	var ic := Icon.make(kind, 24, UIKit.TEXT)
 	UIKit.full(ic)
@@ -154,13 +154,13 @@ static func trophies(n: int, of: int = 3, size: int = 18) -> HBoxContainer:
 static func reward_popup(app: App, title: String, lines: Array) -> void:
 	var m := UIW.modal(app.overlay_layer, 440)
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, title, func(): m.root.queue_free())
+	UIW.modal_head(b, title, func() -> void: m.root.queue_free())
 	for l in lines:
 		var row := UIW.hbox(10)
 		row.add_child(Icon.make("gift", 22, GOLD))
 		row.add_child(UIKit.label(l, 20, UIKit.TEXT, true, 600))
 		b.add_child(row)
-	var ok := UIKit.button(I18n.t("Collect"), func(): m.root.queue_free(), true)
+	var ok := UIKit.button(I18n.t("Collect"), func() -> void: m.root.queue_free(), true)
 	ok.size_flags_horizontal = Control.SIZE_SHRINK_END
 	b.add_child(ok)
 	ok.grab_focus.call_deferred()
@@ -221,7 +221,7 @@ class Icon:
 			"calendar":
 				draw_rect(Rect2(Vector2(0.14, 0.2) * s, Vector2(0.72, 0.66) * s), c, false, w)
 				draw_rect(Rect2(Vector2(0.14, 0.2) * s, Vector2(0.72, 0.16) * s), c)
-				for x in [0.32, 0.5, 0.68]:
+				for x: float in [0.32, 0.5, 0.68]:
 					draw_rect(Rect2(Vector2(x - 0.05, 0.5) * s, Vector2(0.1, 0.1) * s), c)
 			"chest":
 				draw_rect(Rect2(Vector2(0.12, 0.38) * s, Vector2(0.76, 0.46) * s), c)
@@ -252,7 +252,7 @@ class Icon:
 				draw_line(Vector2(0.8, 0.14) * s, Vector2(0.4, 0.58) * s, c, w * 1.8)
 				draw_colored_polygon(PackedVector2Array([Vector2(0.3, 0.52) * s, Vector2(0.46, 0.66) * s, Vector2(0.26, 0.9) * s, Vector2(0.1, 0.86) * s]), c)
 			"list":
-				for y in [0.28, 0.5, 0.72]:
+				for y: float in [0.28, 0.5, 0.72]:
 					draw_rect(Rect2(Vector2(0.12, y - 0.05) * s, Vector2(0.1, 0.1) * s), c)
 					draw_line(Vector2(0.32, y) * s, Vector2(0.88, y) * s, c, w)
 			"flag":

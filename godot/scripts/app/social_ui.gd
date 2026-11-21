@@ -40,7 +40,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	body.add_child(UIW.hair())
 	var offline_box := UIW.vbox(8)
 	offline_box.visible = false
-	var unreachable := func(): offline_box.visible = true
+	var unreachable := func() -> void: offline_box.visible = true
 	var err := UIKit.label("", 15, UIKit.BAD)
 	err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var lead := UIW.muted(I18n.t("Race in seconds: no e-mail, no password."), 15)
@@ -51,7 +51,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	body.add_child(ways)
 	var buttons: Array[Button] = []
 	# one sign-in at a time: every button off while one is asked; r: the server's answer
-	var busy := func(on: bool):
+	var busy := func(on: bool) -> void:
 		for b in buttons:
 			if is_instance_valid(b):
 				b.disabled = on
@@ -70,7 +70,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	var dev := Account.device()
 	if not dev.is_empty():
 		var cont := UIKit.button(I18n.t("Continue as {nick}", {"nick": str(dev.get("nick", ""))}).to_upper(), Callable(), true)
-		cont.pressed.connect(func():
+		cont.pressed.connect(func() -> void:
 			err.text = ""
 			busy.call(true)
 			var r: Dictionary = await Account.resume()
@@ -83,7 +83,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 		ways.add_child(tall.call(cont))
 	if PlayGames.available():
 		var pg := UIKit.button(I18n.t("Continue with Google Play Games"), Callable(), dev.is_empty())
-		pg.pressed.connect(func():
+		pg.pressed.connect(func() -> void:
 			err.text = ""
 			busy.call(true)
 			var code: String = await PlayGames.auth_code()
@@ -115,7 +115,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	guest_box.add_child(note)
 	var start := UIKit.button(I18n.t("Start racing").to_upper(), Callable(), true)
-	var go_guest := func():
+	var go_guest := func() -> void:
 		err.text = ""
 		busy.call(true)
 		var r: Dictionary = await Account.guest(nick.text, invite.text)
@@ -127,7 +127,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	nick.text_submitted.connect(func(_t): go_guest.call())
 	guest_box.add_child(tall.call(start))
 	var guest := UIKit.button(I18n.t("Play as guest"), Callable(), dev.is_empty() and not PlayGames.available())
-	guest.pressed.connect(func():
+	guest.pressed.connect(func() -> void:
 		guest.visible = false
 		guest_box.visible = true
 		if not touch:
@@ -145,7 +145,7 @@ static func sign_in_screen(app: App, on_done: Callable, on_offline: Callable) ->
 	legacy.add_theme_color_override("font_color", UIKit.SOFT)
 	legacy.add_theme_font_size_override("font_size", 14)
 	legacy.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	legacy.pressed.connect(func():
+	legacy.pressed.connect(func() -> void:
 		legacy.visible = false
 		legacy_box.visible = true)
 	body.add_child(legacy)
@@ -182,7 +182,7 @@ static func _sign_in_form(body: VBoxContainer, on_done: Callable, on_unreachable
 	body.add_child(UIW.field(I18n.t("Password"), pw))
 	body.add_child(UIW.row(I18n.t("Show password"), UIW.switch(false, func(on): pw.secret = not on)))
 	body.add_child(err)
-	var go := func():
+	var go := func() -> void:
 		err.text = ""
 		submit.disabled = true
 		var r: Dictionary = await Account.login(nick.text, pw.text)
@@ -252,7 +252,7 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 			list.add_child(UIW.muted(I18n.t("No friends yet: add them by their nickname.")))
 		for f in all:
 			list.add_child(UIW.row_line(_friend_row(app, f, join, watch, _self.refresh, err)))
-	var add := func():
+	var add := func() -> void:
 		err.text = ""
 		var r: Dictionary = await Account.add_friend(input.text)
 		if r.ok:
@@ -271,13 +271,13 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 	var timer := Timer.new()
 	timer.wait_time = 15.0
 	timer.autostart = true
-	timer.timeout.connect(func(): _self.refresh.call())
+	timer.timeout.connect(func() -> void: _self.refresh.call())
 	card.add_child(timer)
 	_self.refresh.call.call_deferred()
 	return UIW.panel(card)
 
 static func _friend_row(app: App, f: Dictionary, join: Callable, watch: Callable, refresh: Callable, err: Label) -> Control:
-	var p = f.get("presence")
+	var p: Variant = f.get("presence")
 	var row := UIW.hbox(10)
 	var info := UIW.vbox(0)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -294,21 +294,21 @@ static func _friend_row(app: App, f: Dictionary, join: Callable, watch: Callable
 	info.add_child(UIKit.label(status, 13, UIKit.MUTED))
 	row.add_child(info)
 	var act := func(label: String, fn: Callable) -> void:
-		row.add_child(UIKit.button(label, func():
+		row.add_child(UIKit.button(label, func() -> void:
 			err.text = ""
 			await fn.call()
 			refresh.call()))
 	if f.status == "incoming":
-		act.call(I18n.t("Accept"), func(): await Account.accept_friend(f.id))
-		act.call(I18n.t("Decline"), func(): await Account.remove_friend(f.id))
+		act.call(I18n.t("Accept"), func() -> void: await Account.accept_friend(f.id))
+		act.call(I18n.t("Decline"), func() -> void: await Account.remove_friend(f.id))
 	elif f.status == "outgoing":
-		act.call(I18n.t("Cancel"), func(): await Account.remove_friend(f.id))
+		act.call(I18n.t("Cancel"), func() -> void: await Account.remove_friend(f.id))
 	elif p != null and p.get("room") != null and p.state == "lobby":
-		act.call(I18n.t("Join"), func(): join.call(p.room))
+		act.call(I18n.t("Join"), func() -> void: join.call(p.room))
 	elif p != null and p.get("room") != null and (p.state == "racing" or p.state == "watching"):
-		act.call(I18n.t("Watch"), func(): watch.call(p.room))
+		act.call(I18n.t("Watch"), func() -> void: watch.call(p.room))
 	if f.status == "friend":
-		act.call("×", func(): await Account.remove_friend(f.id))
+		act.call("×", func() -> void: await Account.remove_friend(f.id))
 	return row
 
 # --------------------------------------------------------------- live rooms ---
@@ -326,7 +326,7 @@ static func room_list(app: App, join: Callable, watch: Callable) -> Control:
 		if r.kind == "practice":
 			return I18n.t("Free practice")
 		return I18n.t("Qualifying · {m} min", {"m": r.sessionMinutes})
-	var refresh := func():
+	var refresh := func() -> void:
 		var rooms: Array = await Connection.list_public_rooms()
 		if not is_instance_valid(list) or app.screen != "menu":
 			return
@@ -342,8 +342,8 @@ static func room_list(app: App, join: Callable, watch: Callable) -> Control:
 			who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(who)
 			if r.phase == "lobby" and r.drivers < r.maxPlayers:
-				row.add_child(UIKit.button(I18n.t("Join"), func(): join.call(r.code)))
-			row.add_child(UIKit.button(I18n.t("Watch"), func(): watch.call(r.code)))
+				row.add_child(UIKit.button(I18n.t("Join"), func() -> void: join.call(r.code)))
+			row.add_child(UIKit.button(I18n.t("Watch"), func() -> void: watch.call(r.code)))
 			list.add_child(UIW.row_line(row))
 	var col := UIW.vbox(8)
 	col.add_child(UIW.section(I18n.t("Live sessions")))
@@ -361,7 +361,7 @@ static func room_list(app: App, join: Callable, watch: Callable) -> Control:
 static func records_modal(app: App) -> void:
 	var m := UIW.modal(app.overlay_layer, 960)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t("Records"), close)
 	var tracks: Array = app.track_index
 	var cars: Array = app.cars.cars
@@ -376,7 +376,7 @@ static func records_modal(app: App) -> void:
 		return id
 	var results := UIW.vbox(4)
 	var load := Callable()
-	load = func():
+	load = func() -> void:
 		for c in results.get_children():
 			c.queue_free()
 		results.add_child(UIW.muted(I18n.t("Loading…")))
@@ -392,7 +392,7 @@ static func records_modal(app: App) -> void:
 		var grid := GridContainer.new()
 		grid.columns = 6
 		grid.add_theme_constant_override("h_separation", 14)
-		for h in [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Lap"), I18n.t("Gap"), I18n.t("Laps")]:
+		for h: String in [I18n.t("Pos"), I18n.t("Driver"), I18n.t("Car"), I18n.t("Lap"), I18n.t("Gap"), I18n.t("Laps")]:
 			grid.add_child(UIKit.label(String(h).to_upper(), 14, UIKit.SOFT, true, 600))
 		for r in rows:
 			var col := UIKit.ACCENT_2 if r.get("me", false) else UIKit.TEXT
@@ -419,7 +419,7 @@ static func records_modal(app: App) -> void:
 	# the career
 	var career := UIW.vbox(6)
 	body.add_child(career)
-	var load_career := func():
+	var load_career := func() -> void:
 		if Account.account() == null:
 			career.add_child(UIW.muted(I18n.t("Sign in to see your career.")))
 			return
@@ -428,7 +428,7 @@ static func records_modal(app: App) -> void:
 			return
 		career.add_child(UIW.section(s.nick))
 		var tiles := UIW.hbox(18)
-		for t in [[I18n.t("Races"), s.races], [I18n.t("Wins"), s.wins], [I18n.t("Podiums"), s.podiums], [I18n.t("Qualifyings"), s.qualifyings], [I18n.t("Poles"), s.poles], [I18n.t("Timed laps"), s.laps]]:
+		for t: Array in [[I18n.t("Races"), s.races], [I18n.t("Wins"), s.wins], [I18n.t("Podiums"), s.podiums], [I18n.t("Qualifyings"), s.qualifyings], [I18n.t("Poles"), s.poles], [I18n.t("Timed laps"), s.laps]]:
 			var c := UIW.vbox(0)
 			c.add_child(UIKit.label(str(t[1]), 26, UIKit.TEXT, true, 700))
 			c.add_child(UIKit.label(t[0], 12, UIKit.MUTED))
@@ -448,7 +448,7 @@ static func profile_modal(app: App, on_done: Callable) -> void:
 	var me: Dictionary = Account.account().user
 	var m := UIW.modal(app.overlay_layer, 480)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free(); on_done.call()
+	var close := func() -> void: m.root.queue_free(); on_done.call()
 	UIW.modal_head(body, I18n.t("Driver profile"), close, str(me.nick))
 	body.add_child(UIW.muted(I18n.t("How you appear on the timing screens: your flag, your number and your three-letter code.")))
 	var opts: Array = [["", I18n.t("Not set")]]
@@ -474,7 +474,7 @@ static func profile_modal(app: App, on_done: Callable) -> void:
 	body.add_child(UIW.field(I18n.t("Helmet colour"), colour))
 	var err := UIKit.label("", 15, UIKit.BAD)
 	body.add_child(err)
-	body.add_child(UIKit.button(I18n.t("Save"), func():
+	body.add_child(UIKit.button(I18n.t("Save"), func() -> void:
 		err.text = ""
 		var n = int(num.value) if num.value > 0 else null
 		var a = abbr.text if abbr.text != "" else null

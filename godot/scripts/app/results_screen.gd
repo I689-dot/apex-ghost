@@ -181,11 +181,11 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 
 	# a championship round (offline, on the round's circuit)
 	var champ = Championship.load_saved()
-	var champ_track = app.room.get("conditions", {}).get("trackId")
+	var champ_track: Variant = app.room.get("conditions", {}).get("trackId")
 	var next_button: Control = null
 	var my_nick: String = app.my_info().get("nick", Settings.data.nickname)
 	if race and champ != null and app.conn != null and LocalRoom.is_local_code(app.conn.code) and champ_track != null and (champ.rounds[champ.done] == champ_track if champ.done < champ.rounds.size() else false or champ.lastScored == "%s-%d" % [app.conn.code, m.raceId]):
-		var fastest_nick = null
+		var fastest_nick: Variant = null
 		if m.get("fastestLap") != null:
 			for r in m.rows:
 				if r.id == m.fastestLap.id:
@@ -210,7 +210,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 		col.add_child(UIW.panel(cb))
 		if not over and champ.done < champ.rounds.size():
 			var next_track: String = champ.rounds[champ.done]
-			next_button = UIKit.button(I18n.t("Next round: {track}", {"track": I18n.t(app.track_entry(next_track).get("name", next_track))}), func():
+			next_button = UIKit.button(I18n.t("Next round: {track}", {"track": I18n.t(app.track_entry(next_track).get("name", next_track))}), func() -> void:
 				if app.conn != null:
 					app.conn.leave()
 				app.teardown_connection()
@@ -221,7 +221,7 @@ static func build(app: App, m: Dictionary, gain) -> Control:
 	var actions: Array = []
 	if m.get("raceAt") != null:
 		var next := UIKit.label("", 20, UIKit.ACCENT_2, true, 600)
-		var tick := func():
+		var tick := func() -> void:
 			if app.screen != "results" or app.conn == null:
 				return
 			var left := maxi(0, ceili((m.raceAt - app.conn.server_now()) / 1000.0))
@@ -250,14 +250,14 @@ static func _weekend_table(app: App, by: String) -> Control:
 	var key := func(w: Dictionary) -> int:
 		if by == "race":
 			return int(w.get("race", 999)) if str(w.get("race", "")).is_valid_int() else 999
-		var v = w.get("qualify") if by == "qualify" else w.get("practice")
+		var v: Variant = w.get("qualify") if by == "qualify" else w.get("practice")
 		return int(v) if v != null else 999
 	rows.sort_custom(func(a, b): return key.call(a[1]) < key.call(b[1]))
 	var grid := GridContainer.new()
 	grid.columns = 6
 	grid.add_theme_constant_override("h_separation", 22)
 	grid.add_theme_constant_override("v_separation", 4)
-	for h in ["#", I18n.t("Driver"), I18n.t("Practice"), I18n.t("Qualify"), I18n.t("G"), I18n.t("Race")]:
+	for h: String in ["#", I18n.t("Driver"), I18n.t("Practice"), I18n.t("Qualify"), I18n.t("G"), I18n.t("Race")]:
 		grid.add_child(UIKit.label(String(h).to_upper(), 14, UIKit.SOFT, true, 600))
 	for r in rows:
 		var w: Dictionary = r[1]
@@ -314,7 +314,7 @@ static func career_block(g: Dictionary) -> Control:
 	bar.custom_minimum_size = Vector2(0, 12)
 	bar.add_theme_stylebox_override("background", UIKit.box(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0), 0, 6))
 	bar.add_theme_stylebox_override("fill", UIKit.box(rank.colour, Color(0, 0, 0, 0), 0, 6))
-	bar.ready.connect(func(): bar.create_tween().tween_property(bar, "value", lv.into, 1.4).set_delay(0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT))
+	bar.ready.connect(func() -> void: bar.create_tween().tween_property(bar, "value", lv.into, 1.4).set_delay(0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT))
 	side.add_child(bar)
 	if g.levelAfter > g.levelBefore:
 		side.add_child(UIKit.label(I18n.t("Level up! Level {n}", {"n": g.levelAfter}), 16, UIKit.GOOD, true, 700))

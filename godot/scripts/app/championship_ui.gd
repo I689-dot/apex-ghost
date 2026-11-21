@@ -7,7 +7,7 @@ static func open(app: App, read_nick: Callable) -> void:
 	var cur = Championship.load_saved()
 	var m := UIW.modal(app.overlay_layer, 600)
 	var body: VBoxContainer = m.body
-	var close := func(): m.root.queue_free()
+	var close := func() -> void: m.root.queue_free()
 	UIW.modal_head(body, I18n.t("Championship"), close, I18n.t("OFFLINE"))
 	var tracks: Array = app.track_index
 	if cur != null:
@@ -26,11 +26,11 @@ static func open(app: App, read_nick: Callable) -> void:
 		var actions := UIW.hbox(10)
 		actions.alignment = BoxContainer.ALIGNMENT_END
 		body.add_child(actions)
-		actions.add_child(UIKit.button(I18n.t("Abandon and start a new one"), func():
+		actions.add_child(UIKit.button(I18n.t("Abandon and start a new one"), func() -> void:
 			Championship.save(null)
 			close.call()
 			open(app, read_nick)))
-		actions.add_child(UIW.default_focus(UIKit.button(I18n.t("Continue"), func():
+		actions.add_child(UIW.default_focus(UIKit.button(I18n.t("Continue"), func() -> void:
 			var nick: String = read_nick.call()
 			if nick == "":
 				return
@@ -61,7 +61,7 @@ static func open(app: App, read_nick: Callable) -> void:
 	var bots := [9]
 	body.add_child(UIW.field(I18n.t("Race length"), UIW.chips(5, [3, 5, 10, 15].map(func(v): return [v, I18n.t("{n} laps", {"n": v})]), func(v): laps[0] = v)))
 	body.add_child(UIW.field(I18n.t("AI drivers"), UIW.chips(9, [5, 9, 11].map(func(v): return [v, str(v)]), func(v): bots[0] = v)))
-	var start := UIKit.button(I18n.t("Start the championship"), func():
+	var start := UIKit.button(I18n.t("Start the championship"), func() -> void:
 		var nick: String = read_nick.call()
 		if nick == "" or picks.is_empty():
 			return

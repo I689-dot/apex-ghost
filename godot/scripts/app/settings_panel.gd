@@ -74,12 +74,12 @@ static func build(app: App, on_change: Callable) -> Control:
 	var decor := MenuDecor.new()
 	UIKit.full(decor)
 	root.add_child(decor)
-	var close := func():
+	var close := func() -> void:
 		_help_title = null
 		_help_text = null
 		root.queue_free()
 	root.set_meta("close", close)
-	var changed := func():
+	var changed := func() -> void:
 		Settings.save()
 		on_change.call()
 	var is_touch := DisplayServer.is_touchscreen_available()
@@ -143,7 +143,7 @@ static func build(app: App, on_change: Callable) -> Control:
 			"view":
 				_view(col, changed)
 			"driving":
-				_driving(col, changed, func(): _self.show.call("driving"))
+				_driving(col, changed, func() -> void: _self.show.call("driving"))
 			"interface":
 				_interface(col, changed, app)
 			"audio":
@@ -156,13 +156,13 @@ static func build(app: App, on_change: Callable) -> Control:
 			"controller":
 				_controller(col, changed, app)
 			"account":
-				SettingsPages.account(col, app, changed, func(): _self.show.call("account"))
+				SettingsPages.account(col, app, changed, func() -> void: _self.show.call("account"))
 			"presets":
-				SettingsPages.presets(col, app, changed, func(): _self.show.call("presets"))
+				SettingsPages.presets(col, app, changed, func() -> void: _self.show.call("presets"))
 		col.add_child(UIW.spacer(false))
 		var sc := UIW.scroll(UIW.margins(col, 0, 0, 14, 12))
 		holder.add_child(sc)
-	var on_group := func(g: String):
+	var on_group := func(g: String) -> void:
 		for grp in GROUPS:
 			if grp[0] == g:
 				_self.show.call(grp[2][0])
@@ -236,12 +236,12 @@ static func _row(label: String, ctrl: Control, hint: String = "") -> Control:
 	ctrl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	r.add_child(ctrl)
 	p.add_child(r)
-	var on := func():
+	var on := func() -> void:
 		p.add_theme_stylebox_override("panel", lit)
 		if _help_title != null and is_instance_valid(_help_title):
 			_help_title.text = label.to_upper()
 			_help_text.text = hint if hint != "" else I18n.t("Point at a setting, or move to it with the pad, to see what it does.")
-	var off := func():
+	var off := func() -> void:
 		if not p.is_inside_tree():
 			return
 		var f := p.get_viewport().gui_get_focus_owner()
@@ -318,20 +318,20 @@ static func _graphics(col: Control, changed: Callable, show: Callable) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Presets"))
 	var note := UIW.muted("", 13)
-	var refresh := func():
+	var refresh := func() -> void:
 		var n := (S.graphics as Dictionary).size()
 		note.text = I18n.t(PRESET_NOTE[S.quality]) + ("" if n == 0 else "\n" + I18n.t("Custom: {n} settings differ from the preset.", {"n": n}))
-	var on_change := func():
+	var on_change := func() -> void:
 		changed.call()
 		refresh.call()
-	_select(col, I18n.t("Quality preset"), "", S, "quality", [["low", I18n.t("Low")], ["medium", I18n.t("Medium")], ["high", I18n.t("High")], ["ultra", I18n.t("Ultra")]], func():
+	_select(col, I18n.t("Quality preset"), "", S, "quality", [["low", I18n.t("Low")], ["medium", I18n.t("Medium")], ["high", I18n.t("High")], ["ultra", I18n.t("Ultra")]], func() -> void:
 		S.graphics = {}
 		S.qualityAuto = false
 		changed.call()
 		show.call("graphics"))
 	col.add_child(UIW.margins(note, 10, 8, 10, 0))
 	refresh.call()
-	_buttons(col, [UIKit.button(I18n.t("Back to the preset"), func():
+	_buttons(col, [UIKit.button(I18n.t("Back to the preset"), func() -> void:
 		S.graphics = {}
 		changed.call()
 		show.call("graphics")), UIKit.button(I18n.t("Detect for this device"), func():
@@ -364,7 +364,7 @@ static func _display(col: Control, changed: Callable) -> void:
 		_select(col, I18n.t("Window mode"), "", d, "windowMode", [["windowed", I18n.t("Windowed")], ["borderless", I18n.t("Borderless full screen")], ["fullscreen", I18n.t("Exclusive full screen")]], changed)
 		if not d.has("uiSize"):
 			d["uiSize"] = "medium"
-		_select(col, I18n.t("Interface size"), I18n.t("The menus and the HUD: Small for a big screen seen from close, Large to read them from the sofa."), d, "uiSize", [["small", I18n.t("Small")], ["medium", I18n.t("Medium")], ["large", I18n.t("Large")]], func():
+		_select(col, I18n.t("Interface size"), I18n.t("The menus and the HUD: Small for a big screen seen from close, Large to read them from the sofa."), d, "uiSize", [["small", I18n.t("Small")], ["medium", I18n.t("Medium")], ["large", I18n.t("Large")]], func() -> void:
 			Graphics.apply_ui_size()
 			changed.call())
 		_toggle(col, I18n.t("Vertical sync"), I18n.t("No tearing; the frame rate stays at most the display's refresh rate"), d, "vsync", changed)
@@ -382,12 +382,12 @@ static func _display(col: Control, changed: Callable) -> void:
 			_select(col, I18n.t("Side screen angle"), I18n.t("How far round each side view is turned: match how your side monitors are angled"), d, "sideAngle", angles, changed, func(v): return int(v))
 	_head(col, I18n.t("Frame rate"))
 	var caps: Array = [["0", I18n.t("No limit")]]
-	for r in [30, 45, 60, 90, 120, 144, 165, 240]:
+	for r: int in [30, 45, 60, 90, 120, 144, 165, 240]:
 		if r <= maxi(hz, 60) + 2 or r == 30:
 			caps.append([str(r), "%d fps" % r])
 	_select(col, I18n.t("Frame rate limit"), I18n.t("Lower: cooler and quieter, longer on a battery"), d, "maxFps", caps, changed, func(v): return int(v))
 	var rates: Array = [[str(45), "45 fps"], [str(60), "60 fps"]]
-	for r in [90, 120, 144]:
+	for r: int in [90, 120, 144]:
 		if hz >= r - 2:
 			rates.append([str(r), "%d fps" % r])
 	_toggle(col, I18n.t("Dynamic resolution"), I18n.t("Lowers the resolution for a moment when the frame rate falls under the target"), S, "dynamicResolution", changed)
@@ -404,14 +404,14 @@ static func _display(col: Control, changed: Callable) -> void:
 	_range(col, I18n.t("Brightness"), "", S, "brightness", 0.6, 1.5, 0.05, _pct, changed)
 	_range(col, I18n.t("Contrast"), "", d, "contrast", 0.8, 1.25, 0.01, _pct, changed)
 	_range(col, I18n.t("Colour saturation"), "", d, "saturation", 0.6, 1.4, 0.01, _pct, changed)
-	for k in [["eyeAdaptation", true], ["lensFlare", true], ["hdr", false]]:
+	for k: Array in [["eyeAdaptation", true], ["lensFlare", true], ["hdr", false]]:
 		if not d.has(k[0]):
 			d[k[0]] = k[1]
 	if not OS.has_feature("mobile"):
 		_toggle(col, I18n.t("Eye adaptation"), I18n.t("The exposure follows what you see, slowly, as your eyes do: out of the forest into the sun, into the dark under the trees, the night (from the next session)"), d, "eyeAdaptation", changed)
 		_toggle(col, I18n.t("Sun lens flare"), I18n.t("The sun's glare and flare when you look towards it"), d, "lensFlare", changed)
 		if Graphics.hdr_supported():
-			_toggle(col, I18n.t("HDR output"), I18n.t("On an HDR screen: the sun, headlights and floodlights as bright as they really are"), d, "hdr", func():
+			_toggle(col, I18n.t("HDR output"), I18n.t("On an HDR screen: the sun, headlights and floodlights as bright as they really are"), d, "hdr", func() -> void:
 				Graphics.apply_hdr()
 				changed.call())
 		else:
@@ -433,14 +433,14 @@ static func _view(col: Control, changed: Callable) -> void:
 		var aspect := maxf(1.0, float(DisplayServer.window_get_size().x) / maxf(1.0, float(DisplayServer.window_get_size().y)))
 		var h := float(sc.widthCm) / aspect
 		return rad_to_deg(2.0 * atan(h / 2.0 / maxf(1.0, float(sc.distanceCm))))
-	var upd := func():
+	var upd := func() -> void:
 		result.text = I18n.t("Your screen covers {v}° of your view vertically.", {"v": "%.0f" % calc.call()})
 	var cm := func(v): return "%d cm" % int(v)
-	_range(col, I18n.t("Screen width"), I18n.t("The picture's visible width"), sc, "widthCm", 20, 200, 1, cm, func(): changed.call(); upd.call())
-	_range(col, I18n.t("Eyes to screen"), "", sc, "distanceCm", 30, 200, 1, cm, func(): changed.call(); upd.call())
+	_range(col, I18n.t("Screen width"), I18n.t("The picture's visible width"), sc, "widthCm", 20, 200, 1, cm, func() -> void: changed.call(); upd.call())
+	_range(col, I18n.t("Eyes to screen"), "", sc, "distanceCm", 30, 200, 1, cm, func() -> void: changed.call(); upd.call())
 	col.add_child(UIW.margins(result, 10, 8, 10, 0))
 	upd.call()
-	_buttons(col, [UIKit.button(I18n.t("Use this field of view"), func():
+	_buttons(col, [UIKit.button(I18n.t("Use this field of view"), func() -> void:
 		S.fov = clampf(roundf(calc.call()), 25.0, 95.0)
 		changed.call()
 		result.text = I18n.t("Field of view set to {v}°.", {"v": "%d" % int(S.fov)}))])
@@ -455,7 +455,7 @@ static func _view(col: Control, changed: Callable) -> void:
 static func _driving(col: Control, changed: Callable, refresh: Callable = Callable()) -> void:
 	var S: Dictionary = Settings.data
 	_head(col, I18n.t("Assist level"))
-	col.add_child(_row(I18n.t("Level"), SettingsPages.assist_row(changed, refresh if refresh.is_valid() else func(): pass), I18n.t("Casual: every assist and the full racing line. Standard: ABS, some traction control, braking zones. Expert: as the real car, manual gears, no line. Change any one below for Custom.")))
+	col.add_child(_row(I18n.t("Level"), SettingsPages.assist_row(changed, refresh if refresh.is_valid() else func() -> void: pass), I18n.t("Casual: every assist and the full racing line. Standard: ABS, some traction control, braking zones. Expert: as the real car, manual gears, no line. Change any one below for Custom.")))
 	_head(col, I18n.t("Assists"))
 	_toggle(col, I18n.t("ABS"), "", S.assists, "abs", changed)
 	_select(col, I18n.t("Traction control"), "", S.assists, "tc", [["0", I18n.t("Off")], ["1", I18n.t("Low")], ["2", I18n.t("High")]], changed, func(v): return int(v))
@@ -477,7 +477,7 @@ static func _interface(col: Control, changed: Callable, app: App = null) -> void
 	_toggle(col, I18n.t("Opening titles"), I18n.t("The studio cinematic when the game starts"), S, "introCinematic", changed)
 	_head(col, I18n.t("HUD"))
 	var h: Dictionary = S.hud
-	var edit := UIKit.button(I18n.t("Edit layout"), func():
+	var edit := UIKit.button(I18n.t("Edit layout"), func() -> void:
 		var ed := HudEditor.new()
 		if app != null:
 			app.overlay_layer.add_child(ed)
@@ -531,7 +531,7 @@ static func _controls(col: Control, changed: Callable, show: Callable) -> void:
 		if codes.size() < 2:
 			keys.add_child(_key_button(a, codes.size(), "+", S, changed, show))
 		col.add_child(_row(I18n.t(ACTION_LABEL[a]), keys))
-	_buttons(col, [UIKit.button(I18n.t("Reset keys"), func():
+	_buttons(col, [UIKit.button(I18n.t("Reset keys"), func() -> void:
 		S.bindings = Settings.DEFAULT_BINDINGS.duplicate(true)
 		changed.call()
 		show.call("controls"))])
@@ -622,7 +622,7 @@ static func _controller(col: Control, changed: Callable, app: App = null) -> voi
 	_range(col, I18n.t("Throttle ramp"), I18n.t("Time from nothing to full throttle: longer, a tap gives part throttle"), k, "throttleRamp", 0.05, 1.5, 0.05, func(v): return "%.2f s" % v, changed)
 	_range(col, I18n.t("Brake ramp"), I18n.t("Time from nothing to full brake"), k, "brakeRamp", 0.05, 1.5, 0.05, func(v): return "%.2f s" % v, changed)
 	_range(col, I18n.t("Steering speed"), "", k, "steerSpeed", 0.5, 1.6, 0.05, _pct, changed)
-	_buttons(col, [UIKit.button(I18n.t("Reset the controller settings"), func():
+	_buttons(col, [UIKit.button(I18n.t("Reset the controller settings"), func() -> void:
 		var layouts = S.pad.layouts
 		S.pad = Settings.default_settings().pad
 		S.pad.layouts = layouts
@@ -669,16 +669,16 @@ static func _packs(col: Control) -> void:
 				status.text = I18n.t(str(j.error)) if not j.is_empty() else (I18n.t("Not installed") if mb > 0.0 else I18n.t("Not installed: no connection"))
 				btn.text = I18n.t("Download ({n} MB)", {"n": "%.0f" % mb})
 				btn.disabled = mb <= 0.0
-		btn.pressed.connect(func():
+		btn.pressed.connect(func() -> void:
 			if Packs.jobs.has(id) and Packs.jobs[id].phase != "failed":
 				Packs.cancel(id)
 			else:
 				Packs.download(id))
-		rm.pressed.connect(func(): Packs.remove(id))
+		rm.pressed.connect(func() -> void: Packs.remove(id))
 		var on_change := func(cid: String) -> void:
 			if cid == id:
 				show.call()
 		Packs.changed.connect(on_change)
-		status.tree_exiting.connect(func(): if Packs.changed.is_connected(on_change): Packs.changed.disconnect(on_change))
+		status.tree_exiting.connect(func() -> void: if Packs.changed.is_connected(on_change): Packs.changed.disconnect(on_change))
 		show.call()
 

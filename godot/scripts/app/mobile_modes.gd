@@ -12,7 +12,7 @@ static func show(app: App, cat: String = "") -> void:
 	if cat != "":
 		_cat = cat
 	app.screen = "m_modes"
-	app.back_to = func(): app.show_menu()
+	app.back_to = func() -> void: app.show_menu()
 	app.set_backdrop("aerial")
 	var holder := Control.new()
 	UIKit.full(holder)
@@ -20,14 +20,14 @@ static func show(app: App, cat: String = "") -> void:
 	shade.color = Color(0.0, 0.01, 0.03, 0.62)
 	UIKit.full(shade)
 	holder.add_child(shade)
-	var top := UIW.top_bar({"title": I18n.t("Game modes"), "back": func(): app.show_menu(),
-		"right": [MobileUI.currency("credit", Progression.credits(), func(): MobileHome.open_store(app, "coins")), MobileUI.currency("coin", StoreScreen.coins(), func(): MobileHome.open_store(app, "coins"))]})
+	var top := UIW.top_bar({"title": I18n.t("Game modes"), "back": func() -> void: app.show_menu(),
+		"right": [MobileUI.currency("credit", Progression.credits(), func() -> void: MobileHome.open_store(app, "coins")), MobileUI.currency("coin", StoreScreen.coins(), func() -> void: MobileHome.open_store(app, "coins"))]})
 	var row := UIW.hbox(18)
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var cats := UIW.vbox(6)
 	cats.custom_minimum_size = Vector2(210, 0)
 	cats.alignment = BoxContainer.ALIGNMENT_CENTER
-	for c in [["career", I18n.t("Career")], ["events", I18n.t("Events")], ["online", I18n.t("Online racing")], ["quick", I18n.t("Quick race")]]:
+	for c: Array in [["career", I18n.t("Career")], ["events", I18n.t("Events")], ["online", I18n.t("Online racing")], ["quick", I18n.t("Quick race")]]:
 		var b := Button.new()
 		b.text = String(c[1]).to_upper()
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -37,10 +37,10 @@ static func show(app: App, cat: String = "") -> void:
 		b.add_theme_font_size_override("font_size", 22)
 		var on: bool = c[0] == _cat
 		b.add_theme_color_override("font_color", UIKit.TEXT if on else UIKit.SOFT)
-		for st in ["normal", "hover", "pressed", "focus"]:
+		for st: String in ["normal", "hover", "pressed", "focus"]:
 			b.add_theme_stylebox_override(st, UIKit.box(Color(1, 1, 1, 0.16 if on else (0.08 if st == "hover" else 0.0)), Color(0, 0, 0, 0), 0, 6, Vector2(16, 6)))
 		var k: String = c[0]
-		b.pressed.connect(func(): show(app, k))
+		b.pressed.connect(func() -> void: show(app, k))
 		cats.add_child(b if not on else UIW.default_focus(b))
 	row.add_child(cats)
 	var cards := UIW.hbox(12)
@@ -89,7 +89,7 @@ static func _mode_card(title: String, photo: String, sub: String, cb: Callable, 
 	if lock == "":
 		b.pressed.connect(cb)
 	else:
-		b.pressed.connect(func(): pass)
+		b.pressed.connect(func() -> void: pass)
 	return b
 
 # ---------------------------------------------------------------- career ---
@@ -133,9 +133,9 @@ static func _cup_card(app: App, c: Array, open: bool) -> Button:
 	col.add_child(tr)
 	MobileUI.card_body(b).add_child(col)
 	if open:
-		b.pressed.connect(func(): show_cup(app, id))
+		b.pressed.connect(func() -> void: show_cup(app, id))
 	else:
-		b.pressed.connect(func(): app.toast(I18n.t("Earn {n} trophies in the career to open this cup.", {"n": int(c[4])})))
+		b.pressed.connect(func() -> void: app.toast(I18n.t("Earn {n} trophies in the career to open this cup.", {"n": int(c[4])})))
 	return b
 
 ## A cup's page: its races as cards (circuit, laps, the AI's level, your best trophies, start).
@@ -144,7 +144,7 @@ static func show_cup(app: App, id: String) -> void:
 	if c.is_empty():
 		return
 	app.screen = "m_cup"
-	app.back_to = func(): show(app, "career")
+	app.back_to = func() -> void: show(app, "career")
 	var races: Array = c[3]
 	app.set_backdrop("grid", races[0][0])
 	var holder := Control.new()
@@ -153,7 +153,7 @@ static func show_cup(app: App, id: String) -> void:
 	shade.color = Color(0.0, 0.01, 0.03, 0.6)
 	UIKit.full(shade)
 	holder.add_child(shade)
-	var top := UIW.top_bar({"title": I18n.t(c[2]), "back": func(): show(app, "career"),
+	var top := UIW.top_bar({"title": I18n.t(c[2]), "back": func() -> void: show(app, "career"),
 		"right": [MobileUI.badge("%d/%d" % [Progression.cup_trophies(id), 3 * races.size()], Color(0, 0, 0, 0.7), MobileUI.GOLD, "trophy")]})
 	var row := UIW.hbox(12)
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -177,12 +177,12 @@ static func show_cup(app: App, id: String) -> void:
 		col.add_child(UIKit.label(I18n.t("{l} laps · {b} rivals · AI {d}%", {"l": r[1], "b": r[2], "d": roundi(float(r[3]) * 100.0)}), 15, UIKit.SOFT, true, 600))
 		col.add_child(MobileUI.trophies(int(res[i]), 3, 22))
 		var idx := i
-		var go := MobileUI.race_button(I18n.t("Start"), func(): start_cup_race(app, id, idx))
+		var go := MobileUI.race_button(I18n.t("Start"), func() -> void: start_cup_race(app, id, idx))
 		go.custom_minimum_size = Vector2(0, 50)
 		go.add_theme_font_size_override("font_size", 24)
 		col.add_child(go)
 		MobileUI.card_body(b).add_child(col)
-		b.pressed.connect(func(): start_cup_race(app, id, idx))
+		b.pressed.connect(func() -> void: start_cup_race(app, id, idx))
 		row.add_child(b)
 	var sc := UIW.hscroll(row)
 	var body := UIW.vbox(10)
@@ -236,15 +236,15 @@ static func _solo(app: App, track: String, laps: int, bots: int, quali_min: int)
 static func _events(app: App, cards: HBoxContainer) -> void:
 	var w := weekly(app)
 	cards.add_child(_mode_card(I18n.t("Featured event") + " · " + Progression.fmt_left(w.left_s), MobileUI.photo(MobileUI.map_of(app, w.track), "pole"),
-		str(w.name) + " · " + I18n.t("double credits"), func():
+		str(w.name) + " · " + I18n.t("double credits"), func() -> void:
 			Progression.set_event("weekly", 0)
 			Progression.data().event.difficulty = Settings.data.ai.difficulty
 			await _solo(app, w.track, int(w.laps), int(w.bots), 2)))
 	var champ = Championship.load_saved()
 	cards.add_child(_mode_card(I18n.t("Championship"), "res://assets/ui/photo_aerial_spa.webp",
 		I18n.t("Round {n} of {m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("A season on every circuit, F1 points"),
-		func(): ChampionshipUI.open(app, func(): return MobileHome.nick())))
-	cards.add_child(_mode_card(I18n.t("Time trial"), "res://assets/ui/photo_straight.webp", I18n.t("Alone on track, 10 minutes: clean laps in a row count"), func():
+		func() -> void: ChampionshipUI.open(app, func(): return MobileHome.nick())))
+	cards.add_child(_mode_card(I18n.t("Time trial"), "res://assets/ui/photo_straight.webp", I18n.t("Alone on track, 10 minutes: clean laps in a row count"), func() -> void:
 		app.set_ui(Control.new())
 		var err := await app.join(LocalRoom.create(), MobileHome.nick())
 		if err != "":
@@ -261,7 +261,7 @@ static func _events(app: App, cards: HBoxContainer) -> void:
 static func _online(app: App, cards: HBoxContainer) -> void:
 	var online: bool = Account.account() != null or Account.accounts_enabled() == false
 	var lock := "" if online else I18n.t("Sign in")
-	cards.add_child(_mode_card(I18n.t("Create room"), "res://assets/ui/photo_grid.webp", I18n.t("Your lobby: invite friends with the code"), func():
+	cards.add_child(_mode_card(I18n.t("Create room"), "res://assets/ui/photo_grid.webp", I18n.t("Your lobby: invite friends with the code"), func() -> void:
 		app.set_ui(Control.new())
 		var c := await Connection.create_room()
 		if c == "":
@@ -270,8 +270,8 @@ static func _online(app: App, cards: HBoxContainer) -> void:
 		var err := await app.join(c, MobileHome.nick())
 		if err != "":
 			app.show_menu(err), lock))
-	cards.add_child(_mode_card(I18n.t("Join room"), "res://assets/ui/photo_pole_zandvoort.webp", I18n.t("A code from a friend"), func(): _join_dialog(app), lock))
-	cards.add_child(_mode_card(I18n.t("Host on this device"), "res://assets/ui/photo_hero.webp", I18n.t("Friends nearby join your phone's race"), func():
+	cards.add_child(_mode_card(I18n.t("Join room"), "res://assets/ui/photo_pole_zandvoort.webp", I18n.t("A code from a friend"), func() -> void: _join_dialog(app), lock))
+	cards.add_child(_mode_card(I18n.t("Host on this device"), "res://assets/ui/photo_hero.webp", I18n.t("Friends nearby join your phone's race"), func() -> void:
 		app.set_ui(Control.new())
 		var r: Dictionary = await P2p.host_race()
 		if r.has("error"):
@@ -280,12 +280,12 @@ static func _online(app: App, cards: HBoxContainer) -> void:
 		var err := await app.join(r.code, MobileHome.nick())
 		if err != "":
 			app.show_menu(err)))
-	cards.add_child(_mode_card(I18n.t("Friends"), "res://assets/ui/photo_aerial.webp", I18n.t("Where your friends race, live sessions"), func(): app.show_classic_menu("friends"), lock))
+	cards.add_child(_mode_card(I18n.t("Friends"), "res://assets/ui/photo_aerial.webp", I18n.t("Where your friends race, live sessions"), func() -> void: app.show_classic_menu("friends"), lock))
 
 static func _join_dialog(app: App) -> void:
 	var m := UIW.modal(app.overlay_layer, 460)
 	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Join room"), func(): m.root.queue_free())
+	UIW.modal_head(b, I18n.t("Join room"), func() -> void: m.root.queue_free())
 	var code := LineEdit.new()
 	code.max_length = 7
 	code.placeholder_text = I18n.t("ROOM CODE")
@@ -294,7 +294,7 @@ static func _join_dialog(app: App) -> void:
 	b.add_child(code)
 	var msg := UIKit.label("", 15, UIKit.BAD)
 	b.add_child(msg)
-	var go := func():
+	var go := func() -> void:
 		var c := Validation.normalize_room_code(code.text)
 		if c == "":
 			msg.text = I18n.t("Enter the 5-character room code.")
@@ -313,14 +313,14 @@ static func _join_dialog(app: App) -> void:
 # ----------------------------------------------------------------- quick ---
 
 static func _quick(app: App, cards: HBoxContainer) -> void:
-	cards.add_child(_mode_card(I18n.t("Quick race"), "res://assets/ui/photo_hero_spa.webp", I18n.t("Any circuit, your settings, the AI"), func():
+	cards.add_child(_mode_card(I18n.t("Quick race"), "res://assets/ui/photo_hero_spa.webp", I18n.t("Any circuit, your settings, the AI"), func() -> void:
 		app.set_ui(Control.new())
 		var err := await app.join(LocalRoom.create(), MobileHome.nick())
 		if err != "":
 			app.show_menu(err)))
 	for t in app.track_index:
 		var id: String = t.id
-		cards.add_child(_mode_card(I18n.t(str(t.name)), MobileUI.photo(str(t.get("map", "")), "aerial"), I18n.t("{km} km · 3 laps", {"km": "%.1f" % (float(t.length) / 1000.0)}), func():
+		cards.add_child(_mode_card(I18n.t(str(t.name)), MobileUI.photo(str(t.get("map", "")), "aerial"), I18n.t("{km} km · 3 laps", {"km": "%.1f" % (float(t.length) / 1000.0)}), func() -> void:
 			if not Packs.ready_for(id):
 				app.toast(I18n.t("Download the circuit first (Settings › Gameplay › Interface)."))
 				return

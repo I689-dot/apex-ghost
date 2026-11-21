@@ -153,10 +153,10 @@ func play() -> void:
 	tw.parallel().tween_property(_key, "light_energy", 14.0, 1.6).set_trans(Tween.TRANS_SINE)
 	for i in shots.size():
 		var sh: Dictionary = shots[i]
-		tw.tween_callback(func(): _place(sh.from[0], sh.from[1], sh.fov))
+		tw.tween_callback(func() -> void: _place(sh.from[0], sh.from[1], sh.fov))
 		if i > 0:
 			tw.tween_property(_fade, "color:a", 0.0, CUT_S)
-		tw.tween_method(func(f: float): _place(sh.from[0].lerp(sh.to[0], f), sh.from[1].lerp(sh.to[1], f), sh.fov); _sweep(i, f), 0.0, 1.0, SHOT_S + (1.2 if sh.get("logo", false) else 0.0)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_method(func(f: float) -> void: _place(sh.from[0].lerp(sh.to[0], f), sh.from[1].lerp(sh.to[1], f), sh.fov); _sweep(i, f), 0.0, 1.0, SHOT_S + (1.2 if sh.get("logo", false) else 0.0)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		if sh.get("caption", false):
 			tw.parallel().tween_property(_caption, "modulate:a", 1.0, 0.5)
 		elif i == shots.size() - 1:

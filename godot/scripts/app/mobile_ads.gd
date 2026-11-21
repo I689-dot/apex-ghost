@@ -59,34 +59,34 @@ static func _show(app: App, reward: bool, what: String, on_done: Callable) -> vo
 	UIKit.full(center)
 	center.add_child(col)
 	layer.add_child(center)
-	var close := UIW.close_button(func(): pass)
+	var close := UIW.close_button(func() -> void: pass)
 	close.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	close.position = Vector2(-80, 24)
 	close.visible = not reward
 	layer.add_child(close)
-	var claim := UIKit.button(I18n.t("Claim reward"), func(): pass, true)
+	var claim := UIKit.button(I18n.t("Claim reward"), func() -> void: pass, true)
 	claim.visible = false
 	col.add_child(claim)
 	app.overlay_layer.add_child(layer)
 	var total := REWARDED_S if reward else INTERSTITIAL_S
 	var state := {"t": 0.0, "done": false}
-	var finish := func(ok: bool):
+	var finish := func(ok: bool) -> void:
 		if state.done:
 			return
 		state.done = true
 		layer.queue_free()
 		on_done.call(ok)
-	close.pressed.connect(func(): finish.call(state.t >= total))
-	claim.pressed.connect(func(): finish.call(true))
+	close.pressed.connect(func() -> void: finish.call(state.t >= total))
+	claim.pressed.connect(func() -> void: finish.call(true))
 	# a rewarded one can be left early (no reward): a small "skip" under the bar
-	var skip := UIKit.button(I18n.t("Close (no reward)"), func(): finish.call(false))
+	var skip := UIKit.button(I18n.t("Close (no reward)"), func() -> void: finish.call(false))
 	skip.visible = reward
 	col.add_child(skip)
 	var timer := Timer.new()
 	timer.wait_time = 0.1
 	timer.autostart = true
 	layer.add_child(timer)
-	timer.timeout.connect(func():
+	timer.timeout.connect(func() -> void:
 		state.t += 0.1
 		bar.value = clampf(state.t / total, 0.0, 1.0)
 		if state.t < total:
