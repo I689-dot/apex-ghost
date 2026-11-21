@@ -199,7 +199,7 @@ static func show_cup(app: App, id: String) -> void:
 static func start_cup_race(app: App, cup_id: String, race: int) -> void:
 	var r: Array = Progression.cup(cup_id)[3][race]
 	if not Packs.ready_for(str(r[0])):
-		app.toast(I18n.t("Download the circuit first (Settings › Circuits)."))
+		app.toast(I18n.t("Download the circuit first (Settings › Gameplay › Interface)."))
 		return
 	Progression.set_event(cup_id, race)
 	Progression.data().event.difficulty = Settings.data.ai.difficulty
@@ -322,6 +322,6 @@ static func _quick(app: App, cards: HBoxContainer) -> void:
 		var id: String = t.id
 		cards.add_child(_mode_card(I18n.t(str(t.name)), MobileUI.photo(str(t.get("map", "")), "aerial"), I18n.t("{km} km · 3 laps", {"km": "%.1f" % (float(t.length) / 1000.0)}), func():
 			if not Packs.ready_for(id):
-				app.toast(I18n.t("Download the circuit first (Settings › Circuits)."))
+				app.toast(I18n.t("Download the circuit first (Settings › Gameplay › Interface)."))
 				return
 			await _solo(app, id, 3, 9, 2), "", Vector2(240, 0)))

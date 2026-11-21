@@ -444,14 +444,14 @@ static func cars(app: App, rerender: Callable) -> void:
 		grid.add_child(card)
 	b.add_child(UIW.scroll(grid))
 
-## Paint: the lobby's car page in a solo room (where the livery editor lives).
+## Paint: the lobby's Paint page (the livery editor) in a solo room.
 static func paint(app: App) -> void:
 	app.set_ui(Control.new())
 	var err := await app.join(LocalRoom.create(), nick())
 	if err != "":
 		app.show_menu(err)
 		return
-	LobbyScreen._page = "car"
+	LobbyScreen._page = "paint"
 	app.render_lobby()
 
 ## The store on its own screen (the classic menu's Store tab), back to the home.

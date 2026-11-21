@@ -386,7 +386,7 @@ static func records_modal(app: App) -> void:
 		for c in results.get_children():
 			c.queue_free()
 		if rows.is_empty():
-			results.add_child(UIW.muted(I18n.t("No laps here yet. Sign in and set the first one!")))
+			results.add_child(UIW.muted(I18n.t("No laps here yet. Set the first one!")))
 			return
 		var best: float = rows[0].lapMs
 		var grid := GridContainer.new()
