@@ -122,9 +122,9 @@ var _blue_since := {}
 var _in_pit := {}
 var _pit_exit_at := {}
 var _passes: Array = [] # {by, of, at, reason}
-var _clear_since = null
+var _clear_since: Variant = null
 var _fcy_incident_at := 0.0
-var _restart_laps = null
+var _restart_laps: Variant = null
 
 func _init(race_tracker: RaceTracker, full_rules: bool) -> void:
 	tracker = race_tracker
@@ -147,7 +147,7 @@ func update(t: float, out: Array = []) -> Array:
 		return out
 	var L: float = tr.track.length
 	var cars: Array = []
-	for p in tr.players.values():
+	for p: RaceTracker.PlayerRaceState in tr.players.values():
 		if p.in_pit:
 			_in_pit[p.id] = true
 		elif _in_pit.erase(p.id):
@@ -164,7 +164,7 @@ func update(t: float, out: Array = []) -> Array:
 	var yellows: Array = []
 	var fcy_cars := 0
 	var serious := false
-	for id in _stopped_since:
+	for id: String in _stopped_since:
 		var p: RaceTracker.PlayerRaceState = tr.players.get(id)
 		if p == null:
 			continue
@@ -181,8 +181,8 @@ func update(t: float, out: Array = []) -> Array:
 			_clear_since = t
 	else:
 		_clear_since = null
-	var rounded: Array = yellows.map(func(y): return [roundi(y[0]), roundi(y[1])])
-	var cur: Array = state.yellows.map(func(y): return [roundi(y[0]), roundi(y[1])])
+	var rounded: Array = yellows.map(func(y: Array) -> Array: return [roundi(y[0]), roundi(y[1])])
+	var cur: Array = state.yellows.map(func(y: Array) -> Array: return [roundi(y[0]), roundi(y[1])])
 	if str(rounded) != str(cur):
 		_set_state({"yellows": rounded})
 
@@ -196,7 +196,7 @@ func update(t: float, out: Array = []) -> Array:
 func _course(t: float, fcy_cars: int, serious: bool) -> void:
 	var st := state
 	var tr := tracker
-	var leader = _leader()
+	var leader: RaceTracker.PlayerRaceState = _leader()
 	if st.course == "green" and fcy_cars > 0:
 		_fcy_incident_at = t
 		if fcy_cars >= C.scCars or serious:
@@ -212,7 +212,7 @@ func _course(t: float, fcy_cars: int, serious: bool) -> void:
 		elif fcy_cars >= C.scCars or serious or (fcy_cars > 0 and t - _fcy_incident_at >= C.scAfterFcyMs):
 			_deploy_sc(t, leader)
 		return
-	var sc = st.sc
+	var sc: Variant = st.sc
 	if st.course == "sc" and sc != null:
 		if _clear_since != null and t - _clear_since >= C.clearForMs and t - st.since >= C.scMinMs:
 			var entry: float = tr.track.get("pitEntryS", null) if tr.track.get("pitEntryS", null) != null else 0.0
@@ -227,13 +227,13 @@ func _course(t: float, fcy_cars: int, serious: bool) -> void:
 		elif leader == null or leader.laps > _restart_laps:
 			_set_state({"course": "green", "since": t, "sc": null, "limitAt": null})
 
-func _deploy_sc(t: float, leader) -> void:
+func _deploy_sc(t: float, leader: RaceTracker.PlayerRaceState) -> void:
 	var s0: float = (leader.progress_s if leader != null else 0.0) + C.scAheadM
 	_set_state({"course": "sc", "since": t, "limitAt": null, "sc": {"t0": t, "s0": s0, "inAt": null}})
 
-func _leader():
-	var best = null
-	for p in tracker.players.values():
+func _leader() -> RaceTracker.PlayerRaceState:
+	var best: RaceTracker.PlayerRaceState = null
+	for p: RaceTracker.PlayerRaceState in tracker.players.values():
 		if not p.dnf and p.finished_ms == null and (best == null or p.race_dist > best.race_dist):
 			best = p
 	return best
@@ -241,9 +241,9 @@ func _leader():
 ## A car being lapped with a lapping car close behind it gets the blue flag; too long is a drive-through.
 func _blue_flags(t: float, cars: Array, L: float, out: Array) -> void:
 	var blue: Array = []
-	for c in cars:
+	for c: RaceTracker.PlayerRaceState in cars:
 		var behind := false
-		for f in cars:
+		for f: RaceTracker.PlayerRaceState in cars:
 			if f == c or f.race_dist < c.race_dist + L * 0.5:
 				continue
 			var gap := TrackMath.wrap_delta(f.progress_s, c.progress_s, L)
@@ -270,22 +270,22 @@ func _overtakes(t: float, cars: Array, L: float, out: Array) -> void:
 		caution = "overtake-fcy"
 	elif st.course == "sc" or st.course == "sc-in":
 		caution = "overtake-sc"
-	var sc_s = null
+	var sc_s: Variant = null
 	if st.sc != null and (st.sc.inAt == null or t < st.sc.inAt):
 		sc_s = safety_car_at(path, st.sc.t0, st.sc.s0, t)
 	var penalise: bool = full and tracker.is_race
-	for a in cars:
-		var pa = _prev_dist.get(a.id)
-		for b in cars:
+	for a: RaceTracker.PlayerRaceState in cars:
+		var pa: Variant = _prev_dist.get(a.id)
+		for b: RaceTracker.PlayerRaceState in cars:
 			if a == b or pa == null:
 				continue
-			var pb = _prev_dist.get(b.id)
+			var pb: Variant = _prev_dist.get(b.id)
 			if pb == null or not (pa < pb and a.race_dist > b.race_dist) or b.speed < C.slowCarMs:
 				continue
 			if t - _pit_exit_at.get(a.id, -1e9) < C.pitExitGraceMs or t - _pit_exit_at.get(b.id, -1e9) < C.pitExitGraceMs:
 				continue
 			var in_yellow := false
-			for y in st.yellows:
+			for y: Array in st.yellows:
 				if TrackMath.wrap_delta(y[0], b.progress_s, L) >= 0.0 and TrackMath.wrap_delta(b.progress_s, y[1], L) >= 0.0:
 					in_yellow = true
 					break
@@ -294,16 +294,16 @@ func _overtakes(t: float, cars: Array, L: float, out: Array) -> void:
 				_passes.append({"by": a.id, "of": b.id, "at": t, "reason": reason})
 		if sc_s != null:
 			var d := TrackMath.wrap_delta(sc_s, a.progress_s, L)
-			var pd = _prev_sc_delta.get(a.id)
+			var pd: Variant = _prev_sc_delta.get(a.id)
 			if pd != null and pd < 0.0 and pd > -60.0 and d >= 0.0 and d < 60.0 and penalise and not _has_pass(a.id, ""):
 				_passes.append({"by": a.id, "of": "", "at": t, "reason": "passed-sc"})
 			_prev_sc_delta[a.id] = d
 		else:
 			_prev_sc_delta.erase(a.id)
-	for p in tracker.players.values():
+	for p: RaceTracker.PlayerRaceState in tracker.players.values():
 		_prev_dist[p.id] = p.race_dist
 	var kept: Array = []
-	for x in _passes:
+	for x: Dictionary in _passes:
 		var a: RaceTracker.PlayerRaceState = tracker.players.get(x.by)
 		if a == null or a.dnf or a.finished_ms != null or a.in_pit:
 			continue
@@ -322,7 +322,7 @@ func _overtakes(t: float, cars: Array, L: float, out: Array) -> void:
 	_passes = kept
 
 func _has_pass(by: String, of: String) -> bool:
-	for x in _passes:
+	for x: Dictionary in _passes:
 		if x.by == by and x.of == of:
 			return true
 	return false

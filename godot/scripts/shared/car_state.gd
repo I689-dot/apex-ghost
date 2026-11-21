@@ -102,7 +102,7 @@ static func pack_quat(qx_: float, qy_: float, qz_: float, qw_: float) -> int:
 static func unpack_quat(packed: int, out: CarState) -> void:
 	var idx := (packed >> 30) & 3
 	var vals := [0.0, 0.0, 0.0]
-	for k in [2, 1, 0]:
+	for k: int in [2, 1, 0]:
 		vals[k] = (((packed >> ((2 - k) * 10)) & 1023) / 1023.0 - 0.5) * 2.0 * SQRT1_2
 	var rest := sqrt(maxf(0.0, 1.0 - vals[0] * vals[0] - vals[1] * vals[1] - vals[2] * vals[2]))
 	var c := [0.0, 0.0, 0.0, 0.0]

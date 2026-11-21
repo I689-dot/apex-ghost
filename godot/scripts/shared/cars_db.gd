@@ -8,7 +8,7 @@ static var _file: Dictionary = {}
 static func file() -> Dictionary:
 	if _file.is_empty():
 		_file = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
-		for c in _file.get("cars", []):
+		for c: Dictionary in _file.get("cars", []):
 			var o: Dictionary = BRAND_FREE.get(c.id, {})
 			if not o.is_empty():
 				c.name = o.name
@@ -68,18 +68,18 @@ static func resolve(id: String) -> Dictionary:
 
 ## The car with this id, or {} when unknown.
 static func by_id(id: String) -> Dictionary:
-	for c in all():
+	for c: Dictionary in all():
 		if c.id == id:
 			return c
 	return {}
 
 ## Cars a player can pick (the safety car is not one).
 static func selectable() -> Array:
-	return all().filter(func(c): return c.get("role", null) != "safety")
+	return all().filter(func(c: Dictionary) -> bool: return c.get("role", null) != "safety")
 
 ## The race-control safety car, or {}.
 static func safety_car() -> Dictionary:
-	for c in all():
+	for c: Dictionary in all():
 		if c.get("role", null) == "safety":
 			return c
 	return {}

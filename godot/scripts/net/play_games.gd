@@ -30,20 +30,20 @@ static func auth_code() -> String:
 	if p == null:
 		return ""
 	p.isAuthenticated()
-	var ok = await _wait(Signal(p, "userAuthenticated"))
+	var ok: Variant = await _wait(Signal(p, "userAuthenticated"))
 	if ok != true:
 		p.signIn()
 		ok = await _wait(Signal(p, "userAuthenticated"))
 	if ok != true:
 		return ""
 	p.requestServerSideAccess(Config.PLAY_GAMES_SERVER_CLIENT_ID, false)
-	var code = await _wait(Signal(p, "serverSideAccessRequested"))
+	var code: Variant = await _wait(Signal(p, "serverSideAccessRequested"))
 	return code if typeof(code) == TYPE_STRING else ""
 
 ## The signal's first argument, or null after WAIT_S.
 static func _wait(sig: Signal) -> Variant:
 	var box := {"done": false, "v": null}
-	var f := func(v): box.done = true; box.v = v
+	var f := func(v: Variant) -> void: box.done = true; box.v = v
 	sig.connect(f, CONNECT_ONE_SHOT)
 	var tree := Engine.get_main_loop() as SceneTree
 	var t := 0.0

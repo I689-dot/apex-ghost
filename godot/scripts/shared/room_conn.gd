@@ -12,7 +12,7 @@ func _init(conn_id: String, send_cb: Callable = Callable(), close_cb: Callable =
 	on_send = send_cb
 	on_close = close_cb
 
-func send(data) -> void:
+func send(data: Variant) -> void:
 	if on_send.is_valid():
 		on_send.call(data)
 

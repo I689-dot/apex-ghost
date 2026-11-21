@@ -22,7 +22,7 @@ static func shuffle(items: Array, rand: Prng) -> Array:
 	var i := a.size() - 1
 	while i > 0:
 		var j := int(floorf(rand.next() * (i + 1)))
-		var tmp = a[i]
+		var tmp: Variant = a[i]
 		a[i] = a[j]
 		a[j] = tmp
 		i -= 1
@@ -30,7 +30,7 @@ static func shuffle(items: Array, rand: Prng) -> Array:
 
 static func hash_string(s: String) -> int:
 	var h := 2166136261
-	for b in _utf16_units(s):
+	for b: int in _utf16_units(s):
 		h ^= b
 		h = (h * 16777619) & M32
 	return h & M32

@@ -27,9 +27,9 @@ static func is_hosted_code(code: String) -> bool:
 static func create(code: String = LOCAL_CODE) -> String:
 	var tracks := {}
 	var def := ""
-	for entry in TrackData.list_layouts():
+	for entry: Dictionary in TrackData.list_layouts():
 		var t := TrackData.load_layout(entry)
-		var pl = t.get("pitLane", null)
+		var pl: Variant = t.get("pitLane", null)
 		tracks[t.id] = {
 			"id": t.id, "name": t.name, "length": t.length, "centerline": t.centerline, "cumS": t.cumS, "gates": t.gates,
 			"sectorGates": t.sectorGates, "firstGate": t.firstGate, "minLapMs": t.minLapMs,
@@ -41,15 +41,15 @@ static func create(code: String = LOCAL_CODE) -> String:
 	if def == "":
 		def = tracks.keys()[0]
 	var env := RoomEnv.new()
-	env.now = func(): return Time.get_unix_time_from_system() * 1000.0
+	env.now = func() -> float: return Time.get_unix_time_from_system() * 1000.0
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	env.random = func(): return rng.randf()
+	env.random = func() -> float: return rng.randf()
 	env.schedule = _schedule
-	env.persist = func(_s): pass
+	env.persist = func(_s: Variant) -> void: pass
 	env.track = tracks[def]
 	env.tracks = tracks
-	env.car_ids = CarsDb.selectable().map(func(c): return c.id)
+	env.car_ids = CarsDb.selectable().map(func(c: Dictionary) -> String: return c.id)
 	var r := RoomCore.new(env)
 	r.init_room(code)
 	room = r
@@ -63,7 +63,7 @@ static func _schedule(at: float) -> void:
 	var delay := maxf(0.0, (at - Time.get_unix_time_from_system() * 1000.0) / 1000.0)
 	_timer = tree.create_timer(delay)
 	var mine := _timer
-	_timer.timeout.connect(func(): if mine == _timer and room != null: room.tick())
+	_timer.timeout.connect(func() -> void: if mine == _timer and room != null: room.tick())
 
 ## A WebSocket look-alike connected to the in-game room.
 class LocalSocket:
@@ -79,7 +79,7 @@ class LocalSocket:
 	func _init() -> void:
 		var id := "local-%d" % LocalRoom._next_id
 		LocalRoom._next_id += 1
-		_conn = RoomConn.new(id, _deliver, func(_c, _r): _shut())
+		_conn = RoomConn.new(id, _deliver, func(_c: int, _r: String) -> void: _shut())
 		# open asynchronously, like a real socket
 		(Engine.get_main_loop() as SceneTree).process_frame.connect(_open, CONNECT_ONE_SHOT)
 
@@ -92,11 +92,11 @@ class LocalSocket:
 			on_open.call()
 
 	# async like a real socket: the room may send while it is still handling our message
-	func _deliver(data) -> void:
+	func _deliver(data: Variant) -> void:
 		var tree := Engine.get_main_loop() as SceneTree
-		tree.process_frame.connect(func(): if ready_state == 1 and on_message.is_valid(): on_message.call(data), CONNECT_ONE_SHOT)
+		tree.process_frame.connect(func() -> void: if ready_state == 1 and on_message.is_valid(): on_message.call(data), CONNECT_ONE_SHOT)
 
-	func send(data) -> void:
+	func send(data: Variant) -> void:
 		if ready_state != 1 or LocalRoom.room == null:
 			return
 		# keepalive: answered by Cloudflare before the room sees it online; here, the same

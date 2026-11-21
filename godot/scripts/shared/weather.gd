@@ -41,10 +41,10 @@ const CLIMATE := {
 
 static func _pick_weighted(rng: Prng, entries: Array) -> String:
 	var total := 0.0
-	for e in entries:
+	for e: Array in entries:
 		total += e[1]
 	var r := rng.next() * total
-	for e in entries:
+	for e: Array in entries:
 		r -= e[1]
 		if r <= 0.0:
 			return e[0]
@@ -57,15 +57,15 @@ static func plan_weather(seed_value: int, opts: Dictionary = {}) -> Dictionary:
 	var rolled_hour := floorf((6.25 + rng.next() * 15.25) * 4.0 + 0.5) / 4.0 # 06:15 .. 21:30
 	var day_of_year := 120 + int(floorf(rng.next() * 150.0)) # May .. late September
 	var rolled_change := rng.next() < 0.35
-	var w = opts.get("weather", "random")
+	var w: Variant = opts.get("weather", "random")
 	if w != null and w != "random":
 		kind = w
-	var t = opts.get("time", "random")
+	var t: Variant = opts.get("time", "random")
 	var start_hour: float = TIME_HOURS[t] if t != null and t != "random" else rolled_hour
-	var ch = opts.get("changes", "random")
+	var ch: Variant = opts.get("changes", "random")
 	var has_change: bool = true if ch == "on" else (false if ch == "off" else rolled_change)
 	var options: Array = NEXT[kind]
-	var change = null
+	var change: Variant = null
 	if has_change:
 		change = {
 			"to": options[int(floorf(rng.next() * options.size()))],

@@ -18,8 +18,8 @@ static func default_rules() -> Dictionary:
 static func clean_livery(lv: Dictionary) -> Dictionary:
 	var hex := RegEx.create_from_string("^#[0-9a-fA-F]{6}$")
 	var out := {}
-	for k in ["base", "accent", "numberColor", "rims", "calipers"]:
-		var c = lv.get(k)
+	for k: String in ["base", "accent", "numberColor", "rims", "calipers"]:
+		var c: Variant = lv.get(k)
 		if typeof(c) != TYPE_STRING or hex.search(c) == null:
 			return {}
 		out[k] = c
@@ -28,11 +28,11 @@ static func clean_livery(lv: Dictionary) -> Dictionary:
 	if not ["plain", "stripes", "twotone", "fade", "side", "hoop", "center", "chevron", "pinstripe", "split"].has(lv.get("design")):
 		return {}
 	# (older clients send no aero: carbon)
-	var aero = lv.get("aero", "carbon")
+	var aero: Variant = lv.get("aero", "carbon")
 	if not ["carbon", "body", "accent"].has(aero):
 		return {}
 	out.aero = aero
-	var n = lv.get("number")
+	var n: Variant = lv.get("number")
 	if not (_num(n) and float(n) == floorf(float(n)) and n >= 0 and n <= 99) or typeof(lv.get("showNumber")) != TYPE_BOOL:
 		return {}
 	out.finish = lv.finish
@@ -41,20 +41,20 @@ static func clean_livery(lv: Dictionary) -> Dictionary:
 	out.showNumber = lv.showNumber
 	return out
 
-static func _str(v, max_len: int = 64) -> bool:
+static func _str(v: Variant, max_len: int = 64) -> bool:
 	return typeof(v) == TYPE_STRING and (v as String).length() <= max_len
 
-static func _num(v) -> bool:
+static func _num(v: Variant) -> bool:
 	return (typeof(v) == TYPE_FLOAT or typeof(v) == TYPE_INT) and is_finite(float(v))
 
-static func _is_int(v) -> bool:
+static func _is_int(v: Variant) -> bool:
 	return _num(v) and float(v) == floorf(float(v))
 
 ## Strict validation of untrusted client JSON. Returns {} for anything malformed.
 static func parse_client_msg(raw: String) -> Dictionary:
 	if raw.length() > 2048:
 		return {}
-	var v = JSON.parse_string(raw)
+	var v: Variant = JSON.parse_string(raw)
 	if typeof(v) != TYPE_DICTIONARY or typeof(v.get("t")) != TYPE_STRING:
 		return {}
 	match v.t:
@@ -62,13 +62,13 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			if not (_num(v.get("v")) and _str(v.get("nick"), 64) and (v.get("session") == null or _str(v.get("session"), 64))):
 				return {}
 			var out := {"t": "hello", "v": v.v, "nick": v.nick, "session": v.session, "spectate": v.get("spectate") == true}
-			var acc = v.get("account")
+			var acc: Variant = v.get("account")
 			if typeof(acc) == TYPE_STRING and RegEx.create_from_string("^[0-9a-f]{48}$").search(acc) != null:
 				out.account = acc
-			var country = v.get("country")
+			var country: Variant = v.get("country")
 			if typeof(country) == TYPE_STRING and RegEx.create_from_string("^[A-Z]{2}$").search(country) != null:
 				out.country = country
-			var n = v.get("num")
+			var n: Variant = v.get("num")
 			if _is_int(n) and n >= 1 and n <= 999:
 				out.num = int(n)
 			return out
@@ -85,16 +85,16 @@ static func parse_client_msg(raw: String) -> Dictionary:
 		"ping":
 			return {"t": "ping", "c": v.c} if _num(v.get("c")) else {}
 		"damage":
-			var z = v.get("zones")
+			var z: Variant = v.get("zones")
 			if typeof(z) != TYPE_ARRAY or z.size() != 6:
 				return {}
-			for x in z:
+			for x: Variant in z:
 				if not (_num(x) and x >= 0 and x <= 1):
 					return {}
 			return {"t": "damage", "zones": z}
 		"chat":
 			# text chat (rooms this game hosts: solo and P2P). "/rc text" is for the host only.
-			var said = v.get("text")
+			var said: Variant = v.get("text")
 			if typeof(said) != TYPE_STRING:
 				return {}
 			var line := Validation.clean_chat(said)
@@ -103,25 +103,25 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			return {"t": "leave"}
 		"setLivery":
 			# a driver's paint (CarPaint): colours as #rrggbb, a known finish and design, a number 0-99
-			var lv = v.get("livery")
+			var lv: Variant = v.get("livery")
 			return {"t": "setLivery", "livery": clean_livery(lv)} if typeof(lv) == TYPE_DICTIONARY and not clean_livery(lv).is_empty() else {}
 		"addBot":
 			return {"t": "addBot"}
 		"removeBot":
 			return {"t": "removeBot", "id": v.id} if _str(v.get("id"), 32) else {}
 		"setSession":
-			var m = v.get("minutes")
+			var m: Variant = v.get("minutes")
 			return {"t": "setSession", "minutes": int(m)} if _is_int(m) and m >= 1 and m <= 60 else {}
 		"setPublic":
 			return {"t": "setPublic", "isPublic": v.isPublic} if typeof(v.get("isPublic")) == TYPE_BOOL else {}
 		"setRaceMinutes":
-			var m2 = v.get("minutes")
+			var m2: Variant = v.get("minutes")
 			return {"t": "setRaceMinutes", "minutes": int(m2)} if _num(m2) and Const.RACE_MINUTE_CHOICES.has(int(m2)) and float(m2) == floorf(m2) else {}
 		"setPractice":
-			var m3 = v.get("minutes")
+			var m3: Variant = v.get("minutes")
 			return {"t": "setPractice", "minutes": int(m3)} if _num(m3) and Const.PRACTICE_MINUTE_CHOICES.has(int(m3)) and float(m3) == floorf(m3) else {}
 		"setRaceLaps":
-			var l = v.get("laps")
+			var l: Variant = v.get("laps")
 			return {"t": "setRaceLaps", "laps": int(l)} if _is_int(l) and l >= 0 and l <= 50 else {}
 		"pit":
 			if typeof(v.get("in")) != TYPE_BOOL or (v.has("id") and not _str(v.id, 32)):
@@ -131,7 +131,7 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			var lim := MAX_BUMP_IMPULSE
 			if not _str(v.get("to"), 32):
 				return {}
-			for k in ["ix", "iy", "iz", "ty"]:
+			for k: String in ["ix", "iy", "iz", "ty"]:
 				if not (_num(v.get(k)) and absf(v[k]) <= lim):
 					return {}
 			if v.has("from") and not _str(v["from"], 32):
@@ -144,7 +144,7 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			if typeof(v.get("rules")) != TYPE_DICTIONARY:
 				return {}
 			var rules := {}
-			for k in default_rules():
+			for k: String in default_rules():
 				if not v.rules.has(k):
 					continue
 				if typeof(v.rules[k]) != TYPE_BOOL:

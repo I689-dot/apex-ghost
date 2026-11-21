@@ -6,7 +6,7 @@ extends Node
 ## your records, and a heartbeat tells your friends where you are.
 ## API calls are async: `var r = await Account.login(nick, pw)` returns {ok, status, data, error}.
 
-signal changed(account)
+signal changed(account: Variant)
 
 const SAVE_PATH := "user://account.json"
 ## {id, key, nick}: the guest (or Play Games) account this device signs back in to without anyone typing anything.
@@ -23,7 +23,7 @@ var auto_resume := true
 
 func _ready() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
-		var v = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+		var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if typeof(v) == TYPE_DICTIONARY:
 			current = v
 
@@ -47,7 +47,7 @@ func api(path: String, body: Variant = null, token: Variant = null) -> Dictionar
 	var req := HTTPRequest.new()
 	add_child(req)
 	var headers := PackedStringArray(["Content-Type: application/json"])
-	var tk = token if token != null else (current.token if current != null else null)
+	var tk: Variant = token if token != null else (current.token if current != null else null)
 	if tk != null:
 		headers.append("Authorization: Bearer %s" % tk)
 	var err := req.request("%s/api/%s" % [Config.SERVER_URL, path], headers, HTTPClient.METHOD_GET if body == null else HTTPClient.METHOD_POST, "" if body == null else JSON.stringify(body))
@@ -58,7 +58,7 @@ func api(path: String, body: Variant = null, token: Variant = null) -> Dictionar
 	req.queue_free()
 	var status: int = res[1]
 	var text: String = (res[3] as PackedByteArray).get_string_from_utf8()
-	var data = JSON.parse_string(text)
+	var data: Variant = JSON.parse_string(text)
 	if typeof(data) != TYPE_DICTIONARY:
 		data = {}
 	if res[0] != HTTPRequest.RESULT_SUCCESS:
@@ -89,7 +89,7 @@ func probe_accounts() -> bool:
 func device() -> Dictionary:
 	if not FileAccess.file_exists(DEVICE_PATH):
 		return {}
-	var v = JSON.parse_string(FileAccess.get_file_as_string(DEVICE_PATH))
+	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(DEVICE_PATH))
 	return v if typeof(v) == TYPE_DICTIONARY and v.has("id") and v.has("key") else {}
 
 func _save_device(d: Dictionary) -> void:
@@ -287,6 +287,6 @@ func _send_presence() -> void:
 	if _timer == null:
 		_timer = Timer.new()
 		_timer.wait_time = 45.0
-		_timer.timeout.connect(func(): if current != null and _shows_online(): api("presence", {"presence": _presence}))
+		_timer.timeout.connect(func() -> void: if current != null and _shows_online(): api("presence", {"presence": _presence}))
 		add_child(_timer)
 		_timer.start()

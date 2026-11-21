@@ -18,7 +18,7 @@ var rtt := 0.0
 var stats := {"sent": 0, "recv": 0, "binRecv": 0, "lastSeqGaps": 0}
 
 var _ws: WebSocketPeer = null
-var _local = null  # LocalRoom.LocalSocket (offline) or P2p.P2pSocket (a race hosted on a device)
+var _local: Variant = null  # LocalRoom.LocalSocket (offline) or P2p.P2pSocket (a race hosted on a device)
 var _samples: Array = []
 var _offset := 0.0
 var _ping_at := -1.0
@@ -45,7 +45,7 @@ static func create_room() -> String:
 	var tree := Engine.get_main_loop() as SceneTree
 	var req := HTTPRequest.new()
 	tree.root.add_child(req)
-	var token = Account.account().token if Account.account() != null else null
+	var token: Variant = Account.account().token if Account.account() != null else null
 	var headers := PackedStringArray()
 	if token != null:
 		headers.append("Authorization: Bearer %s" % token)
@@ -69,7 +69,7 @@ static func create_room() -> String:
 	if res[1] < 200 or res[1] >= 300:
 		last_error = "Server error (%d). Try again." % res[1]
 		return ""
-	var body = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
+	var body: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
 	if typeof(body) != TYPE_DICTIONARY or not body.has("code"):
 		last_error = "Server returned no room code."
 		return ""
@@ -87,7 +87,7 @@ static func list_public_rooms() -> Array:
 	req.queue_free()
 	if res[0] != HTTPRequest.RESULT_SUCCESS or res[1] != 200:
 		return []
-	var body = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
+	var body: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
 	return body.get("rooms", []) if typeof(body) == TYPE_DICTIONARY else []
 
 func setup(room_code: String, nickname: String, spectator: bool = false) -> Connection:
@@ -110,8 +110,8 @@ func connect_to_room() -> Dictionary:
 func _wait_welcome() -> Array:
 	# lambdas capture by value: the shared state lives in a Dictionary
 	var st := {"done": false, "result": {}}
-	var on_ok := func(): if not st.done: st.done = true; st.result = {"ok": true}
-	var on_fail := func(c, m): if not st.done: st.done = true; st.result = {"ok": false, "code": c, "message": m}
+	var on_ok := func() -> void: if not st.done: st.done = true; st.result = {"ok": true}
+	var on_fail := func(c: int, m: String) -> void: if not st.done: st.done = true; st.result = {"ok": false, "code": c, "message": m}
 	welcomed.connect(on_ok)
 	connect_failed.connect(on_fail)
 	while not st.done:
@@ -123,8 +123,8 @@ func _wait_welcome() -> Array:
 func _url() -> String:
 	var base := Config.SERVER_URL.replace("http", "ws")
 	# online play is for signed-in drivers: the server checks the account token before the room is reached
-	var acc = Account.account()
-	var token = acc.token if acc != null else null
+	var acc: Variant = Account.account()
+	var token: Variant = acc.token if acc != null else null
 	return "%s/api/rooms/%s/ws%s" % [base, code.uri_encode(), "?t=%s" % token if token != null else ""]
 
 func _open() -> void:
@@ -159,7 +159,7 @@ func _is_open() -> bool:
 
 func _on_open() -> void:
 	_reconnect_attempt = 0
-	var acc = Account.account()
+	var acc: Variant = Account.account()
 	# (a race hosted on a device is no place for the account's token)
 	var online := not spectate and not LocalRoom.is_local_code(code) and not P2p.is_known(code)
 	var hello := {
@@ -176,12 +176,12 @@ func _on_open() -> void:
 		hello.num = int(acc.user.num)
 	send_json(hello)
 
-func _on_data(data) -> void:
+func _on_data(data: Variant) -> void:
 	if typeof(data) == TYPE_STRING:
 		stats.recv += 1
 		if data == "ka":
 			return
-		var msg = JSON.parse_string(data)
+		var msg: Variant = JSON.parse_string(data)
 		if typeof(msg) == TYPE_DICTIONARY:
 			_on_json(msg)
 	else:
@@ -286,7 +286,7 @@ func _send_raw(buf: PackedByteArray) -> void:
 func _flush_backlog() -> void:
 	if not _is_open():
 		return
-	for b in _backlog:
+	for b: Variant in _backlog:
 		_send_raw(b)
 	stats.sent += _backlog.size()
 	_backlog = []

@@ -23,7 +23,7 @@ static func available() -> bool:
 static func _api(c: String, path: String = "") -> String:
 	return "%s/api/p2p/%s%s" % [Config.SERVER_URL, c, path]
 
-static func _request(url: String, body = null) -> Dictionary:
+static func _request(url: String, body: Variant = null) -> Dictionary:
 	var req := HTTPRequest.new()
 	(Engine.get_main_loop() as SceneTree).root.add_child(req)
 	var err := req.request(url, PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_GET if body == null else HTTPClient.METHOD_POST, "" if body == null else JSON.stringify(body))
@@ -32,7 +32,7 @@ static func _request(url: String, body = null) -> Dictionary:
 		return {"status": 0, "data": {}}
 	var res: Array = await req.request_completed
 	req.queue_free()
-	var data = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8()) if (res[3] as PackedByteArray).size() > 0 else {}
+	var data: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8()) if (res[3] as PackedByteArray).size() > 0 else {}
 	return {"status": res[1], "data": data if typeof(data) == TYPE_DICTIONARY else {}}
 
 static func is_known(c: String) -> bool:
@@ -59,12 +59,12 @@ class Handshake:
 	func _init() -> void:
 		pc = WebRTCPeerConnection.new()
 		pc.initialize(P2p.ICE)
-		pc.session_description_created.connect(func(t, s):
+		pc.session_description_created.connect(func(t: String, s: String) -> void:
 			type = t
 			sdp = s
 			pc.set_local_description(t, s)
 			created = true)
-		pc.ice_candidate_created.connect(func(_media, _index, name): candidates.append("a=%s" % name))
+		pc.ice_candidate_created.connect(func(_media: String, _index: int, name: String) -> void: candidates.append("a=%s" % name))
 
 	## Waits for the local description and the candidates.
 	func complete() -> String:
@@ -79,7 +79,7 @@ class Handshake:
 			await tree.process_frame
 		pc.poll()
 		var lines := sdp.rstrip("\r\n")
-		for c in candidates:
+		for c: String in candidates:
 			lines += "\r\n" + c
 		return lines + "\r\na=end-of-candidates\r\n"
 
@@ -110,7 +110,7 @@ static func stop_hosting() -> void:
 
 func _shutdown() -> void:
 	_hosting = false
-	for p in _peers:
+	for p: Dictionary in _peers:
 		p.pc.close()
 		if LocalRoom.room != null:
 			LocalRoom.room.on_close(p.conn)
@@ -120,7 +120,7 @@ func _process(dt: float) -> void:
 	if not _hosting:
 		return
 	var gone: Array = []
-	for peer in _peers:
+	for peer: Dictionary in _peers:
 		var pc: WebRTCPeerConnection = peer.pc
 		pc.poll()
 		var dc: WebRTCDataChannel = peer.dc
@@ -130,7 +130,7 @@ func _process(dt: float) -> void:
 		if st == WebRTCDataChannel.STATE_OPEN:
 			while dc.get_available_packet_count() > 0:
 				var pkt := dc.get_packet()
-				var data = pkt.get_string_from_utf8() if dc.was_string_packet() else pkt
+				var data: Variant = pkt.get_string_from_utf8() if dc.was_string_packet() else pkt
 				# keepalive: answered here, as the server's edge answers it online
 				if typeof(data) == TYPE_STRING and data == "ka":
 					dc.write_mode = WebRTCDataChannel.WRITE_MODE_TEXT
@@ -141,7 +141,7 @@ func _process(dt: float) -> void:
 			if LocalRoom.room != null:
 				LocalRoom.room.on_close(peer.conn)
 			gone.append(peer)
-	for g in gone:
+	for g: Dictionary in gone:
 		_peers.erase(g)
 	# the server's relay: guests' offers are answered (every poll also keeps the code listed)
 	_poll_in -= dt
@@ -153,7 +153,7 @@ func _poll_offers() -> void:
 	var r := await _request(_api(code, "/offers"))
 	if not _hosting or r.status != 200:
 		return
-	for o in r.data.get("offers", []):
+	for o: Dictionary in r.data.get("offers", []):
 		if not _seen.has(o.id):
 			_seen[o.id] = true
 			_accept(o.id, o.sdp)
@@ -162,7 +162,7 @@ func _poll_offers() -> void:
 func _accept(id: String, sdp: String) -> void:
 	var hs := Handshake.new()
 	var peer := {"pc": hs.pc, "dc": null, "id": id}
-	peer.conn = RoomConn.new("p2p-" + id, func(data):
+	peer.conn = RoomConn.new("p2p-" + id, func(data: Variant) -> void:
 		var dc: WebRTCDataChannel = peer.dc
 		if dc != null and dc.get_ready_state() == WebRTCDataChannel.STATE_OPEN:
 			if typeof(data) == TYPE_STRING:
@@ -170,9 +170,9 @@ func _accept(id: String, sdp: String) -> void:
 				dc.put_packet((data as String).to_utf8_buffer())
 			else:
 				dc.write_mode = WebRTCDataChannel.WRITE_MODE_BINARY
-				dc.put_packet(data), func(_c, _r): hs.pc.close())
+				dc.put_packet(data), func(_c: int, _r: String) -> void: hs.pc.close())
 	_peers.append(peer)
-	hs.pc.data_channel_received.connect(func(ch): peer.dc = ch)
+	hs.pc.data_channel_received.connect(func(ch: WebRTCDataChannel) -> void: peer.dc = ch)
 	hs.pc.set_remote_description("offer", sdp)
 	var answer := await hs.complete()
 	if not _hosting:
@@ -243,7 +243,7 @@ class P2pSocket:
 		if _pc != null and _pc.get_connection_state() == WebRTCPeerConnection.STATE_FAILED:
 			_shut()
 
-	func send(data) -> void:
+	func send(data: Variant) -> void:
 		if ready_state != 1 or _dc == null:
 			return
 		if typeof(data) == TYPE_STRING:

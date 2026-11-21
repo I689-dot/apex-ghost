@@ -21,18 +21,18 @@ class Player:
 	var id: String
 	var nick: String
 	var session: String
-	var car_id = null
+	var car_id: Variant = null
 	var ready := false
 	var joined_at := 0.0
 	var waiting := false
 	var bot := false
 	var tyre := "medium"
-	var account = null
-	var country = null
-	var num = null
+	var account: Variant = null
+	var country: Variant = null
+	var num: Variant = null
 	var conn: RoomConn = null
 	var briefed := false
-	var disconnected_at = null
+	var disconnected_at: Variant = null
 	var slot := -1
 	var last_damage_at := 0.0
 	var last_packet_at := 0.0
@@ -46,19 +46,19 @@ var env: RoomEnv
 var code := ""
 var created := false
 var phase := "lobby"
-var host_id = null
+var host_id: Variant = null
 var race_id := 0
 var players := {} # id -> Player
 ## carId -> playerId: the single source of truth for car ownership.
 var car_locks := {}
 var _conn_player := {} # conn id -> player id
-var race = null # RaceSetup Dictionary
+var race: Variant = null # RaceSetup Dictionary
 var briefing_until := 0.0
 var tracker: RaceTracker = null
-var start_at = null
+var start_at: Variant = null
 var _loaded := {}
-var _load_deadline = null
-var finish_deadline = null
+var _load_deadline: Variant = null
+var finish_deadline: Variant = null
 var session_minutes: int = Const.DEFAULT_SESSION_MINUTES
 var race_laps: int = Const.DEFAULT_RACE_LAPS
 var race_minutes := 0
@@ -71,7 +71,7 @@ var _rc_sent := -1
 var _last_rc_at := 0.0
 var spectators := {} # conn id -> RoomConn
 var _last_report := ""
-var race_at = null
+var race_at: Variant = null
 var _race_grid: Array = []
 var conditions := {"trackId": "", "weather": "random", "time": "random", "changes": "random", "seed": 1}
 var _last_standings_at := 0.0
@@ -107,7 +107,7 @@ func restore(s: Dictionary) -> void:
 	rules = Protocol.default_rules()
 	rules.merge(s.get("rules", {}), true)
 	conditions = s.get("conditions", {"trackId": env.track.id, "weather": "random", "time": "random", "changes": "random", "seed": _new_seed()})
-	for sp in s.players:
+	for sp: Dictionary in s.players:
 		var p := Player.new()
 		p.id = sp.id
 		p.nick = sp.nick
@@ -138,7 +138,7 @@ func reattach(conn: RoomConn, player_id: String) -> void:
 
 func _persist() -> void:
 	var list: Array = []
-	for p in players.values():
+	for p: Player in players.values():
 		var d := {"id": p.id, "nick": p.nick, "session": p.session, "carId": p.car_id, "ready": p.ready, "joinedAt": p.joined_at, "waiting": p.waiting, "bot": p.bot, "tyre": p.tyre}
 		if p.account != null:
 			d.account = p.account
@@ -165,12 +165,12 @@ func _rid(n: int) -> String:
 
 func snapshot() -> Dictionary:
 	var sorted: Array = []
-	for p in players.values():
+	for p: Player in players.values():
 		sorted.append(p)
 	var order := range(sorted.size())
-	order.sort_custom(func(a, b): return sorted[a].joined_at < sorted[b].joined_at or (sorted[a].joined_at == sorted[b].joined_at and a < b))
+	order.sort_custom(func(a: int, b: int) -> bool: return sorted[a].joined_at < sorted[b].joined_at or (sorted[a].joined_at == sorted[b].joined_at and a < b))
 	var list: Array = []
-	for i in order:
+	for i: int in order:
 		var p: Player = sorted[i]
 		list.append({
 			"id": p.id, "nick": p.nick, "carId": p.car_id, "ready": p.ready, "host": p.id == host_id,
@@ -193,10 +193,10 @@ func _send(p: Player, msg: Dictionary) -> void:
 
 func _broadcast(msg: Dictionary, except: String = "") -> void:
 	var s := JSON.stringify(msg)
-	for p in players.values():
+	for p: Player in players.values():
 		if p.conn != null and p.id != except:
 			p.conn.send(s)
-	for c in spectators.values():
+	for c: RoomConn in spectators.values():
 		c.send(s)
 
 func _broadcast_room() -> void:
@@ -207,9 +207,9 @@ func _broadcast_room() -> void:
 func _report() -> void:
 	if not env.report.is_valid():
 		return
-	var humans: Array = players.values().filter(func(p): return not p.bot)
+	var humans: Array = players.values().filter(func(p: Player) -> bool: return not p.bot)
 	var host: Player = players.get(host_id) if host_id != null else null
-	var summary = null
+	var summary: Variant = null
 	if created and is_public and humans.size() > 0:
 		summary = {
 			"code": code, "host": host.nick if host != null else "", "trackId": conditions.trackId, "phase": phase,
@@ -234,15 +234,15 @@ func _racers() -> Array:
 	var out: Array = []
 	if race == null:
 		return out
-	for id in race.grid:
-		var p = players.get(id)
+	for id: String in race.grid:
+		var p: Player = players.get(id)
 		if p != null:
 			out.append(p)
 	return out
 
 # ------------------------------------------------------------- messages ---
 
-func on_message(conn: RoomConn, data) -> void:
+func on_message(conn: RoomConn, data: Variant) -> void:
 	if typeof(data) != TYPE_STRING:
 		_on_binary(conn, data)
 		return
@@ -256,7 +256,7 @@ func on_message(conn: RoomConn, data) -> void:
 	if msg.t == "hello":
 		_on_hello(conn, msg)
 		return
-	var pid = _conn_player.get(conn.id)
+	var pid: Variant = _conn_player.get(conn.id)
 	var p: Player = players.get(pid) if pid != null else null
 	if p == null:
 		if spectators.has(conn.id):
@@ -276,7 +276,7 @@ func _on_hello(conn: RoomConn, msg: Dictionary) -> void:
 
 	# reconnect with a session token
 	if msg.session != null and msg.session != "":
-		for existing in players.values():
+		for existing: Player in players.values():
 			if existing.session == msg.session:
 				if existing.conn != null and existing.conn.id != conn.id:
 					_conn_player.erase(existing.conn.id)
@@ -300,7 +300,7 @@ func _on_hello(conn: RoomConn, msg: Dictionary) -> void:
 	if players.size() >= Const.MAX_PLAYERS:
 		return _error(conn, "room_full", "Room is full (%d players)." % Const.MAX_PLAYERS, true)
 	var key := Validation.nickname_key(nick.nick)
-	for o in players.values():
+	for o: Player in players.values():
 		if Validation.nickname_key(o.nick) == key:
 			return _error(conn, "nick_taken", "That nickname is already taken in this room.", true)
 
@@ -467,7 +467,7 @@ func _handle(p: Player, msg: Dictionary) -> void:
 			if msg["in"]:
 				tracker.pit_in(who.id, now2, ev)
 			else:
-				var exit_s = tracker.track.get("pitExitS", null)
+				var exit_s: Variant = tracker.track.get("pitExitS", null)
 				tracker.pit_out(who.id, exit_s if exit_s != null else 0.0, now2, ev)
 			_broadcast({"t": "pit", "playerId": who.id, "in": msg["in"]})
 			_handle_race_events(ev, who, now2)
@@ -494,10 +494,10 @@ func _handle(p: Player, msg: Dictionary) -> void:
 				if p.conn != null and p.id != host_id:
 					p.conn.send(line)
 			else:
-				for q in players.values():
+				for q: Player in players.values():
 					if q.conn != null:
 						q.conn.send(line)
-				for c in spectators.values():
+				for c: RoomConn in spectators.values():
 					c.send(line)
 		"bump":
 			# contact rule: the hit, for whoever simulates the car that was hit (a bot: the host)
@@ -534,7 +534,7 @@ func _new_seed() -> int:
 func _update_bot_tyres() -> void:
 	var plan := Weather.plan_weather(conditions.seed, conditions)
 	var tyre := "wet" if plan.initialWetness > 0.35 else "medium"
-	for b in players.values():
+	for b: Player in players.values():
 		if b.bot:
 			b.tyre = tyre
 
@@ -547,15 +547,15 @@ func _add_bot(host: Player) -> void:
 		_send(host, {"t": "error", "code": "room_full", "message": "Room is full (%d players)." % Const.MAX_PLAYERS, "fatal": false})
 		return
 	var all: Array = env.car_ids if env.car_ids != null else []
-	var free: Array = all.filter(func(c): return not car_locks.has(c))
+	var free: Array = all.filter(func(c: String) -> bool: return not car_locks.has(c))
 	var shared := false
 	if free.is_empty() and not all.is_empty():
 		var uses := {}
-		for x in players.values():
+		for x: Player in players.values():
 			if x.car_id != null:
 				uses[x.car_id] = int(uses.get(x.car_id, 0)) + 1
-		var least: int = all.map(func(c): return int(uses.get(c, 0))).min()
-		free = all.filter(func(c): return int(uses.get(c, 0)) == least)
+		var least: int = all.map(func(c: String) -> int: return int(uses.get(c, 0))).min()
+		free = all.filter(func(c: String) -> bool: return int(uses.get(c, 0)) == least)
 		shared = true
 	if free.is_empty():
 		_send(host, {"t": "error", "code": "car_taken", "message": "No free car left for a bot.", "fatal": false})
@@ -563,11 +563,11 @@ func _add_bot(host: Player) -> void:
 	# the car first (as it always was drawn), then the name and number
 	var car_id: String = free[int(floorf(_rand() * free.size()))]
 	var used := {}
-	for x in players.values():
+	for x: Player in players.values():
 		used[x.nick] = true
-	var free_names: Array = BOT_DRIVERS.filter(func(d): return not used.has(d[0]))
+	var free_names: Array = BOT_DRIVERS.filter(func(d: Array) -> bool: return not used.has(d[0]))
 	var nick: String
-	var country = null
+	var country: Variant = null
 	if free_names.size() > 0:
 		var d: Array = free_names[int(floorf(_rand() * free_names.size()))]
 		nick = d[0]
@@ -575,7 +575,7 @@ func _add_bot(host: Player) -> void:
 	else:
 		nick = "AI %s" % _rid(3).to_upper()
 	var used_nums := {}
-	for x in players.values():
+	for x: Player in players.values():
 		used_nums[x.num] = true
 	var num := 2 + int(floorf(_rand() * 97))
 	while used_nums.has(num):
@@ -598,7 +598,7 @@ func _add_bot(host: Player) -> void:
 	_broadcast_room()
 
 ## Atomic car lock: grant only when nobody else holds the car.
-func select_car(p: Player, car_id) -> void:
+func select_car(p: Player, car_id: Variant) -> void:
 	if phase != "lobby" and not p.waiting:
 		_send(p, {"t": "carLock", "ok": false, "carId": car_id, "owner": null})
 		return
@@ -606,7 +606,7 @@ func select_car(p: Player, car_id) -> void:
 		_send(p, {"t": "carLock", "ok": false, "carId": car_id, "owner": null})
 		return
 	if car_id != null:
-		var owner = car_locks.get(car_id)
+		var owner: Variant = car_locks.get(car_id)
 		if owner != null and owner != p.id:
 			_send(p, {"t": "carLock", "ok": false, "carId": car_id, "owner": owner})
 			return
@@ -625,14 +625,14 @@ func _start(p: Player) -> void:
 	if p.id != host_id or phase != "lobby":
 		_send(p, {"t": "error", "code": "not_host", "message": "Only the host can start the race.", "fatal": false})
 		return
-	var entrants: Array = players.values().filter(func(x): return x.conn != null or x.bot)
-	if entrants.is_empty() or entrants.any(func(x): return x.car_id == null or not x.ready):
+	var entrants: Array = players.values().filter(func(x: Player) -> bool: return x.conn != null or x.bot)
+	if entrants.is_empty() or entrants.any(func(x: Player) -> bool: return x.car_id == null or not x.ready):
 		_send(p, {"t": "error", "code": "not_ready", "message": "Everyone needs a car and must be ready.", "fatal": false})
 		return
 	# Briefing: the conditions are final now, everyone sees them and sets up their car.
 	phase = "briefing"
 	briefing_until = _now() + Const.BRIEFING_MS
-	for x in players.values():
+	for x: Player in players.values():
 		x.briefed = x.bot
 	_update_bot_tyres()
 	_persist()
@@ -642,7 +642,7 @@ func _start(p: Player) -> void:
 ## After the qualifying results: the race, gridded in qualifying order.
 func _launch_race() -> void:
 	race_at = null
-	var entrants: Array = players.values().filter(func(x): return (x.conn != null or x.bot) and x.car_id != null)
+	var entrants: Array = players.values().filter(func(x: Player) -> bool: return (x.conn != null or x.bot) and x.car_id != null)
 	if entrants.is_empty():
 		phase = "lobby"
 		_broadcast_room()
@@ -656,10 +656,10 @@ func _launch_race() -> void:
 func _maybe_launch(force: bool = false) -> void:
 	if phase != "briefing":
 		return
-	var humans: Array = players.values().filter(func(x): return not x.bot and x.conn != null and x.car_id != null)
-	if not force and humans.any(func(x): return not x.briefed):
+	var humans: Array = players.values().filter(func(x: Player) -> bool: return not x.bot and x.conn != null and x.car_id != null)
+	if not force and humans.any(func(x: Player) -> bool: return not x.briefed):
 		return
-	var entrants: Array = players.values().filter(func(x): return (x.conn != null or x.bot) and x.car_id != null)
+	var entrants: Array = players.values().filter(func(x: Player) -> bool: return (x.conn != null or x.bot) and x.car_id != null)
 	if entrants.is_empty():
 		phase = "lobby"
 		_broadcast_room()
@@ -667,16 +667,16 @@ func _maybe_launch(force: bool = false) -> void:
 	_launch(entrants, null, "practice" if practice_minutes > 0 else "qualifying")
 
 ## Load a session: practice / qualifying (random grid) or the race (grid = race_grid).
-func _launch(entrants: Array, race_grid, timed: String = "qualifying") -> void:
+func _launch(entrants: Array, race_grid: Variant, timed: String = "qualifying") -> void:
 	var now := _now()
 	race_id += 1
 	var seed_value := int(floorf(_rand() * 0xffffffff)) & 0xFFFFFFFF
 	var rand := Prng.new(seed_value)
-	var ids: Array = entrants.map(func(x): return x.id)
+	var ids: Array = entrants.map(func(x: Player) -> String: return x.id)
 	var grid: Array
 	if race_grid != null:
-		grid = race_grid.filter(func(id): return ids.has(id))
-		grid.append_array(ids.filter(func(id): return not race_grid.has(id)))
+		grid = race_grid.filter(func(id: String) -> bool: return ids.has(id))
+		grid.append_array(ids.filter(func(id: String) -> bool: return not race_grid.has(id)))
 	else:
 		grid = Prng.shuffle(ids, rand)
 	var slots := {}
@@ -685,7 +685,7 @@ func _launch(entrants: Array, race_grid, timed: String = "qualifying") -> void:
 		var pl: Player = players.get(grid[i])
 		if pl != null:
 			pl.slot = i
-	for x in players.values():
+	for x: Player in players.values():
 		x.waiting = not grid.has(x.id)
 	var cond := conditions
 	var track_id: String = cond.trackId if _tracks().has(cond.trackId) else env.track.id
@@ -711,7 +711,7 @@ func _launch(entrants: Array, race_grid, timed: String = "qualifying") -> void:
 func _maybe_begin_countdown(force: bool = false) -> void:
 	if phase != "loading" or race == null:
 		return
-	var waiting_for: Array = _racers().filter(func(r): return r.conn != null and not _loaded.has(r.id))
+	var waiting_for: Array = _racers().filter(func(r: Player) -> bool: return r.conn != null and not _loaded.has(r.id))
 	if not force and waiting_for.size() > 0:
 		return
 	var now := _now()
@@ -725,7 +725,7 @@ func _maybe_begin_countdown(force: bool = false) -> void:
 	else:
 		mode = {"sessionMs": race.sessionMs, "cleanStreak": race.rules.get("cleanStreak", false)}
 	tracker = RaceTracker.new(_tracks().get(race.trackId, env.track), start_at, mode)
-	for id in race.grid:
+	for id: String in race.grid:
 		tracker.add_player(id)
 	# race control: flags in qualifying, the full procedures (FCY, safety car, penalties) in the race
 	rc = RaceControl.new(tracker, true) if race.rules.raceControl else null
@@ -738,7 +738,7 @@ func _maybe_begin_countdown(force: bool = false) -> void:
 # --------------------------------------------------------------- binary ---
 
 func _on_binary(conn: RoomConn, buf: PackedByteArray) -> void:
-	var pid = _conn_player.get(conn.id)
+	var pid: Variant = _conn_player.get(conn.id)
 	var sender: Player = players.get(pid) if pid != null else null
 	if sender == null or race == null or tracker == null or (phase != "countdown" and phase != "racing"):
 		return
@@ -754,7 +754,7 @@ func _on_binary(conn: RoomConn, buf: PackedByteArray) -> void:
 		if dec.is_empty():
 			return
 		p = null
-		for x in players.values():
+		for x: Player in players.values():
 			if x.bot and x.slot == dec.slot:
 				p = x
 				break
@@ -789,10 +789,10 @@ func _on_binary(conn: RoomConn, buf: PackedByteArray) -> void:
 			_broadcast({"t": "raceControl", "raceId": race.raceId, "state": rc.state})
 	_handle_race_events(ev, p, now)
 	# relay to everybody else in the race (bot states go to everyone but the simulating host)
-	for o in players.values():
+	for o: Player in players.values():
 		if o.conn != null and o.id != p.id and o.id != sender.id and not o.waiting:
 			o.conn.send(relay)
-	for c in spectators.values():
+	for c: RoomConn in spectators.values():
 		c.send(relay)
 	if now - _last_standings_at >= 500.0:
 		_last_standings_at = now
@@ -802,7 +802,7 @@ func _on_binary(conn: RoomConn, buf: PackedByteArray) -> void:
 
 ## Broadcast what the lap logic decided (laps, sectors, penalties, finishes, the flag).
 func _handle_race_events(ev: Array, sender: Player, now: float) -> void:
-	for e in ev:
+	for e: Dictionary in ev:
 		# race control's events can be about any car, not just the one whose packet was processed
 		var who: Player = players.get(sender.id if e.type == "flag" else e.playerId, sender)
 		if e.type == "lap" or e.type == "penalty":
@@ -855,13 +855,13 @@ func _handle_race_events(ev: Array, sender: Player, now: float) -> void:
 func end_race() -> void:
 	if race == null or tracker == null:
 		return
-	for p in tracker.players.values():
+	for p: RaceTracker.PlayerRaceState in tracker.players.values():
 		if p.finished_ms == null:
 			tracker.mark_dnf(p.id)
 	var st := tracker.standings()
-	var fastest = null
+	var fastest: Variant = null
 	var rows: Array = []
-	for s in st:
+	for s: Dictionary in st:
 		var pl: Player = players.get(s.id)
 		if s.bestLapMs != null and (fastest == null or s.bestLapMs < fastest.ms):
 			fastest = {"id": s.id, "ms": s.bestLapMs}
@@ -872,7 +872,7 @@ func end_race() -> void:
 		})
 	# signed-in drivers' results (a driver who set no time in a timed session has no result)
 	if env.record.is_valid():
-		for s in st:
+		for s: Dictionary in st:
 			var pl2: Player = players.get(s.id)
 			if pl2 == null or pl2.account == null or pl2.car_id == null or (s.bestLapMs == null and s.finishedMs == null):
 				continue
@@ -881,11 +881,11 @@ func end_race() -> void:
 				"position": s.position, "entrants": st.size(), "bestLapMs": s.bestLapMs, "totalMs": s.finishedMs,
 			})
 	# the weekend goes on: after free practice qualifying, after qualifying the race (by laps or by time)
-	var race_next: bool = race.kind == "qualifying" and (race_laps > 0 or race_minutes > 0) and st.any(func(x): return not x.dnf or x.bestLapMs != null)
+	var race_next: bool = race.kind == "qualifying" and (race_laps > 0 or race_minutes > 0) and st.any(func(x: Dictionary) -> bool: return not x.dnf or x.bestLapMs != null)
 	var quali_next: bool = race.kind == "practice"
 	_next_session = "qualifying" if quali_next else "race"
 	race_at = _now() + Const.QUALI_TO_RACE_MS if race_next or quali_next else null
-	_race_grid = st.map(func(x): return x.id) if race_next else []
+	_race_grid = st.map(func(x: Dictionary) -> String: return x.id) if race_next else []
 	_broadcast({"t": "results", "raceId": race.raceId, "kind": race.kind, "rows": rows, "fastestLap": fastest, "raceAt": race_at})
 	phase = "results" if race_next or quali_next else "lobby"
 	race = null
@@ -894,7 +894,7 @@ func end_race() -> void:
 	start_at = null
 	finish_deadline = null
 	_load_deadline = null
-	for p in players.values():
+	for p: Player in players.values():
 		p.ready = false
 		p.waiting = false
 		p.slot = -1
@@ -908,7 +908,7 @@ func on_close(conn: RoomConn) -> void:
 	if spectators.erase(conn.id):
 		_broadcast_room()
 		return
-	var pid = _conn_player.get(conn.id)
+	var pid: Variant = _conn_player.get(conn.id)
 	_conn_player.erase(conn.id)
 	var p: Player = players.get(pid) if pid != null else null
 	if p == null or p.conn == null or p.conn.id != conn.id:
@@ -936,12 +936,12 @@ func remove_player(id: String) -> void:
 	if host_id == id:
 		# bots were simulated by the old host: they cannot continue this race
 		if tracker != null:
-			for b in players.values():
+			for b: Player in players.values():
 				if b.bot:
 					tracker.mark_dnf(b.id)
-		var humans: Array = players.values().filter(func(x): return not x.bot)
+		var humans: Array = players.values().filter(func(x: Player) -> bool: return not x.bot)
 		var order := range(humans.size())
-		order.sort_custom(func(a, b):
+		order.sort_custom(func(a: int, b: int) -> bool:
 			var ha: bool = humans[a].conn != null
 			var hb: bool = humans[b].conn != null
 			if ha != hb:
@@ -950,7 +950,7 @@ func remove_player(id: String) -> void:
 				return humans[a].joined_at < humans[b].joined_at
 			return a < b)
 		host_id = humans[order[0]].id if order.size() > 0 else null
-	if not players.values().any(func(x): return not x.bot):
+	if not players.values().any(func(x: Player) -> bool: return not x.bot):
 		# no humans left: the room code expires (bots go with it)
 		players.clear()
 		created = false
@@ -970,7 +970,7 @@ func remove_player(id: String) -> void:
 ## Process deadlines. Returns the next time we need a tick, or -1 for none.
 func tick() -> float:
 	var now := _now()
-	for p in players.values().duplicate():
+	for p: Player in players.values().duplicate():
 		if p.disconnected_at != null and now - p.disconnected_at >= Const.RECONNECT_GRACE_MS:
 			remove_player(p.id)
 	if phase == "briefing" and now >= briefing_until:
@@ -995,7 +995,7 @@ func tick() -> float:
 
 func _schedule_next() -> float:
 	var times: Array = []
-	for p in players.values():
+	for p: Player in players.values():
 		if p.disconnected_at != null:
 			times.append(p.disconnected_at + Const.RECONNECT_GRACE_MS)
 	if phase == "briefing":

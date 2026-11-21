@@ -14,4 +14,4 @@ var record: Callable = Callable()
 var track: Dictionary
 var tracks: Dictionary = {}
 ## Selectable car ids (Array of String), or null for any.
-var car_ids = null
+var car_ids: Variant = null

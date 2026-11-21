@@ -23,7 +23,7 @@ class PlayerRaceState:
 	var id: String
 	var laps := 0
 	var lap_penalty_ms := 0
-	var off_since = null
+	var off_since: Variant = null
 	var off_last := 0.0
 	var off_speed0 := 0.0
 	var off_min_speed := 0.0
@@ -54,10 +54,10 @@ class PlayerRaceState:
 	var lap_start_ms := 0.0
 	var sector_start_ms := 0.0
 	var sectors: Array = []
-	var last_lap_ms = null
-	var best_lap_ms = null
+	var last_lap_ms: Variant = null
+	var best_lap_ms: Variant = null
 	var best_sectors: Array = []
-	var finished_ms = null
+	var finished_ms: Variant = null
 	var dnf := false
 	var penalty_ms := 0
 	var resets := 0
@@ -77,13 +77,13 @@ var players := {} # id -> PlayerRaceState (insertion ordered)
 ## Lap-count mode: timed laps after the out lap (0 = timed session).
 var laps := 0
 ## Timed session: when the chequered flag falls (server clock), or null.
-var flag_at = null
-var first_finish_ms = null
+var flag_at: Variant = null
+var first_finish_ms: Variant = null
 var flag_shown := false
 var is_race := false
-var pit_window = null # {open, close} in laps
-var race_end_at = null
-var pit_window_ms = null # {open, close} in ms
+var pit_window: Variant = null # {open, close} in laps
+var race_end_at: Variant = null
+var pit_window_ms: Variant = null # {open, close} in ms
 var drive_through_ms: int
 
 static func pit_window_laps(n: int) -> Dictionary:
@@ -206,13 +206,13 @@ func _race_done(p: PlayerRaceState, t: float) -> bool:
 		return p.laps >= laps
 	if t < race_end_at:
 		return false
-	for o in players.values():
+	for o: PlayerRaceState in players.values():
 		if o != p and not o.dnf and o.finished_ms == null and o.race_dist > p.race_dist + 1.0:
 			return false
 	return true
 
 ## The car's last known lap distance is from `before` to `after` metres around s (true without s or a position).
-func _near(p: PlayerRaceState, s, before: float, after: float) -> bool:
+func _near(p: PlayerRaceState, s: Variant, before: float, after: float) -> bool:
 	if s == null or not p.has_pos:
 		return true
 	var d := TrackMath.wrap_delta(s, p.progress_s, track.length)
@@ -223,7 +223,7 @@ func _finish(p: PlayerRaceState, t: float, out: Array) -> void:
 		return
 	p.finished_ms = t - start_ms
 	if is_race:
-		for d in p.drive_throughs:
+		for d: Dictionary in p.drive_throughs:
 			_add_penalty(p, d.reason, drive_through_ms, out)
 		p.drive_throughs = []
 		if pit_window != null and not p.stop_done:
@@ -239,7 +239,7 @@ func check_flag(t: float, out: Array = []) -> Array:
 	if not flag_shown:
 		flag_shown = true
 		out.append({"type": "flag"})
-	for p in players.values():
+	for p: PlayerRaceState in players.values():
 		if p.in_pit and not p.dnf:
 			_finish(p, t, out)
 	return out
@@ -340,7 +340,7 @@ func ingest(id: String, t: float, x: float, y: float, z: float, reset: bool, out
 		return out
 
 	# Cross as many gates as the segment covers (packet loss can skip several samples).
-	var s_new = null
+	var s_new: Variant = null
 	var a := Vector3(p.lx, p.ly, p.lz)
 	var at := p.lt
 	for guard in n:
@@ -590,7 +590,7 @@ func standings() -> Array:
 	for i in list.size():
 		ordered.append([i, list[i]])
 	if is_race:
-		ordered.sort_custom(func(A, B):
+		ordered.sort_custom(func(A: Array, B: Array) -> bool:
 			var a: PlayerRaceState = A[1]
 			var b: PlayerRaceState = B[1]
 			if a.dnf != b.dnf:
@@ -609,7 +609,7 @@ func standings() -> Array:
 				return a.race_dist > b.race_dist
 			return A[0] < B[0])
 	else:
-		ordered.sort_custom(func(A, B):
+		ordered.sort_custom(func(A: Array, B: Array) -> bool:
 			var a: PlayerRaceState = A[1]
 			var b: PlayerRaceState = B[1]
 			var at: bool = a.best_lap_ms != null
@@ -627,7 +627,7 @@ func standings() -> Array:
 	var result: Array = []
 	for i in ordered.size():
 		var p: PlayerRaceState = ordered[i][1]
-		var gap = null
+		var gap: Variant = null
 		if is_race:
 			gap = _race_gap(leader, p)
 		elif leader != null and leader.best_lap_ms != null and p.best_lap_ms != null:
@@ -651,7 +651,7 @@ func _race_gap(leader: PlayerRaceState, p: PlayerRaceState) -> Variant:
 	return maxf(0.0, ((leader.race_dist - p.race_dist) / speed) * 1000.0) + p.penalty_ms - leader.penalty_ms
 
 func all_done() -> bool:
-	for p in players.values():
+	for p: PlayerRaceState in players.values():
 		if not p.dnf and p.finished_ms == null:
 			return false
 	return true

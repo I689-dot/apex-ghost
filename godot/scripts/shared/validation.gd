@@ -23,7 +23,7 @@ static func clean_chat(raw: String) -> String:
 	s = _spaces.sub(s, " ", true).strip_edges()
 	return s.left(CHAT_MAX_LEN)
 
-static func sanitize_nickname(raw) -> Dictionary:
+static func sanitize_nickname(raw: Variant) -> Dictionary:
 	if typeof(raw) != TYPE_STRING:
 		return {"ok": false, "error": "Nickname is required."}
 	_init_re()
@@ -42,7 +42,7 @@ static func nickname_key(nick: String) -> String:
 	return nick.to_lower()
 
 ## Normalises user input ("ab c-d e" -> "ABCDE") and checks it only uses the room-code alphabet. "" when invalid.
-static func normalize_room_code(raw) -> String:
+static func normalize_room_code(raw: Variant) -> String:
 	if typeof(raw) != TYPE_STRING:
 		return ""
 	var code: String = (raw as String).to_upper().replace(" ", "").replace("\t", "").replace("\n", "").replace("-", "")

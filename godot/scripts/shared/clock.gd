@@ -17,6 +17,6 @@ static func estimate_offset(samples: Array) -> Dictionary:
 	if samples.is_empty():
 		return {"offset": 0.0, "rtt": 0.0}
 	var sorted := samples.duplicate()
-	sorted.sort_custom(func(a, b): return a.rtt < b.rtt)
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.rtt < b.rtt)
 	var best := sorted.slice(0, maxi(1, ceili(sorted.size() / 2.0)))
-	return {"offset": median(best.map(func(s): return s.offset)), "rtt": median(best.map(func(s): return s.rtt))}
+	return {"offset": median(best.map(func(s: Dictionary) -> float: return s.offset)), "rtt": median(best.map(func(s: Dictionary) -> float: return s.rtt))}
