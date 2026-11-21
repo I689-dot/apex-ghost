@@ -80,7 +80,7 @@ static func seats_on_stands(root: Node3D, track: Dictionary, density: float, sta
 	for i in range(0, npts, step):
 		line.append(Vector2(cl[i * 3], cl[i * 3 + 2]))
 	var seats: Array = []  # [Vector3 position, yaw]
-	for node in CarVisual._walk(root):
+	for node: Node in CarVisual._walk(root):
 		if not (node is MeshInstance3D) or (node as MeshInstance3D).mesh == null:
 			continue
 		var mi := node as MeshInstance3D
@@ -91,7 +91,7 @@ static func seats_on_stands(root: Node3D, track: Dictionary, density: float, sta
 				continue
 			var arrays := mi.mesh.surface_get_arrays(s)
 			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var idx = arrays[Mesh.ARRAY_INDEX]
+			var idx: Variant = arrays[Mesh.ARRAY_INDEX]
 			var count: int = idx.size() if idx != null and idx.size() > 0 else verts.size()
 			for k in range(0, count - 2, 3):
 				var ia: int = idx[k] if idx != null and idx.size() > 0 else k

@@ -70,7 +70,7 @@ static func apply(visual: CarVisual, livery: Dictionary) -> void:
 	var number_tex := _number_texture(visual, livery)
 	var aabb := _body_box(visual)
 	var fin: Dictionary = FINISHES.get(livery.get("finish", "gloss"), FINISHES.gloss)
-	for n in CarVisual._walk(visual):
+	for n: Node in CarVisual._walk(visual):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mi := n as MeshInstance3D
@@ -171,7 +171,7 @@ static func _rel(visual: Node3D, n: Node3D) -> Transform3D:
 static func _body_box(visual: CarVisual) -> AABB:
 	var out := AABB()
 	var first := true
-	for n in CarVisual._walk(visual):
+	for n: Node in CarVisual._walk(visual):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mi := n as MeshInstance3D

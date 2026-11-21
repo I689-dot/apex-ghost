@@ -34,7 +34,7 @@ func _init(root: Node3D) -> void:
 	var overlay_re := RegEx.create_from_string(OVERLAY_RE)
 	var seen := {}
 	var meshes: Array = []
-	for n in CarVisual._walk(root):
+	for n: Node in CarVisual._walk(root):
 		if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
 			meshes.append(n)
 	for mi: MeshInstance3D in meshes:
@@ -162,7 +162,7 @@ func _project_uv(mi: MeshInstance3D, surface: int, root: Node3D, aspect: float) 
 		pts[i] = to_root * verts[i]
 	# the plane's normal: the area-weighted sum of the triangles' (sign-free)
 	var acc := [Vector3.ZERO]  # lambdas capture by value: the sum lives in an Array
-	var idx = arrays[Mesh.ARRAY_INDEX]
+	var idx: Variant = arrays[Mesh.ARRAY_INDEX]
 	var tri := func(a: int, b: int, c: int) -> void:
 		var cr := (pts[b] - pts[a]).cross(pts[c] - pts[a])
 		if (acc[0] as Vector3).dot(cr) < 0.0:

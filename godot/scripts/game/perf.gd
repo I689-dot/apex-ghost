@@ -66,7 +66,7 @@ func _process(dt: float) -> void:
 func _draw() -> void:
 	var base := Vector2(0, 190)
 	draw_rect(Rect2(base, Vector2(240, 60)), Color(0, 0, 0, 0.45))
-	for ms in [16.7, 25.0, 33.3]:
+	for ms: float in [16.7, 25.0, 33.3]:
 		var y: float = base.y + 60.0 - (ms / 50.0) * 60.0
 		draw_line(Vector2(0, y), Vector2(240, y), Color(1, 1, 1, 0.25))
 	for i in _times.size():

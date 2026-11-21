@@ -437,7 +437,7 @@ static func apply(track: TrackScene) -> void:
 	var seen := {}
 	var counts := {}
 	var off: Array = []
-	for n in CarVisual._walk(track):
+	for n: Node in CarVisual._walk(track):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mesh := (n as MeshInstance3D).mesh
@@ -527,7 +527,7 @@ static func apply(track: TrackScene) -> void:
 					_detail(sm, d[1], d[2])
 					break
 	if not off.is_empty():
-		for n in CarVisual._walk(track):
+		for n: Node in CarVisual._walk(track):
 			if n is MeshInstance3D and (n as MeshInstance3D).mesh != null:
 				var mi := n as MeshInstance3D
 				for k in mi.mesh.get_surface_count():

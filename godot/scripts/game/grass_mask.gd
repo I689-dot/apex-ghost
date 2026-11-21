@@ -51,7 +51,7 @@ static func build(chunks: Array, track: Dictionary, ground: Array) -> GrassMask:
 	for ch in chunks:
 		if ch.kind != "scenery":
 			continue
-		for n in CarVisual._walk(ch.object):
+		for n: Node in CarVisual._walk(ch.object):
 			if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 				continue
 			var mi := n as MeshInstance3D
@@ -64,7 +64,7 @@ static func build(chunks: Array, track: Dictionary, ground: Array) -> GrassMask:
 					continue
 				var arrays := mesh.surface_get_arrays(s)
 				var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-				var idx = arrays[Mesh.ARRAY_INDEX]
+				var idx: Variant = arrays[Mesh.ARRAY_INDEX]
 				var has_idx: bool = idx != null and idx.size() > 0
 				var count: int = idx.size() if has_idx else verts.size()
 				for i in range(0, count - 2, 3):

@@ -58,7 +58,7 @@ static func vehicle_setup(setup: Dictionary) -> Dictionary:
 		return 1.0 + SETUP.damperPerClick * (_clamp_click(_pair(arr, i, 4.0)) - SETUP.baseline)
 	var ride := func(i: int) -> float:
 		return clampf(_pair(setup.get("ride"), i, 0.0), -SETUP.rideMm, SETUP.rideMm) / 1000.0
-	var pr = setup.get("pressure")
+	var pr: Variant = setup.get("pressure")
 	return {
 		"pressure": [float(pr[0]), float(pr[1])] if pr != null else null,
 		"ride": [ride.call(0), ride.call(1)],
@@ -77,7 +77,7 @@ static func vehicle_setup(setup: Dictionary) -> Dictionary:
 ## What an engineer would suggest for this forecast. Returns {tyre, wing, note}.
 static func recommend_setup(plan: Dictionary) -> Dictionary:
 	var wet_start: bool = plan.initialWetness > 0.35
-	var change = plan.get("change")
+	var change: Variant = plan.get("change")
 	var rain_later: bool = change != null and (change.to == "light_rain" or change.to == "heavy_rain")
 	var drying: bool = change != null and wet_start and change.to != "heavy_rain" and change.to != "light_rain"
 	if wet_start:
@@ -101,7 +101,7 @@ static func sanitize(raw: Variant) -> Variant:
 	if typeof(raw) != TYPE_DICTIONARY:
 		return null
 	var pair := func(key: String, lo: float, hi: float, def: float, whole: bool) -> Array:
-		var a = raw.get(key)
+		var a: Variant = raw.get(key)
 		var out: Array = []
 		for i in 2:
 			var v: float = def
@@ -109,12 +109,12 @@ static func sanitize(raw: Variant) -> Variant:
 				v = clampf(float(a[i]), lo, hi)
 			out.append(roundi(v) if whole else v)
 		return out
-	var tyre = raw.get("tyre")
-	var wing = raw.get("wing")
-	var bias = raw.get("brakeBias")
-	var fuel = raw.get("fuelL")
-	var pr = raw.get("pressure")
-	var pressure = null
+	var tyre: Variant = raw.get("tyre")
+	var wing: Variant = raw.get("wing")
+	var bias: Variant = raw.get("brakeBias")
+	var fuel: Variant = raw.get("fuelL")
+	var pr: Variant = raw.get("pressure")
+	var pressure: Variant = null
 	if typeof(pr) == TYPE_ARRAY and pr.size() >= 2 and (typeof(pr[0]) == TYPE_FLOAT or typeof(pr[0]) == TYPE_INT) and (typeof(pr[1]) == TYPE_FLOAT or typeof(pr[1]) == TYPE_INT):
 		pressure = [clampf(float(pr[0]), 15.0, 40.0), clampf(float(pr[1]), 15.0, 40.0)]
 	return {

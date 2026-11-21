@@ -78,9 +78,9 @@ class LocalBot:
 	var pit: PitLaneMonitor = null
 	var stop_lap := 0
 	var service_end := 0.0
-	var service_plan = null
+	var service_plan: Variant = null
 	var service_start := 0.0
-	var service_events = null
+	var service_events: Variant = null
 	var fired := 0
 	var lift := 0.0
 	var exit_at := 0.0
@@ -259,7 +259,7 @@ func incident(points: int) -> void:
 ## What this session gave the career (read before the session is disposed).
 func career_stats() -> Dictionary:
 	var c := career
-	var turns = track_data.get("turns")
+	var turns: Variant = track_data.get("turns")
 	return {"km": c.km, "laps": c.laps, "cleanLaps": c.cleanLaps, "corners": c.laps * (turns if turns != null else 12), "incidents": c.incidents, "personalBests": c.pbs}
 
 ## The race's laps: set, or for a timed race what fits in its time at a GT3's pace here.
@@ -306,7 +306,7 @@ func load_session(progress: Callable) -> void:
 			var alt := CarsDb.resolve(str(pl.carId))
 			if not alt.is_empty():
 				entries[pl.carId] = alt
-	var my_car_id = null
+	var my_car_id: Variant = null
 	if spectator:
 		for r in racers:
 			var pl = r.player
@@ -464,7 +464,7 @@ func load_session(progress: Callable) -> void:
 		chat.grow_vertical = Control.GROW_DIRECTION_BEGIN
 		chat.offset_left = 16.0
 		chat.offset_bottom = -240.0
-		chat.submitted.connect(func(text: String): conn.send_json({"t": "chat", "text": text}))
+		chat.submitted.connect(func(text: String) -> void: conn.send_json({"t": "chat", "text": text}))
 		chat.closed.connect(func():
 			chat_open = false
 			chat_closed_frame = Engine.get_process_frames())
@@ -685,7 +685,7 @@ func _build_cinematic(entries: Dictionary) -> void:
 	var entrants: Array = []
 	for id in race.grid:
 		var p = _player(id)
-		var e = entries.get(p.carId) if p != null and p.carId != null else null
+		var e: Variant = entries.get(p.carId) if p != null and p.carId != null else null
 		if p == null or e == null:
 			continue
 		entrants.append({"slot": race.slots.get(id, 0), "nick": p.nick, "carName": e.name, "color": e.color, "me": id == me, "bot": p.get("bot", false)})
@@ -1041,7 +1041,7 @@ func _create_local_bots(entries: Dictionary) -> void:
 		var p = _player(r.id)
 		if p == null or not p.get("bot", false) or p.carId == null:
 			continue
-		var entry = entries.get(p.carId)
+		var entry: Variant = entries.get(p.carId)
 		if entry == null:
 			continue
 		var g: Dictionary = track_data.grid[r.slot] if r.slot < track_data.grid.size() else track_data.grid[0]
@@ -2298,7 +2298,7 @@ func update_wake() -> void:
 ## Engines, chassis noises and ambience, heard from the active camera.
 func update_audio(dt: float, view_cam: Camera3D) -> void:
 	if snd == null:
-		var a = cb.get("audio", Callable()).call() if cb.has("audio") else null
+		var a: Variant = cb.get("audio", Callable()).call() if cb.has("audio") else null
 		if a == null or not a.settled:
 			return
 		snd = SessionAudio.new(a, vehicle.car, track_data)
@@ -2460,7 +2460,7 @@ func _load_safety_car() -> void:
 	visual.visible = false
 	add_child(visual)
 	var look := SafetyCarLook.dress(visual, entry)
-	var body = null
+	var body: Variant = null
 	if contact:
 		var r := Remote.new()
 		r.entry = entry
@@ -2481,7 +2481,7 @@ func update_safety_car(server_now: float, dt: float) -> void:
 	sc.visual.visible = true
 	if not on or d == null:
 		# waiting at the end of the pit lane, as at a real race, lights off
-		var lane = track_data.get("pitLane")
+		var lane: Variant = track_data.get("pitLane")
 		if lane == null:
 			sc.visual.visible = false
 			return
@@ -2520,7 +2520,7 @@ func update_limiters(server_now: float) -> void:
 	var fcy: bool = rc.course == "fcy" and rc.limitAt != null and server_now >= rc.limitAt
 	var lane := pit.limit_ms() if pit != null else -1.0
 	# the limit ends at the pit-out line (an exit road may run on beyond it)
-	var pl = track_data.get("pitLane")
+	var pl: Variant = track_data.get("pitLane")
 	var out: float = pl.outIndex if pl != null and pl.get("outIndex", null) != null else INF
 	if pit != null and pit.in_lane and pit.index <= out:
 		vehicle.speed_limit_ms = lane
@@ -2723,7 +2723,7 @@ var _tri_grid := {}
 ## Height of the visible road at (x, z) under top (the highest surface below the probe), from the triangles near the pit lane.
 func _road_height(x: float, z: float, top: float):
 	const G := 2.0
-	var best = null
+	var best: Variant = null
 	var k := int(floorf(x / G)) * 65536 + int(floorf(z / G))
 	for t in _tri_grid.get(k, []):
 		var ax := _tris[t]
@@ -2802,7 +2802,7 @@ func _build_pit_lane() -> void:
 	var pit_box := AABB(lo - Vector3(45, 45, 45), (hi - lo) + Vector3(90, 90, 90))
 	var road_re := RegEx.create_from_string("(?i)^(asph|pits|conc_|pavement|tiles|lines|box_decal)")
 	var tris := PackedFloat32Array()
-	for n in CarVisual._walk(track):
+	for n: Node in CarVisual._walk(track):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mi := n as MeshInstance3D
@@ -2817,7 +2817,7 @@ func _build_pit_lane() -> void:
 		for s in mi.mesh.get_surface_count():
 			var arr := mi.mesh.surface_get_arrays(s)
 			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-			var idx = arr[Mesh.ARRAY_INDEX]
+			var idx: Variant = arr[Mesh.ARRAY_INDEX]
 			var count: int = idx.size() if idx != null else verts.size()
 			var i := 0
 			while i + 2 < count:
@@ -2930,7 +2930,7 @@ func open_pit_menu() -> void:
 	pit_menu = PitMenu.new(opts, func(p, seconds):
 		var now := Time.get_ticks_msec() as float
 		service = {"plan": p, "start": now, "end": now + seconds * 1000.0, "events": PitCrew.stop_timeline(p, damage.zones), "fired": 0},
-		func(): release_from_box())
+		func() -> void: release_from_box())
 	hud.add_child(pit_menu)
 
 func finish_service(plan: Dictionary) -> void:

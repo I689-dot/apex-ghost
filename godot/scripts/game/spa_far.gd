@@ -32,7 +32,7 @@ static func build(dir: String = "assets/maps/spa_g") -> SpaFar:
 	if ResourceLoader.exists(COVER2):
 		mat.set_shader_parameter("cover2", load(COVER2))
 		mat.set_shader_parameter("has_cover2", true)
-	for n in CarVisual._walk(scene):
+	for n: Node in CarVisual._walk(scene):
 		if n is MeshInstance3D:
 			var mi := n as MeshInstance3D
 			mi.material_override = mat

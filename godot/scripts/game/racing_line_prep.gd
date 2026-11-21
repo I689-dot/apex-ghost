@@ -6,7 +6,7 @@ extends RefCounted
 class Task:
 	extends RefCounted
 	var thread := Thread.new()
-	var result = null
+	var result: Variant = null
 	var done := false
 
 static func start(track: Dictionary) -> Task:

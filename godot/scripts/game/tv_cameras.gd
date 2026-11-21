@@ -82,7 +82,7 @@ func _best_spot(spot: Dictionary, from: float, to: float, sight: Callable, groun
 	var best_seen := -1.0
 	for side in [spot.side, -spot.side]:
 		# [offset from the track edge, height]; a crane over the trees is the last resort
-		for oh in [[14.0, 6.0], [24.0, 9.0], [38.0, 14.0], [8.0, 4.0], [16.0, 24.0]]:
+		for oh: Array in [[14.0, 6.0], [24.0, 9.0], [38.0, 14.0], [8.0, 4.0], [16.0, 24.0]]:
 			var off: float = oh[0]
 			var up: float = oh[1]
 			var lx: float = cos(pt.yaw) * side
@@ -90,7 +90,7 @@ func _best_spot(spot: Dictionary, from: float, to: float, sight: Callable, groun
 			var half2: float = half if side == spot.side else (td.widthR[i] if spot.side > 0 else td.widthL[i])
 			var x: float = pt.x + lx * (half2 + off)
 			var z: float = pt.z + lz * (half2 + off)
-			var g = ground.call(x, z, pt.y + 200.0)
+			var g: Variant = ground.call(x, z, pt.y + 200.0)
 			var y: float = maxf(pt.y, g if g != null else pt.y) + up
 			var seen := 0
 			for tg in targets:

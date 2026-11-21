@@ -67,7 +67,7 @@ static func data() -> Dictionary:
 	if _data.is_empty():
 		_data = _start()
 		if FileAccess.file_exists(SAVE_PATH) and not dry:
-			var v = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+			var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 			if typeof(v) == TYPE_DICTIONARY:
 				_data.merge(v, true)
 		# a new pass season: its XP and claims start again

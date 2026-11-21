@@ -29,7 +29,7 @@ var _cells := {}
 ## ground: Callable(x, yTop, z, maxD) -> ground height under (x, z) from yTop down at most maxD, or null.
 static func build(td: Dictionary, ground: Callable) -> RoadPatches:
 	var r := RoadPatches.new()
-	var lane = td.get("pitLane", null)
+	var lane: Variant = td.get("pitLane", null)
 	if lane != null and lane.points.size() >= 4:
 		r._add(td, ground, lane.points, 9.0, 4, 0.15, true)
 	var cl: Array = td.centerline
@@ -86,7 +86,7 @@ func _add(td: Dictionary, ground: Callable, pts: Array, half: float, smooth_m: i
 	for i in n:
 		for j in bins:
 			var lat := -half + j * BIN
-			var g = ground.call(px[i] + tz[i] * lat, py[i] + 2.0, pz[i] - tx[i] * lat, 4.0)
+			var g: Variant = ground.call(px[i] + tz[i] * lat, py[i] + 2.0, pz[i] - tx[i] * lat, 4.0)
 			raw[i * bins + j] = NAN if g == null else g
 	# across: a median over 2 m (kerb ridges, painted stripes and decals 1 m wide are gone, the fall stays)
 	var across := PackedFloat32Array()
@@ -184,7 +184,7 @@ func _add(td: Dictionary, ground: Callable, pts: Array, half: float, smooth_m: i
 ## hit: {dist, pos, normal, surface}; modified in place.
 func apply(o: Vector3, d: Vector3, max_dist: float, hit: Dictionary) -> void:
 	var hp: Vector3 = hit.pos
-	var cell_v = _cells.get(int(floorf(hp.x)) * 100003 + int(floorf(hp.z)))
+	var cell_v: Variant = _cells.get(int(floorf(hp.x)) * 100003 + int(floorf(hp.z)))
 	if cell_v == null:
 		return
 	var p: Patch = _patches[int(cell_v / 1000000)]

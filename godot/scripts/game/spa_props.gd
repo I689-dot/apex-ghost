@@ -69,7 +69,7 @@ static func build(track: TrackScene) -> SpaProps:
 func _boards() -> void:
 	if not FileAccess.file_exists(BOARDS) or not ResourceLoader.exists(BOARD_ART):
 		return
-	var d = JSON.parse_string(FileAccess.get_file_as_string(BOARDS))
+	var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(BOARDS))
 	if not (d is Dictionary) or (d.indices as Array).is_empty():
 		return
 	var pos := PackedVector3Array()
@@ -106,7 +106,7 @@ func _boards() -> void:
 func _terraces() -> void:
 	if not FileAccess.file_exists(TERRACES):
 		return
-	var d = JSON.parse_string(FileAccess.get_file_as_string(TERRACES))
+	var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(TERRACES))
 	if not (d is Dictionary):
 		return
 	var pos := PackedVector3Array()
@@ -142,11 +142,11 @@ func _place_props() -> void:
 		return
 	var scene := Assets.scene(PROPS).instantiate()
 	var meshes := {}
-	for n in CarVisual._walk(scene):
+	for n: Node in CarVisual._walk(scene):
 		if n is MeshInstance3D:
 			meshes[String(n.name)] = (n as MeshInstance3D).mesh
 	scene.free()
-	var rows = JSON.parse_string(FileAccess.get_file_as_string(PLACES))
+	var rows: Variant = JSON.parse_string(FileAccess.get_file_as_string(PLACES))
 	if not (rows is Array):
 		return
 	for row in rows:
@@ -178,7 +178,7 @@ static func _cut(track: TrackScene, c: Dictionary) -> Array:
 		var nor := PackedVector3Array()
 		var uv := PackedVector2Array()
 		var mat: Material = null
-		for n in CarVisual._walk(track):
+		for n: Node in CarVisual._walk(track):
 			if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 				continue
 			var mi := n as MeshInstance3D
@@ -189,9 +189,9 @@ static func _cut(track: TrackScene, c: Dictionary) -> Array:
 					continue
 				var a := mi.mesh.surface_get_arrays(s)
 				var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
-				var nv = a[Mesh.ARRAY_NORMAL]
-				var tv = a[Mesh.ARRAY_TEX_UV]
-				var idx = a[Mesh.ARRAY_INDEX]
+				var nv: Variant = a[Mesh.ARRAY_NORMAL]
+				var tv: Variant = a[Mesh.ARRAY_TEX_UV]
+				var idx: Variant = a[Mesh.ARRAY_INDEX]
 				var has_idx: bool = idx != null and idx.size() > 0
 				var cnt: int = idx.size() if has_idx else v.size()
 				for i in range(0, cnt - 2, 3):
@@ -250,7 +250,7 @@ static func _repaint(track: TrackScene, rp: Array) -> void:
 		hi = hi.max(p)
 	lo -= Vector2.ONE * rp[5]
 	hi += Vector2.ONE * rp[5]
-	for n in CarVisual._walk(track):
+	for n: Node in CarVisual._walk(track):
 		if not (n is MeshInstance3D) or not ((n as MeshInstance3D).mesh is ArrayMesh):
 			continue
 		var mi := n as MeshInstance3D

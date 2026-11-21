@@ -113,7 +113,7 @@ func _pull_ground_pieces() -> void:
 	var ground := Node3D.new()
 	ground.name = "ground_pieces"
 	var pieces: Array = []
-	for n in CarVisual._walk(self):
+	for n: Node in CarVisual._walk(self):
 		if n is MeshInstance3D and (n as MeshInstance3D).mesh != null and (n as MeshInstance3D).mesh.get_surface_count() > 0:
 			var m0 := (n as MeshInstance3D).mesh.surface_get_material(0)
 			if m0 != null and _match(GROUND_PIECE_RE, m0.resource_name):
@@ -145,7 +145,7 @@ func _chunk_kind_of(mesh: Node) -> String:
 
 func _prepare_materials() -> void:
 	var seen := {}
-	for n in CarVisual._walk(self):
+	for n: Node in CarVisual._walk(self):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mesh := n as MeshInstance3D
@@ -192,7 +192,7 @@ func _prepare_materials() -> void:
 					lawn_materials.append(sm)
 			elif _match(PAVED_MAT_RE, nm) or _match(ROAD_MAT_RE, nm):
 				ground_materials.append(sm)
-		var culled = null
+		var culled: Variant = null
 		if first_name != "" and _match(DETAIL_MAT_RE, first_name):
 			culled = _details
 		elif first_name != "" and _match(BARRIER_MAT_RE, first_name):
@@ -212,7 +212,7 @@ func _lift_decals() -> void:
 	var res: Array = []
 	for d in DECAL_LAYERS:
 		res.append(RegEx.create_from_string(d[0]))
-	for n in CarVisual._walk(self):
+	for n: Node in CarVisual._walk(self):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null or not ((n as MeshInstance3D).mesh is ArrayMesh):
 			continue
 		var mi := n as MeshInstance3D
@@ -254,7 +254,7 @@ func apply_quality(q: Dictionary) -> void:
 		far.apply_quality(q)
 	for c: Chunk in chunks:
 		var cast: bool = q.treeShadows if c.kind == "trees" else (q.sceneryShadows if c.kind == "scenery" else false)
-		for n in CarVisual._walk(c.object):
+		for n: Node in CarVisual._walk(c.object):
 			if n is GeometryInstance3D:
 				n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if cast else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
@@ -341,7 +341,7 @@ func point_at(s: float) -> Dictionary:
 func extract_card_trees() -> Array:
 	var out: Array = []
 	for c: Chunk in chunks.filter(func(ch): return ch.kind == "trees"):
-		for n in CarVisual._walk(c.object):
+		for n: Node in CarVisual._walk(c.object):
 			if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 				continue
 			var mi := n as MeshInstance3D
@@ -362,7 +362,7 @@ func extract_card_trees() -> Array:
 func _card_trees_of_surface(mi: MeshInstance3D, s: int, pine: bool, out: Array) -> void:
 	var arr := mi.mesh.surface_get_arrays(s)
 	var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-	var idx = arr[Mesh.ARRAY_INDEX]
+	var idx: Variant = arr[Mesh.ARRAY_INDEX]
 	var n := verts.size()
 	var par := PackedInt32Array()
 	par.resize(n)

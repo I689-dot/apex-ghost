@@ -172,7 +172,7 @@ func apply_seat() -> void:
 ## (up to 14 cm, keeping headroom) until the road is visible from ~10 m ahead. Runs once while loading.
 func auto_seat(car: Node3D) -> void:
 	var meshes: Array = []
-	for n in CarVisual._walk(car):
+	for n: Node in CarVisual._walk(car):
 		if not (n is MeshInstance3D) or not (n as MeshInstance3D).is_visible_in_tree() or (n as MeshInstance3D).mesh == null:
 			continue
 		var skip := false

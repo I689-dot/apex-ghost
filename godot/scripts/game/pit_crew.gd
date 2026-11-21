@@ -29,9 +29,9 @@ static func stop_timeline(plan: Dictionary, zones) -> Array:
 	if plan.tyres != null:
 		# two wheel men a side: the front wheel, then the rear
 		var per := PitService.TYRES / 2.0
-		for wk in [[0, 0], [1, 0], [2, 1], [3, 1]]:
+		for wk: Array in [[0, 0], [1, 0], [2, 1], [3, 1]]:
 			var t0: float = first + jack + wk[1] * per
-			for kind in ["gunOff", "wheelOff", "wheelOn", "gunOn"]:
+			for kind: String in ["gunOff", "wheelOff", "wheelOn", "gunOn"]:
 				ev.append({"at": t0 + WHEEL[kind] * per, "kind": kind, "wheel": wk[0]})
 	ev.append({"at": total - jack * 0.8, "kind": "jackDown", "wheel": 0})
 	ev.sort_custom(func(a, b): return a.at < b.at)
@@ -40,8 +40,8 @@ static func stop_timeline(plan: Dictionary, zones) -> Array:
 ## The state of the car at time u of a stop: {wheelOut: [4 floats], lift}.
 static func stop_pose(ev: Array, u: float) -> Dictionary:
 	var out := {"wheelOut": [0.0, 0.0, 0.0, 0.0], "lift": 0.0}
-	var up = null
-	var down = null
+	var up: Variant = null
+	var down: Variant = null
 	var off := [-1.0, -1.0, -1.0, -1.0]
 	var on := [-1.0, -1.0, -1.0, -1.0]
 	for e in ev:

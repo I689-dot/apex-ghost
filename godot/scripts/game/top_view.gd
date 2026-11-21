@@ -22,7 +22,7 @@ const HEIGHT_SHADER := "shader_type spatial;\nrender_mode unshaded, cull_disable
 static func _car_box(root: Node3D) -> AABB:
 	var box := AABB()
 	var first := true
-	for n in CarVisual._walk(root):
+	for n: Node in CarVisual._walk(root):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mi := n as MeshInstance3D
@@ -84,7 +84,7 @@ static func render_top_lines(host: Node, model: PackedScene, px_wide: int = 220)
 		if pass_i == 1:
 			mat.set_shader_parameter("lo", box.position.y)
 			mat.set_shader_parameter("hi", box.end.y)
-		for n in CarVisual._walk(car):
+		for n: Node in CarVisual._walk(car):
 			if n is MeshInstance3D:
 				(n as MeshInstance3D).material_override = mat
 		var e := WorldEnvironment.new()
@@ -111,7 +111,7 @@ static func render_top_lines(host: Node, model: PackedScene, px_wide: int = 220)
 			var i := (y * W + x) * 4
 			var solid := nd[i + 3] > 0
 			var e := 0.0
-			for d in [[1, 0], [0, 1], [1, 1], [1, -1]]:
+			for d: Array in [[1, 0], [0, 1], [1, 1], [1, -1]]:
 				var nx: int = x + d[0]
 				var ny: int = y + d[1]
 				if nx < 0 or ny < 0 or nx >= W or ny >= H:

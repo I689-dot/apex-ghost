@@ -51,14 +51,14 @@ static var _models := {}
 ## Lets a model loaded with load_car_model go (one shown once, as the intro's: kept, it held the phone's memory).
 static func forget_car_model(entry: Dictionary, lods_wanted: int = 3, cockpit: bool = false, first_level: int = 0) -> void:
 	var files: Array = entry.lods
-	var cock = entry.get("cockpit", null)
+	var cock: Variant = entry.get("cockpit", null)
 	if cockpit and cock != null:
 		files = [cock] + entry.lods.slice(1)
 	_models.erase("%s:%d-%d:%s" % [entry.id, mini(first_level, files.size() - 1), lods_wanted, str(cockpit and cock != null)])
 
 static func load_car_model(entry: Dictionary, lods_wanted: int = 3, cockpit: bool = false, first_level: int = 0) -> Dictionary:
 	var files: Array = []
-	var cock = entry.get("cockpit", null)
+	var cock: Variant = entry.get("cockpit", null)
 	if cockpit and cock != null:
 		files.append(cock)
 		files.append_array(entry.lods.slice(1))

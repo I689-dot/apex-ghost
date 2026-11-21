@@ -67,7 +67,7 @@ func build(td: Dictionary, ground: Callable, seed_value: int) -> void:
 		var p := Puddle.new()
 		p.x = cl[i * 3] + tz * lat
 		p.z = cl[i * 3 + 2] - tx * lat
-		var h = ground.call(p.x, cl[i * 3 + 1] + 2.0, p.z, 5.0)
+		var h: Variant = ground.call(p.x, cl[i * 3 + 1] + 2.0, p.z, 5.0)
 		if h == null:
 			continue
 		p.y = float(h)
@@ -78,10 +78,10 @@ func build(td: Dictionary, ground: Callable, seed_value: int) -> void:
 		# the surface under it: a plane through the ground at its ends and sides
 		var fwd := Vector3(sin(p.yaw), 0, cos(p.yaw))
 		var right := Vector3(fwd.z, 0, -fwd.x)
-		var hf = ground.call(p.x + fwd.x * p.a, p.y + 1.0, p.z + fwd.z * p.a, 3.0)
-		var hb = ground.call(p.x - fwd.x * p.a, p.y + 1.0, p.z - fwd.z * p.a, 3.0)
-		var hr = ground.call(p.x + right.x * p.b, p.y + 1.0, p.z + right.z * p.b, 3.0)
-		var hl = ground.call(p.x - right.x * p.b, p.y + 1.0, p.z - right.z * p.b, 3.0)
+		var hf: Variant = ground.call(p.x + fwd.x * p.a, p.y + 1.0, p.z + fwd.z * p.a, 3.0)
+		var hb: Variant = ground.call(p.x - fwd.x * p.a, p.y + 1.0, p.z - fwd.z * p.a, 3.0)
+		var hr: Variant = ground.call(p.x + right.x * p.b, p.y + 1.0, p.z + right.z * p.b, 3.0)
+		var hl: Variant = ground.call(p.x - right.x * p.b, p.y + 1.0, p.z - right.z * p.b, 3.0)
 		var df: float = (float(hf) - float(hb)) / (2.0 * p.a) if hf != null and hb != null else 0.0
 		var dr: float = (float(hr) - float(hl)) / (2.0 * p.b) if hr != null and hl != null else 0.0
 		var ax := (fwd + Vector3.UP * df).normalized()

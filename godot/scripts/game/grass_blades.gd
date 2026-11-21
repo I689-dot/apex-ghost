@@ -113,8 +113,8 @@ static func build(track: Dictionary, ground: GroundQuery, detail: Dictionary, ma
 	var chunk_from := 0.0
 	var along := 0.0
 	var total := 0
-	var limit_l = track.get("limitL", null)
-	var limit_r = track.get("limitR", null)
+	var limit_l: Variant = track.get("limitL", null)
+	var limit_r: Variant = track.get("limitR", null)
 	var wl: PackedFloat32Array = track.widthL
 	var wr: PackedFloat32Array = track.widthR
 	for i in n:
@@ -130,7 +130,7 @@ static func build(track: Dictionary, ground: GroundQuery, detail: Dictionary, ma
 		var tz := dz / seg
 		var a := 0.0
 		while a < seg:
-			for side in [1.0, -1.0]:
+			for side: float in [1.0, -1.0]:
 				# clear of the white line and the kerb: blades right on it read as black specks over the paint
 				var edge: float = (limit_l[i] if limit_l != null else wl[i]) if side > 0.0 else (limit_r[i] if limit_r != null else wr[i])
 				edge += 0.9

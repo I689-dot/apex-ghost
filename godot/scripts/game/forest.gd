@@ -111,7 +111,7 @@ func _load(track: TrackScene, track_data: Dictionary, q: Dictionary) -> bool:
 		hero_m = SpaLook._p("forest_hero", SpaLook.FOREST_HERO)
 		shadow_m = SpaLook._p("forest_shadow", SpaLook.FOREST_SHADOW)
 		fades = true
-	var ref = track_data.get("forest", null)
+	var ref: Variant = track_data.get("forest", null)
 	if ref != null:
 		var base := Assets.path(ref.file).get_base_dir()
 		var meta_path := base + "/forest_pack.json"
@@ -351,7 +351,7 @@ func _bake_cards() -> void:
 			var src := _near_mats[k][si] as ShaderMaterial
 			var bm := ShaderMaterial.new()
 			bm.shader = load("res://shaders/tree_bake.gdshader")
-			for prm in ["albedo_tex", "tint", "uv_scale", "uv_offset", "leaf"]:
+			for prm: String in ["albedo_tex", "tint", "uv_scale", "uv_offset", "leaf"]:
 				bm.set_shader_parameter(prm, src.get_shader_parameter(prm))
 			mi.set_surface_override_material(si, bm)
 		vp.render_target_update_mode = SubViewport.UPDATE_ONCE

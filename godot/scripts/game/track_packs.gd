@@ -99,7 +99,7 @@ func refresh() -> void:
 		_req.queue_free()
 		_req = null
 		if result == HTTPRequest.RESULT_SUCCESS and code == 200:
-			var m = JSON.parse_string(body.get_string_from_utf8())
+			var m: Variant = JSON.parse_string(body.get_string_from_utf8())
 			if m is Dictionary and m.has("packs"):
 				manifest = m
 				_write(DIR + "manifest.json", manifest)
@@ -289,7 +289,7 @@ func _close() -> void:
 static func _read(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
-	var d = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	return d if d is Dictionary else {}
 
 static func _write(path: String, d: Dictionary) -> void:

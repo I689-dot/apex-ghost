@@ -70,8 +70,8 @@ func measure_boxes(probe: Callable) -> void:
 			var n := maxi(1, roundi(seg / 0.5))
 			for s in n:
 				var f := float(s) / n
-				for lift in [0.0, 0.9]:
-					var h = probe.call(
+				for lift: float in [0.0, 0.9]:
+					var h: Variant = probe.call(
 						pts[i][0] + (pts[j][0] - pts[i][0]) * f,
 						pts[i][1] + (pts[j][1] - pts[i][1]) * f + lift,
 						pts[i][2] + (pts[j][2] - pts[i][2]) * f,
@@ -297,7 +297,7 @@ func _bar(pts: Array, ground: Callable, i: int, mat: Material, t: float = 0.15) 
 	var nrm := away_at(i)
 	var sh := shift_at(i)
 	var pos := PackedVector3Array()
-	for of in [[sh - HALF, -1.0], [sh + HALF, -1.0], [sh - HALF, 1.0], [sh + HALF, 1.0]]:
+	for of: Array in [[sh - HALF, -1.0], [sh + HALF, -1.0], [sh - HALF, 1.0], [sh + HALF, 1.0]]:
 		var x: float = pts[i][0] + nrm.x * of[0] + fx * of[1]
 		var z: float = pts[i][2] + nrm.y * of[0] + fz * of[1]
 		pos.append(Vector3(x, float(ground.call(x, z, pts[i][1])) + _paint_lift, z))
@@ -351,8 +351,8 @@ func build_surface(ground: Callable, probe: Callable) -> Node3D:
 	for i in n:
 		var p: Array = pts[i]
 		var aw := away_at(i)
-		var out = probe.call(p[0], p[1], p[2], aw.x, aw.y, 20.0)
-		var inn = probe.call(p[0], p[1], p[2], -aw.x, -aw.y, 20.0)
+		var out: Variant = probe.call(p[0], p[1], p[2], aw.x, aw.y, 20.0)
+		var inn: Variant = probe.call(p[0], p[1], p[2], -aw.x, -aw.y, 20.0)
 		raw.append([5.0 if out == null else minf(14.0, out - 0.25), 3.0 if inn == null else minf(12.0, inn - 0.25)])
 	var edge: Array = []
 	for i in n:

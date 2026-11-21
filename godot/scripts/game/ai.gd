@@ -196,7 +196,7 @@ static func learned_grip(track: Dictionary) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
 	var f := FileAccess.get_file_as_string("res://data/ai_learned/%s.json" % track.id)
 	if f != "":
-		var d = JSON.parse_string(f)
+		var d: Variant = JSON.parse_string(f)
 		if d is Dictionary and d.has("mult"):
 			var bin: float = d.binM
 			var mult: Array = d.mult
@@ -227,12 +227,12 @@ static func line_from_file(track: Dictionary) -> Dictionary:
 	var path := "res://data/racelines/%s.json" % track.id
 	if not FileAccess.file_exists(path):
 		return {}
-	var d = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var cl: Array = track.centerline
 	var n := cl.size() / 3
 	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != 1 or int(d.get("n", 0)) != n or absf(float(d.get("length", 0)) - float(track.length)) > 1.0:
 		return {}
-	for k in ["opt", "alt", "lo", "hi"]:
+	for k: String in ["opt", "alt", "lo", "hi"]:
 		if not (d.get(k) is Array) or (d[k] as Array).size() != n:
 			return {}
 	var off := PackedFloat32Array()
@@ -404,7 +404,7 @@ func roomy_side() -> float:
 
 ## Pit lane target point and speed, or {} when not pitting. {follow: false} while still on track braking for the entry.
 func _pit_path(dt: float, x: float, z: float, s: float, speed: float) -> Dictionary:
-	var pl = track.get("pitLane", null)
+	var pl: Variant = track.get("pitLane", null)
 	if pl == null or (pit_request == "" and not in_pit_lane):
 		return {}
 	var pts: Array = pl.points

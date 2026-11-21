@@ -11,7 +11,7 @@ const SAVE_PATH := "user://championship.json"
 static func load_saved() -> Variant:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return null
-	var v = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	return v if typeof(v) == TYPE_DICTIONARY else null
 
 ## Save, or delete the saved championship with null.

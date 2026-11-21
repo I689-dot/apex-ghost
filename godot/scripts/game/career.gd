@@ -62,7 +62,7 @@ static func _start() -> Dictionary:
 static func load_career() -> Dictionary:
 	var c := _start()
 	if FileAccess.file_exists(SAVE_PATH):
-		var v = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+		var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if typeof(v) == TYPE_DICTIONARY:
 			c.merge(v, true)
 	return c

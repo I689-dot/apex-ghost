@@ -52,7 +52,7 @@ static func service_time(plan: Dictionary, z) -> Dictionary:
 static func default_plan(z, avg_wear: float, current: String, wetness: float, fuel_l: float = 0.0, driver_change: bool = false) -> Dictionary:
 	var want_wet := wetness > 0.35
 	var right_kind: bool = current == "wet" if want_wet else current != "wet"
-	var tyres = null
+	var tyres: Variant = null
 	if not right_kind:
 		tyres = "wet" if want_wet else "medium"
 	elif avg_wear > 0.25:

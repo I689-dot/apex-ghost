@@ -13,7 +13,7 @@ var _t := 0.0
 var off_track := false
 
 static func limit_at(track: Dictionary, index: int, left: bool) -> float:
-	var lim = track.get("limitL" if left else "limitR")
+	var lim: Variant = track.get("limitL" if left else "limitR")
 	if lim != null and index < lim.size() and lim[index] != null:
 		return lim[index]
 	return (track.widthL[index] if left else track.widthR[index]) + 0.5

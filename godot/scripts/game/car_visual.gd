@@ -91,7 +91,7 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 	local = is_local
 	_steer_ratio = SteeringLock.lock_deg(entry.id) / 2.0 / maxf(10.0, float(entry.specs.maxSteerDeg))
 	name = "car_%s" % entry.id
-	var st = entry.get("steering", null)
+	var st: Variant = entry.get("steering", null)
 	if st != null:
 		_steer_axis = Vector3(st.axis[0], st.axis[1], st.axis[2]).normalized()
 	var levels: Array = model.lods.slice(0, 1) if local else model.lods
@@ -134,7 +134,7 @@ func _init(car_entry: Dictionary, model: Dictionary, is_local: bool, outside: Pa
 		set_inside(true)
 	# remote cars always, and your own car when real spot lights are too expensive, get a projected light pool
 	_make_light_pool()
-	for n in _walk(self):
+	for n: Node in _walk(self):
 		if n is GeometryInstance3D and n != _pool:
 			n.layers = VIS_OWN if local else VIS_CARS
 	_make_contact_shadow()
@@ -157,7 +157,7 @@ func _cut_out_wheel(root: Node3D, w: Dictionary) -> void:
 	for s in src.get_surface_count():
 		var arrays := src.surface_get_arrays(s)
 		var mat := src.surface_get_material(s)
-		var idx = arrays[Mesh.ARRAY_INDEX]
+		var idx: Variant = arrays[Mesh.ARRAY_INDEX]
 		if mat == null or not (w.materials as Array).has(mat.resource_name) or idx == null:
 			kept.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 			kept.surface_set_material(kept.get_surface_count() - 1, mat)
@@ -217,7 +217,7 @@ func cockpit_root() -> Node3D:
 
 ## LOD by visibility range on every mesh of a level: visible from begin to end metres (0 = unlimited).
 func _set_lod_range(root: Node, begin: float, end_m: float) -> void:
-	for n in _walk(root):
+	for n: Node in _walk(root):
 		if n is GeometryInstance3D:
 			n.visibility_range_begin = begin
 			n.visibility_range_end = end_m
@@ -241,7 +241,7 @@ const DEBRIS_LIFE := 25.0
 const DEBRIS_LAYER := 32
 
 func _collect_parts(root: Node) -> void:
-	for n in _walk(root):
+	for n: Node in _walk(root):
 		if n is MeshInstance3D and String(n.name).begins_with("part_"):
 			var key := String(n.name).trim_prefix("part_")
 			if not _parts.has(key):
@@ -320,12 +320,12 @@ func restore_parts() -> void:
 func _add_body(root: Node) -> void:
 	var b := root.find_child("body", true, false)
 	if b != null:
-		for n in _walk(b):
+		for n: Node in _walk(b):
 			if n is MeshInstance3D:
 				_body_meshes.append(n)
 
 func _set_shadows(root: Node) -> void:
-	for n in _walk(root):
+	for n: Node in _walk(root):
 		if n is GeometryInstance3D:
 			n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
@@ -336,13 +336,13 @@ static func _is_glass(mat_name: String) -> bool:
 
 ## The car's material fixes (CarEntry.look), checked from the driver's seat.
 func _apply_look(sm: StandardMaterial3D) -> void:
-	var look = entry.get("look", null)
+	var look: Variant = entry.get("look", null)
 	if look == null:
 		return
-	var f = look.get("tint", {}).get(sm.resource_name) if look.get("tint") != null else null
+	var f: Variant = look.get("tint", {}).get(sm.resource_name) if look.get("tint") != null else null
 	if f != null:
 		sm.albedo_color = Color(sm.albedo_color.r * f, sm.albedo_color.g * f, sm.albedo_color.b * f, sm.albedo_color.a)
-	var flat = look.get("plain", {}).get(sm.resource_name) if look.get("plain") != null else null
+	var flat: Variant = look.get("plain", {}).get(sm.resource_name) if look.get("plain") != null else null
 	if flat != null:
 		sm.albedo_texture = null
 		sm.albedo_color = Color(flat)
@@ -359,7 +359,7 @@ func _apply_look(sm: StandardMaterial3D) -> void:
 		_strip_mats.append([sm, sm.albedo_color])
 
 func _prepare_materials(root: Node, cache: Dictionary) -> void:
-	for n in _walk(root):
+	for n: Node in _walk(root):
 		if not (n is MeshInstance3D):
 			continue
 		var mi := n as MeshInstance3D
@@ -557,21 +557,21 @@ func set_inside(inside: bool) -> void:
 		return
 	_inside = inside
 	_inside_root.visible = inside
-	for n in _walk(_inside_root):
+	for n: Node in _walk(_inside_root):
 		if n is GeometryInstance3D:
 			n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for n in _walk(_outside_root):
+	for n: Node in _walk(_outside_root):
 		if n is GeometryInstance3D:
 			n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY if inside else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 			n.visible = true
 	_outside_root.visible = true
 	if inside:
 		# only shadows from the outside model: its meshes are not drawn for the view
-		for n in _walk(_outside_root):
+		for n: Node in _walk(_outside_root):
 			if n is GeometryInstance3D:
 				n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 	else:
-		for n in _walk(_outside_root):
+		for n: Node in _walk(_outside_root):
 			if n is GeometryInstance3D:
 				n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
@@ -581,7 +581,7 @@ func simplify_for_cockpit() -> void:
 	tint.albedo_color = Color(0x80 / 255.0, 0x90 / 255.0, 0xa0 / 255.0, 0.1)
 	tint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	tint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	for n in _walk(self):
+	for n: Node in _walk(self):
 		if not (n is MeshInstance3D) or n.mesh == null:
 			continue
 		for s in n.mesh.get_surface_count():
@@ -597,7 +597,7 @@ const HEAD_BEAM := 12.0
 ## Real spot lights for the local car (shadows optional).
 func add_headlights(shadows: bool) -> void:
 	var z := float(entry.dims.length) / 2.0 - 0.3
-	for x in [0.6, -0.6]:
+	for x: float in [0.6, -0.6]:
 		var l := SpotLight3D.new()
 		l.light_color = Color("fff3e0")
 		l.light_energy = 0.0

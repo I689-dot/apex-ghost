@@ -51,7 +51,7 @@ static func _move_old_user_dir() -> void:
 	if FileAccess.file_exists(now.path_join("settings.json")):
 		return
 	var old := ""
-	for n in ["CorsaGhost", "Apex Ghost"]:
+	for n: String in ["CorsaGhost", "Apex Ghost"]:
 		var d := now.get_base_dir().path_join(n)
 		if d != now and DirAccess.dir_exists_absolute(d) and FileAccess.file_exists(d.path_join("settings.json")):
 			old = d
@@ -141,7 +141,7 @@ func load_settings() -> Dictionary:
 	var defaults := default_settings()
 	if not FileAccess.file_exists(SAVE_PATH):
 		return defaults
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return defaults
 	var merged := merge_deep(defaults, parsed)
@@ -207,17 +207,17 @@ func quality_config() -> Dictionary:
 		return _cached_q
 	var q: Dictionary = presets()[data.quality].duplicate()
 	var o: Dictionary = data.graphics
-	var gk = o.get("ao", data.quality)
+	var gk: Variant = o.get("ao", data.quality)
 	q.merge(GODOT_PRESET_KEYS.get(gk if GODOT_PRESET_KEYS.has(gk) else data.quality, GODOT_PRESET_KEYS.low), true)
 	var groups: Dictionary = _quality().groups
 	for g in groups:
-		var from = o.get(g)
+		var from: Variant = o.get(g)
 		if from == null or not presets().has(from):
 			continue
 		for k in groups[g]:
 			q[k] = presets()[from][k]
 	for g in EXTRA_GROUPS:
-		var from = o.get(g)
+		var from: Variant = o.get(g)
 		if from == null or not presets().has(from):
 			continue
 		for k in EXTRA_GROUPS[g]:

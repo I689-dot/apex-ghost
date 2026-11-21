@@ -42,7 +42,7 @@ static func cut(positions: PackedVector3Array, indices: PackedInt32Array, center
 		var hit := false
 		var seen := {}
 		for v in tri:
-			var list = grid.get(_key(v.x, v.z))
+			var list: Variant = grid.get(_key(v.x, v.z))
 			if list == null:
 				continue
 			for i in list:

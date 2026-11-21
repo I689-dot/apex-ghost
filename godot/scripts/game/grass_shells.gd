@@ -39,7 +39,7 @@ static func build(track_root: Node3D, lawn: Array, track: Dictionary, mask: Gras
 				near[_key(cl[i] + dx * CELL, cl[i + 2] + dz * CELL)] = true
 	# lawn triangles, world space, by cell
 	var by_cell := {}
-	for n in CarVisual._walk(track_root):
+	for n: Node in CarVisual._walk(track_root):
 		if not (n is MeshInstance3D) or (n as MeshInstance3D).mesh == null:
 			continue
 		var mi := n as MeshInstance3D
@@ -50,8 +50,8 @@ static func build(track_root: Node3D, lawn: Array, track: Dictionary, mask: Gras
 				continue
 			var arrays := mesh.surface_get_arrays(s)
 			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var nors = arrays[Mesh.ARRAY_NORMAL]
-			var idx = arrays[Mesh.ARRAY_INDEX]
+			var nors: Variant = arrays[Mesh.ARRAY_NORMAL]
+			var idx: Variant = arrays[Mesh.ARRAY_INDEX]
 			var has_idx: bool = idx != null and idx.size() > 0
 			var count: int = idx.size() if has_idx else verts.size()
 			for i in range(0, count - 2, 3):
