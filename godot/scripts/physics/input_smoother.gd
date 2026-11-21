@@ -23,7 +23,7 @@ func update(_dt: float, kb: KeyboardInput, _speed_ms: float, reverse: bool) -> C
 	var left := kb.held("steerLeft")
 	var right := kb.held("steerRight")
 	out.steer = 0.0 if left == right else (1.0 if left else -1.0)
-	for src in [InputState.touch, InputState.pad, InputState.rig]:
+	for src: Dictionary in [InputState.touch, InputState.pad, InputState.rig]:
 		if not src.active:
 			continue
 		var thr := clampf(src.throttle, 0.0, 1.0)

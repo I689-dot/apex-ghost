@@ -50,7 +50,7 @@ func _sm(key: String, target: float, tc: float, dt: float) -> float:
 
 ## A recorded layer's loop, started on first use, at a random point. False when its recording is not there.
 func _layer(name: String, vol: float, rate: float, dt: float) -> bool:
-	var s = a.samples.get(name, null)
+	var s: AudioStream = a.samples.get(name, null)
 	if s == null:
 		return false
 	var p: AudioStreamPlayer = _loops.get(name, null)

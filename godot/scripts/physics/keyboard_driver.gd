@@ -42,7 +42,7 @@ static func _smoothstep(a: float, b: float, x: float) -> float:
 	return t * t * (3.0 - 2.0 * t)
 
 ## keys: {throttle, brake, steer, handbrake, analog}. m: {vx, vy, r, a, b, wheelbase, maxLockRad, alphaPeak}.
-func step(dt: float, keys, m: Dictionary) -> void:
+func step(dt: float, keys: Controls, m: Dictionary) -> void:
 	var kb := KB
 	var pd := PAD
 	var target: float = keys.steer

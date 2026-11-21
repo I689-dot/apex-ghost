@@ -77,7 +77,7 @@ func _process(_dt: float) -> void:
 	connected = true
 	var pad := PadMap.read(dev)
 	var now: Array = []
-	for b in pad.buttons:
+	for b: Dictionary in pad.buttons:
 		now.append(b.pressed)
 	var next := "drive" if driving.is_valid() and driving.call() else "menu"
 	if next != _mode:
@@ -132,11 +132,11 @@ func _drive(pad: Dictionary, now: Array, pressed: Callable, spec: bool) -> void:
 		if pressed.call(BTN.MENU):
 			_tap_action("pause")
 		return
-	for t in TAP:
+	for t: Array in TAP:
 		if pressed.call(t[0]):
 			_tap_action(t[1])
 	var want := {}
-	for h in HOLD:
+	for h: Array in HOLD:
 		if now[h[0]]:
 			want[h[1]] = true
 	var rx: float = pad.axes[2]
@@ -146,10 +146,10 @@ func _drive(pad: Dictionary, now: Array, pressed: Callable, spec: bool) -> void:
 			want["lookLeft"] = true
 		if rx > 0.6:
 			want["lookRight"] = true
-	for a in _held.keys():
+	for a: String in _held.keys():
 		if not want.has(a):
 			_press_action(a, false)
-	for a in want.keys():
+	for a: String in want.keys():
 		if not _held.has(a):
 			_press_action(a, true)
 	_held = want
@@ -184,7 +184,7 @@ func _digital_ramp(i: int, raw: float) -> float:
 	return s.v
 
 func _release() -> void:
-	for a in _held.keys():
+	for a: String in _held.keys():
 		_press_action(a, false)
 	_held.clear()
 	var pd: Dictionary = InputState.pad

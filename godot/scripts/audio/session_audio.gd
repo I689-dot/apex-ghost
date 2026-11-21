@@ -68,7 +68,7 @@ func update(dt: float, o: Dictionary) -> void:
 	var sand := 0.0
 	var road := 0.0
 	var water := 0.0
-	var tp = v.tire.p
+	var tp: TireModel.TireParams = v.tire.p
 	for w in v.wheels:
 		if not w.contact:
 			continue
@@ -91,31 +91,31 @@ func update(dt: float, o: Dictionary) -> void:
 	# ---- other cars: voices for the nearest few
 	var near: Array = []
 	var listener: Vector3 = o.listener
-	for c in o.others:
+	for c: Dictionary in o.others:
 		var d: float = c.pos.distance_to(listener)
 		if d < HEAR_M and 1.0 / (1.0 + pow(d / 14.0, 1.5)) > 0.015:
 			near.append([d, c])
-	near.sort_custom(func(x, y): return x[0] < y[0])
+	near.sort_custom(func(x: Array, y: Array) -> bool: return x[0] < y[0])
 	near = near.slice(0, MAX_OTHERS)
 	var keep := {}
-	for x in near:
+	for x: Array in near:
 		keep[x[1].key] = true
-	for k in _others.keys():
+	for k: String in _others.keys():
 		if not keep.has(k):
 			_others[k].voice.stop()
 			_others.erase(k)
-	for x in near:
+	for x: Array in near:
 		var c: Dictionary = x[1]
-		var ov = _others.get(c.key, null)
+		var ov: Variant = _others.get(c.key, null)
 		if ov == null:
 			var voice := a.create_engine(EngineProfiles.for_car(c.entry))
 			ov = {"voice": voice, "prev_speed": c.vel.length(), "load": 0.3, "gear": 1}
 			_others[c.key] = ov
 		var speed: float = c.vel.length()
 		var p := _place(c.pos, c.vel, o)
-		var rpm = c.get("rpm", null)
-		var ld = c.get("load", null)
-		var rt = c.get("gearRatio", null)
+		var rpm: Variant = c.get("rpm", null)
+		var ld: Variant = c.get("load", null)
+		var rt: Variant = c.get("gearRatio", null)
 		if rpm == null or ld == null or rt == null:
 			var est := _estimate_rpm(c.entry, speed, ov.gear)
 			ov.gear = est.gear
@@ -182,7 +182,7 @@ func chime(kind: String) -> void:
 func dispose() -> void:
 	if _mine != null:
 		_mine.stop()
-	for ov in _others.values():
+	for ov: Dictionary in _others.values():
 		ov.voice.stop()
 	_others.clear()
 	_car.dispose()

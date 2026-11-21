@@ -8,7 +8,12 @@ together with `git log`.
 - **Phase:** batch 2 (dead code) is done (2026-11-21). Next: batch 3, typing; then check-in 2.
 - **Size and warnings after batch 2:**
   - Scripts and lines: 151 scripts (152 at the start), 34,138 lines (35,232 at the start, −1,094).
-  - Warnings: 2,488 (2,591 after the guardrails). No unused-name warning is left.
+  - Warnings: **2,433 distinct**, counted by the corrected compile_all (`fe65a16`). The 2,488 and 2,591 reported
+    before were from the first counter. It counted only the scripts that happened to compile first, so the number
+    moved with the load order, and it counted some warnings twice. No unused-name warning is left.
+  - The corrected compile_all reloads every script in its `--debug` run and also fails on any script error. Before,
+    a script that compiled only in part still loaded and passed: it happened once during typing, with an inner-class
+    type written without its class (`TireParams` for `TireModel.TireParams`).
 - **Batch 2 commits.** Each one compiled, passed the full headless suite through `compare.sh` (PASS: identical to the
   baseline), and passed the rendered features_test, a session, and, for the UI, rendered menu_test, the phone shots
   and a HUD shot.
@@ -39,7 +44,8 @@ together with `git log`.
   - `tests/compile_all.gd` still fails when a script does not compile. It now also starts itself again with `--debug`
     and prints the warnings per script, per kind, and in total. `WARNINGS=0` compiles only.
   - `held` (app.gd, the threaded load kept referenced) carries `@warning_ignore("unused_variable")` with its reason.
-- **Warnings from here on** (the number every batch reports): **2,591 in 131 scripts.** By kind:
+- **Warnings at the guardrails, by the first counter** (the per-kind table stays as a rough guide; the counts from batch 2 on are
+  the corrected counter's): **2,591 in 131 scripts.** By kind:
 
   | Kind | Count |
   |---|---:|

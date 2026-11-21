@@ -33,12 +33,12 @@ func _init(levels: Dictionary = {}) -> void:
 		noise[i] = w
 		last = (last + 0.02 * w) / 1.02
 		brown[i] = last * 3.5
-	for name in SAMPLE_NAMES:
+	for name: String in SAMPLE_NAMES:
 		var path := "res://assets/audio/surface/%s.wav" % name
 		if not ResourceLoader.exists(path):
 			push_warning("[audio] %s not loaded: the procedural sound stays" % name)
 			continue
-		var s = load(path)
+		var s: Resource = load(path)
 		if s is AudioStreamWAV:
 			s = s.duplicate()
 			if name in LOOPED:
@@ -59,7 +59,7 @@ func _setup_buses() -> void:
 			has = true
 	if not has:
 		AudioServer.add_bus_effect(0, comp)
-	for b in ["Engine", "Sfx", "Amb", "Radio"]:
+	for b: String in ["Engine", "Sfx", "Amb", "Radio"]:
 		if AudioServer.get_bus_index(b) < 0:
 			AudioServer.add_bus()
 			var i := AudioServer.bus_count - 1
@@ -67,7 +67,7 @@ func _setup_buses() -> void:
 			AudioServer.set_bus_send(i, "Master")
 
 func set_levels(l: Dictionary) -> void:
-	var f := func(bus: String, v: float): AudioServer.set_bus_volume_db(AudioServer.get_bus_index(bus), linear_to_db(maxf(v, 1e-4)))
+	var f := func(bus: String, v: float) -> void: AudioServer.set_bus_volume_db(AudioServer.get_bus_index(bus), linear_to_db(maxf(v, 1e-4)))
 	f.call("Master", l.master * l.master)
 	f.call("Engine", l.engine * l.engine)
 	f.call("Sfx", l.effects * l.effects)
@@ -145,7 +145,7 @@ func filtered_loop(key: String, chain: Array, use_brown: bool = false, am_hz: fl
 	if _cache.has(key):
 		return _cache[key]
 	var x: PackedFloat32Array = brown if use_brown else noise
-	for c in chain:
+	for c: Array in chain:
 		# two passes over the loop; the second one has the filter already settled, so the loop point is clean
 		var y := biquad(c[0], c[1], c[2], x + x)
 		x = y.slice(x.size())
@@ -232,7 +232,7 @@ func play_stream(stream: AudioStream, vol: float, rate: float, bus: String, pan:
 	add_child(p)
 	p.finished.connect(p.queue_free)
 	if when > 0.0:
-		get_tree().create_timer(when).timeout.connect(func(): if is_instance_valid(p): p.play())
+		get_tree().create_timer(when).timeout.connect(func() -> void: if is_instance_valid(p): p.play())
 	else:
 		p.play()
 

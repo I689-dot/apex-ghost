@@ -7,7 +7,7 @@ extends RigidBody3D
 const C = preload("res://scripts/physics/vehicle_consts.gd")
 
 ## Ground rays: ground.cast(origin, dir, max_dist) -> {} or {dist, pos, normal, surface}. Must ignore the car itself.
-var ground
+var ground: GroundQuery
 var car: Dictionary
 var specs: Dictionary
 var damage: DamageState
@@ -36,7 +36,7 @@ var compound: Dictionary = Tyres.COMPOUNDS.medium
 ## Track water 0..1 (tyre wear).
 var wetness := 0.0
 ## The track's puddles (WetFx), or null: each wheel asks how much water is under it.
-var puddles = null
+var puddles: WetFx = null
 ## Aerodynamic wake of a car ahead.
 var wake := {"drag": 1.0, "downforce": 1.0, "strength": 0.0}
 ## Pit lane speed limiter (m/s), or -1 when off.
@@ -81,7 +81,7 @@ var _ducts := 1.0
 var _map_fuel := 1.0
 
 ## Build the car from its cars.json entry. Call before adding to the tree.
-func setup_car(car_entry: Dictionary, ground_query, assist_set: Dictionary, damage_state: DamageState) -> void:
+func setup_car(car_entry: Dictionary, ground_query: GroundQuery, assist_set: Dictionary, damage_state: DamageState) -> void:
 	car = car_entry
 	specs = car.specs
 	ground = ground_query
@@ -139,7 +139,7 @@ func setup_car(car_entry: Dictionary, ground_query, assist_set: Dictionary, dama
 	var rear_load := m * C.G * (1.0 - float(specs.weightFront)) / 2.0
 	# symmetric axles for the physics (source models are a few millimetres lopsided, which would pull)
 	var geom := {}
-	for pair in [["FL", "FR"], ["RL", "RR"]]:
+	for pair: Array in [["FL", "FR"], ["RL", "RR"]]:
 		var wa: Dictionary = car.wheels[pair[0]]
 		var wb: Dictionary = car.wheels[pair[1]]
 		var x: float = (absf(wa.position[0]) + absf(wb.position[0])) / 2.0
@@ -148,7 +148,7 @@ func setup_car(car_entry: Dictionary, ground_query, assist_set: Dictionary, dama
 		var r: float = (wa.radius + wb.radius) / 2.0
 		geom[pair[0]] = [Vector3(x, y, z), r]
 		geom[pair[1]] = [Vector3(-x, y, z), r]
-	for k in ["FL", "FR", "RL", "RR"]:
+	for k: String in ["FL", "FR", "RL", "RR"]:
 		var g: Array = geom[k]
 		wheels.append(Wheel.new(k, g[0], g[1], specs, front_load if k[0] == "F" else rear_load))
 	for w in wheels:

@@ -18,7 +18,7 @@ static func load_bank(name: String) -> Dictionary:
 		var loops: Array = []
 		var sum := 0.0
 		var cnt := 0
-		for l in meta.loops:
+		for l: Dictionary in meta.loops:
 			var on := _loop(pcm, l.on, rate)
 			var off := _loop(pcm, l.off, rate)
 			# every bank at the same full-throttle loudness (the files are peak-normalised and recordings differ in crest factor)

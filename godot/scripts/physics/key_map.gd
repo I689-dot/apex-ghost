@@ -33,7 +33,7 @@ static func key_of(code: String) -> int:
 static func code_of(keycode: int) -> String:
 	if _map.is_empty():
 		_build()
-	for c in _map:
+	for c: String in _map:
 		if _map[c] == keycode:
 			return c
 	return ""

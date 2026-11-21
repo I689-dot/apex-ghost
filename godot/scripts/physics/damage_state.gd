@@ -64,7 +64,7 @@ func _add(i: int, v: float) -> void:
 func repair(parts: Dictionary) -> bool:
 	var changed := false
 	if parts.get("body", false):
-		for i in [0, 1, 2, 3]:
+		for i: int in [0, 1, 2, 3]:
 			if zones[i] > 0.0:
 				changed = true
 			zones[i] = 0.0

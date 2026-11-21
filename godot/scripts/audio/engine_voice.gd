@@ -46,7 +46,7 @@ func _init(audio: GameAudio, prof: Dictionary) -> void:
 	_panner = a.voice_bus(_bus, "Engine")
 	# the car's own tone over the shared recording
 	var tone: Array = prof.get("tone", [0.0, 0.0, 0.0])
-	if tone.any(func(g): return absf(float(g)) > 0.01):
+	if tone.any(func(g: Variant) -> bool: return absf(float(g)) > 0.01):
 		var eq := AudioEffectEQ6.new()
 		eq.set_band_gain_db(0, float(tone[0]))
 		eq.set_band_gain_db(1, float(tone[0]) * 0.6)
@@ -80,7 +80,7 @@ func _ready() -> void:
 	for p in _players:
 		add_child(p)
 		p.play(randf() * 0.5)
-	for p in [_whine, _turbo, _motor]:
+	for p: AudioStreamPlayer in [_whine, _turbo, _motor]:
 		if p != null:
 			add_child(p)
 			p.play()
@@ -170,8 +170,8 @@ func _update_engine(cut: float) -> void:
 	var k := 0
 	while k < loops.size() - 2 and loops[k + 1].rpm < r:
 		k += 1
-	var lo = loops[k]
-	var hi = loops[mini(k + 1, loops.size() - 1)]
+	var lo: Dictionary = loops[k]
+	var hi: Dictionary = loops[mini(k + 1, loops.size() - 1)]
 	var f := 0.0 if hi == lo else clampf((r - lo.rpm) / (hi.rpm - lo.rpm), 0.0, 1.0)
 	if k != _lo or _hi != mini(k + 1, loops.size() - 1):
 		_lo = k

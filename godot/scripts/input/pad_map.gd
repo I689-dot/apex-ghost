@@ -20,7 +20,7 @@ static func pad_key(id: String) -> String:
 
 ## "custom", "standard" or "raw" (Godot knows the pad's mapping).
 static func layout_kind(device: int) -> String:
-	var custom = Settings.data.pad.layouts.get(pad_key(Input.get_joy_name(device)), null)
+	var custom: Variant = Settings.data.pad.layouts.get(pad_key(Input.get_joy_name(device)), null)
 	if custom != null:
 		return "custom"
 	return "standard" if Input.is_joy_known(device) else "raw"
@@ -38,13 +38,13 @@ static func source_value(device: int, s: Variant) -> float:
 ## {buttons: [{pressed, value}] × 17, axes: [LX, LY, RX, RY], layout, name}.
 static func read(device: int) -> Dictionary:
 	var kind := layout_kind(device)
-	var layout = Settings.data.pad.layouts.get(pad_key(Input.get_joy_name(device)), null) if kind == "custom" else null
+	var layout: Variant = Settings.data.pad.layouts.get(pad_key(Input.get_joy_name(device)), null) if kind == "custom" else null
 	var buttons: Array = []
 	for i in STD_BUTTONS:
 		var v := 0.0
 		var pressed := false
 		if layout != null:
-			var s = layout.buttons[i] if i < layout.buttons.size() else null
+			var s: Variant = layout.buttons[i] if i < layout.buttons.size() else null
 			v = source_value(device, s)
 			pressed = Input.is_joy_button_pressed(device, int(s.b)) if s != null and s.has("b") else v > 0.5
 		elif i == 6:
@@ -61,7 +61,7 @@ static func read(device: int) -> Dictionary:
 	var std := [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y, JOY_AXIS_RIGHT_X, JOY_AXIS_RIGHT_Y]
 	for i in 4:
 		if layout != null:
-			var s = layout.axes[i] if i < layout.axes.size() else null
+			var s: Variant = layout.axes[i] if i < layout.axes.size() else null
 			axes[i] = Input.get_joy_axis(device, int(s.a)) * s.dir if s != null else 0.0
 		else:
 			axes[i] = Input.get_joy_axis(device, std[i])

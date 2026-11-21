@@ -56,7 +56,7 @@ static func bindings() -> Dictionary:
 ## The connected device a binding means: by its name, the n-th of that name.
 static func device_of(b: Dictionary) -> int:
 	var n := 0
-	for d in joypads():
+	for d: int in joypads():
 		if PadMap.pad_key(joy_name(d)) == b.get("dev", ""):
 			if n == int(b.get("nth", 0)):
 				return d
@@ -107,7 +107,7 @@ func _process(_dt: float) -> void:
 	var rig: Dictionary = InputState.rig
 	var drive_bound: bool = bs.has("steer") or bs.has("throttle") or bs.has("brake")
 	var any_connected := false
-	for k in ["steer", "throttle", "brake"]:
+	for k: String in ["steer", "throttle", "brake"]:
 		if bs.has(k) and device_of(bs[k]) >= 0:
 			any_connected = true
 	rig.active = drive_bound and any_connected
@@ -134,7 +134,7 @@ func _process(_dt: float) -> void:
 			gear = -1
 	rig.gear = (0 if gear == -99 else gear) if h_bound else -99
 	# buttons: the game's actions, tapped or held
-	for f in FUNCTIONS:
+	for f: Array in FUNCTIONS:
 		if f[1] != "button" or f[0] == "handbrake" or not bs.has(f[0]):
 			continue
 		var on := pressed(bs[f[0]])
