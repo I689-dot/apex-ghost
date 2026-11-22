@@ -69,6 +69,17 @@ func load_session(progress: Callable) -> void:
 
 	# my car
 	await step.call(I18n.t("Placing the cars on the grid"))
+	# every car model of the session read in threads first (Assets.fetch), held until the cars are built
+	var files: Array = Assets.car_files(my_entry, 1, bool(q.cockpitDetail)) + Assets.car_files(my_entry, 1, false)
+	for r: Dictionary in racers:
+		var rp: Variant = r.player
+		if r.id != me and rp != null and rp.carId != null and entries.has(rp.carId):
+			var e: Dictionary = entries[rp.carId]
+			files.append_array(Assets.car_files(e, 1, false, 0) if bool(Settings.data.get("carsFullDetail", false)) else Assets.car_files(e, 3, false, 1))
+	if race.get("rules", {}).get("raceControl", false) and race.kind == "race" and not CarsDb.safety_car().is_empty():
+		files.append_array(Assets.car_files(CarsDb.safety_car(), 3, false, 1))
+	@warning_ignore("unused_variable")
+	var held := await Assets.fetch(files)
 	var slot: int = race.slots.get(me, 0)
 	var grid: Dictionary = track_data.grid[slot] if slot < track_data.grid.size() else track_data.grid[0]
 	# the setup chosen in the lobby (wing, brake balance) changes the car's specs for the physics

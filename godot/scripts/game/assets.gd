@@ -56,6 +56,36 @@ static func forget_car_model(entry: Dictionary, lods_wanted: int = 3, cockpit: b
 		files = [cock] + entry.lods.slice(1)
 	_models.erase("%s:%d-%d:%s" % [entry.id, mini(first_level, files.size() - 1), lods_wanted, str(cockpit and cock != null)])
 
+## The model files load_car_model reads for these arguments.
+static func car_files(entry: Dictionary, lods_wanted: int = 3, cockpit: bool = false, first_level: int = 0) -> Array:
+	var files: Array = []
+	var cock: Variant = entry.get("cockpit", null)
+	if cockpit and cock != null:
+		files.append(cock)
+		files.append_array(entry.lods.slice(1))
+	else:
+		files = entry.lods.duplicate()
+	if files.is_empty():
+		return []
+	return files.slice(mini(first_level, files.size() - 1), lods_wanted)
+
+## Loads these files in threads, frames going on, and returns them: hold the array until they are used, and a load()
+## of them then comes from the cache. A big model loaded on the main thread never finished on the phone (the Pixel
+## 10a, 2026-11-20 and -22: 0 % CPU for minutes, the race's loading screen frozen).
+static func fetch(files: Array) -> Array:
+	var tree := Engine.get_main_loop() as SceneTree
+	var wait: Array = []
+	for f: String in files:
+		if not wait.has(f) and not ResourceLoader.has_cached(path(f)):
+			request(f)
+			wait.append(f)
+	var held: Array = []
+	for f: String in wait:
+		while not scene_ready(f):
+			await tree.process_frame
+		held.append(scene_result(f))
+	return held
+
 static func load_car_model(entry: Dictionary, lods_wanted: int = 3, cockpit: bool = false, first_level: int = 0) -> Dictionary:
 	var files: Array = []
 	var cock: Variant = entry.get("cockpit", null)

@@ -318,6 +318,11 @@ func ensure_ghost_visual() -> void:
 		return
 	ghost_loading = true
 	var entry: Dictionary = vehicle.car
+	# (read in threads, the session going on: Assets.fetch)
+	@warning_ignore("unused_variable")
+	var held := await Assets.fetch(Assets.car_files(entry, 3, false))
+	if not is_inside_tree():
+		return
 	var model := Assets.load_car_model(entry, 3, false)
 	var v := CarVisual.new(entry, model, false)
 	v.set_opacity(0.3)
