@@ -14,12 +14,12 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
     t=100 s  lap distance  4123 m  203 km/h
     t=120 s  lap distance  4917 m  107 km/h
   lap 1: 2:06.903 (out)
-    t=140 s  lap distance  5868 m   86 km/h
-    t=160 s  lap distance  6522 m  147 km/h
-    t=180 s  lap distance  7364 m  195 km/h
-    t=200 s  lap distance  8217 m  173 km/h
-    t=220 s  lap distance  9067 m  179 km/h
-    t=240 s  lap distance  9946 m  136 km/h
-  lap 2: 2:04.771
-skill 0.97: lap 2:04.771, resets 0, top 245 km/h, finished=true, off the track 0 times
-exit=0 seconds=14
+    t=140 s  lap distance  5866 m   80 km/h
+    t=160 s  lap distance  6521 m  147 km/h
+    t=180 s  lap distance  7363 m  195 km/h
+    t=200 s  lap distance  8216 m  173 km/h
+    t=220 s  lap distance  9050 m  146 km/h
+    t=240 s  lap distance  9931 m  141 km/h
+  lap 2: 2:05.067
+skill 0.97: lap 2:05.067, resets 0, top 245 km/h, finished=true, off the track 0 times
+exit=0 seconds=0

@@ -15,6 +15,13 @@ together with `git log`.
     long stop near the end (driver change, repairs, tyres: 1 to 2 minutes) is classified at the flag where it is, as
     the tracker means (cars in the garage when it falls). The diagnostic showed every "standing" bot moving at the
     pit limiter or serving its stop.
+  - **ailap's baseline re-recorded (2026-11-22).** Layouts 0-3 drifted from the baseline after about 140 s on the
+    same code. A bot's mistake roll is seeded with `hash(get_instance_id())`, and an object's id depends on how many
+    objects the engine made before it: one extra `RefCounted.new()` before the test moves layout 0's lap from 2:04.922
+    to 2:04.943. So the lap times follow the engine's object count as well as the code. Proof that the code did not
+    cause it: the baseline's own commit (5f19051), run today in a scratch worktree, gives exactly today's 16 outputs.
+    Those 16 outputs are now the baseline. **When ailap differs again,** run the baseline commit in a worktree before
+    blaming a change.
 - **The user's answers at check-in 2:**
   - Find the cause of the server's exhausted quota.
   - Fix the safety car's missing lod1.glb now.

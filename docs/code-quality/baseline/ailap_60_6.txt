@@ -22,4 +22,4 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
     t=240 s  lap distance  9950 m   68 km/h
   lap 2: 2:06.989
 skill 0.97: lap 2:06.989, resets 0, top 259 km/h, finished=true, off the track 0 times
-exit=0 seconds=14
+exit=0 seconds=0
