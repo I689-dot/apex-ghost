@@ -5,7 +5,7 @@ together with `git log`.
 
 ## State
 
-- **Phase:** phase 4 done (2026-11-22); check-in 4 next. check.sh: PASS on HEAD.
+- **Phase:** done (check-in 4, 2026-11-22). Left: the frame-rate comparison (old code against new, back to back, Spa Ultra session_test), at the start of the next session (the user's choice): the PC's windows stalled 1 s every 1.1 s that night.
 - **Numbers at check-in 3:** 153 scripts (two helpers added: JsonFile, JsonHttp), 34,060 lines (34,140 at check-in 2),
   676 warnings (689). One behaviour fix in the batch: the phone's Join (2eb818d).
 - **Answers at check-in 3:** batch 5: go on. The server quota: not now. The bots: seed them from their own id.
@@ -593,7 +593,7 @@ contain none of these names.
 ## Phase 4 (keep it clean)
 
 - `CLAUDE.md` (102 lines), `tools/godot/check.sh`, the DECISIONS.md section "Code-quality pass (2026-11)".
-- **Proposed Stop hook (not installed: needs the user's OK).** In `.claude/settings.json`, a session cannot finish
+- **Stop hook: installed at check-in 4 with the user's OK** (`.claude/settings.json`, which .gitignore leaves out: this checkout only; pipe-tested: exit 0 on a clean tree, exit 2 naming the file and line for an untyped variable). In `.claude/settings.json`, a session cannot finish
   while a changed `.gd` file fails to compile (exit 2 blocks the stop and shows the errors to the session; the
   compile without the warning count takes about 10 s):
 
