@@ -47,9 +47,20 @@ together with `git log`.
     ResultsScreen.fmt_time, CareerScreen._name / MobileHome.nick, UIW.row / SettingsPanel._row (the panel's has its
     help hooks), the row-line style. The env's "white" stays in each look (AgX ignores it, but it is a setting each
     passes on). The "anything but toasts and perf" overlay test is another question than "a modal is open".
-  - **Found, needs a fix commit: the phone's Join cannot reach a race hosted on a device.** Only the classic menu
-    calls P2p.is_p2p_code, which marks the code as a device's (Connection then connects over WebRTC); the phone's
-    Join goes to app.join straight away and Connection treats the code as a server room.
+  - **Fixed (2eb818d): the phone's Join could not reach a race hosted on a device.** Only the classic menu called
+    P2p.is_p2p_code, which marks the code as a device's (Connection then connects over WebRTC); the phone's Join went
+    to app.join straight away and Connection took the code for a server room. Both now use App.join_code. Measured
+    against a local server with the race hosted in another process: before, the phone's way opened 6 WebSockets to
+    a server room of that code and had not joined after 60 s; the menu's way and App.join_code joined.
+  - Bars: UIW.bar (9 copies). Back navigation: the phone's back button takes go_back's steps (App.top_modal for the
+    top modal) and keeps its own (pause the race, close the app from the classic menu, leave the results, a lobby,
+    the briefing, watching). Kept apart on purpose: Esc does not leave a lobby or the results.
+  - race_session's pit service: serve (the end of a stop: tyres with their grip, fuel), fuel_to_add, avg_wear,
+    nominal_fuel_per_lap and TYRE_OUT_C, shared by the bots and me. Measured: a probe ran 400 random stops (wear,
+    fuel, plans, weather) through the old inline code and the helpers on two real vehicles: 0 different.
+  - **The PC tonight (2026-11-22 ~03:40): any window stalls 1 s every 1.1 s,** an empty one too and on the code
+    before these changes (probe: 6 long frames of 1,001-1,003 ms in 6 s). Likely the screens asleep (Wayland: no DPMS
+    query). Rendered frame times are not usable until it is gone; menu_buttons_test's presses all ran.
 - **The user's answers at check-in 2:**
   - Find the cause of the server's exhausted quota.
   - Fix the safety car's missing lod1.glb now.
