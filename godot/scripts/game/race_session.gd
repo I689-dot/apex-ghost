@@ -14,6 +14,8 @@ const MAX_FRAME_DT := 0.1
 const PASS_OFFSET := 3.6
 ## AI cars leave the grid one at a time, this far apart (qualifying: no rolling start).
 const BOT_RELEASE_MS := 1000.0
+## The tyres leave the pits this much above the air's temperature: no tyre warmers (°C).
+const TYRE_OUT_C := 12.0
 ## Contact rule: a car simulated elsewhere is a stand-in here with its real mass, driven every step to where the
 ## prediction puts it (velocity towards that pose, PROXY_TAU_S).
 const PROXY_TAU_S := 0.06
@@ -368,8 +370,8 @@ func load_session(progress: Callable) -> void:
 	air = Weather.temperatures(race.weather, weather, track_data.map)
 	vehicle.set_air(air.airC, air.trackC, air.airDensity)
 	var tyre_id: String = Settings.data.carSetup.tyre
-	vehicle.fit_tyres(Tyres.COMPOUNDS.get(tyre_id, Tyres.COMPOUNDS[Tyres.compound_for_weather(weather.wetness)]), vehicle.ambient_c + 12.0)
-	fuel_per_lap = (float(track_data.length) / 1000.0) * VehicleConsts.FUEL.perKm
+	vehicle.fit_tyres(Tyres.COMPOUNDS.get(tyre_id, Tyres.COMPOUNDS[Tyres.compound_for_weather(weather.wetness)]), vehicle.ambient_c + TYRE_OUT_C)
+	fuel_per_lap = nominal_fuel_per_lap()
 	if race.get("rules", {}).get("fuel", false):
 		vehicle.set_fuel(Settings.data.carSetup.fuelL)
 	var with_cockpit: bool = bool(q.cockpitDetail) and my_entry.get("cockpit") != null
@@ -1047,11 +1049,11 @@ func _create_local_bots(entries: Dictionary) -> void:
 		v.place(g.p[0], g.p[1], g.p[2], g.yaw)
 		v.frozen = true
 		v.set_air(air.airC, air.trackC, air.airDensity)
-		v.fit_tyres(Tyres.COMPOUNDS[Tyres.compound_for_weather(weather.wetness)], v.ambient_c + 12.0)
+		v.fit_tyres(Tyres.COMPOUNDS[Tyres.compound_for_weather(weather.wetness)], v.ambient_c + TYRE_OUT_C)
 		if contact:
 			v.set_contact(true)
 		# fuel for the race and a little more (they refuel at a stop if a tank is not enough), 40 l for qualifying
-		var per_lap: float = (float(track_data.length) / 1000.0) * VehicleConsts.FUEL.perKm
+		var per_lap := nominal_fuel_per_lap()
 		if race.get("rules", {}).get("fuel", false):
 			v.set_fuel(minf(VehicleConsts.FUEL.tankL, race_laps() * per_lap * 1.05 + 2.0) if race.kind == "race" else 40.0)
 		var win := RaceTracker.pit_window_laps(race_laps())
@@ -2587,7 +2589,7 @@ func update_bot_pits(server_now: float) -> void:
 		var lap := tr.laps + 1
 		var st: Variant = _standing(r.id)
 		var laps_left := race_laps() - tr.laps
-		var per_lap: float = (float(track_data.length) / 1000.0) * VehicleConsts.FUEL.perKm
+		var per_lap := nominal_fuel_per_lap()
 		# the mandatory stop: on its lap of the window, or (a timed race) at its moment in the window's 10 minutes
 		var in_window: bool
 		if wt != null:
@@ -2603,11 +2605,8 @@ func update_bot_pits(server_now: float) -> void:
 				b.ai.pit_request = "through"
 		# in the box: the crew's work, timed like a player's stop
 		if b.ai.at_box() and b.service_end == 0.0:
-			var wear := 0.0
-			for w in v.wheels:
-				wear += w.wear
-			wear /= 4.0
-			var fuel_add := 0.0 if v.fuel_l < 0.0 else ceilf(minf(VehicleConsts.FUEL.tankL - v.fuel_l, maxf(0.0, (laps_left + 1) * per_lap - v.fuel_l)))
+			var wear := avg_wear(v)
+			var fuel_add := fuel_to_add(v, (laps_left + 1) * per_lap)
 			var driver: bool = bool(rules.get("pitWindow", false)) and not (st != null and st.stopDone) and ((tr.pit_in_ms >= wt.open and tr.pit_in_ms < wt.close) if wt != null else (lap >= win.open and lap <= win.close))
 			var plan := PitService.default_plan(r.damage.zones, wear, v.compound.id, weather.wetness, fuel_add, driver)
 			b.service_plan = plan
@@ -2626,12 +2625,8 @@ func update_bot_pits(server_now: float) -> void:
 			r.visual.wheel_out = pose.wheelOut
 			b.lift = pose.lift
 		elif b.service_end > 0.0 and now >= b.service_end:
-			var plan2: Variant = b.service_plan
-			if plan2 != null and plan2.tyres != null:
-				v.fit_tyres(Tyres.COMPOUNDS[plan2.tyres], v.ambient_c + 12.0)
-				v.weather_grip = Tyres.compound_grip(v.compound, weather.wetness, weather.rain)
-			if plan2 != null and plan2.fuelL > 0.0 and v.fuel_l >= 0.0:
-				v.set_fuel(v.fuel_l + plan2.fuelL)
+			if b.service_plan != null:
+				serve(v, b.service_plan, weather.wetness, weather.rain)
 			b.service_end = 0.0
 			b.service_plan = null
 			b.service_events = null
@@ -2902,18 +2897,12 @@ func open_pit_menu() -> void:
 	pit_hold = true
 	v.frozen = true
 	var wear: Array = v.wheels.map(func(w: Wheel) -> float: return w.wear)
-	var avg_wear := 0.0
-	for w: float in wear:
-		avg_wear += w
-	avg_wear /= 4.0
 	# the race: fuel to the finish (and a lap more); the mandatory stop when the window is open
 	var laps_left: Variant = maxi(0, race_laps() - my_laps) if race.kind == "race" else null
 	var fuel_need: Variant = (laps_left + 1) * fuel_per_lap if laps_left != null else null
-	var fuel_add := 0.0
-	if v.fuel_l >= 0.0 and fuel_need != null:
-		fuel_add = ceilf(minf(VehicleConsts.FUEL.tankL - v.fuel_l, maxf(0.0, fuel_need - v.fuel_l)))
+	var fuel_add := fuel_to_add(v, fuel_need) if fuel_need != null else 0.0
 	var driver := driver_change_state()
-	var plan := PitService.default_plan(damage.zones, avg_wear, v.compound.id, weather.wetness, fuel_add, driver == "due")
+	var plan := PitService.default_plan(damage.zones, avg_wear(v), v.compound.id, weather.wetness, fuel_add, driver == "due")
 	# a puncture: new tyres whatever their wear
 	if damage.punctured.has(true) and plan.tyres == null:
 		plan.tyres = v.compound.id
@@ -2929,17 +2918,40 @@ func open_pit_menu() -> void:
 		func() -> void: release_from_box())
 	hud.add_child(pit_menu)
 
+## The end of a stop, the same for a bot's and for mine: the plan's new tyres (with their grip for the water on the
+## track) and its fuel.
+static func serve(v: Vehicle, plan: Dictionary, wetness: float, rain: float) -> void:
+	if plan.tyres != null:
+		v.fit_tyres(Tyres.COMPOUNDS[plan.tyres], v.ambient_c + TYRE_OUT_C)
+		v.weather_grip = Tyres.compound_grip(v.compound, wetness, rain)
+	if plan.fuelL > 0.0 and v.fuel_l >= 0.0:
+		v.set_fuel(v.fuel_l + plan.fuelL)
+
+## Litres to add at a stop for need litres in the tank, at most a full tank; 0 without a fuel model (fuel_l < 0).
+static func fuel_to_add(v: Vehicle, need: float) -> float:
+	if v.fuel_l < 0.0:
+		return 0.0
+	return ceilf(minf(VehicleConsts.FUEL.tankL - v.fuel_l, maxf(0.0, need - v.fuel_l)))
+
+## The four tyres' mean wear.
+static func avg_wear(v: Vehicle) -> float:
+	var sum := 0.0
+	for w: Wheel in v.wheels:
+		sum += w.wear
+	return sum / 4.0
+
+## Fuel a lap of this track takes by the cars' figures (until a lap of mine measures it).
+func nominal_fuel_per_lap() -> float:
+	return (float(track_data.length) / 1000.0) * VehicleConsts.FUEL.perKm
+
 func finish_service(plan: Dictionary) -> void:
 	var v := vehicle
+	serve(v, plan, weather.wetness, weather.rain)
 	if plan.tyres != null:
-		v.fit_tyres(Tyres.COMPOUNDS[plan.tyres], v.ambient_c + 12.0)
 		damage.tyres_changed()
-		v.weather_grip = Tyres.compound_grip(v.compound, weather.wetness, weather.rain)
 	# dents are visual: reset them with any bodywork repair, even if the damage value had already reached zero
 	if plan.body:
 		my_visual.reset_damage()
-	if plan.fuelL > 0.0 and v.fuel_l >= 0.0:
-		v.set_fuel(v.fuel_l + plan.fuelL)
 	if damage.repair({"body": plan.body, "suspension": plan.suspension, "engine": plan.engine}):
 		v.drivetrain.power_scale = damage.power_scale()
 		conn.send_json({"t": "damage", "zones": _round_zones()})
@@ -2965,7 +2977,7 @@ func close_pit_menu() -> void:
 ## wheel by wheel with the crew.
 func stop_event(e: Dictionary, v: Vehicle, plan: Dictionary, audible: bool) -> void:
 	if e.kind == "wheelOn" and plan.tyres != null:
-		v.fit_wheel(e.wheel, Tyres.COMPOUNDS[plan.tyres], v.ambient_c + 12.0)
+		v.fit_wheel(e.wheel, Tyres.COMPOUNDS[plan.tyres], v.ambient_c + TYRE_OUT_C)
 		v.weather_grip = Tyres.compound_grip(v.compound, weather.wetness, weather.rain)
 	if not audible or e.kind == "wheelOff" or e.kind == "wheelOn":
 		return
