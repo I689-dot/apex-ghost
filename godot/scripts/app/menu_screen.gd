@@ -94,12 +94,7 @@ static func build(app: App, error: String = "") -> Control:
 			err.text = I18n.t("Enter the 5-character room code.")
 			code.grab_focus()
 			return
-		await go.call(func(n: String) -> String:
-			# a race hosted on a device: straight to it (no account needed, as on a LAN)
-			var hosted: bool = await P2p.is_p2p_code(c)
-			if not hosted and not online:
-				return I18n.t("Online needs an account")
-			return await app.join(c, n, spectate))
+		await go.call(func(n: String) -> String: return await app.join_code(c, n, spectate))
 	var host := func() -> void:
 		await go.call(func(n: String) -> String:
 			var r: Dictionary = await P2p.host_race()

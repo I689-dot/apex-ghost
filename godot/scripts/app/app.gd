@@ -307,6 +307,15 @@ func show_career() -> void:
 	set_backdrop("pole")
 	set_ui(CareerScreen.build(self))
 
+## Joins a room by the code a player typed. A race hosted on a device is looked up first: it needs no account (as on a
+## LAN), and once known its code makes Connection connect over WebRTC instead of to the server's room. Returns "" or the
+## error to show. (Before 2026-11-22 only the classic menu looked it up: the phone's Join could not reach a phone's race.)
+func join_code(code: String, nick: String, spectate: bool = false) -> String:
+	var hosted: bool = await P2p.is_p2p_code(code)
+	if not hosted and Account.account() == null and Account.accounts_enabled() != false:
+		return I18n.t("Online needs an account")
+	return await join(code, nick, spectate)
+
 func join(code: String, nick: String, spectate: bool = false) -> String:
 	spectating = spectate
 	conn = Connection.new().setup(code, nick, spectate)

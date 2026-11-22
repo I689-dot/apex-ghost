@@ -301,7 +301,7 @@ static func _join_dialog(app: App) -> void:
 			return
 		m.root.queue_free()
 		app.set_ui(Control.new())
-		var err := await app.join(c, MobileHome.nick())
+		var err := await app.join_code(c, MobileHome.nick())
 		if err != "":
 			app.show_menu(err)
 	code.text_submitted.connect(func(_t: String) -> void: go.call())
