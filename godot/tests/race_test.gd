@@ -86,6 +86,7 @@ func _run() -> void:
 		var frames := 0
 		var t0 := Time.get_ticks_msec()
 		var last_report := 0
+		var still := {}
 		while _results().size() == n_results:
 			await get_tree().process_frame
 			frames += 1
@@ -98,6 +99,17 @@ func _run() -> void:
 					for id in tr.players:
 						row.append("%.0f" % tr.players[id].race_dist)
 				print("  [%s %3d s] %d fps, distances: %s" % [kind, t / 1000, Engine.get_frames_per_second(), " ".join(row)])
+				# a bot that has not moved since the last report: its pit state (why it stands)
+				if tr != null:
+					for r in session.remotes.values():
+						if r.bot == null or not tr.players.has(r.id):
+							continue
+						var d: float = tr.players[r.id].race_dist
+						if absf(d - float(still.get(r.id, -1.0))) < 1.0:
+							var ai: AiDriver = r.bot.ai
+							var p = tr.players[r.id]
+							print("    %s stands at %.0f m: in lane %s, request '%s', box done %s, at box %s, lane %d / box %d, speed %.1f, service end %.0f, finished %s, dnf %s" % [r.id, d, ai.in_pit_lane, ai.pit_request, ai._box_done, ai.at_box(), ai._lane_idx, ai.pit_box, r.bot.vehicle.telemetry.speed, r.bot.service_end, p.finished_ms, p.dnf])
+						still[r.id] = d
 			if t > 900000:
 				check(false, "the %s ended (15 min)" % kind)
 				get_tree().quit(1)
@@ -125,12 +137,19 @@ func _run() -> void:
 	for i in positions.size():
 		ordered = ordered and positions[i] == i + 1
 	check(ordered, "the race: positions 1..%d in order" % rows.size())
-	# the classification counts time penalties (race control's, for incidents with car contact on)
+	# the classification: more laps first, then the race time with the time penalties (race control's, for incidents
+	# with car contact on); a car a lap down has the lower total (2026-11-21: the check compared the totals alone)
 	var totals: Array = finished.map(func(r): return float(r.totalMs) + float(r.get("penaltyMs", 0) if r.get("penaltyMs") != null else 0))
+	# (the results carry no lap count: the race's last standings message has it)
+	var standings := msgs.filter(func(m): return m is Dictionary and m.t == "standings")
+	var laps_of := {}
+	for s in (standings.back().list if not standings.is_empty() else []):
+		laps_of[s.id] = int(s.get("laps", 0))
+	var finished_laps: Array = finished.map(func(r): return int(laps_of.get(r.id, 0)))
 	var by_time := true
 	for i in range(1, totals.size()):
-		by_time = by_time and totals[i] >= totals[i - 1]
-	check(by_time, "the race: the finishers in order of their race time")
+		by_time = by_time and (finished_laps[i] < finished_laps[i - 1] or (finished_laps[i] == finished_laps[i - 1] and totals[i] >= totals[i - 1]))
+	check(by_time, "the race: the finishers in order of their laps, then their race time")
 	check(rows.all(func(r): return r.get("dnf", false) or int(r.get("validLaps", 0)) <= laps), "the race: no finisher has more than %d valid laps" % laps)
 	print("%d failures" % failures)
 	get_tree().quit(1 if failures > 0 else 0)
