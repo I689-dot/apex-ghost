@@ -5,8 +5,26 @@ together with `git log`.
 
 ## State
 
-- **Phase:** batch 3 (typing) is in progress (2026-11-21). Done: input, physics, audio, net, shared, ui, game.
-  Left: app/ (about 795 places, most of them lambdas). Then check-in 2.
+- **Phase:** batches 2 (dead code) and 3 (typing) are done (2026-11-22). **Check-in 2 is waiting for the user.**
+  Next: batch 4, the duplication.
+- **Numbers at check-in 2**, against the start:
+  - scripts: 151 (152);
+  - lines: 34,140 (35,232: −1,092);
+  - warnings: 689 distinct. The start's 2,433 was measured with the corrected counter before typing; the first
+    counter's 221 left out untyped declarations.
+  - Of the 689, 500 are "return value discarded"; the rest are 56 integer divisions, 36 incompatible ternaries,
+    about 60 shadowings and a few smaller kinds.
+  - **No untyped declaration is left in godot/scripts, and `untyped_declaration` is an error there now.**
+    godot/tests is left out by a directory rule, as res://addons already was, because this job does not edit tests.
+  - 31 commits since `5f19051`: 7 of them are fixes, each with its measurement.
+- **Found at the end of batch 3: the live server was down.** Every Durable Object request failed with "Exceeded
+  allowed volume of requests in Durable Objects free tier" (rooms and accounts: error 1101, seen with `wrangler
+  tail`). It worked again after the daily reset at 00:00 UTC. My test runs make only a handful of live requests each,
+  so something else used up the day's allowance. The user stopped the investigation (watching the live log after the
+  reset), so it is a question for check-in 2.
+- **compile_all, again:** an error in its `--debug` run stopped that run in the stdout debugger. With an open stdin
+  the check hung; with an empty one it passed a broken script. Errors now come from a run without `--debug`, and the
+  warnings are counted only when there are none (`ca2b6f8`).
 - **Found while checking game/'s typing** (not fixed, for check-in 2):
   - **A bot can stay in its pit box until the end of the race**, with pitWindow, raceControl, contact and fuel on
     (Zandvoort, 4 laps). It happened both after the typing and with game/ as it was before it, so it is not the
@@ -38,6 +56,10 @@ together with `git log`.
   - `6b8761f` game/, the mechanical part (→ 1,814).
   - `18a79a4` game/'s smaller scripts (→ 1,659).
   - `9cf08aa` race_session, car_visual, track_scene, spa_look (→ 1,449).
+  - `0634ecf` app/, the mechanical part (→ 1,150).
+  - `d7e31d0` the lobby and the settings panel (→ 926).
+  - `d6bc849` the rest of app/ (→ 700).
+  - `9e1d8e5` the last places; untyped_declaration is an error (→ 689).
 - **Kept Variant on purpose:**
   - A loop over objects that may already be freed. The replay's saved visuals are checked with is_instance_valid,
     and a typed variable refuses a freed object.
