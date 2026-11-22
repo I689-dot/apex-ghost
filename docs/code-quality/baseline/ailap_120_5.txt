@@ -4,23 +4,23 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Silverstone Circuit
-  racing line built in 4 ms
+  racing line built in 3 ms
   quasi-steady-state lap on the racing line: 1:59.610
     t=  0 s  lap distance   -10 m    0 km/h
     t= 20 s  lap distance   706 m  111 km/h
     t= 40 s  lap distance  1485 m  222 km/h
-    t= 60 s  lap distance  2318 m  182 km/h
-    t= 80 s  lap distance  3394 m  217 km/h
-    t=100 s  lap distance  4279 m  196 km/h
-    t=120 s  lap distance  5342 m  113 km/h
-  lap 1: 2:14.642 (out)
-    t=140 s  lap distance  6183 m  135 km/h
-    t=160 s  lap distance  6926 m  145 km/h
-    t=180 s  lap distance  7896 m   97 km/h
-    t=200 s  lap distance  8851 m  145 km/h
-    t=220 s  lap distance  9787 m  116 km/h
-    t=240 s  lap distance 10811 m  143 km/h
-    t=260 s  lap distance 11611 m  164 km/h
-  lap 2: 2:09.288
-skill 0.97: lap 2:09.288, resets 0, top 240 km/h, finished=true, off the track 0 times
-exit=0 seconds=19
+    t= 60 s  lap distance  2318 m  183 km/h
+    t= 80 s  lap distance  3395 m  217 km/h
+    t=100 s  lap distance  4280 m  196 km/h
+    t=120 s  lap distance  5342 m  112 km/h
+  lap 1: 2:14.717 (out)
+    t=140 s  lap distance  6180 m  134 km/h
+    t=160 s  lap distance  6922 m  144 km/h
+    t=180 s  lap distance  7893 m  101 km/h
+    t=200 s  lap distance  8846 m  143 km/h
+    t=220 s  lap distance  9782 m  113 km/h
+    t=240 s  lap distance 10803 m  142 km/h
+    t=260 s  lap distance 11604 m  163 km/h
+  lap 2: 2:09.360
+skill 0.97: lap 2:09.360, resets 0, top 240 km/h, finished=true, off the track 0 times
+exit=0 seconds=20

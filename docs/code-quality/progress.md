@@ -5,10 +5,14 @@ together with `git log`.
 
 ## State
 
-- **Phase:** check-in 3 (2026-11-22): batch 4 (duplication) done; batch 5 (splits) waits for the user's answers.
+- **Phase:** batch 5 (splits), after check-in 3 (2026-11-22).
 - **Numbers at check-in 3:** 153 scripts (two helpers added: JsonFile, JsonHttp), 34,060 lines (34,140 at check-in 2),
   676 warnings (689). One behaviour fix in the batch: the phone's Join (2eb818d).
-- **Questions at check-in 3:** batch 5 go-ahead; the server quota's fix; the bots' randomness from their instance id.
+- **Answers at check-in 3:** batch 5: go on. The server quota: not now. The bots: seed them from their own id.
+- **Done after check-in 3:** a bot's mistakes and its pace per stretch come from AiDriver.set_seed(its id) (0 for a
+  driver without one, as ailap's), not its instance id. Measured: ailap layout 0 after 0, 1, 2 and 5 extra objects at
+  boot: 2:05.147 each time (before: 2:04.922, 2:04.943, 2:05.007, 2:04.949). ailap's baseline re-recorded for the
+  new seed; ailap_seeded.sh removed (nothing left for it to replace).
 - **Done after check-in 2:**
   - The safety car: build-cars.py repoints an entry whose file is gone. data/cars.json is fixed here (it is
     git-ignored); a race with race control no longer logs "Resource file not found".

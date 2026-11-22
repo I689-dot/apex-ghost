@@ -4,25 +4,25 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Circuit de Spa-Francorchamps
-  racing line built in 3 ms
+  racing line built in 4 ms
   quasi-steady-state lap on the racing line: 2:19.994
     t=  0 s  lap distance   115 m    0 km/h
     t= 20 s  lap distance   712 m  195 km/h
-    t= 40 s  lap distance  1767 m  214 km/h
-    t= 60 s  lap distance  2747 m  141 km/h
-    t= 80 s  lap distance  3553 m  191 km/h
-    t=100 s  lap distance  4587 m  122 km/h
-    t=120 s  lap distance  5395 m  186 km/h
-    t=140 s  lap distance  6626 m  202 km/h
-  lap 1: 2:32.843 (out)
-    t=160 s  lap distance  7401 m  105 km/h
-    t=180 s  lap distance  8322 m  166 km/h
-    t=200 s  lap distance  9480 m  122 km/h
-    t=220 s  lap distance 10219 m  133 km/h
-    t=240 s  lap distance 11154 m  192 km/h
-    t=260 s  lap distance 12041 m  101 km/h
-    t=280 s  lap distance 13087 m  235 km/h
-    t=300 s  lap distance 13985 m  127 km/h
-  lap 2: 2:29.532
-skill 0.97: lap 2:29.532, resets 0, top 245 km/h, finished=true, off the track 0 times
-exit=0 seconds=13
+    t= 40 s  lap distance  1770 m  214 km/h
+    t= 60 s  lap distance  2748 m  142 km/h
+    t= 80 s  lap distance  3557 m  192 km/h
+    t=100 s  lap distance  4590 m  124 km/h
+    t=120 s  lap distance  5398 m  185 km/h
+    t=140 s  lap distance  6629 m  203 km/h
+  lap 1: 2:32.640 (out)
+    t=160 s  lap distance  7406 m   97 km/h
+    t=180 s  lap distance  8333 m  165 km/h
+    t=200 s  lap distance  9486 m  121 km/h
+    t=220 s  lap distance 10226 m  136 km/h
+    t=240 s  lap distance 11162 m  194 km/h
+    t=260 s  lap distance 12045 m  103 km/h
+    t=280 s  lap distance 13081 m  234 km/h
+    t=300 s  lap distance 13980 m  126 km/h
+  lap 2: 2:29.853
+skill 0.97: lap 2:29.853, resets 0, top 245 km/h, finished=true, off the track 0 times
+exit=0 seconds=14

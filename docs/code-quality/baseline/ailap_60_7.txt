@@ -4,20 +4,20 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Circuit de Barcelona-Catalunya
-  racing line built in 2 ms
+  racing line built in 3 ms
   quasi-steady-state lap on the racing line: 1:36.894
     t=  0 s  lap distance   -10 m    0 km/h
-    t= 20 s  lap distance   659 m  132 km/h
-    t= 40 s  lap distance  1547 m  154 km/h
-    t= 60 s  lap distance  2326 m  140 km/h
-    t= 80 s  lap distance  3213 m  117 km/h
-    t=100 s  lap distance  4009 m  152 km/h
-  lap 1: 1:51.496 (out)
-    t=120 s  lap distance  5149 m   98 km/h
-    t=140 s  lap distance  6034 m  106 km/h
-    t=160 s  lap distance  6815 m  128 km/h
-    t=180 s  lap distance  7735 m  143 km/h
-    t=200 s  lap distance  8430 m  150 km/h
-  lap 2: 1:44.967
-skill 0.97: lap 1:44.967, resets 0, top 256 km/h, finished=true, off the track 0 times
+    t= 20 s  lap distance   659 m  131 km/h
+    t= 40 s  lap distance  1546 m  154 km/h
+    t= 60 s  lap distance  2327 m  140 km/h
+    t= 80 s  lap distance  3215 m  118 km/h
+    t=100 s  lap distance  4010 m  151 km/h
+  lap 1: 1:51.464 (out)
+    t=120 s  lap distance  5150 m   98 km/h
+    t=140 s  lap distance  6036 m  107 km/h
+    t=160 s  lap distance  6819 m  124 km/h
+    t=180 s  lap distance  7737 m  140 km/h
+    t=200 s  lap distance  8431 m  151 km/h
+  lap 2: 1:44.935
+skill 0.97: lap 1:44.935, resets 0, top 256 km/h, finished=true, off the track 0 times
 exit=0 seconds=9

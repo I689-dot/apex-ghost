@@ -1064,6 +1064,7 @@ func _create_local_bots(entries: Dictionary) -> void:
 		var b := LocalBot.new()
 		b.vehicle = v
 		b.ai = AiDriver.new(track_data, v, skill, lane)
+		b.ai.set_seed(r.id)
 		b.pit = PitLaneMonitor.new(track_data) if track_data.get("pitLane") != null else null
 		# spread over the window so they don't all stop on the same lap
 		b.stop_lap = win.open + (r.slot % (win.close - win.open + 1))

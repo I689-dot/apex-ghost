@@ -7,19 +7,19 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
   racing line built in 4 ms
   quasi-steady-state lap on the racing line: 1:55.410
     t=  0 s  lap distance   248 m    0 km/h
-    t= 20 s  lap distance   820 m  118 km/h
-    t= 40 s  lap distance  1557 m  202 km/h
-    t= 60 s  lap distance  2433 m  112 km/h
-    t= 80 s  lap distance  3294 m  202 km/h
-    t=100 s  lap distance  4162 m  198 km/h
-    t=120 s  lap distance  4954 m  114 km/h
-  lap 1: 2:05.849 (out)
-    t=140 s  lap distance  5891 m  101 km/h
-    t=160 s  lap distance  6566 m  162 km/h
-    t=180 s  lap distance  7422 m  206 km/h
-    t=200 s  lap distance  8265 m  177 km/h
-    t=220 s  lap distance  9118 m  190 km/h
-    t=240 s  lap distance  9974 m  140 km/h
-  lap 2: 2:05.169
-skill 0.97: lap 2:05.169, resets 0, top 244 km/h, finished=true, off the track 1 times
-exit=0 seconds=11
+    t= 20 s  lap distance   823 m  117 km/h
+    t= 40 s  lap distance  1564 m  203 km/h
+    t= 60 s  lap distance  2436 m  106 km/h
+    t= 80 s  lap distance  3301 m  189 km/h
+    t=100 s  lap distance  4171 m  197 km/h
+    t=120 s  lap distance  4941 m  110 km/h
+  lap 1: 2:06.253 (out)
+    t=140 s  lap distance  5881 m   91 km/h
+    t=160 s  lap distance  6548 m  157 km/h
+    t=180 s  lap distance  7400 m  202 km/h
+    t=200 s  lap distance  8246 m  174 km/h
+    t=220 s  lap distance  9077 m  157 km/h
+    t=240 s  lap distance  9926 m  116 km/h
+  lap 2: 2:06.109
+skill 0.97: lap 2:06.109, resets 0, top 244 km/h, finished=true, off the track 1 times
+exit=0 seconds=12

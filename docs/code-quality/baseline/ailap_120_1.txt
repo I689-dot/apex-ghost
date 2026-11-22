@@ -4,20 +4,20 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Nürburgring GP · Short (no Müllenbachschleife)
-  racing line built in 2 ms
+  racing line built in 1 ms
   quasi-steady-state lap on the racing line: 1:32.749
     t=  0 s  lap distance   248 m    0 km/h
-    t= 20 s  lap distance   819 m  110 km/h
-    t= 40 s  lap distance  1522 m  195 km/h
-    t= 60 s  lap distance  2017 m  142 km/h
-    t= 80 s  lap distance  2873 m  213 km/h
-    t=100 s  lap distance  3691 m  105 km/h
-  lap 1: 1:47.264 (out)
-    t=120 s  lap distance  4635 m   65 km/h
-    t=140 s  lap distance  5270 m  136 km/h
-    t=160 s  lap distance  5837 m   96 km/h
-    t=180 s  lap distance  6556 m  160 km/h
-    t=200 s  lap distance  7458 m  131 km/h
-  lap 2: 1:45.645
-skill 0.97: lap 1:45.645, resets 0, top 244 km/h, finished=true, off the track 2 times
+    t= 20 s  lap distance   818 m  112 km/h
+    t= 40 s  lap distance  1523 m  196 km/h
+    t= 60 s  lap distance  1996 m  136 km/h
+    t= 80 s  lap distance  2841 m  213 km/h
+    t=100 s  lap distance  3676 m  105 km/h
+  lap 1: 1:47.748 (out)
+    t=120 s  lap distance  4626 m   58 km/h
+    t=140 s  lap distance  5253 m  128 km/h
+    t=160 s  lap distance  5826 m   86 km/h
+    t=180 s  lap distance  6535 m  152 km/h
+    t=200 s  lap distance  7442 m  123 km/h
+  lap 2: 1:45.633
+skill 0.97: lap 1:45.633, resets 0, top 244 km/h, finished=true, off the track 2 times
 exit=0 seconds=16

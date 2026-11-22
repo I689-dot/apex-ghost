@@ -348,12 +348,14 @@ var _last_s := 0.0
 var human := true
 var _rng := RandomNumberGenerator.new()
 var _lap_salt := 0
+## What this driver's mistakes and pace vary by (set_seed; 0 until set).
+var _seed_key := 0
 var _mistake_m := 0.0
 var _was_braking := false
 ## The lap's pace factor of a stretch: deterministic per bot, lap and stretch.
 func _pace(s: float) -> float:
 	var b := int(s / 25.0)
-	var h := hash(Vector3i(get_instance_id() & 0xffff, _lap_salt, b))
+	var h := hash(Vector3i(_seed_key, _lap_salt, b))
 	var u := float(h % 10000) / 10000.0 - 0.5
 	var spread := 0.022 * clampf(1.06 - skill, 0.06, 0.25) / 0.15
 	return 1.0 + u * spread
@@ -375,7 +377,14 @@ func _init(track_data: Dictionary, veh: Vehicle, skill_value: float, lane_offset
 	_kahead = curvature_ahead(track, _line)
 	_limits = car_limits(veh.specs, skill, veh.air_density)
 	_profile = speed_profile(_line, _limits, 1.0, false, learned_grip(track))
-	_rng.seed = hash(get_instance_id())
+	_rng.seed = hash(_seed_key)
+
+## Seeds the driver's mistakes and pace from a stable key (a bot's id): the same key drives the same way. (Until
+## 2026-11-22 they came from the object's instance id, which follows how many objects the engine made before it: the
+## same race played out differently after any unrelated change.)
+func set_seed(key: String) -> void:
+	_seed_key = hash(key) & 0xffff
+	_rng.seed = hash(_seed_key)
 
 func lane_index() -> int:
 	return _lane_idx
