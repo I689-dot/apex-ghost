@@ -170,6 +170,27 @@ def dedupe(cid, dst, e):
         print(f'[dedupe] {cid}: lod1.glb = lod0.glb, kept once')
 
 
+def repoint(cars):
+    """Entries whose model file is gone point at that folder's lod0.glb. dedupe() fixes the car it runs on, but an entry
+    can use another car's files (the safety car is the Vantage's model): it kept the removed lod1.glb and cockpit.glb
+    and its middle level failed to load in every race (2026-11-21)."""
+    for e in cars:
+        for key in ('lods', 'cockpit'):
+            urls = e.get(key)
+            if urls is None:
+                continue
+            single = isinstance(urls, str)
+            urls = [urls] if single else urls
+            for i, u in enumerate(urls):
+                f = os.path.join(ROOT, 'godot', u.split('?')[0])
+                lod0 = os.path.join(os.path.dirname(f), 'lod0.glb')
+                if not os.path.exists(f) and os.path.exists(lod0):
+                    urls[i] = os.path.dirname(u.split('?')[0]) + '/lod0.glb' + ('?' + u.split('?', 1)[1] if '?' in u else '')
+                    print(f"[repoint] {e['id']}: {os.path.basename(f)} is gone, lod0.glb instead")
+            if single:
+                e[key] = urls[0]
+
+
 # the driver's eye from the steering wheel, where the converter's eye search is not trusted (it put several eyes 15-25 cm
 # behind the wheel, which then fell below the view, or 8 cm to the side of it): a GT3 driver's reach, 0.58 m behind the
 # wheel's centre and 0.30 m above it, less what CockpitCamera adds (EYE_FORWARD 0.2, EYE_UP 0.02)
@@ -217,6 +238,7 @@ def main():
             d = os.path.join(ROOT, 'godot/assets/cars', e['id'])
             if os.path.isdir(d) and e.get('lods'):
                 dedupe(e['id'], d, e)
+        repoint(data['cars'])
         json.dump(data, open(path, 'w'), indent=1)
         return
     src_root = sys.argv[1]
@@ -257,6 +279,7 @@ def main():
             sc[k] = van.get(k)
         sc['model'] = van['id']
         print('safety car: the Vantage GT3 model')
+    repoint(data['cars'])
     json.dump(data, open(CARS_JSON, 'w'), indent=1)
     print('failed:', failed or 'none')
     if '--no-import' not in sys.argv:
