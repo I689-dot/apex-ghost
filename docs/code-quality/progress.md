@@ -593,7 +593,7 @@ contain none of these names.
 ## Phase 4 (keep it clean)
 
 - `CLAUDE.md` (102 lines), `tools/godot/check.sh`, the DECISIONS.md section "Code-quality pass (2026-11)".
-- **Stop hook: installed at check-in 4 with the user's OK** (`.claude/settings.json`, which .gitignore leaves out: this checkout only; pipe-tested: exit 0 on a clean tree, exit 2 naming the file and line for an untyped variable). In `.claude/settings.json`, a session cannot finish
+- **Stop hook: installed at check-in 4 with the user's OK** (`.claude/settings.json`, committed with the user's "push everything"; pipe-tested: exit 0 on a clean tree, exit 2 naming the file and line for an untyped variable). In `.claude/settings.json`, a session cannot finish
   while a changed `.gd` file fails to compile (exit 2 blocks the stop and shows the errors to the session; the
   compile without the warning count takes about 10 s):
 

@@ -21,7 +21,7 @@ the code, the code is right"); the 2026-11 code-quality pass is `docs/prompts/co
   cache. Scripts starting `extends Node` run inside `tests/runner.tscn` (autoloads present).
 - `tools/godot/gd.sh tests/compile_all.gd < /dev/null`: every script compiles, then the warning count. It must say
   `0 failed`. Untyped declarations are an error in `godot/scripts`.
-- A Stop hook (`.claude/settings.json`, git-ignored, this checkout only) runs that compile when a `.gd` file under
+- A Stop hook (`.claude/settings.json`, committed although `.claude/` is otherwise git-ignored) runs that compile when a `.gd` file under
   `godot/` changed: a session can't finish with a script that doesn't compile.
 - `tools/godot/check.sh`: compile_all, every headless test, and their deterministic numbers (simtest, tracktest,
   roomtest, ailap at 120 and 60 Hz, replay, settings...) against `docs/code-quality/baseline/`. PASS or FAIL.
