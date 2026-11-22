@@ -4,20 +4,20 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Circuit Zandvoort
-  racing line built in 3 ms
+  racing line built in 2 ms
   quasi-steady-state lap on the racing line: 1:38.092
     t=  0 s  lap distance   -19 m    0 km/h
-    t= 20 s  lap distance   610 m  146 km/h
-    t= 40 s  lap distance  1372 m  190 km/h
-    t= 60 s  lap distance  2260 m  148 km/h
+    t= 20 s  lap distance   609 m  144 km/h
+    t= 40 s  lap distance  1372 m  189 km/h
+    t= 60 s  lap distance  2260 m  147 km/h
     t= 80 s  lap distance  3010 m  199 km/h
-    t=100 s  lap distance  3753 m  154 km/h
-  lap 1: 1:52.019 (out)
-    t=120 s  lap distance  4717 m  102 km/h
-    t=140 s  lap distance  5380 m  140 km/h
-    t=160 s  lap distance  6332 m  181 km/h
-    t=180 s  lap distance  7022 m  125 km/h
-    t=200 s  lap distance  7806 m  170 km/h
-  lap 2: 1:46.305
-skill 0.97: lap 1:46.305, resets 0, top 221 km/h, finished=true, off the track 0 times
-exit=0 seconds=0
+    t=100 s  lap distance  3752 m  154 km/h
+  lap 1: 1:52.047 (out)
+    t=120 s  lap distance  4717 m  103 km/h
+    t=140 s  lap distance  5381 m  141 km/h
+    t=160 s  lap distance  6331 m  180 km/h
+    t=180 s  lap distance  7021 m  124 km/h
+    t=200 s  lap distance  7803 m  169 km/h
+  lap 2: 1:46.330
+skill 0.97: lap 1:46.330, resets 0, top 221 km/h, finished=true, off the track 0 times
+exit=0 seconds=17

@@ -4,72 +4,70 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Nürburgring Gesamtstrecke (GP + Nordschleife)
-  racing line built in 16 ms
+  racing line built in 15 ms
   quasi-steady-state lap on the racing line: 8:38.042
     t=  0 s  lap distance   248 m    0 km/h
-    t= 20 s  lap distance   814 m  123 km/h
+    t= 20 s  lap distance   813 m  122 km/h
     t= 40 s  lap distance  1558 m  202 km/h
-    t= 60 s  lap distance  2433 m  112 km/h
-    t= 80 s  lap distance  3289 m  201 km/h
-    t=100 s  lap distance  4151 m  211 km/h
-    t=120 s  lap distance  4881 m   74 km/h
-    t=140 s  lap distance  5230 m  147 km/h
-    t=160 s  lap distance  6111 m  130 km/h
-    t=180 s  lap distance  6851 m  205 km/h
-    t=200 s  lap distance  8004 m  251 km/h
-    t=220 s  lap distance  8965 m  160 km/h
-    t=240 s  lap distance 10035 m  114 km/h
-    t=260 s  lap distance 10747 m  208 km/h
-    t=280 s  lap distance 11435 m  137 km/h
-    t=300 s  lap distance 12210 m  141 km/h
-    t=320 s  lap distance 12872 m  106 km/h
-    t=340 s  lap distance 13763 m  124 km/h
-    t=360 s  lap distance 14726 m  210 km/h
-    t=380 s  lap distance 15860 m  144 km/h
-    t=400 s  lap distance 16644 m  153 km/h
-    t=420 s  lap distance 17237 m  177 km/h
-    t=440 s  lap distance 18026 m  103 km/h
-    t=460 s  lap distance 18831 m  141 km/h
-    t=480 s  lap distance 19478 m  164 km/h
-    t=500 s  lap distance 20325 m  168 km/h
-    t=520 s  lap distance 21419 m  150 km/h
-    t=540 s  lap distance 22167 m  162 km/h
-    t=560 s  lap distance 23324 m  253 km/h
-    t=580 s  lap distance 24757 m  259 km/h
-    t=600 s  lap distance 25722 m  175 km/h
-  lap 1: 10:03.006 (out)
-    t=620 s  lap distance 26669 m  136 km/h
-    t=640 s  lap distance 27366 m  187 km/h
-    t=660 s  lap distance 27839 m  123 km/h
-    t=680 s  lap distance 28666 m  180 km/h
-    t=700 s  lap distance 29515 m  127 km/h
-    t=720 s  lap distance 30464 m   82 km/h
-    t=740 s  lap distance 30871 m   40 km/h
-    t=760 s  lap distance 31166 m   36 km/h
-    t=780 s  lap distance 31711 m  111 km/h
-    t=800 s  lap distance 32254 m  113 km/h
-    t=820 s  lap distance 33054 m  153 km/h
-    t=840 s  lap distance 34273 m  232 km/h
-    t=860 s  lap distance 35142 m  217 km/h
-    t=880 s  lap distance 36036 m  105 km/h
-    t=900 s  lap distance 36925 m  102 km/h
-    t=920 s  lap distance 37634 m   99 km/h
-    t=940 s  lap distance 38274 m   73 km/h
-    t=960 s  lap distance 38998 m  150 km/h
-    t=980 s  lap distance 39869 m  160 km/h
-    t=1000 s  lap distance 40937 m  214 km/h
-    t=1020 s  lap distance 41875 m  142 km/h
-    t=1040 s  lap distance 42676 m  141 km/h
-    t=1060 s  lap distance 43229 m  177 km/h
-    t=1080 s  lap distance 43994 m  175 km/h
-    t=1100 s  lap distance 44794 m  129 km/h
-    t=1120 s  lap distance 45480 m  116 km/h
-    t=1140 s  lap distance 46336 m  167 km/h
-    t=1160 s  lap distance 47368 m  158 km/h
-    t=1180 s  lap distance 48123 m  163 km/h
-    t=1200 s  lap distance 49263 m  252 km/h
-    t=1220 s  lap distance 50677 m  238 km/h
-    t=1240 s  lap distance 51601 m  175 km/h
-  lap 2: 10:40.031
-skill 0.97: lap 10:40.031, resets 3, top 262 km/h, finished=true, off the track 31 times
-exit=0 seconds=0
+    t= 60 s  lap distance  2432 m  112 km/h
+    t= 80 s  lap distance  3290 m  200 km/h
+    t=100 s  lap distance  4150 m  211 km/h
+    t=120 s  lap distance  4890 m   47 km/h
+    t=140 s  lap distance  5295 m  172 km/h
+    t=160 s  lap distance  6133 m  104 km/h
+    t=180 s  lap distance  6839 m  205 km/h
+    t=200 s  lap distance  7989 m  250 km/h
+    t=220 s  lap distance  8945 m  146 km/h
+    t=240 s  lap distance 10015 m  120 km/h
+    t=260 s  lap distance 10743 m  211 km/h
+    t=280 s  lap distance 11470 m  151 km/h
+    t=300 s  lap distance 12261 m   79 km/h
+    t=320 s  lap distance 12929 m  131 km/h
+    t=340 s  lap distance 13811 m  107 km/h
+    t=360 s  lap distance 14817 m  215 km/h
+    t=380 s  lap distance 15923 m  157 km/h
+    t=400 s  lap distance 16706 m  169 km/h
+    t=420 s  lap distance 17294 m  185 km/h
+    t=440 s  lap distance 18060 m  117 km/h
+    t=460 s  lap distance 18866 m  102 km/h
+    t=480 s  lap distance 19538 m  111 km/h
+    t=500 s  lap distance 20404 m  167 km/h
+    t=520 s  lap distance 21497 m  166 km/h
+    t=540 s  lap distance 22256 m  174 km/h
+    t=560 s  lap distance 23470 m  256 km/h
+    t=580 s  lap distance 24905 m  257 km/h
+    t=600 s  lap distance 25838 m  199 km/h
+  lap 1: 10:00.768 (out)
+    t=620 s  lap distance 26747 m  116 km/h
+    t=640 s  lap distance 27493 m  181 km/h
+    t=660 s  lap distance 28318 m  101 km/h
+    t=680 s  lap distance 29135 m  203 km/h
+    t=700 s  lap distance 29952 m  211 km/h
+    t=720 s  lap distance 30750 m   81 km/h
+    t=740 s  lap distance 31116 m  164 km/h
+    t=760 s  lap distance 31936 m  116 km/h
+    t=780 s  lap distance 32440 m  128 km/h
+    t=800 s  lap distance 33467 m  208 km/h
+    t=820 s  lap distance 34632 m  112 km/h
+    t=840 s  lap distance 35606 m  191 km/h
+    t=860 s  lap distance 36332 m  181 km/h
+    t=880 s  lap distance 37205 m   86 km/h
+    t=900 s  lap distance 37917 m  167 km/h
+    t=920 s  lap distance 38577 m  165 km/h
+    t=940 s  lap distance 39394 m  151 km/h
+    t=960 s  lap distance 40275 m  193 km/h
+    t=980 s  lap distance 41410 m  224 km/h
+    t=1000 s  lap distance 42310 m   91 km/h
+    t=1020 s  lap distance 42857 m   74 km/h
+    t=1040 s  lap distance 43626 m  125 km/h
+    t=1060 s  lap distance 44423 m  164 km/h
+    t=1080 s  lap distance 45150 m  106 km/h
+    t=1100 s  lap distance 45934 m  195 km/h
+    t=1120 s  lap distance 46894 m  186 km/h
+    t=1140 s  lap distance 47705 m  100 km/h
+    t=1160 s  lap distance 48617 m  206 km/h
+    t=1180 s  lap distance 49983 m  257 km/h
+    t=1200 s  lap distance 51253 m   98 km/h
+  lap 2: 10:12.185
+skill 0.97: lap 10:12.185, resets 2, top 262 km/h, finished=true, off the track 17 times
+exit=0 seconds=79

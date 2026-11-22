@@ -8,21 +8,21 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
   quasi-steady-state lap on the racing line: 2:19.994
     t=  0 s  lap distance   115 m    0 km/h
     t= 20 s  lap distance   709 m  194 km/h
-    t= 40 s  lap distance  1766 m  214 km/h
-    t= 60 s  lap distance  2750 m  143 km/h
-    t= 80 s  lap distance  3562 m  194 km/h
-    t=100 s  lap distance  4596 m  125 km/h
-    t=120 s  lap distance  5411 m  186 km/h
-    t=140 s  lap distance  6641 m  204 km/h
-  lap 1: 2:32.521 (out)
-    t=160 s  lap distance  7410 m   91 km/h
-    t=180 s  lap distance  8340 m  166 km/h
-    t=200 s  lap distance  9493 m  122 km/h
-    t=220 s  lap distance 10236 m  139 km/h
-    t=240 s  lap distance 11182 m  195 km/h
-    t=260 s  lap distance 12058 m  110 km/h
-    t=280 s  lap distance 13116 m  235 km/h
-    t=300 s  lap distance 14008 m  137 km/h
-  lap 2: 2:29.223
-skill 0.97: lap 2:29.223, resets 0, top 245 km/h, finished=true, off the track 0 times
-exit=0 seconds=0
+    t= 40 s  lap distance  1762 m  213 km/h
+    t= 60 s  lap distance  2746 m  141 km/h
+    t= 80 s  lap distance  3555 m  192 km/h
+    t=100 s  lap distance  4590 m  123 km/h
+    t=120 s  lap distance  5397 m  184 km/h
+    t=140 s  lap distance  6626 m  203 km/h
+  lap 1: 2:32.776 (out)
+    t=160 s  lap distance  7403 m  101 km/h
+    t=180 s  lap distance  8326 m  167 km/h
+    t=200 s  lap distance  9485 m  122 km/h
+    t=220 s  lap distance 10227 m  137 km/h
+    t=240 s  lap distance 11170 m  194 km/h
+    t=260 s  lap distance 12052 m  106 km/h
+    t=280 s  lap distance 13106 m  235 km/h
+    t=300 s  lap distance 13999 m  134 km/h
+  lap 2: 2:29.197
+skill 0.97: lap 2:29.197, resets 0, top 245 km/h, finished=true, off the track 0 times
+exit=0 seconds=22

@@ -19,7 +19,13 @@ for f in "$B"/*.txt; do
   fi
   # (the exit line stays, without its time: a test that fails or hangs shows as its exit code)
   a=$(grep -vE "$DROP" "$f" | sed -E 's/ seconds=[0-9]+$//'); b=$(grep -vE "$DROP" "$RUN/$n" | sed -E 's/ seconds=[0-9]+$//')
-  if [ "$n" = menu_test.txt ]; then a=$(echo "$a" | sort); b=$(echo "$b" | sort); fi
+  # menu_test talks to the live server: its error lines depend on when the answers come (a page freed before its
+  # answer), and the account page's size on the account this device signs in with (16 controls on 11-20, 10 on 11-22
+  # on the code of both days); its checks are what counts, in any order
+  if [ "$n" = menu_test.txt ]; then
+    keep() { grep -E "^(ok|FAIL) |failures" | sed -E 's/(account builds \(..\)): [0-9]+ controls/\1/' | sort; }
+    a=$(echo "$a" | keep); b=$(echo "$b" | keep)
+  fi
   if [ "$a" != "$b" ]; then echo "== $n"; diff <(echo "$a") <(echo "$b") | head -8; fail=1; fi
 done
 [ $fail = 0 ] && echo PASS || echo FAIL

@@ -4,22 +4,22 @@ Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
 [boot] settings loaded
 [boot] packs
 ▶ AI lap: Wrenfeld F6 GT3 R on Shanghai International Circuit
-  racing line built in 4 ms
+  racing line built in 3 ms
   quasi-steady-state lap on the racing line: 1:54.749
     t=  0 s  lap distance   -10 m    0 km/h
     t= 20 s  lap distance   605 m   83 km/h
     t= 40 s  lap distance  1360 m   63 km/h
-    t= 60 s  lap distance  2196 m  141 km/h
+    t= 60 s  lap distance  2195 m  141 km/h
     t= 80 s  lap distance  2943 m  101 km/h
-    t=100 s  lap distance  3873 m  240 km/h
+    t=100 s  lap distance  3874 m  240 km/h
     t=120 s  lap distance  4825 m  184 km/h
-  lap 1: 2:12.481 (out)
-    t=140 s  lap distance  5802 m  133 km/h
-    t=160 s  lap distance  6493 m  188 km/h
+  lap 1: 2:12.508 (out)
+    t=140 s  lap distance  5802 m  134 km/h
+    t=160 s  lap distance  6492 m  190 km/h
     t=180 s  lap distance  7328 m  177 km/h
-    t=200 s  lap distance  8091 m  195 km/h
-    t=220 s  lap distance  8846 m  199 km/h
-    t=240 s  lap distance  9955 m   76 km/h
-  lap 2: 2:06.824
-skill 0.97: lap 2:06.824, resets 0, top 259 km/h, finished=true, off the track 0 times
-exit=0 seconds=0
+    t=200 s  lap distance  8093 m  195 km/h
+    t=220 s  lap distance  8849 m  200 km/h
+    t=240 s  lap distance  9957 m   79 km/h
+  lap 2: 2:06.701
+skill 0.97: lap 2:06.701, resets 0, top 259 km/h, finished=true, off the track 0 times
+exit=0 seconds=20
