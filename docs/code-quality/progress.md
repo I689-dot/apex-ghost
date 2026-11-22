@@ -5,7 +5,10 @@ together with `git log`.
 
 ## State
 
-- **Phase:** check-in 2 answered (2026-11-22). The four items below come first, then batch 4 (the duplication).
+- **Phase:** check-in 3 (2026-11-22): batch 4 (duplication) done; batch 5 (splits) waits for the user's answers.
+- **Numbers at check-in 3:** 153 scripts (two helpers added: JsonFile, JsonHttp), 34,060 lines (34,140 at check-in 2),
+  676 warnings (689). One behaviour fix in the batch: the phone's Join (2eb818d).
+- **Questions at check-in 3:** batch 5 go-ahead; the server quota's fix; the bots' randomness from their instance id.
 - **Done after check-in 2:**
   - The safety car: build-cars.py repoints an entry whose file is gone. data/cars.json is fixed here (it is
     git-ignored); a race with race control no longer logs "Resource file not found".
