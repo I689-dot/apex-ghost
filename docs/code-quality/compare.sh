@@ -6,7 +6,7 @@
 set -u
 B="$(cd "$(dirname "$0")" && pwd)/baseline"
 RUN="$1"
-DROP='audio ok, buses:|seconds=| ms\b|[0-9]+ ?ms|fps|Godot Engine|^\s*$|ObjectDB instances|RID allocations|RIDs of type|resources still in use|welcome:|state=open|carLock|invite code|gets a number|^\s+at: '
+DROP='audio ok, buses:| ms\b|[0-9]+ ?ms|fps|Godot Engine|^\s*$|ObjectDB instances|RID allocations|RIDs of type|resources still in use|welcome:|state=open|carLock|invite code|gets a number|^\s+at: '
 fail=0
 for f in "$B"/*.txt; do
   n=$(basename "$f")
@@ -17,7 +17,8 @@ for f in "$B"/*.txt; do
     grep -qE "^[0-9]+ scripts, 0 failed" "$RUN/$n" || { echo "== compile_all: a script failed to compile"; fail=1; }
     continue
   fi
-  a=$(grep -vE "$DROP" "$f"); b=$(grep -vE "$DROP" "$RUN/$n")
+  # (the exit line stays, without its time: a test that fails or hangs shows as its exit code)
+  a=$(grep -vE "$DROP" "$f" | sed -E 's/ seconds=[0-9]+$//'); b=$(grep -vE "$DROP" "$RUN/$n" | sed -E 's/ seconds=[0-9]+$//')
   if [ "$n" = menu_test.txt ]; then a=$(echo "$a" | sort); b=$(echo "$b" | sort); fi
   if [ "$a" != "$b" ]; then echo "== $n"; diff <(echo "$a") <(echo "$b") | head -8; fail=1; fi
 done

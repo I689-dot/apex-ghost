@@ -20,8 +20,36 @@ together with `git log`.
     objects the engine made before it: one extra `RefCounted.new()` before the test moves layout 0's lap from 2:04.922
     to 2:04.943. So the lap times follow the engine's object count as well as the code. Proof that the code did not
     cause it: the baseline's own commit (5f19051), run today in a scratch worktree, gives exactly today's 16 outputs.
-    Those 16 outputs are now the baseline. **When ailap differs again,** run the baseline commit in a worktree before
-    blaming a change.
+    Those 16 outputs are now the baseline.
+  - **When ailap differs: `docs/code-quality/ailap_seeded.sh`.** The pace a bot varies per 25 m stretch is hashed from
+    its instance id too (ai.gd `_pace`), so with the seed alone fixed the laps still moved. The script runs HEAD and
+    the working tree in two scratch worktrees with both ids replaced by constants; the 16 laps must match exactly.
+    The JSON / HTTP merge loads two new scripts at boot and moved every lap in the baseline; seeded, 16 of 16 match.
+  - baseline.sh stops a test after 15 min (exit 124), and compare.sh keeps each test's exit code (it dropped the
+    whole line with the time). A script error in my HTTP merge hung guest_test and with it the whole run.
+  - menu_test talks to the live server: whether the store's invite answer arrives after its page is gone ("Lambda
+    capture ... was freed") depends on the server's timing. Its 50 checks are what counts.
+- **Batch 4 so far (duplication):**
+  - Lap-time formatter and the player's car: one copy each (committed).
+  - JSON saves: 8 copies of "read a dictionary, else {}" / "write it" / "delete it" -> JsonFile (settings, career,
+    championship, progression, track packs, touch prefs, account, device key). The res:// data reads stay: each
+    handles its own file.
+  - Server requests: 4 copies -> JsonHttp.request (account, create room, room list, P2P relay), and its "Cannot reach
+    the game server" message. The first version added every request under the root, which takes no child while the
+    first scene sets up: the sign-in at boot failed (guest_test). The Account autoload passes itself, as before.
+  - Looks: the kerb grain comes from kerb_re alone, ahead of each detail list (each profile wrote its kerb regex
+    twice; the Nordschleife's drifted, bug 5); the road scan's albedo, the forest tint and the gravel scan's tile
+    named once in SpaLook. Inside spa_look: one image preparation (3 copies), one regrain (2), one world-space scan
+    under the road and gravel surfaces (2), _road_file gone (it was _scan_file("asphalt_track")). Measured by a probe
+    that builds every layout at Ultra and lists each material (detail layer and tile, uv, albedo, textures with the
+    repainted ones' pixel hashes, roughness, specular): 1,810 lines identical before and after.
+  - Left alone, under the rule (two copies, no bug): StoreScreen.fmt / CareerScreen._thousands, Hud.fmt_time /
+    ResultsScreen.fmt_time, CareerScreen._name / MobileHome.nick, UIW.row / SettingsPanel._row (the panel's has its
+    help hooks), the row-line style. The env's "white" stays in each look (AgX ignores it, but it is a setting each
+    passes on). The "anything but toasts and perf" overlay test is another question than "a modal is open".
+  - **Found, needs a fix commit: the phone's Join cannot reach a race hosted on a device.** Only the classic menu
+    calls P2p.is_p2p_code, which marks the code as a device's (Connection then connects over WebRTC); the phone's
+    Join goes to app.join straight away and Connection treats the code as a server room.
 - **The user's answers at check-in 2:**
   - Find the cause of the server's exhausted quota.
   - Fix the safety car's missing lod1.glb now.

@@ -10,7 +10,8 @@ cd "$R"
 run() { # name, command...
   local n="$1"; shift
   local t0=$(date +%s)
-  "$@" > "$OUT/$n.txt" 2>&1; local rc=$?
+  # (15 min at most: a test that hangs, e.g. on a script error, fails with exit 124 instead of stopping the run)
+  timeout 900 "$@" > "$OUT/$n.txt" 2>&1; local rc=$?
   echo "exit=$rc seconds=$(( $(date +%s) - t0 ))" >> "$OUT/$n.txt"
   echo "$n exit=$rc"
 }
