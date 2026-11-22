@@ -73,7 +73,7 @@ static func build(app: App) -> Control:
 		var sb := UIKit.box(MobileUI.PURPLE.darkened(0.15 if st == "normal" else 0.0), Color(1, 1, 1, 0.3), 1, 4, Vector2(18, 8))
 		sb.skew = Vector2(0.22, 0)
 		champ.add_theme_stylebox_override(st, sb)
-	champ.pressed.connect(func() -> void: ChampionshipUI.open(app, func(): return nick()))
+	champ.pressed.connect(func() -> void: ChampionshipUI.open(app, func() -> String: return nick()))
 	right.add_child(champ)
 	var wins := UIW.vbox(4)
 	var wl := UIW.hbox(8)

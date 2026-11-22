@@ -243,7 +243,7 @@ static func _events(app: App, cards: HBoxContainer) -> void:
 	var champ: Variant = Championship.load_saved()
 	cards.add_child(_mode_card(I18n.t("Championship"), "res://assets/ui/photo_aerial_spa.webp",
 		I18n.t("Round {n} of {m}", {"n": champ.done + 1, "m": champ.rounds.size()}) if champ != null else I18n.t("A season on every circuit, F1 points"),
-		func() -> void: ChampionshipUI.open(app, func(): return MobileHome.nick())))
+		func() -> void: ChampionshipUI.open(app, func() -> String: return MobileHome.nick())))
 	cards.add_child(_mode_card(I18n.t("Time trial"), "res://assets/ui/photo_straight.webp", I18n.t("Alone on track, 10 minutes: clean laps in a row count"), func() -> void:
 		app.set_ui(Control.new())
 		var err := await app.join(LocalRoom.create(), MobileHome.nick())

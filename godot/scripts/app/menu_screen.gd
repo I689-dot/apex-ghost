@@ -79,16 +79,16 @@ static func build(app: App, error: String = "") -> Control:
 		var res: String = await starter.call(n)
 		if res != "":
 			app.show_menu(res)
-	var solo := func():
+	var solo := func() -> void:
 		await go.call(func(n: String) -> String:
 			return await app.join(LocalRoom.create(), n))
-	var create := func():
+	var create := func() -> void:
 		await go.call(func(n: String) -> String:
 			var c := await Connection.create_room()
 			if c == "":
 				return I18n.t(Connection.last_error) if Connection.last_error != "" else I18n.t("Cannot reach the game server. Check your connection.")
 			return await app.join(c, n))
-	var join_it := func(spectate: bool = false, code_in: String = ""):
+	var join_it := func(spectate: bool = false, code_in: String = "") -> void:
 		var c := Validation.normalize_room_code(code_in if code_in != "" else code.text)
 		if c == "":
 			err.text = I18n.t("Enter the 5-character room code.")
@@ -100,7 +100,7 @@ static func build(app: App, error: String = "") -> Control:
 			if not hosted and not online:
 				return I18n.t("Online needs an account")
 			return await app.join(c, n, spectate))
-	var host := func():
+	var host := func() -> void:
 		await go.call(func(n: String) -> String:
 			var r: Dictionary = await P2p.host_race()
 			if r.has("error"):

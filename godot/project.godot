@@ -17,7 +17,11 @@ Packs="*res://scripts/game/track_packs.gd"
 
 [debug]
 
-gdscript/warnings/untyped_declaration=1
+gdscript/warnings/directory_rules={
+"res://addons": 0,
+"res://tests": 0
+}
+gdscript/warnings/untyped_declaration=2
 gdscript/warnings/return_value_discarded=1
 
 [display]

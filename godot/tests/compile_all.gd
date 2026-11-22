@@ -25,7 +25,7 @@ func _compile() -> int:
 	var bad := 0
 	var n := 0
 	var inner := OS.get_cmdline_user_args().has("--inner")
-	for path in _scripts("res://scripts"):
+	for path: String in _scripts("res://scripts"):
 		n += 1
 		var s := load(path)
 		# (the inner runs: a reload compiles it again, printing its warnings and any error)
@@ -85,11 +85,11 @@ func _warnings() -> void:
 		kinds[kind] = int(kinds.get(kind, 0)) + 1
 	var paths := per.keys()
 	paths.sort_custom(func(a: String, b: String) -> bool: return per[a] > per[b] or (per[a] == per[b] and a < b))
-	for p in paths:
+	for p: String in paths:
 		print("warnings %4d  %s" % [per[p], p])
 	var ks := kinds.keys()
 	ks.sort_custom(func(a: String, b: String) -> bool: return kinds[a] > kinds[b])
-	for k in ks:
+	for k: String in ks:
 		print("kind %4d  %s" % [kinds[k], k.left(110)])
 	print("%d warnings in %d scripts" % [total, paths.size()])
 

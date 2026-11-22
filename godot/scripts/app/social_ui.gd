@@ -235,7 +235,7 @@ static func friends_panel(app: App, join: Callable, watch: Callable) -> Control:
 	var card := UIW.vbox(8)
 	# (a lambda captures by value: it reaches itself through this dictionary, else it calls an empty Callable)
 	var _self := {}
-	_self.refresh = func():
+	_self.refresh = func() -> void:
 		var all: Array = await Account.friends()
 		if not is_instance_valid(list):
 			return
