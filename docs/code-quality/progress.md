@@ -5,7 +5,7 @@ together with `git log`.
 
 ## State
 
-- **Phase:** batch 5 (splits), after check-in 3 (2026-11-22).
+- **Phase:** phase 4 done (2026-11-22); check-in 4 next. check.sh: PASS on HEAD.
 - **Numbers at check-in 3:** 153 scripts (two helpers added: JsonFile, JsonHttp), 34,060 lines (34,140 at check-in 2),
   676 warnings (689). One behaviour fix in the batch: the phone's Join (2eb818d).
 - **Answers at check-in 3:** batch 5: go on. The server quota: not now. The bots: seed them from their own id.
@@ -589,3 +589,15 @@ contain none of these names.
 - **The README:** it misses many tests and env hooks (APEX_SERVER, APEX_SCREEN, APEX_MOBILE_UI, most of
   session_test's).
 - **Hot-path allocations** listed in F6, for a performance job with measurements.
+
+## Phase 4 (keep it clean)
+
+- `CLAUDE.md` (102 lines), `tools/godot/check.sh`, the DECISIONS.md section "Code-quality pass (2026-11)".
+- **Proposed Stop hook (not installed: needs the user's OK).** In `.claude/settings.json`, a session cannot finish
+  while a changed `.gd` file fails to compile (exit 2 blocks the stop and shows the errors to the session; the
+  compile without the warning count takes about 10 s):
+
+  ```json
+  {"hooks": {"Stop": [{"hooks": [{"type": "command", "timeout": 120,
+    "command": "cd \"$CLAUDE_PROJECT_DIR\" && if git status --porcelain -- godot | grep -q '\\.gd$'; then WARNINGS=0 tools/godot/gd.sh tests/compile_all.gd < /dev/null > /tmp/gridcorsa_compile.log 2>&1 || { grep -E 'FAILED|SCRIPT ERROR' -A1 /tmp/gridcorsa_compile.log | head -20 >&2; exit 2; }; fi"}]}]}}
+  ```

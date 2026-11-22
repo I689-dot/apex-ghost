@@ -1814,3 +1814,32 @@ assumes the old peak; retune AI_GRIP if needed).
 - One native crash in the Mali driver (vkAllocateDescriptorSets) right after the first guest sign-in opened the
   garage. The phone was short of memory at the time: about 530 MB free, swap full, Android killing other apps. It did
   not come back in the starts after.
+
+## Code-quality pass (2026-11)
+
+- The brief: `docs/prompts/code-quality-pass.md`; the log, with the evidence for each deletion: `docs/code-quality/progress.md`.
+  Godot app only, from 5f19051; same behaviour throughout, each real bug fixed in its own `Fix:` commit with a measurement.
+- **Removed** (each after the searches CLAUDE.md lists): the pit crews, the radio that never attached, the look, paint
+  and line dev knobs (SPA_LOOK, SPA_TINT, LOOK_ROLES, SPA_DEBUG, MUL_GAIN, FOREST_NO_FADE, CAR_DEPTH, LINE_MARGIN,
+  SIDE_SCREENS), and about 60 smaller unused members.
+- **Typed:** every declaration in `godot/scripts`; `untyped_declaration` is now an error there (`godot/tests` exempt).
+- **Merged** (three copies, or two that had drifted into a bug): the lap-time formatter (UIKit.fmt_lap), the player's
+  car (CarStudio.my_car), the save files (JsonFile, 8 copies), the server requests (JsonHttp, 4), the looks' kerb grain
+  and shared values, Spa's image and scan code, the progress bars (UIW.bar, 9), the back button and Esc
+  (App.go_back), and the pit service shared by the bots and the player.
+- **Split:** race_session.gd (3,301 lines) into a chain of ten layers (SessionBase ... RaceSession, the largest 1,063);
+  the briefing (BriefingScreen), the dev tours (DevTours), and the widget classes (scripts/ui/widgets).
+- **Fixed on the way** (11 commits): the phone's Settings applying at once; the forest cards' bake size on High and Ultra;
+  each circuit's own sky on the PC; the Nordschleife's kerb grain; the phone's Paint button; the safety car's missing
+  model level; the phone's Join reaching a race hosted on a device; bots seeded from their id instead of their
+  instance id (which made the same race play out differently after any unrelated change); three tools/tests fixes.
+- **Before / after:** scripts 152 -> 169 (the splits), lines 35,232 -> 34,124, GDScript warnings 2,433 -> 676. Every
+  deterministic output (simtest for every car, tracktest, roomtest, replay, ailap on 8 layouts at 120 and 60 Hz)
+  identical to the start but ailap after the bot-seed fix, which changes the bots' variation on purpose (re-recorded).
+  Before that fix ailap's baseline was re-recorded twice for the instance-id effect alone, each time after proving
+  the laps identical with the bots' randomness fixed (the baseline commit in a worktree; HEAD against the change).
+  Frame rates: not re-measured at the end (the PC's windows stalled 1 s every 1.1 s on 2026-11-22, the code from
+  before the pass too); to be compared back to back, old code against new.
+- **Guardrails:** `CLAUDE.md` (scope, checks, rules, Godot traps, the session's layers, patterns not to copy);
+  `tools/godot/check.sh` (compile_all, every headless test, compared with `docs/code-quality/baseline/`);
+  compile_all counts errors and warnings in runs that reload every script.
