@@ -285,3 +285,20 @@ func flash(msg: String, ms: float = 2500.0, kind: String = "info") -> void:
 	message = msg
 	message_kind = kind
 	message_until = Time.get_ticks_msec() + ms
+
+## A driver's row in the last standings, null before the first.
+func _standing(id: String) -> Variant:
+	for s: Dictionary in standings:
+		if s.id == id:
+			return s
+	return null
+
+## The cars simulated here (mine, the bots I run): [[id, vehicle], ...].
+func simulated() -> Array:
+	var out: Array = []
+	if not spectator:
+		out.append([me, vehicle])
+	for r: Remote in remotes.values():
+		if r.bot != null:
+			out.append([r.id, r.bot.vehicle])
+	return out
