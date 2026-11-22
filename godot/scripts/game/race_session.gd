@@ -1,15 +1,11 @@
 class_name RaceSession
-extends SessionBase
+extends SessionReplay
 ## One race: loads everything for it, runs physics / render / network until the results arrive (port of
 ## game/session.ts RaceSession). The top layer of the session: its state and helpers are in SessionBase (session_base.gd).
 
 # Fields only this layer uses (the shared state is in SessionBase).
 ## The H-pattern lever's last gear (DeviceBindings), -99 none.
 var _h_gear := -99
-var _replay_proxy := Node3D.new()
-var _replay_chase := ChaseCamera.new()
-var _replay_saved := {}
-var _replay_poses := PackedFloat32Array()
 var _in_water := false
 var _ui_acc := 0.0
 
@@ -438,9 +434,6 @@ func _warm_up() -> void:
 	# the first frames compile the shaders: show everything once, behind the loading screen
 	track.show_all()
 	await get_tree().process_frame
-
-func _set_view_camera(c: Camera3D) -> void:
-	c.current = true
 
 # ----------------------------------------------------------- networking ---
 
@@ -1223,187 +1216,6 @@ func update_lap_delta(now_ms: float, ev: Array) -> void:
 
 ## ------------------------------------------------------------------ replay ---
 
-func _replay_visual(i: int) -> CarVisual:
-	var id: String = replay.ids[i]
-	if id == me:
-		return my_visual
-	var r := remote_by_id(id)
-	return r.visual if r != null else null
-
-## One sample of every car's pose, 20 times a second, from the cars as they were drawn this frame.
-func _replay_record(dt: float, server_now: float) -> void:
-	if start_at == null or server_now < start_at - 3000.0:
-		return
-	if replay.ids.is_empty():
-		var ids: Array = [] if spectator else [me]
-		for r: Remote in remotes.values():
-			ids.append(r.id)
-		replay.clear(ids)
-		_replay_poses.resize(ids.size() * Replay.STRIDE)
-	if not replay.due(dt):
-		return
-	for i in replay.ids.size():
-		var v := _replay_visual(i)
-		if v == null:
-			continue
-		Replay.put(_replay_poses, i, v.global_position, v.global_transform.basis.get_rotation_quaternion(), v.pose_steer, v.pose_rot_f, v.pose_rot_r, v.brake_on)
-	replay.add(float(Time.get_ticks_msec()), _replay_poses)
-
-func open_replay() -> void:
-	if replay_open or replay.size() < 40 or cinematic != null:
-		return
-	replay_open = true
-	replay_playing = true
-	replay_speed = 1.0
-	replay_t = maxf(replay.first_ms(), replay.last_ms() - 15000.0)
-	replay_car = 0
-	replay_cam_mode = 0
-	_replay_chase.reset()
-	_replay_saved.clear()
-	for i in replay.ids.size():
-		var v := _replay_visual(i)
-		if v != null:
-			_replay_saved[v] = v.transform
-			# placed in world space while the replay runs: my car's model is a child of the live car, which rolls on
-			# under the physics between frames (the replayed car jittered with it)
-			v.top_level = true
-	replay_cam = Camera3D.new()
-	replay_cam.near = 0.1
-	replay_cam.far = 9000.0
-	add_child(replay_cam)
-	add_child(_replay_proxy)
-	add_child(_replay_chase.camera)
-	hud.visible = false
-	if cb.has("on_replay_toggle"):
-		cb.on_replay_toggle.call(true)
-
-func close_replay() -> void:
-	if not replay_open:
-		return
-	replay_open = false
-	# (Variant: a saved visual may be freed by now, which a typed variable would refuse)
-	for v: Variant in _replay_saved:
-		if is_instance_valid(v):
-			v.top_level = false
-			v.transform = _replay_saved[v]
-	_replay_saved.clear()
-	if replay_cam != null:
-		replay_cam.queue_free()
-		replay_cam = null
-	if _replay_proxy.get_parent() == self:
-		remove_child(_replay_proxy)
-	if _replay_chase.camera.get_parent() == self:
-		remove_child(_replay_chase.camera)
-	hud.visible = true
-	if cb.has("on_replay_toggle"):
-		cb.on_replay_toggle.call(false)
-
-func replay_toggle_play() -> void:
-	if not replay_playing and ((replay_speed > 0.0 and replay_t >= replay.last_ms() - 1.0) or (replay_speed < 0.0 and replay_t <= replay.first_ms() + 1.0)):
-		replay_t = replay.first_ms() if replay_speed > 0.0 else replay.last_ms()
-	replay_playing = not replay_playing
-
-func replay_set_speed(sp: float) -> void:
-	replay_speed = sp
-	replay_playing = true
-
-## One recorded sample (a twentieth of a second) back or forward, paused.
-func replay_step(dir: int) -> void:
-	replay_playing = false
-	replay_t = clampf(replay_t + dir * 1000.0 / Replay.HZ, replay.first_ms(), replay.last_ms())
-
-func replay_jump(ms: float) -> void:
-	replay_t = clampf(replay_t + ms, replay.first_ms(), replay.last_ms())
-
-func replay_seek_fraction(f: float) -> void:
-	replay_t = replay.first_ms() + clampf(f, 0.0, 1.0) * replay.duration_ms()
-
-func replay_change_car(dir: int) -> void:
-	replay_car = posmod(replay_car + dir, maxi(1, replay.ids.size()))
-	_replay_chase.reset()
-
-func replay_change_camera() -> void:
-	replay_cam_mode = (replay_cam_mode + 1) % REPLAY_CAMERAS.size()
-	_replay_chase.reset()
-
-func replay_camera_name() -> String:
-	return REPLAY_CAMERAS[replay_cam_mode]
-
-func replay_car_name() -> String:
-	if replay_car >= replay.ids.size():
-		return ""
-	return String(names.get(replay.ids[replay_car], "?"))
-
-## Desktop keys while the replay is open (the bar has buttons for everything).
-func _replay_keys() -> void:
-	if Input.is_key_pressed(KEY_ESCAPE) or kb.tapped("pause") or kb.tapped("replay"):
-		close_replay()
-		return
-	if kb.tapped("handbrake") or _tapped_key(KEY_K):
-		replay_toggle_play()
-	if _tapped_key(KEY_COMMA):
-		replay_step(-1)
-	if _tapped_key(KEY_PERIOD):
-		replay_step(1)
-	if _tapped_key(KEY_LEFT) or _tapped_key(KEY_J):
-		replay_jump(-5000.0)
-	if _tapped_key(KEY_RIGHT) or _tapped_key(KEY_L):
-		replay_jump(5000.0)
-	if kb.tapped("camera"):
-		replay_change_camera()
-	if kb.tapped("steerLeft") and not _tapped_key(KEY_LEFT):
-		replay_change_car(-1)
-	if kb.tapped("steerRight") and not _tapped_key(KEY_RIGHT):
-		replay_change_car(1)
-
-func _tapped_key(k: int) -> bool:
-	return kb._pressed.has(k)
-
-## Playback time, and the camera on the car being watched. Returns the camera to look through.
-func _replay_update(dt: float) -> Camera3D:
-	if replay_playing:
-		replay_t += dt * 1000.0 * replay_speed
-		if replay_t >= replay.last_ms() and replay_speed > 0.0:
-			replay_t = replay.last_ms()
-			replay_playing = false
-		elif replay_t <= replay.first_ms() and replay_speed < 0.0:
-			replay_t = replay.first_ms()
-			replay_playing = false
-	var p := replay.pose(replay_t, replay_car)
-	if p.is_empty():
-		return null
-	_replay_proxy.global_transform = Transform3D(Basis(p.rot), p.pos)
-	var vel := replay.velocity(replay_t, replay_car)
-	if replay_cam_mode == 1 and tv_cameras() != null:
-		_tv_hint = TrackMath.nearest_centerline_index(track_data, p.pos.x, p.pos.y, p.pos.z, _tv_hint, 40)
-		var s := TrackMath.progress_at(track_data, _tv_hint, p.pos.x, p.pos.z)
-		var cams: TvCameras = tv_cameras()
-		if cams.update(dt, p.pos, vel, s):
-			return cams.camera
-	if replay_cam_mode == 2:
-		var fwd: Vector3 = p.rot * Vector3(0, 0, 1)
-		replay_cam.global_position = p.pos + fwd * 9.0 + Vector3(0, 1.1, 0)
-		replay_cam.look_at(p.pos + Vector3(0, 0.7, 0), Vector3.UP)
-		replay_cam.fov = 60.0
-		return replay_cam
-	_replay_chase.update(dt, _replay_proxy, vel, "chase", false)
-	return _replay_chase.camera
-
-## Puts every car where the replay has it (after the live update, so the live positions are only overdrawn).
-func _replay_apply() -> void:
-	for i in replay.ids.size():
-		var v := _replay_visual(i)
-		if v == null:
-			continue
-		var p := replay.pose(replay_t, i)
-		if p.is_empty():
-			continue
-		v.global_transform = Transform3D(Basis(p.rot), p.pos)
-		v.set_pose(p.steer, p.rot_f, p.rot_r, [0.0, 0.0, 0.0, 0.0])
-		v.set_lights(p.brake, headlights_on, env.night)
-		v.set_opacity(1.0)
-		v.visible = true
-
 ## In-car adjustments (iRacing's F8 black box): they take effect at once and are kept for the next session.
 const BIAS_STEP := 0.005
 
@@ -2040,136 +1852,6 @@ func update_audio(dt: float, view_cam: Camera3D) -> void:
 		"myVel": vehicle.linear_velocity, "vehicle": vehicle, "others": others, "rain": weather.rain, "wet": weather.wetness, "day": 1.0 - env.night,
 	})
 
-# ------------------------------------------------------------ cameras ---
-
-func cycle_camera() -> void:
-	var modes: Array = Settings.CAMERA_MODES
-	var i := modes.find(Settings.data.camera)
-	Settings.data.camera = modes[(i + 1) % modes.size()]
-	Settings.save()
-	chase.reset()
-	flash(I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0, "osd")
-
-func tv_wanted() -> bool:
-	if spectator:
-		return spec_tv
-	# after the chequered flag the broadcast takes over, as F1 / GT games show your in-lap
-	return tv_view or (finished_ms != null and race.kind == "race")
-
-func toggle_tv() -> void:
-	tv_view = not tv_view
-	if tv != null:
-		tv.reset()
-	flash(I18n.t("TV cameras") if tv_view else I18n.t({"cockpit": "Cockpit camera", "chase": "Chase camera", "far": "Far chase camera"}[Settings.data.camera]), 1200.0, "osd")
-
-## Placed the first time they are wanted: a sightline check per tower against the circuit's collision.
-func tv_cameras() -> TvCameras:
-	if tv != null:
-		return tv
-	if not ResourceLoader.exists("res://scripts/game/tv_cameras.gd"):
-		return null
-	var cast_sight := func(a: Vector3, b: Vector3) -> Variant:
-		var d := a.distance_to(b)
-		if d < 0.01:
-			return null
-		var q := PhysicsRayQueryParameters3D.create(a, a.move_toward(b, maxf(0.0, d - 3.0)), VehicleConsts.RAY_MASK)
-		var hit := get_viewport().world_3d.direct_space_state.intersect_ray(q)
-		if not hit.is_empty():
-			return a.distance_to(hit.position)
-		if forest != null and forest.blocks(a, b):
-			return d / 2.0
-		return null
-	var ground_at := func(x: float, z: float, from_y: float) -> Variant:
-		var q := PhysicsRayQueryParameters3D.create(Vector3(x, from_y, z), Vector3(x, from_y - 600.0, z), VehicleConsts.RAY_MASK)
-		var hit := get_viewport().world_3d.direct_space_state.intersect_ray(q)
-		return null if hit.is_empty() else hit.position.y
-	tv = load("res://scripts/game/tv_cameras.gd").new(track_data, cast_sight, ground_at)
-	add_child(tv.camera)
-	return tv
-
-var _tv_hint := -1
-
-## The car the TV cameras follow: watching, the watched car; driving, yours. Returns {pos, vel, s} or null.
-func tv_target() -> Variant:
-	if not spectator:
-		return {"pos": vehicle.global_position, "vel": vehicle.linear_velocity, "s": loc.s}
-	var r := remote_by_id(spec_target)
-	if r == null and remotes.size() > 0:
-		r = remotes.values()[0]
-	if r == null:
-		return null
-	var p: Vector3 = r.visual.global_position
-	_tv_hint = TrackMath.nearest_centerline_index(track_data, p.x, p.y, p.z, _tv_hint, 40)
-	return {"pos": p, "vel": r.vel, "s": TrackMath.progress_at(track_data, _tv_hint, p.x, p.z)}
-
-func _on_spectator_key(e: InputEventKey) -> void:
-	var have := {}
-	for r: Remote in remotes.values():
-		have[r.id] = true
-	var src: Array = standings.map(func(s: Dictionary) -> String: return s.id) if standings.size() > 0 else race.grid
-	var ids: Array = src.filter(func(id: String) -> bool: return have.has(id))
-	if ids.is_empty():
-		return
-	var i := ids.find(spec_target)
-	if e.keycode == KEY_C or e.keycode == KEY_T:
-		spec_tv = not spec_tv
-		if tv != null:
-			tv.reset()
-		flash(I18n.t("TV cameras") if spec_tv else I18n.t("Chase camera"), 1200.0, "osd")
-		return
-	if e.keycode == KEY_RIGHT:
-		i = (i + 1) % ids.size()
-	elif e.keycode == KEY_LEFT:
-		i = (i - 1 + ids.size()) % ids.size()
-	elif e.keycode >= KEY_1 and e.keycode <= KEY_9:
-		i = mini(ids.size() - 1, e.keycode - KEY_1)
-	else:
-		return
-	spec_target = ids[i]
-	spec_cam_init = false
-	if tv != null:
-		tv.reset()
-
-## Chase camera behind the watched car, smoothed.
-func update_spectator_cam(dt: float) -> void:
-	var r := remote_by_id(spec_target)
-	if r == null and remotes.size() > 0:
-		r = remotes.values()[0]
-	if r == null:
-		return
-	var o: Node3D = r.visual
-	var f := o.global_transform.basis.z
-	f.y = 0.0
-	f = f.normalized()
-	var want := o.global_position - f * 7.5 + Vector3(0, 2.6, 0)
-	if not spec_cam_init:
-		spec_cam.global_position = want
-		spec_cam_init = true
-	else:
-		spec_cam.global_position = spec_cam.global_position.lerp(want, 1.0 - exp(-dt * 5.0))
-	spec_cam.look_at(o.global_position + f * 4.0 + Vector3(0, 1, 0), Vector3.UP)
-
-## The pit stop's TV shot: low from the front three-quarter on the fast-lane side, the garage behind the car, a slow
-## drift around it while the crew works, as broadcasts frame a stop.
-func update_pit_cam(dt: float) -> void:
-	pit_cam_t += dt
-	if service == null or Time.get_ticks_msec() - service.start < 50.0:
-		pit_cam_t = 0.0
-	var fwd := vehicle.global_transform.basis.z
-	var fx := fwd.x
-	var fz := fwd.z
-	# the fast lane is away from the garage
-	var away := Vector2(fz, -fx)
-	if pit != null and pit.index >= 0:
-		away = pit.away_at(pit.index)
-	var side_sign := -1.0 if away.x * fz - away.y * fx > 0.0 else 1.0
-	var a := 0.62 - pit_cam_t * 0.025
-	var f := cos(a) * 6.2
-	var side := sin(a) * 6.2 * side_sign
-	var p := vehicle.global_position
-	pit_cam.global_position = Vector3(p.x + fx * f + fz * side, p.y + 1.15, p.z + fz * f - fx * side)
-	pit_cam.look_at(Vector3(p.x - fx * 0.4, p.y + 0.45, p.z - fz * 0.4), Vector3.UP)
-
 # ------------------------------------------------------- race control ---
 
 ## The safety car's model (race control, race only): loaded after the session, shown when it is deployed.
@@ -2710,7 +2392,6 @@ func stop_event(e: Dictionary, v: Vehicle, plan: Dictionary, audible: bool) -> v
 		pan = -0.7 if e.wheel % 2 == 0 else 0.7
 	if snd != null:
 		snd.pit_event(e.kind, pan)
-
 
 # ------------------------------------------------------------------ ui ---
 
