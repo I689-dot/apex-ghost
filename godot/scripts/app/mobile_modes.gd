@@ -265,7 +265,7 @@ static func _online(app: App, cards: HBoxContainer) -> void:
 		app.set_ui(Control.new())
 		var c := await Connection.create_room()
 		if c == "":
-			app.show_menu(I18n.t("Cannot reach the game server. Check your connection."))
+			app.show_menu(JsonHttp.unreachable())
 			return
 		var err := await app.join(c, MobileHome.nick())
 		if err != "":

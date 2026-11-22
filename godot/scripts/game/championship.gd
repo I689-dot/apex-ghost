@@ -9,20 +9,15 @@ const CHAMP_POINTS := [25, 18, 15, 12, 10, 8, 6, 4, 2, 1]
 const SAVE_PATH := "user://championship.json"
 
 static func load_saved() -> Variant:
-	if not FileAccess.file_exists(SAVE_PATH):
-		return null
-	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	return v if typeof(v) == TYPE_DICTIONARY else null
+	var c := JsonFile.read(SAVE_PATH)
+	return null if c.is_empty() else c
 
 ## Save, or delete the saved championship with null.
 static func save(c: Variant) -> void:
 	if c == null:
-		if FileAccess.file_exists(SAVE_PATH):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
-		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(c))
+		JsonFile.remove(SAVE_PATH)
+	else:
+		JsonFile.write(SAVE_PATH, c)
 
 static func create(rounds: Array, race_laps: int, quali_minutes: int, bots: int) -> Dictionary:
 	return {"rounds": rounds, "done": 0, "raceLaps": race_laps, "qualiMinutes": quali_minutes, "bots": bots, "drivers": {}, "lastScored": ""}

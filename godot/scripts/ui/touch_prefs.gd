@@ -13,10 +13,7 @@ static func _ensure() -> void:
 	if not data.is_empty():
 		return
 	data = DEFAULTS.duplicate()
-	if FileAccess.file_exists(SAVE_PATH):
-		var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-		if typeof(v) == TYPE_DICTIONARY:
-			data.merge(v, true)
+	data.merge(JsonFile.read(SAVE_PATH), true)
 
 static func get_pref(key: String) -> Variant:
 	_ensure()
@@ -29,9 +26,7 @@ static func set_pref(key: String, value: Variant) -> void:
 
 static func save() -> void:
 	_ensure()
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(data))
+	JsonFile.write(SAVE_PATH, data)
 	for l in _listeners:
 		l.call()
 

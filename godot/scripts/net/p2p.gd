@@ -23,24 +23,12 @@ static func available() -> bool:
 static func _api(c: String, path: String = "") -> String:
 	return "%s/api/p2p/%s%s" % [Config.SERVER_URL, c, path]
 
-static func _request(url: String, body: Variant = null) -> Dictionary:
-	var req := HTTPRequest.new()
-	(Engine.get_main_loop() as SceneTree).root.add_child(req)
-	var err := req.request(url, PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_GET if body == null else HTTPClient.METHOD_POST, "" if body == null else JSON.stringify(body))
-	if err != OK:
-		req.queue_free()
-		return {"status": 0, "data": {}}
-	var res: Array = await req.request_completed
-	req.queue_free()
-	var data: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8()) if (res[3] as PackedByteArray).size() > 0 else {}
-	return {"status": res[1], "data": data if typeof(data) == TYPE_DICTIONARY else {}}
-
 static func is_known(c: String) -> bool:
 	return _known.has(c)
 
 ## Is this room code a race hosted on a device right now?
 static func is_p2p_code(c: String) -> bool:
-	var r := await _request(_api(c))
+	var r := await JsonHttp.request(_api(c))
 	var yes: bool = r.status == 200 and r.data.get("hosted", false) == true
 	if yes:
 		_known[c] = true
@@ -91,7 +79,7 @@ static func host_race() -> Dictionary:
 	var c := ""
 	for i in Const.ROOM_CODE_LENGTH:
 		c += Const.ROOM_CODE_ALPHABET[randi() % Const.ROOM_CODE_ALPHABET.length()]
-	var r := await _request(_api(c, "/host"), {})
+	var r := await JsonHttp.request(_api(c, "/host"), {})
 	if r.status != 200:
 		return {"error": I18n.t("Cannot reach the game server to share the code. Check your connection.")}
 	LocalRoom.create(c)
@@ -150,7 +138,7 @@ func _process(dt: float) -> void:
 		_poll_offers()
 
 func _poll_offers() -> void:
-	var r := await _request(_api(code, "/offers"))
+	var r := await JsonHttp.request(_api(code, "/offers"))
 	if not _hosting or r.status != 200:
 		return
 	for o: Dictionary in r.data.get("offers", []):
@@ -177,7 +165,7 @@ func _accept(id: String, sdp: String) -> void:
 	var answer := await hs.complete()
 	if not _hosting:
 		return
-	await _request(_api(code, "/answer"), {"id": id, "sdp": answer})
+	await JsonHttp.request(_api(code, "/answer"), {"id": id, "sdp": answer})
 
 ## A WebSocket look-alike over a data channel to the device hosting the race (the guest's side): the same interface as
 ## LocalRoom.LocalSocket, which Connection uses for offline rooms.
@@ -204,7 +192,7 @@ class P2pSocket:
 		_dc = _pc.create_data_channel("race", {"ordered": true})
 		_pc.create_offer()
 		var offer := await hs.complete()
-		var r := await P2p._request(P2p._api(room_code, "/offer"), {"sdp": offer})
+		var r := await JsonHttp.request(P2p._api(room_code, "/offer"), {"sdp": offer})
 		if r.status != 200:
 			_shut()
 			return
@@ -213,7 +201,7 @@ class P2pSocket:
 			if ready_state == 3:
 				return
 			await (Engine.get_main_loop() as SceneTree).create_timer(0.5).timeout
-			var a := await P2p._request(P2p._api(room_code, "/answer/" + id))
+			var a := await JsonHttp.request(P2p._api(room_code, "/answer/" + id))
 			if a.status == 204:
 				continue
 			if a.status != 200:

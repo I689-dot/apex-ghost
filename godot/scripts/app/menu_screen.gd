@@ -86,7 +86,7 @@ static func build(app: App, error: String = "") -> Control:
 		await go.call(func(n: String) -> String:
 			var c := await Connection.create_room()
 			if c == "":
-				return I18n.t(Connection.last_error) if Connection.last_error != "" else I18n.t("Cannot reach the game server. Check your connection.")
+				return I18n.t(Connection.last_error) if Connection.last_error != "" else JsonHttp.unreachable()
 			return await app.join(c, n))
 	var join_it := func(spectate: bool = false, code_in: String = "") -> void:
 		var c := Validation.normalize_room_code(code_in if code_in != "" else code.text)

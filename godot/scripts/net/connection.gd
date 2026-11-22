@@ -42,53 +42,29 @@ signal connect_failed(code: String, text: String)
 static var last_error := ""
 
 static func create_room() -> String:
-	var tree := Engine.get_main_loop() as SceneTree
-	var req := HTTPRequest.new()
-	tree.root.add_child(req)
 	var token: Variant = Account.account().token if Account.account() != null else null
-	var headers := PackedStringArray()
-	if token != null:
-		headers.append("Authorization: Bearer %s" % token)
 	# where the room runs (Settings › Gameplay › Interface › Online): near the host ("auto"), or a region for friends
 	# far away (the server's location hints)
-	headers.append("Content-Type: application/json")
 	var region: String = str(Settings.data.get("online", {}).get("region", "auto"))
-	var req_body := JSON.stringify({"region": region} if region != "auto" else {})
-	if req.request("%s/api/rooms" % Config.SERVER_URL, headers, HTTPClient.METHOD_POST, req_body) != OK:
-		req.queue_free()
-		last_error = I18n.t("Cannot reach the game server. Check your connection.")
+	var r := await JsonHttp.request("%s/api/rooms" % Config.SERVER_URL, {"region": region} if region != "auto" else {}, token)
+	if not r.sent:
+		last_error = JsonHttp.unreachable()
 		return ""
-	var res: Array = await req.request_completed
-	req.queue_free()
-	if res[0] != HTTPRequest.RESULT_SUCCESS:
-		last_error = I18n.t("Cannot reach the game server. Check your connection.")
-		return ""
-	if res[1] == 401:
+	if r.status == 401:
 		last_error = I18n.t("Sign in to play online.")
 		return ""
-	if res[1] < 200 or res[1] >= 300:
-		last_error = "Server error (%d). Try again." % res[1]
+	if r.status < 200 or r.status >= 300:
+		last_error = "Server error (%d). Try again." % r.status
 		return ""
-	var body: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
-	if typeof(body) != TYPE_DICTIONARY or not body.has("code"):
+	if not r.data.has("code"):
 		last_error = "Server returned no room code."
 		return ""
-	return body.code
+	return r.data.code
 
 ## The public room list (rooms whose host made them public).
 static func list_public_rooms() -> Array:
-	var tree := Engine.get_main_loop() as SceneTree
-	var req := HTTPRequest.new()
-	tree.root.add_child(req)
-	if req.request("%s/api/rooms" % Config.SERVER_URL) != OK:
-		req.queue_free()
-		return []
-	var res: Array = await req.request_completed
-	req.queue_free()
-	if res[0] != HTTPRequest.RESULT_SUCCESS or res[1] != 200:
-		return []
-	var body: Variant = JSON.parse_string((res[3] as PackedByteArray).get_string_from_utf8())
-	return body.get("rooms", []) if typeof(body) == TYPE_DICTIONARY else []
+	var r := await JsonHttp.request("%s/api/rooms" % Config.SERVER_URL)
+	return r.data.get("rooms", []) if r.status == 200 else []
 
 func setup(room_code: String, nickname: String, spectator: bool = false) -> Connection:
 	code = room_code

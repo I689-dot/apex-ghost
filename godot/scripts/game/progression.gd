@@ -66,10 +66,8 @@ static func _start() -> Dictionary:
 static func data() -> Dictionary:
 	if _data.is_empty():
 		_data = _start()
-		if FileAccess.file_exists(SAVE_PATH) and not dry:
-			var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-			if typeof(v) == TYPE_DICTIONARY:
-				_data.merge(v, true)
+		if not dry:
+			_data.merge(JsonFile.read(SAVE_PATH), true)
 		# a new pass season: its XP and claims start again
 		if int(_data.passSeason) != _season_index():
 			_data.passSeason = _season_index()
@@ -81,9 +79,7 @@ static func data() -> Dictionary:
 static func save() -> void:
 	if dry:
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(_data))
+	JsonFile.write(SAVE_PATH, _data)
 
 ## Tests: forget what is in memory (the next data() reads the file again).
 static func reset_cache() -> void:

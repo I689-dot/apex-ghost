@@ -22,10 +22,9 @@ var _accounts_on: Variant = null
 var auto_resume := true
 
 func _ready() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-		if typeof(v) == TYPE_DICTIONARY:
-			current = v
+	var a := JsonFile.read(SAVE_PATH)
+	if not a.is_empty():
+		current = a
 
 func account() -> Variant:
 	return current
@@ -33,36 +32,21 @@ func account() -> Variant:
 func _save(a: Variant) -> void:
 	current = a
 	if a != null:
-		var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-		if f != null:
-			f.store_string(JSON.stringify(a))
-	elif FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+		JsonFile.write(SAVE_PATH, a)
+	else:
+		JsonFile.remove(SAVE_PATH)
 	changed.emit(a)
 	if a != null:
 		_send_presence()
 
 ## One request to the server's API. body == null: GET, otherwise POST with JSON. Returns {ok, status, data, error}.
 func api(path: String, body: Variant = null, token: Variant = null) -> Dictionary:
-	var req := HTTPRequest.new()
-	add_child(req)
-	var headers := PackedStringArray(["Content-Type: application/json"])
 	var tk: Variant = token if token != null else (current.token if current != null else null)
-	if tk != null:
-		headers.append("Authorization: Bearer %s" % tk)
-	var err := req.request("%s/api/%s" % [Config.SERVER_URL, path], headers, HTTPClient.METHOD_GET if body == null else HTTPClient.METHOD_POST, "" if body == null else JSON.stringify(body))
-	if err != OK:
-		req.queue_free()
-		return {"ok": false, "status": 0, "data": {}, "error": I18n.t("Cannot reach the game server. Check your connection.")}
-	var res: Array = await req.request_completed
-	req.queue_free()
-	var status: int = res[1]
-	var text: String = (res[3] as PackedByteArray).get_string_from_utf8()
-	var data: Variant = JSON.parse_string(text)
-	if typeof(data) != TYPE_DICTIONARY:
-		data = {}
-	if res[0] != HTTPRequest.RESULT_SUCCESS:
-		return {"ok": false, "status": 0, "data": {}, "error": I18n.t("Cannot reach the game server. Check your connection.")}
+	var r := await JsonHttp.request("%s/api/%s" % [Config.SERVER_URL, path], body, tk, self)
+	if not r.sent:
+		return {"ok": false, "status": 0, "data": {}, "error": JsonHttp.unreachable()}
+	var status: int = r.status
+	var data: Dictionary = r.data
 	if status < 200 or status >= 300:
 		# a token the server no longer knows (signed out elsewhere, account removed): signed out here too
 		if status == 401 and current != null and path != "account/login":
@@ -87,19 +71,14 @@ func probe_accounts() -> bool:
 
 ## The device key's account ({id, key, nick}), or {} when this device has none.
 func device() -> Dictionary:
-	if not FileAccess.file_exists(DEVICE_PATH):
-		return {}
-	var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(DEVICE_PATH))
-	return v if typeof(v) == TYPE_DICTIONARY and v.has("id") and v.has("key") else {}
+	var d := JsonFile.read(DEVICE_PATH)
+	return d if d.has("id") and d.has("key") else {}
 
 func _save_device(d: Dictionary) -> void:
 	if d.is_empty():
-		if FileAccess.file_exists(DEVICE_PATH):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(DEVICE_PATH))
-		return
-	var f := FileAccess.open(DEVICE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(d))
+		JsonFile.remove(DEVICE_PATH)
+	else:
+		JsonFile.write(DEVICE_PATH, d)
 
 ## How the signed-in account signs in: "guest", "playGames" or "password" (the first accounts).
 func kind() -> String:

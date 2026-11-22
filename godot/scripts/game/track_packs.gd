@@ -36,8 +36,8 @@ var _req: HTTPRequest
 func _ready() -> void:
 	print("[boot] packs")
 	DirAccess.make_dir_recursive_absolute(DIR)
-	state = _read(DIR + "state.json")
-	manifest = _read(DIR + "manifest.json")
+	state = JsonFile.read(DIR + "state.json")
+	manifest = JsonFile.read(DIR + "manifest.json")
 	for id: String in state.keys():
 		_mount(id)
 	# APEX_PACKS_AUTO=<id>: fetch the manifest and download that pack straight away (end-to-end tests of a build)
@@ -102,7 +102,7 @@ func refresh() -> void:
 			var m: Variant = JSON.parse_string(body.get_string_from_utf8())
 			if m is Dictionary and m.has("packs"):
 				manifest = m
-				_write(DIR + "manifest.json", manifest)
+				JsonFile.write(DIR + "manifest.json", manifest)
 				for id: String in (manifest.packs as Dictionary):
 					changed.emit(id))
 	_req.request(base_url() + "packs.json")
@@ -150,7 +150,7 @@ func remove(id: String) -> void:
 	if state.has(id):
 		DirAccess.remove_absolute(DIR + str(state[id].file))
 		state.erase(id)
-		_write(DIR + "state.json", state)
+		JsonFile.write(DIR + "state.json", state)
 		changed.emit(id)
 
 func _process(_dt: float) -> void:
@@ -249,7 +249,7 @@ func _check_step() -> void:
 		DirAccess.remove_absolute(DIR + str(old.file))
 	var p: Dictionary = manifest.packs[id]
 	state[id] = {"version": str(p.version), "file": str(r.file), "size": int(r.size), "sha256": str(r.sha256)}
-	_write(DIR + "state.json", state)
+	JsonFile.write(DIR + "state.json", state)
 	_job_id = ""
 	jobs.erase(id)
 	_mount(id)
@@ -261,7 +261,7 @@ func _mount(id: String) -> void:
 	# a pack that is not there or not whole (an interrupted copy) is forgotten rather than mounted
 	if not FileAccess.file_exists(path) or FileAccess.open(path, FileAccess.READ).get_length() != int(s.size):
 		state.erase(id)
-		_write(DIR + "state.json", state)
+		JsonFile.write(DIR + "state.json", state)
 		return
 	if not ProjectSettings.load_resource_pack(path, true):
 		push_error("track pack %s did not mount" % path)
@@ -286,13 +286,3 @@ func _close() -> void:
 		_http = null
 	_job_id = ""
 
-static func _read(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {}
-	var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	return d if d is Dictionary else {}
-
-static func _write(path: String, d: Dictionary) -> void:
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(d))

@@ -139,10 +139,8 @@ static func merge_deep(base: Dictionary, over: Dictionary) -> Dictionary:
 
 func load_settings() -> Dictionary:
 	var defaults := default_settings()
-	if not FileAccess.file_exists(SAVE_PATH):
-		return defaults
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-	if typeof(parsed) != TYPE_DICTIONARY:
+	var parsed := JsonFile.read(SAVE_PATH)
+	if parsed.is_empty():
 		return defaults
 	var merged := merge_deep(defaults, parsed)
 	# the old default (72 degrees, a very wide view) moves to the new one
@@ -157,9 +155,7 @@ func save() -> void:
 	if testing:
 		changed.emit()
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(data))
+	JsonFile.write(SAVE_PATH, data)
 	changed.emit()
 
 # Session tokens for reconnecting to a room (kept for the app's run).

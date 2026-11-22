@@ -61,16 +61,11 @@ static func _start() -> Dictionary:
 
 static func load_career() -> Dictionary:
 	var c := _start()
-	if FileAccess.file_exists(SAVE_PATH):
-		var v: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-		if typeof(v) == TYPE_DICTIONARY:
-			c.merge(v, true)
+	c.merge(JsonFile.read(SAVE_PATH), true)
 	return c
 
 static func save_career(c: Dictionary) -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(c))
+	JsonFile.write(SAVE_PATH, c)
 
 ## XP a level needs: 500 for the first, 250 more for each one after. Returns {level, into, need}.
 static func level_of(xp: float) -> Dictionary:
