@@ -81,12 +81,13 @@ func _ready() -> void:
 	if auto == "intro" or (auto == "" and Settings.data.get("introCinematic", true)):
 		_play_intro()
 		print("[boot] intro")
+	# the dev tours (DevTours): run once the app has started
 	if auto == "intro":
-		_shots_only.call_deferred()
+		(func() -> void: DevTours.intro_shots(self)).call_deferred()
 	elif auto == "ui":
-		_ui_shots.call_deferred()
+		(func() -> void: DevTours.ui(self)).call_deferred()
 	elif auto != "":
-		_autotest.call_deferred()
+		(func() -> void: DevTours.solo(self)).call_deferred()
 
 func _build_layers() -> void:
 	bg = CanvasLayer.new()
@@ -734,69 +735,6 @@ func app_event_track(ev: Dictionary) -> String:
 	var c := Progression.cup(str(ev.get("cup", "")))
 	return str(c[3][int(ev.race)][0]) if not c.is_empty() else ""
 
-## Dev: APEX_AUTO=solo plays through menu → lobby → briefing → race by itself (SHOT_DIR saves a screenshot per step).
-func _autotest() -> void:
-	var shot := func(n: String) -> void:
-		var dir := OS.get_environment("SHOT_DIR")
-		if dir != "":
-			await get_tree().process_frame
-			get_viewport().get_texture().get_image().save_png("%s/app_%s.png" % [dir, n])
-	await get_tree().create_timer(1.0).timeout
-	await shot.call("menu")
-	var err := await join(LocalRoom.create(), "Max")
-	print("join: ", err)
-	if OS.get_environment("TRACK") != "":
-		send({"t": "setConditions", "trackId": OS.get_environment("TRACK")})
-	await get_tree().create_timer(0.6).timeout
-	await shot.call("lobby_hub")
-	for step: String in ["circuit", "conditions", "session", "rules", "car", "drivers"]:
-		LobbyScreen._page = step
-		render_lobby()
-		await get_tree().create_timer(0.3).timeout
-		await shot.call("lobby_" + step)
-	if OS.get_environment("AUTODRIVE") != "":
-		send({"t": "setSession", "minutes": 5})
-		send({"t": "setRaceLaps", "laps": 0})
-	send({"t": "selectCar", "carId": CarsDb.selectable()[0].id})
-	send({"t": "addBot"})
-	send({"t": "addBot"})
-	send({"t": "ready", "ready": true})
-	await get_tree().create_timer(0.5).timeout
-	await shot.call("lobby_ready")
-	send({"t": "start"})
-	await get_tree().create_timer(1.0).timeout
-	await shot.call("briefing")
-	send({"t": "briefed"})
-	for i in 40:
-		await get_tree().create_timer(0.5).timeout
-		if screen == "race":
-			break
-	await shot.call("loaded")
-	await get_tree().create_timer(6.0).timeout
-	await shot.call("racing")
-	if OS.get_environment("AUTODRIVE") != "":
-		# the AI drives my car through the whole session: the results screen, the career, the lobby after it
-		session.autodrive = AiDriver.new(session.track_data, session.vehicle, 0.95, 0.0)
-		session.autodrive.human = false
-		var t0 := Time.get_ticks_msec()
-		var n := 0
-		while screen != "results" and Time.get_ticks_msec() - t0 < 9 * 60 * 1000:
-			await get_tree().create_timer(30.0).timeout
-			n += 1
-			await shot.call("drive_%02d" % n)
-			print("t=%ds screen=%s speed=%d" % [(Time.get_ticks_msec() - t0) / 1000, screen, int(session.vehicle.telemetry.speed * 3.6) if session != null else -1])
-		await get_tree().create_timer(2.0).timeout
-		await shot.call("results")
-		print("results reached: ", screen == "results")
-		get_tree().quit()
-		return
-	await get_tree().create_timer(10.0).timeout
-	await shot.call("race")
-	await get_tree().create_timer(6.0).timeout
-	await shot.call("race2")
-	print("autotest done, screen=", screen)
-	get_tree().quit()
-
 ## The intro when the game opens (Settings › introCinematic; a tap or a key skips it): the logo over a short reel of
 ## the circuit and a car, then the menu (port of playIntro in main.ts).
 func _play_intro() -> void:
@@ -841,93 +779,6 @@ func _play_intro() -> void:
 		intro.queue_free()
 		Assets.forget_car_model(entry, 1, false))
 	intro.play()
-
-func _shots_only() -> void:
-	for t: float in [1.0, 2.6, 4.2, 6.8, 9.6]:
-		await get_tree().create_timer(t).timeout
-		get_viewport().get_texture().get_image().save_png("%s/intro_%d.png" % [OS.get_environment("SHOT_DIR"), int(t)])
-	get_tree().quit()
-
-## Dev: APEX_AUTO=ui screenshots the menus: the menu's tabs and modals, the career's pages, every settings page, the
-## lobby's pages and the briefing of a solo room, and a results screen from made-up rows (nothing is saved).
-func _ui_shots() -> void:
-	var dir := OS.get_environment("SHOT_DIR")
-	var shot := func(n: String) -> void:
-		await get_tree().create_timer(0.7).timeout
-		get_viewport().get_texture().get_image().save_png("%s/ui_%s.png" % [dir, n])
-	var clear := func() -> void:
-		for c in overlay_layer.get_children():
-			if c != toasts and c != perf:
-				c.queue_free()
-	await get_tree().create_timer(1.5).timeout
-	await shot.call("menu")
-	# the pad's D-pad: the focus ring moves to the next card
-	var pad := InputEventAction.new()
-	pad.action = "ui_right"
-	pad.pressed = true
-	Input.parse_input_event(pad)
-	await shot.call("menu_pad_focus")
-	for t: String in ["online", "friends"]:
-		MenuScreen._tab = t
-		show_menu()
-		await shot.call("menu_" + t)
-	MenuScreen._tab = "play"
-	for t: String in ["profile", "achievements", "ranks"]:
-		CareerScreen._tab = t
-		show_career()
-		await shot.call("career_" + t)
-	CareerScreen._tab = "profile"
-	show_sign_in()
-	await shot.call("signin")
-	show_menu()
-	ChampionshipUI.open(self, func() -> String: return "Max")
-	await shot.call("champ")
-	clear.call()
-	SocialUI.records_modal(self)
-	await shot.call("records")
-	clear.call()
-	for tab: String in ["graphics", "display", "view", "driving", "interface", "audio", "controls", "controller"]:
-		SettingsPanel._tab = tab
-		var panel := SettingsPanel.build(self, func() -> void: pass)
-		await shot.call("settings_" + tab)
-		panel.queue_free()
-	# a solo room: every lobby page, then the briefing's pages
-	await join(LocalRoom.create(), "Max")
-	await get_tree().create_timer(0.6).timeout
-	for step: String in ["hub", "circuit", "car", "session", "conditions", "rules", "drivers"]:
-		LobbyScreen._page = step
-		render_lobby()
-		await shot.call("lobby_" + step)
-	LobbyScreen._page = "hub"
-	render_lobby()
-	send({"t": "addBot"})
-	send({"t": "addBot"})
-	send({"t": "ready", "ready": true})
-	send({"t": "start"})
-	await get_tree().create_timer(0.8).timeout
-	for t: String in ["setup", "advanced", "saved"]:
-		BriefingScreen._brief_tab = t
-		render_briefing()
-		await shot.call("briefing_" + t)
-	BriefingScreen._brief_tab = "setup"
-	# the results, from made-up rows, with the room closed so no championship is scored
-	var ids: Array = CarsDb.selectable().map(func(c: Dictionary) -> String: return c.id)
-	var nicks := ["Max", "Harry Ashdown", "Sem van Doorn", "Lucas Moreau", "Jonas Keller", "Marco Rossi"]
-	var rows: Array = []
-	for i in nicks.size():
-		rows.append({"id": me if i == 0 else "bot%d" % i, "nick": nicks[i], "carId": ids[(i * 3) % ids.size()], "position": i + 1, "totalMs": 612345.0 + i * 1834.0,
-			"penaltyMs": 5000.0 if i == 3 else 0.0, "gapMs": i * 1834.0, "bestLapMs": 118234.0 + i * 211.0, "validLaps": 5, "dnf": i == 5})
-	var gain := {"lines": [["Race finished", 120], ["Position", 150], ["Clean laps", 40]], "xp": 310, "xpBefore": 0, "srBefore": 2.5, "srAfter": 2.62,
-		"levelBefore": 1, "levelAfter": 1, "licenceBefore": "R", "licenceAfter": "R", "rankBefore": "Rookie", "rankAfter": "Rookie", "ratingBefore": 1350, "ratingAfter": 1372,
-		"achievements": [CareerData.ACHIEVEMENTS[0]]}
-	pending_race = {"trackId": "spa"}
-	teardown_connection()
-	weekend.clear()
-	screen = "results"
-	set_backdrop("pole", "spa")
-	set_ui(ResultsScreen.build(self, {"kind": "race", "rows": rows, "fastestLap": {"id": me, "ms": 118234.0}, "raceId": 1}, gain))
-	await shot.call("results")
-	get_tree().quit()
 
 ## Esc and the pad's B (GamepadInput sends Esc) step back in the menus: the top modal closes, a lobby page returns to
 ## its overview, the career to the menu. The race keeps Esc for its pause menu.
