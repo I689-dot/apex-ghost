@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 120,
+            "statusMessage": "Compiling the changed Godot scripts",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && if git status --porcelain -- godot | grep -q '\\.gd$'; then WARNINGS=0 tools/godot/gd.sh tests/compile_all.gd < /dev/null > /tmp/gridcorsa_compile.log 2>&1 || { grep -E 'FAILED|SCRIPT ERROR' -A1 /tmp/gridcorsa_compile.log | head -20 >&2; exit 2; }; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
