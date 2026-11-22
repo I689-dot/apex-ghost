@@ -484,7 +484,7 @@ func render_briefing() -> void:
 	if not mine.is_empty() and mine.get("tyre") != Settings.data.carSetup.tyre:
 		send({"t": "setTyre", "tyre": Settings.data.carSetup.tyre})
 	set_backdrop("aerial", room.conditions.trackId)
-	set_ui(LobbyScreen.build_briefing(self))
+	set_ui(BriefingScreen.build_briefing(self))
 
 ## Menus and modals are enlarged on a touch screen; the race (HUD, touch pads) keeps the base scale.
 func _apply_ui_scale() -> void:
@@ -906,10 +906,10 @@ func _ui_shots() -> void:
 	send({"t": "start"})
 	await get_tree().create_timer(0.8).timeout
 	for t: String in ["setup", "advanced", "saved"]:
-		LobbyScreen._brief_tab = t
+		BriefingScreen._brief_tab = t
 		render_briefing()
 		await shot.call("briefing_" + t)
-	LobbyScreen._brief_tab = "setup"
+	BriefingScreen._brief_tab = "setup"
 	# the results, from made-up rows, with the room closed so no championship is scored
 	var ids: Array = CarsDb.selectable().map(func(c: Dictionary) -> String: return c.id)
 	var nicks := ["Max", "Harry Ashdown", "Sem van Doorn", "Lucas Moreau", "Jonas Keller", "Marco Rossi"]
