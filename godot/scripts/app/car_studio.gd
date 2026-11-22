@@ -47,6 +47,17 @@ static func picture_rect(entry: Dictionary, livery: Dictionary, size: Vector2) -
 static func my_livery() -> Dictionary:
 	return Settings.data.get("livery", {})
 
+## The player's car: the one last driven, else the first one a player can pick ({} without cars).
+static func my_car() -> Dictionary:
+	var cars := CarsDb.selectable()
+	if cars.is_empty():
+		return {}
+	var last := str(Settings.data.get("lastCar", ""))
+	for c: Dictionary in cars:
+		if c.id == last:
+			return c
+	return cars[0]
+
 ## The file of the car's model level that _car(near) uses.
 static func model_file(entry: Dictionary, near: bool) -> String:
 	var lods: Array = entry.get("lods", [])

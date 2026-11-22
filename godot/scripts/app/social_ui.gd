@@ -5,10 +5,6 @@ extends RefCounted
 
 const COUNTRIES := "GB DE FR IT ES NL BE AT CH PT DK SE NO FI PL CZ HU MC US CA MX BR AR CL CO JP CN KR AU NZ ZA AE SA QA BH IN TH MY SG ID IE IS LU LT LV EE SK SI HR RS RO BG GR TR UA RU UY PE VE EC PY BO CR PA GT CU DO PR MA DZ TN EG NG KE IL PH VN TW HK"
 
-static func fmt_lap(ms: float) -> String:
-	var m := int(ms / 60000.0)
-	return "%d:%06.3f" % [m, (ms - m * 60000.0) / 1000.0]
-
 # ----------------------------------------------------------------- sign in ---
 
 ## The sign-in screen the game opens on (the user, 2026-11-17: you are signed in before the menu; 2026-11-20: "login
@@ -399,7 +395,7 @@ static func records_modal(app: App) -> void:
 			grid.add_child(UIKit.label(str(r.position), 15, col))
 			grid.add_child(UIKit.label(r.nick, 15, col))
 			grid.add_child(UIKit.label(car_name.call(r.carId), 15, col))
-			grid.add_child(UIKit.label(fmt_lap(r.lapMs), 15, col))
+			grid.add_child(UIKit.label(UIKit.fmt_lap(r.lapMs), 15, col))
 			grid.add_child(UIKit.label("" if r.position == 1 else "+%.3f" % ((r.lapMs - best) / 1000.0), 15, UIKit.MUTED))
 			grid.add_child(UIKit.label(str(r.laps), 15, UIKit.MUTED))
 		results.add_child(grid)
@@ -438,7 +434,7 @@ static func records_modal(app: App) -> void:
 		if s.best.is_empty():
 			career.add_child(UIW.muted(I18n.t("No timed laps yet.")))
 		for b: Dictionary in s.best:
-			career.add_child(UIKit.label("%s   %s   %s" % [I18n.t(app.track_entry(b.trackId).get("name", b.trackId)), fmt_lap(b.lapMs), car_name.call(b.carId)], 15))
+			career.add_child(UIKit.label("%s   %s   %s" % [I18n.t(app.track_entry(b.trackId).get("name", b.trackId)), UIKit.fmt_lap(b.lapMs), car_name.call(b.carId)], 15))
 	load.call()
 	load_career.call()
 

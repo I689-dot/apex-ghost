@@ -314,18 +314,11 @@ static func _items(app: App, rerender: Callable) -> Control:
 	grid.columns = 2 if UIKit.touch() else 5
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
-	var me := _my_car()
+	var me := CarStudio.my_car()
 	for it: Dictionary in ITEMS:
 		grid.add_child(_item_card(app, it, me, rerender))
 	col.add_child(grid)
 	return col
-
-static func _my_car() -> Dictionary:
-	var id: String = str(Settings.data.get("lastCar", ""))
-	for c: Dictionary in CarsDb.all():
-		if c.id == id:
-			return c
-	return CarsDb.all()[0]
 
 static func _item_card(app: App, it: Dictionary, car: Dictionary, rerender: Callable) -> Control:
 	var owned: bool = _owned.has(it.name)

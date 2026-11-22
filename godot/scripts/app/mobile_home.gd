@@ -18,7 +18,7 @@ static func build(app: App) -> Control:
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UIKit.full(shade)
 	root.add_child(shade)
-	var car := my_car()
+	var car := CarStudio.my_car()
 	if not car.is_empty():
 		var pv := CarStudio.Preview.new(car, CarStudio.my_livery())
 		pv.anchor_left = 0.2
@@ -324,23 +324,13 @@ static func nick() -> String:
 	var n := str(Settings.data.get("nickname", ""))
 	return n if n != "" else I18n.t("Driver")
 
-static func my_car() -> Dictionary:
-	var cars := CarsDb.selectable()
-	if cars.is_empty():
-		return {}
-	var last := str(Settings.data.get("lastCar", ""))
-	for c: Dictionary in cars:
-		if c.id == last:
-			return c
-	return cars[0]
-
 static func _cycle_car(step: int) -> void:
 	var cars := CarsDb.selectable()
 	if cars.is_empty():
 		return
 	var i := 0
 	for k in cars.size():
-		if cars[k].id == my_car().id:
+		if cars[k].id == CarStudio.my_car().id:
 			i = k
 	Settings.data.lastCar = cars[posmod(i + step, cars.size())].id
 	Settings.save()
@@ -426,7 +416,7 @@ static func cars(app: App, rerender: Callable) -> void:
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
-	var mine := my_car()
+	var mine := CarStudio.my_car()
 	for c: Dictionary in CarsDb.selectable():
 		var card := UIW.card_button(c.id == mine.get("id"), 6)
 		card.custom_minimum_size = Vector2(220, 150)

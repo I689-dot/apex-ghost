@@ -836,7 +836,7 @@ func _on_my_lap(m: Dictionary) -> void:
 	elif m.best:
 		tag = I18n.t("  ·  FASTEST LAP") if session_best else I18n.t("  ·  personal best")
 	var pen := I18n.t("  ·  incl. +{s} s penalties", {"s": "%.1f" % (m.penaltyMs / 1000.0)}) if m.penaltyMs > 0 else ""
-	flash(I18n.t("Lap {n}: {time}", {"n": m.lap - 1, "time": fmt_lap(m.lapMs)}) + tag + pen, 3500.0, "bad" if not m.valid else (("best" if session_best else "pb") if m.best else "lap"))
+	flash(I18n.t("Lap {n}: {time}", {"n": m.lap - 1, "time": UIKit.fmt_lap(m.lapMs)}) + tag + pen, 3500.0, "bad" if not m.valid else (("best" if session_best else "pb") if m.best else "lap"))
 	if m.valid:
 		_chime(("session-best" if session_best else "best") if m.best else "lap")
 
@@ -891,11 +891,6 @@ func update_timing() -> void:
 		var p: Variant = _player(id)
 		var car := CarsDb.resolve(p.carId) if p != null and p.carId != null else {}
 		return {"nick": names.get(id, "?"), "car": car.get("name", ""), "colour": car.get("color", "#888888"), "bot": p != null and p.get("bot", false)})
-
-static func fmt_lap(ms: float) -> String:
-	var m := int(ms / 60000.0)
-	var s := (ms - m * 60000.0) / 1000.0
-	return "%d:%06.3f" % [m, s]
 
 static func fmt_clock(ms: float) -> String:
 	var t := maxi(0, ceili(ms / 1000.0))
