@@ -22,7 +22,7 @@ const PROFILE := {
 	# every asphalt: one scanned asphalt
 	"road_re": "^asph_sh_(road|runoff|runoff_art1|runoff_art2|paddock|paddock2|pit)$",
 	"target": [
-		["^asph_sh_road$", [0.19, 0.19, 0.195]],
+		["^asph_sh_road$", SpaLook.ROAD_ALBEDO],
 		["^asph_sh_(runoff|runoff_art1|runoff_art2)$", [0.205, 0.202, 0.2]],
 		# the paddock and the pit lane: the pale concrete-grey asphalt of a new circuit
 		["^asph_sh_(paddock|paddock2|pit)$", [0.22, 0.218, 0.215]],
@@ -34,11 +34,11 @@ const PROFILE := {
 		["^astroturf_sh$", [0.03, 0.12, 0.045]],
 		["^astroturf_sh_blue$", [0.03, 0.09, 0.2]],
 	],
-	"scans": [["^sand_sh", "gravel_floor", 1.5]],
+	"scans": [["^sand_sh", "gravel_floor", SpaLook.GRAVEL_TILE]],
 	"tint": [
 		["^asph_sh_g1", [1.0, 1.0, 1.0, 0.6]],
 		["@lawn", [0.98, 1.08, 0.6]],
-		["@forest", [0.27, 0.31, 0.16]],
+		["@forest", SpaLook.FOREST_TINT],
 		["^(trees_sh|treeline)", [0.62, 0.6, 0.42]],
 	],
 	"lawn_re": "^grass_sh(_bank)?$",
@@ -51,7 +51,6 @@ const PROFILE := {
 	"detail": [
 		["^(wall_sh|sha_wall|Muro|sha_infrastructure_arcwall|aa_|standard_)", "concrete", 2.7],
 		["^(grail_sh|sha_barrier)", "metal", 1.0],
-		["^curb_sh(_2|_3)?$", "concrete", 1.6],
 		["^(sha_building|orig_sha_building|material_sha_building|sha_hut)", "painted", 2.0],
 	],
 	"own_wear": true,

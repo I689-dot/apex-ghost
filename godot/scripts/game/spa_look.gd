@@ -59,6 +59,13 @@ const DRAW := [
 ## is tall conifers, trees2's broadleaf crowns.
 const CONIFER_RE := "(?i)^trees_new_spa1"
 
+## Values every circuit shares, as its surfaces are the same scans: the scanned road asphalt's albedo (a profile's
+## "target" for its racing surface), the scanned forest's tint ("@forest") and the scanned gravel's repeat in metres
+## (a profile's "scans").
+const ROAD_ALBEDO := [0.19, 0.19, 0.195]
+const FOREST_TINT := [0.27, 0.31, 0.16]
+const GRAVEL_TILE := 1.5
+
 ## The environment for Spa (GameEnvironment.look): fitted to the video's clear afternoon (matched chase camera, sun 38 deg
 ## up at 142 deg; tools: ~/apex-ghost-sources/survey-tools/cmp_measure.py). AgX rolls the highlights off as the video
 ## does (its brightest 0.1 % at 218/255, nothing clipped); the sun and the sky's fill are stronger and the sky itself
@@ -77,7 +84,7 @@ const TINT := [
 	["@lawn", [1.98, 1.78, 1.47]],
 	# the forest (scanned spruces, beech) and the source's distant tree cards: the video's spruce is a dark green
 	# (red nearly equal to green read olive-beige on the sunlit side of the crowns once they were lit as crowns)
-	["@forest", [0.27, 0.31, 0.16]],
+	["@forest", FOREST_TINT],
 	["^(trees_|bushes)", [0.57, 0.54, 0.38]],
 ]
 
@@ -99,7 +106,7 @@ const ASPHALT_DETAIL_MEAN := 0.5
 const SKY_FP := 0.62 / 0.70
 
 const TARGET := [
-	["^asph_spa_(base|base2|new|pit|pit2)$", [0.19, 0.19, 0.195]],
+	["^asph_spa_(base|base2|new|pit|pit2)$", ROAD_ALBEDO],
 	["^pavement_spa", [0.17, 0.17, 0.172]],
 	# the source's bare dirt banks (the hill after La Source, behind Raidillon) carry the planted forest
 	# (build_forest.py): a needle-strewn forest floor in shade, not a quarry
@@ -121,34 +128,19 @@ static func _paint(m: StandardMaterial3D) -> void:
 	if t == null:
 		return
 	if not _painted.has(t):
-		var img := t.get_image()
+		var img := _editable_image(t)
 		if img == null:
 			return
-		img = img.duplicate()
-		if img.is_compressed():
-			img.decompress()
-		img.clear_mipmaps()
-		img.convert(Image.FORMAT_RGBA8)
 		var paint := []
-		var sum := 0.0
 		for y in img.get_height():
 			for x in img.get_width():
 				var c := img.get_pixel(x, y)
 				if c.g > c.r * 1.25 or (c.b > c.r * 1.4 and bool(_p("paint_blue", true))):
-					var l := c.srgb_to_linear()
-					var lum := l.r * 0.2126 + l.g * 0.7152 + l.b * 0.0722
-					paint.append([x, y, lum])
-					sum += lum
+					paint.append([x, y, _lum(c)])
 		if paint.is_empty():
 			_painted[t] = t
 		else:
-			var mean := sum / paint.size()
-			for p: Array in paint:
-				var k: float = clampf(p[2] / mean, 0.6, 1.4)
-				var pg: Color = _p("paint_green", PAINT_GREEN)
-				var c := Color(pg.r * k, pg.g * k, pg.b * k).linear_to_srgb()
-				c.a = img.get_pixel(p[0], p[1]).a
-				img.set_pixel(p[0], p[1], c)
+			_regrain(img, paint, _p("paint_green", PAINT_GREEN), 0.6, 1.4)
 			img.generate_mipmaps()
 			_painted[t] = ImageTexture.create_from_image(img)
 	m.albedo_texture = _painted[t]
@@ -159,6 +151,36 @@ static func _paint(m: StandardMaterial3D) -> void:
 	m.metallic_specular = 0.15
 	m.roughness = 0.9
 
+## A texture's image to recolour: a copy, uncompressed, RGBA8, without mipmaps. null when it has none.
+static func _editable_image(t: Texture2D) -> Image:
+	var img := t.get_image()
+	if img == null:
+		return null
+	img = img.duplicate()
+	if img.is_compressed():
+		img.decompress()
+	img.clear_mipmaps()
+	img.convert(Image.FORMAT_RGBA8)
+	return img
+
+## A texel's linear luminance.
+static func _lum(c: Color) -> float:
+	var l := c.srgb_to_linear()
+	return l.r * 0.2126 + l.g * 0.7152 + l.b * 0.0722
+
+## Texels ([x, y, luminance]) recoloured to want (linear), each keeping its brightness against their mean as grain
+## (clamped to lo..hi) and its alpha.
+static func _regrain(img: Image, texels: Array, want: Color, lo: float, hi: float) -> void:
+	var sum := 0.0
+	for p: Array in texels:
+		sum += float(p[2])
+	var mean := sum / texels.size()
+	for p: Array in texels:
+		var k: float = clampf(p[2] / mean, lo, hi)
+		var c := Color(want.r * k, want.g * k, want.b * k).linear_to_srgb()
+		c.a = img.get_pixel(p[0], p[1]).a
+		img.set_pixel(p[0], p[1], c)
+
 ## Detail layers on the source's hard surfaces (its textures are cut to 256 px): [material pattern, layer, metres a
 ## repeat covers]. The layer (tools/asset-pipeline/spa_godot/build_detail_textures.py: scanned CC0 grain, linear mean 0.5,
 ## and its normal map) is multiplied on in world space over a second UV set, so the material's own texture and its
@@ -166,11 +188,12 @@ static func _paint(m: StandardMaterial3D) -> void:
 const DETAIL := [
 	["^(wall_spa$|wall_spa_concrete|wall_spa_jersey|wall_spa_stone|wall_spa_barriers)", "concrete", 2.7],
 	["^(grail_spa|galvanized_spa|metal_beam|fence_spa_special)", "metal", 1.0],
-	# the kerbs: painted concrete
-	["^(curb_spa|lines_spa$)", "concrete", 1.6],
 	["^(structures|box1|houses|main-gstand|raidillon-grandstand|marshal-post|box-door)", "painted", 2.0],
 ]
 const DETAIL_DIR := "res://assets/textures/spa/"
+## The kerbs (kerb_re): painted concrete, this tile (m). Ahead of a profile's own detail list, so the kerbs take it
+## whatever that list has (2026-11-20: the Nordschleife's kerbs were added to kerb_re but not to the list, and had none).
+const KERB_TILE := 1.6
 
 static func _detail(m: StandardMaterial3D, layer: String, tile: float) -> void:
 	var tex := DETAIL_DIR + "detail_%s.png" % layer
@@ -220,17 +243,11 @@ static func _kerb(m: StandardMaterial3D) -> void:
 	var t := m.albedo_texture
 	if t == null:
 		return
-	var img := t.get_image()
+	var img := _editable_image(t)
 	if img == null:
 		return
-	img = img.duplicate()
-	if img.is_compressed():
-		img.decompress()
-	img.clear_mipmaps()
-	img.convert(Image.FORMAT_RGBA8)
-	# each paint's texels and their mean brightness first, so the grain keeps its average
+	# each paint's texels first, so the grain keeps their average brightness
 	var groups := {"red": [], "yellow": []}
-	var sums := {"red": 0.0, "yellow": 0.0}
 	for y in img.get_height():
 		for x in img.get_width():
 			var c := img.get_pixel(x, y)
@@ -241,23 +258,14 @@ static func _kerb(m: StandardMaterial3D) -> void:
 			elif (c.r + c.g) * 0.5 > c.b * 1.2 and absf(c.r - c.g) < 0.12 and (c.r + c.g) * 0.5 - c.b > 0.08:
 				key = "yellow"
 			if key != "":
-				var l := c.srgb_to_linear()
-				var lum := l.r * 0.2126 + l.g * 0.7152 + l.b * 0.0722
-				groups[key].append([x, y, lum])
-				sums[key] += lum
+				groups[key].append([x, y, _lum(c)])
 	var changed := false
 	for key: String in groups:
 		var g: Array = groups[key]
 		if g.is_empty():
 			continue
 		changed = true
-		var mean: float = sums[key] / g.size()
-		var want: Color = _p("kerb_red", KERB_RED) if key == "red" else _p("kerb_yellow", KERB_YELLOW)
-		for p: Array in g:
-			var k: float = clampf(p[2] / mean, 0.7, 1.3)
-			var c := Color(want.r * k, want.g * k, want.b * k).linear_to_srgb()
-			c.a = img.get_pixel(p[0], p[1]).a
-			img.set_pixel(p[0], p[1], c)
+		_regrain(img, g, _p("kerb_red", KERB_RED) if key == "red" else _p("kerb_yellow", KERB_YELLOW), 0.7, 1.3)
 	# matte paint: the source's kerbs were glossy and a flat kerb seen low against the sky came out pale pink and cream
 	m.roughness = 0.85
 	m.metallic = 0.0
@@ -298,38 +306,16 @@ static func _lawn(m: StandardMaterial3D) -> void:
 ## in world space over every road layer. The source's road textures are Assetto Corsa strips (1024 x 4096) whose
 ## brightness changes along their length: the same layer showed light on one straight and dark on the next.
 const ROAD_RE := "^asph_spa_(base|base2|new|pit|pit2)$"
-## 4K on the PC, 2K on phones (the phone's pack carries only the 2K set: tools/godot/build-track-pack.py); whichever
-## is there.
-static func _road_file(map: String) -> String:
-	for res: String in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
-		var p := "res://assets/textures/spa/asphalt_track_%s_%s.jpg" % [map, res]
-		if ResourceLoader.exists(p):
-			return p
-	return ""
-
-## (looked up when used, not when the script loads: a pack downloaded in the session mounts after that)
 const ROAD_TILE_M := 2.0
 ## The scan's mean linear colour, measured from the file (reading it back from the GPU's compressed copy came out wrong).
 const ROAD_TEX_MEAN := Color(0.0163, 0.0128, 0.0120)
 
 static func _road_surface(m: StandardMaterial3D) -> void:
-	var ROAD_TEX := _road_file("diff")
-	var ROAD_NORMAL := _road_file("nor_gl")
-	var ROAD_ARM := _road_file("arm")
-	if ROAD_TEX == "":
+	if not _world_scan(m, "asphalt_track", ROAD_TILE_M):
 		return
-	m.albedo_texture = load(ROAD_TEX)
-	m.uv1_triplanar = true
-	m.uv1_world_triplanar = true
-	m.uv1_scale = Vector3.ONE / ROAD_TILE_M
-	m.uv1_offset = Vector3.ZERO
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	if ResourceLoader.exists(ROAD_NORMAL):
-		m.normal_enabled = true
-		m.normal_texture = load(ROAD_NORMAL)
-		m.normal_scale = 1.0
-	if ResourceLoader.exists(ROAD_ARM):
-		m.roughness_texture = load(ROAD_ARM)
+	var arm := _scan_file("asphalt_track", "arm")
+	if arm != "":
+		m.roughness_texture = load(arm)
 		m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
 		m.roughness = 1.0
 
@@ -338,6 +324,9 @@ static func _road_surface(m: StandardMaterial3D) -> void:
 ## 128 px gravel, which showed as a blurred, tiled orange. Same 2K / 4K choice as the road.
 const SCAN_MEAN := {"gravel_floor": Color(0.376, 0.2505, 0.1432)}
 
+## A scan's file (map: "diff", "nor_gl", "arm"): 4K on the PC, 2K on phones (the phone's pack carries only the 2K set:
+## tools/godot/build-track-pack.py), whichever is there; "" when neither. (Looked up when used, not when the script
+## loads: a pack downloaded in the session mounts after that.)
 static func _scan_file(scan: String, map: String) -> String:
 	for res: String in (["2k", "4k"] if OS.has_feature("mobile") else ["4k", "2k"]):
 		var p := "res://assets/textures/spa/%s_%s_%s.jpg" % [scan, map, res]
@@ -346,6 +335,15 @@ static func _scan_file(scan: String, map: String) -> String:
 	return ""
 
 static func _scan_surface(m: StandardMaterial3D, scan: String, tile: float) -> bool:
+	if not _world_scan(m, scan, tile):
+		return false
+	m.roughness = 1.0
+	m.metallic_specular = 0.3
+	return true
+
+## A scan (its colour and normal map) laid on the material in world space, a repeat every tile metres. false when the
+## scan is not there.
+static func _world_scan(m: StandardMaterial3D, scan: String, tile: float) -> bool:
 	var tex := _scan_file(scan, "diff")
 	if tex == "":
 		return false
@@ -360,8 +358,6 @@ static func _scan_surface(m: StandardMaterial3D, scan: String, tile: float) -> b
 		m.normal_enabled = true
 		m.normal_texture = load(nor)
 		m.normal_scale = 1.0
-	m.roughness = 1.0
-	m.metallic_specular = 0.3
 	return true
 
 ## Linear to sRGB encoding, also above 1 (a factor brightening a dark texture).
@@ -375,12 +371,9 @@ static func texture_mean(t: Texture2D) -> Color:
 		return Color(1, 1, 1)
 	if _means.has(t):
 		return _means[t]
-	var img := t.get_image()
+	var img := _editable_image(t)
 	if img == null:
 		return Color(1, 1, 1)
-	img = img.duplicate()
-	if img.is_compressed():
-		img.decompress()
 	img.convert(Image.FORMAT_RGB8)
 	img.resize(32, 32, Image.INTERPOLATE_BILINEAR)
 	var acc := Vector3.ZERO
@@ -515,7 +508,7 @@ static func apply(track: TrackScene) -> void:
 	# the repainted textures live on in their materials: no static reference left to outlive the scene (a leak at exit)
 	_painted.clear()
 	if Settings.data.quality == "high" or Settings.data.quality == "ultra":
-		var det_res := []
+		var det_res := [[kerb_re, "concrete", KERB_TILE]]
 		for d: Array in _p("detail", DETAIL):
 			det_res.append([RegEx.create_from_string(d[0]), d[1], d[2]])
 		for mm: Material in seen:

@@ -25,7 +25,7 @@ const PROFILE := {
 	# the racing surface: the scanned asphalt at Spa's albedo; the pit lane keeps its painted texture
 	"road_re": "^asph_ss_road$",
 	"target": [
-		["^asph_ss_road$", [0.19, 0.19, 0.195]],
+		["^asph_ss_road$", SpaLook.ROAD_ALBEDO],
 		# the run-off: older, dustier asphalt (keeps the atlas: its green paint strip and the pit lane's markings)
 		["^asph_ss_runoff", [0.2, 0.198, 0.195]],
 		["^pavement_ss(_b)?$", [0.21, 0.21, 0.205]],
@@ -38,14 +38,14 @@ const PROFILE := {
 		["^top2_ss", [0.06, 0.075, 0.03]],
 	],
 	# the gravel traps: the scanned gravel in world space (SpaLook._scan_surface), at its target above
-	"scans": [["^sand_ss$", "gravel_floor", 1.5]],
+	"scans": [["^sand_ss$", "gravel_floor", SpaLook.GRAVEL_TILE]],
 	"tint": [
 		# the rubber: the groove at 60 % (it covered the racing line in one dark band), the braking marks in full
 		["^asph_ss_g1", [1.0, 1.0, 1.0, 0.6]],
 		# the edge lines: geometry over the scanned asphalt (white paint, not glossy)
 		["^lines_ss", [1.0, 1.0, 1.0]],
 		["@lawn", [1.0, 1.08, 0.58]],
-		["@forest", [0.27, 0.31, 0.16]],
+		["@forest", SpaLook.FOREST_TINT],
 		["^trees_ss", [0.6, 0.58, 0.4]],
 	],
 	"lawn_re": "^grass_ss(_nm)?$",
@@ -60,7 +60,6 @@ const PROFILE := {
 	"detail": [
 		["^(wall_ss$|wall_ss_jersey)", "concrete", 2.7],
 		["^(grail_ss|metals1)", "metal", 1.0],
-		["^(curb_ss|curb_ss_new)$", "concrete", 1.6],
 		["^(structures|box1|box2|gstands1|bridges|NewBridge\\.concrete|HotelConcrete|marshall)", "painted", 2.0],
 	],
 	"own_wear": true,

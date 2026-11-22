@@ -23,7 +23,7 @@ const PROFILE := {
 	# the racing surface, the 2023 piece and the paddock / run-off asphalt: one scanned asphalt
 	"road_re": "^asph_bc_(road|old|fill|patch|patch2)$",
 	"target": [
-		["^asph_bc_(road|old|patch2)$", [0.19, 0.19, 0.195]],
+		["^asph_bc_(road|old|patch2)$", SpaLook.ROAD_ALBEDO],
 		["^asph_bc_(fill|patch)$", [0.205, 0.202, 0.2]],
 		# the painted run-off: green, red, yellow and pink paint on asphalt (as Spa's green paint and kerb red)
 		["^asph_bc_paint_green", [0.006, 0.22, 0.075]],
@@ -37,12 +37,12 @@ const PROFILE := {
 		# the satellite photo of the surroundings: dry scrub and fields
 		["^top2_bc", [0.11, 0.1, 0.07]],
 	],
-	"scans": [["^sand_bc$", "gravel_floor", 1.5]],
+	"scans": [["^sand_bc$", "gravel_floor", SpaLook.GRAVEL_TILE]],
 	"tint": [
 		["^asph_bc_g1", [1.0, 1.0, 1.0, 0.6]],
 		# the lawn under a Mediterranean sun: drier and yellower than Spa's
 		["@lawn", [1.05, 1.05, 0.52]],
-		["@forest", [0.27, 0.31, 0.16]],
+		["@forest", SpaLook.FOREST_TINT],
 		["^trees_bc", [0.62, 0.6, 0.42]],
 	],
 	"lawn_re": "^grass_bc$",
@@ -57,7 +57,6 @@ const PROFILE := {
 	"detail": [
 		["^(wall_bc$|wall_bc_(concrete|safer|safer2|barrier)|GRANDSTAND_BASE|GSTANDS|BOX_1|pavement_bc)", "concrete", 2.7],
 		["^(grail_bc|METAL_BASE|GARAGE_METAL_BASE|STRUCTURE_BASE)", "metal", 1.0],
-		["^curb_bc(_2|_3)?$", "concrete", 1.6],
 	],
 	"own_wear": true,
 	"far_dir": "assets/maps/barcelona",

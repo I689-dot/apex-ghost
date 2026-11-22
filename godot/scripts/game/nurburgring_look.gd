@@ -25,7 +25,7 @@ const PROFILE := {
 	"road_re": "^(asph_(new|mid|old|003|ext_new)|travert_0)",
 	"target": [
 		["^(asph_ext_new|travert_0)", [0.215, 0.212, 0.21]],
-		["^asph_(new|mid|old|003)", [0.19, 0.19, 0.195]],
+		["^asph_(new|mid|old|003)", SpaLook.ROAD_ALBEDO],
 		["^pavement_brick", [0.15, 0.135, 0.11]],
 		# the painted concrete strips: Spa's green paint, the kerbs' red
 		["^conc_green", [0.006, 0.22, 0.075]],
@@ -39,12 +39,12 @@ const PROFILE := {
 		["^(sand_0|sandbrd)", [0.32, 0.25, 0.16]],
 	],
 	# the gravel traps: the scanned gravel in world space (SpaLook._scan_surface), at its target above
-	"scans": [["^(gravel_ext|sand_0)", "gravel_floor", 1.5]],
+	"scans": [["^(gravel_ext|sand_0)", "gravel_floor", SpaLook.GRAVEL_TILE]],
 	"tint": [
 		# the GP's lawns are open to the sky (Spa's mostly stand by the forest): Spa's tint came out pale yellow-green
 		# (183, 191, 130 on screen against Spa's 114, 127, 85); this one 129, 145, 61, a mown lawn in sun
 		["@lawn", [1.0, 1.1, 0.55]],
-		["@forest", [0.27, 0.31, 0.16]],
+		["@forest", SpaLook.FOREST_TINT],
 		["^(trees|pines|tree[0-9])", [0.57, 0.54, 0.38]],
 	],
 	"lawn_re": "^(grass_0|grassbrd_gp|grass_fill)",
@@ -58,7 +58,6 @@ const PROFILE := {
 	"detail": [
 		["^(walls_new|wall_dorint|wall_pitlane|wall_ringwerk|conc_|tiles)", "concrete", 2.7],
 		["^(grail_tess|galvanized|fence_details|metals|metal_wall|metal_white|gantry)", "metal", 1.0],
-		["^(curb_0|curb_b|curbs_new|curb_misc)", "concrete", 1.6],
 		["^(building|garage|box_top|box_struct|box_door|marshal|marshall|timetower|paddock_roof|stairs|openstand|concrete_0|medical|pits_0|gs_roof)", "painted", 2.0],
 	],
 	# the generic rubber and wear decal (the model has no rubber layers of its own)

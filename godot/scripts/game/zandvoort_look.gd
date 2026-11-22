@@ -26,7 +26,7 @@ const PROFILE := {
 	"target": [
 		# the two asphalts: asph_zv96 is the run-off and the pit apron, and the racing surface in places too (the banked
 		# turns): one albedo for both
-		["^asph_zv(42|96)$", [0.19, 0.19, 0.195]],
+		["^asph_zv(42|96)$", SpaLook.ROAD_ALBEDO],
 		["^conc_zv", [0.2, 0.19, 0.17]],
 		# the gravel traps: Zandvoort's gravel is pale, near the dunes' sand
 		["^gravel_zv43$", [0.36, 0.31, 0.21]],
@@ -35,14 +35,14 @@ const PROFILE := {
 		["^grass_zv24$", [0.3, 0.27, 0.19]],
 	],
 	# the gravel traps: the scanned gravel in world space (SpaLook._scan_surface), at its target above
-	"scans": [["^gravel_zv43$", "gravel_floor", 1.5]],
+	"scans": [["^gravel_zv43$", "gravel_floor", SpaLook.GRAVEL_TILE]],
 	"tint": [
 		# the rubber: the band down the racing line at half strength (it darkened the road in one long stripe), the
 		# skid marks in full
 		["^asph_zv61$", [1.0, 1.0, 1.0, 0.5]],
 		# the lawn by the sea: a little drier than Spa's
 		["@lawn", [1.0, 1.06, 0.56]],
-		["@forest", [0.27, 0.31, 0.16]],
+		["@forest", SpaLook.FOREST_TINT],
 		["^Dado_LW_041_87", [0.62, 0.6, 0.42]],
 	],
 	"lawn_re": "^(grass_zv97|grass_fill)$",
@@ -56,7 +56,6 @@ const PROFILE := {
 	"detail": [
 		["^(wall_zv|conc_zv|struct_zv)", "concrete", 2.7],
 		["^(galvanized_zv|grille_zv)", "metal", 1.0],
-		["^curb_zv(25|44|48)$", "concrete", 1.6],
 	],
 	"own_wear": true,
 	"far_dir": "assets/maps/zandvoort",
