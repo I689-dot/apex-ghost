@@ -302,3 +302,69 @@ func simulated() -> Array:
 		if r.bot != null:
 			out.append([r.id, r.bot.vehicle])
 	return out
+
+func _player(id: String) -> Variant:
+	for p: Dictionary in room.players:
+		if p.id == id:
+			return p
+	return null
+
+## Signed distance from the centreline at index i (+ = left).
+static func lateral_at(t: Dictionary, i: int, x: float, z: float) -> float:
+	var cl: Array = t.centerline
+	var j := (i + 1) % (cl.size() / 3)
+	var tx: float = cl[j * 3] - cl[i * 3]
+	var tz: float = cl[j * 3 + 2] - cl[i * 3 + 2]
+	var l := Vector2(tx, tz).length()
+	if l == 0.0:
+		l = 1.0
+	return ((x - cl[i * 3]) * tz - (z - cl[i * 3 + 2]) * tx) / l
+
+## Copy a vehicle's state into a network sample. Returns the flags (without reset/smoke).
+static func fill_state(s: CarState, v: Vehicle, server_now: float, headlights: bool) -> int:
+	var t := v.global_position
+	var q := v.global_transform.basis.get_rotation_quaternion()
+	var lv := v.linear_velocity
+	var av := v.angular_velocity
+	s.t = roundf(server_now)
+	s.px = t.x
+	s.py = t.y
+	s.pz = t.z
+	s.qx = q.x
+	s.qy = q.y
+	s.qz = q.z
+	s.qw = q.w
+	s.vx = lv.x
+	s.vy = lv.y
+	s.vz = lv.z
+	s.wx = av.x
+	s.wy = av.y
+	s.wz = av.z
+	s.steer = v.steer_angle
+	s.rot_f = v.wheels[0].angle
+	s.rot_r = v.wheels[2].angle
+	# a lowered car's wheels sit higher in the arches (ride height setup), as the others should see them
+	for i in 4:
+		s.susp[i] = clampf(v.wheels[i].compression - v.setup.ride[0 if i < 2 else 1], 0.0, 0.25)
+	var f := 0
+	if v.pedals.brake > 0.1 and not v.is_reverse():
+		f |= CarState.FLAG_BRAKE
+	if headlights:
+		f |= CarState.FLAG_HEADLIGHTS
+	if v.is_reverse():
+		f |= CarState.FLAG_REVERSE
+	if v.kbd.handbrake > 0.5:
+		f |= CarState.FLAG_HANDBRAKE
+	return f
+
+## Fuel a lap of this track takes by the cars' figures (until a lap of mine measures it).
+func nominal_fuel_per_lap() -> float:
+	return (float(track_data.length) / 1000.0) * VehicleConsts.FUEL.perKm
+
+static func fmt_clock(ms: float) -> String:
+	var t := maxi(0, ceili(ms / 1000.0))
+	return "%d:%02d" % [t / 60, t % 60]
+
+func _chime(kind: String) -> void:
+	if snd != null:
+		snd.chime(kind)

@@ -13,6 +13,16 @@ together with `git log`.
   driver without one, as ailap's), not its instance id. Measured: ailap layout 0 after 0, 1, 2 and 5 extra objects at
   boot: 2:05.147 each time (before: 2:04.922, 2:04.943, 2:05.007, 2:04.949). ailap's baseline re-recorded for the
   new seed; ailap_seeded.sh removed (nothing left for it to replace).
+- **Batch 5, race_session.gd split in layers** (3,301 lines -> 1,063 in race_session.gd and nine layers of 135-370):
+  - GDScript has no partial classes, so the session is a chain of classes, each file extending the one below:
+    SessionBase (state, Remote / LocalBot, shared helpers) -> SessionCameras -> SessionReplay -> SessionContact ->
+    SessionBots -> SessionRaceControl -> SessionPits -> SessionHudFeed -> SessionWorld -> RaceSession (loading,
+    networking, the physics and frame loops, teardown). One object as before; members moved verbatim, other files
+    unchanged (RaceSession.X still reaches every inherited constant, static function and inner class: checked in a
+    scratch project first). A layer calls only what it and the layers below declare (the compiler enforces it); a
+    field only one layer uses stays in that layer.
+  - Checked after each layer: compile (warnings 676 throughout) and features_test (29 checks); at the end the headless
+    suite (PASS) and a Zandvoort weekend with contact, the mandatory stop and fuel on (11 of 11, the bots served).
 - **Done after check-in 2:**
   - The safety car: build-cars.py repoints an entry whose file is gone. data/cars.json is fixed here (it is
     git-ignored); a race with race control no longer logs "Resource file not found".
