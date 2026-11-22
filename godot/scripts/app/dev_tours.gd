@@ -44,7 +44,7 @@ static func solo(app: App) -> void:
 	await app.get_tree().create_timer(6.0).timeout
 	await shot.call("racing")
 	if OS.get_environment("AUTODRIVE") != "":
-		# the AI drives my car through the whole app.session: the results app.screen, the career, the lobby after it
+		# the AI drives my car through the whole session: the results screen, the career, the lobby after it
 		app.session.autodrive = AiDriver.new(app.session.track_data, app.session.vehicle, 0.95, 0.0)
 		app.session.autodrive.human = false
 		var t0 := Time.get_ticks_msec()
@@ -74,7 +74,7 @@ static func intro_shots(app: App) -> void:
 	app.get_tree().quit()
 
 ## Dev: APEX_AUTO=ui screenshots the menus: the menu's tabs and modals, the career's pages, every settings page, the
-## lobby's pages and the briefing of a solo room, and a results app.screen from made-up rows (nothing is saved).
+## lobby's pages and the briefing of a solo room, and a results screen from made-up rows (nothing is saved).
 static func ui(app: App) -> void:
 	var dir := OS.get_environment("SHOT_DIR")
 	var shot := func(n: String) -> void:

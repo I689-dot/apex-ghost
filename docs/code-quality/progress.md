@@ -601,3 +601,8 @@ contain none of these names.
   {"hooks": {"Stop": [{"hooks": [{"type": "command", "timeout": 120,
     "command": "cd \"$CLAUDE_PROJECT_DIR\" && if git status --porcelain -- godot | grep -q '\\.gd$'; then WARNINGS=0 tools/godot/gd.sh tests/compile_all.gd < /dev/null > /tmp/gridcorsa_compile.log 2>&1 || { grep -E 'FAILED|SCRIPT ERROR' -A1 /tmp/gridcorsa_compile.log | head -20 >&2; exit 2; }; fi"}]}]}}
   ```
+- **Independent review of batches 4 and 5** (a read-only subagent, told to report only correctness and the rules):
+  no correctness problem; no test edited; the session layers' lines match the old file's as a multiset; the dev
+  tours identical once `app.` is stripped. It noted two harmless differences (a save file holding exactly `{}` reads
+  as no file; the room list's GET now sends a Content-Type header), one negligible edge (back pressed on the menu in
+  the frame a modal closes now quits), and two comments the `app.` prefixing changed (fixed).
