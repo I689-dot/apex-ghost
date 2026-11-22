@@ -532,10 +532,7 @@ func start_loading(race: Dictionary, start_at: Variant) -> void:
 	pending_start_at = start_at
 	set_backdrop("aerial", race.trackId)
 	_drop_session()
-	var bar := ProgressBar.new()
-	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(520, 4)
-	bar.max_value = 1.0
+	var bar := UIW.bar(Vector2(520, 4))
 	var label := UIKit.label(I18n.t("Preparing…"), 17, UIKit.SOFT)
 	var w0 := Weather.weather_at(race.weather, 0.0)
 	var weather_txt := I18n.t(Weather.LABEL[race.weather.kind])
@@ -930,12 +927,18 @@ func _unhandled_input(e: InputEvent) -> void:
 		if go_back():
 			get_viewport().set_input_as_handled()
 
-## One step back; false when there is nowhere to go from here.
-func go_back() -> bool:
+## The modal on top (the last one opened and not closing), or null.
+func top_modal() -> Node:
 	var top: Node = null
 	for c in overlay_layer.get_children():
 		if c.has_meta("modal") and not c.is_queued_for_deletion():
 			top = c
+	return top
+
+## One step back (Esc, the pad's B, the phone's back button): the top modal closes, a phone page or a lobby page goes
+## back, the career to the menu, a menu tab to Play. false when there is nowhere to go from here.
+func go_back() -> bool:
+	var top := top_modal()
 	if top != null:
 		if top.has_meta("close"):
 			(top.get_meta("close") as Callable).call()
@@ -964,18 +967,14 @@ func go_back() -> bool:
 func _notification(what: int) -> void:
 	match what:
 		NOTIFICATION_WM_GO_BACK_REQUEST:
-			if screen != "race" and overlay_layer.get_children().any(func(c: Node) -> bool: return c.has_meta("modal")):
-				go_back()
-			elif screen == "race" and session != null:
+			# as Esc (go_back), except: the race pauses, the classic menu closes the app (before its tab goes back to
+			# Play), and the results, a lobby, the briefing and watching are left
+			if screen == "race" and session != null:
 				session.toggle_pause()
-			elif screen.begins_with("m_") and back_to.is_valid():
-				back_to.call()
-			elif screen == "menu":
+			elif screen == "menu" and top_modal() == null:
 				get_tree().quit()
-			elif screen == "career":
-				show_menu()
-			elif screen == "lobby" and LobbyScreen.back_page():
-				render_lobby()
+			elif screen != "race" and go_back():
+				pass
 			elif screen == "results" or screen == "lobby" or screen == "briefing" or screen == "watch":
 				leave()
 			elif pause_ui != null and session != null:

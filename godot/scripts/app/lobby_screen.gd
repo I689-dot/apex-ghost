@@ -238,11 +238,7 @@ static func _stat_bar(label: String, value: String, frac: float) -> Control:
 	row.add_child(lb)
 	row.add_child(UIKit.label(value, 17, UIKit.TEXT, true, 600))
 	col.add_child(row)
-	var pb := ProgressBar.new()
-	pb.show_percentage = false
-	pb.max_value = 1.0
-	pb.value = clampf(frac, 0.04, 1.0)
-	pb.custom_minimum_size = Vector2(0, 4)
+	var pb := UIW.bar(Vector2(0, 4), clampf(frac, 0.04, 1.0))
 	col.add_child(pb)
 	return col
 
@@ -1278,11 +1274,7 @@ static func _tyre_guide() -> Control:
 			var lb := UIKit.label(bar[0], 12, UIKit.SOFT)
 			lb.custom_minimum_size = Vector2(62, 0)
 			row.add_child(lb)
-			var pb := ProgressBar.new()
-			pb.show_percentage = false
-			pb.max_value = 1.0
-			pb.value = clampf(bar[1], 0.06, 1.0)
-			pb.custom_minimum_size = Vector2(0, 4)
+			var pb := UIW.bar(Vector2(0, 4), clampf(bar[1], 0.06, 1.0))
 			pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			row.add_child(pb)

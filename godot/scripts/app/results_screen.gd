@@ -306,12 +306,8 @@ static func career_block(g: Dictionary) -> Control:
 	var rank := CareerData.rank_of(lv.level)
 	side.add_child(UIKit.label("%s · %s   %d / %d XP" % [I18n.t(rank.name).to_upper(), I18n.t("Level {n}", {"n": lv.level}), int(lv.into), lv.need], 16, rank.colour, true, 700))
 	# the bar fills from where it was to where it is now (from zero after a level up)
-	var bar := ProgressBar.new()
-	bar.show_percentage = false
-	bar.max_value = lv.need
 	var before := CareerData.level_of(g.get("xpBefore", c.xp))
-	bar.value = before.into if before.level == lv.level else 0.0
-	bar.custom_minimum_size = Vector2(0, 12)
+	var bar := UIW.bar(Vector2(0, 12), before.into if before.level == lv.level else 0.0, lv.need)
 	bar.add_theme_stylebox_override("background", UIKit.box(Color(1, 1, 1, 0.1), Color(0, 0, 0, 0), 0, 6))
 	bar.add_theme_stylebox_override("fill", UIKit.box(rank.colour, Color(0, 0, 0, 0), 0, 6))
 	bar.ready.connect(func() -> void: bar.create_tween().tween_property(bar, "value", lv.into, 1.4).set_delay(0.4).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT))

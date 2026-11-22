@@ -38,11 +38,8 @@ func _init(on_change: Callable) -> void:
 		bind.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bind.clip_text = true
 		row.add_child(bind)
-		var live := ProgressBar.new()
-		live.show_percentage = false
-		live.custom_minimum_size = Vector2(90, 10)
+		var live := UIW.bar(Vector2(90, 10))
 		live.min_value = -1.0 if f[1] == "steer" else 0.0
-		live.max_value = 1.0
 		live.step = 0.001
 		live.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(live)

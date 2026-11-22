@@ -547,11 +547,7 @@ static func _invite() -> Control:
 		b.add_child(rr)
 		b.add_child(UIW.hair())
 	b.add_child(UIW.muted(I18n.t("Friends joined: {j} · racing: {n} of 3", {"j": joined, "n": racing}), 15))
-	var bar := ProgressBar.new()
-	bar.max_value = 3
-	bar.value = mini(racing, 3)
-	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(0, 10)
+	var bar := UIW.bar(Vector2(0, 10), mini(racing, 3), 3)
 	b.add_child(bar)
 	var bt := UIW.tile(b, Vector2(22, 18))
 	bt.custom_minimum_size = Vector2(440, 0)

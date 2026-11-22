@@ -47,10 +47,7 @@ static func _show(app: App, reward: bool, what: String, on_done: Callable) -> vo
 	var sub := UIKit.label(I18n.t("Placeholder: an ad network would show a video here.") + ("\n" + I18n.t("Reward: {what}", {"what": what}) if what != "" else ""), 18, UIKit.SOFT)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(sub)
-	var bar := ProgressBar.new()
-	bar.show_percentage = false
-	bar.custom_minimum_size = Vector2(520, 6)
-	bar.max_value = 1.0
+	var bar := UIW.bar(Vector2(520, 6))
 	col.add_child(bar)
 	var left := UIKit.label("", 20, UIKit.ACCENT_2, true, 600)
 	left.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

@@ -67,6 +67,15 @@ static func h2(text: String) -> Label:
 static func h3(text: String) -> Label:
 	return UIKit.label(text.to_upper(), 15, UIKit.SOFT, true, 600)
 
+## A bar without the percentage text: size its minimum (0 width: as wide as its container), value of max_value.
+static func bar(size: Vector2, value: float = 0.0, max_value: float = 1.0) -> ProgressBar:
+	var b := ProgressBar.new()
+	b.show_percentage = false
+	b.custom_minimum_size = size
+	b.max_value = max_value
+	b.value = value
+	return b
+
 static func muted(text: String, size: int = 15) -> Label:
 	var l := UIKit.label(text, size, UIKit.SOFT)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

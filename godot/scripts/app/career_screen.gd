@@ -147,11 +147,7 @@ static func _rank_tile(title: String, value: String, frac: float, caption: Strin
 	var v := UIKit.label(value, 50 if touch else 60, ink, true, 600)
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	inner.add_child(v)
-	var pb := ProgressBar.new()
-	pb.show_percentage = false
-	pb.max_value = 1.0
-	pb.value = frac
-	pb.custom_minimum_size = Vector2(0, 5)
+	var pb := UIW.bar(Vector2(0, 5), frac)
 	pb.add_theme_stylebox_override("background", UIKit.box(Color(ink, 0.25), Color(0, 0, 0, 0), 0, 1))
 	pb.add_theme_stylebox_override("fill", UIKit.box(ink, Color(0, 0, 0, 0), 0, 1))
 	inner.add_child(UIW.margins(pb, 14, 0, 14, 10))
@@ -169,11 +165,7 @@ static func _rank_tile(title: String, value: String, frac: float, caption: Strin
 static func _bar(frac: float, colour: Color, text: String, sub: String) -> Control:
 	var col := UIW.vbox(3)
 	var row := UIW.hbox(10)
-	var pb := ProgressBar.new()
-	pb.show_percentage = false
-	pb.max_value = 1.0
-	pb.value = clampf(frac, 0.0, 1.0)
-	pb.custom_minimum_size = Vector2(0, 6)
+	var pb := UIW.bar(Vector2(0, 6), clampf(frac, 0.0, 1.0))
 	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	pb.add_theme_stylebox_override("fill", UIKit.box(colour, Color(0, 0, 0, 0), 0, 2))
