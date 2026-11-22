@@ -55,6 +55,11 @@ func _ready() -> void:
 	print("[boot] app")
 	get_tree().root.theme = UIKit.build_theme()
 	_build_layers()
+	# lists that scroll under a finger (TouchScroll); a PC with APEX_TOUCH tries it with the mouse as the finger
+	if UIKit.touch():
+		if not DisplayServer.is_touchscreen_available():
+			Input.emulate_touch_from_mouse = true
+		add_child(TouchScroll.new())
 	print("[boot] layers")
 	cars = CarsDb.file()
 	track_index = TrackData.list_layouts()

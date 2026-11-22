@@ -403,6 +403,10 @@ static func screen(top: Control, body: Control, bottom: Control = null) -> Contr
 	var col := UIW.vbox(0)
 	col.add_child(top)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# a phone's menus have about 480 units of height (UIKit.ui_scale): a body taller than that scrolls (TouchScroll)
+	# instead of pushing the bottom bar off the screen (the lobby's Start race was cut off)
+	if touch and not body is ScrollContainer:
+		body = UIW.scroll(body)
 	col.add_child(UIW.margins(body, 22 if touch else 40, 12 if touch else 18, 22 if touch else 40, 8 if bottom != null else (14 if touch else 24)))
 	col.get_child(1).size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if bottom != null:
@@ -626,6 +630,9 @@ static func default_focus(c: Control) -> Control:
 ## Focuses the subtree's default control, else its first focusable one (hidden: the ring shows on the first pad or key press).
 static func focus_first(root: Node) -> void:
 	if root == null or not is_instance_valid(root) or not root.is_inside_tree():
+		return
+	# a touch screen without a pad: no focus ring on a screen the finger has not touched (it read as a stuck highlight)
+	if UIKit.touch() and Input.get_connected_joypads().is_empty():
 		return
 	var pick := _find_focus(root, true)
 	if pick == null:

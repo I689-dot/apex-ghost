@@ -45,7 +45,8 @@ static func show(app: App, cat: String = "") -> void:
 	row.add_child(cats)
 	var cards := UIW.hbox(12)
 	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	cards.custom_minimum_size = Vector2(0, 430)
+	# (a phone's screen is about 480 units high: the cards take the height there is; they ran off its bottom)
+	cards.custom_minimum_size = Vector2(0, 0 if UIKit.touch() else 430)
 	match _cat:
 		"events":
 			_events(app, cards)

@@ -48,7 +48,15 @@ static func build(app: App) -> Control:
 	left.add_child(_event_card(app))
 	left.add_child(_section(I18n.t("Special offer")))
 	left.add_child(_offer_card(app))
-	root.add_child(_place(left, Control.PRESET_TOP_LEFT, Vector2(16, 76)))
+	# a scroller down to the bottom bar: on a phone the column is taller than the room it has (the offer sat under the
+	# bar, out of reach)
+	var lsc := UIW.scroll(left)
+	lsc.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	lsc.offset_left = 16
+	lsc.offset_top = 76
+	lsc.offset_right = 16 + 290
+	lsc.offset_bottom = -84
+	root.add_child(lsc)
 
 	# right column: free bonus, chests, championship, daily wins
 	var right := UIW.vbox(10)
@@ -432,7 +440,8 @@ static func cars(app: App, rerender: Callable) -> void:
 			m.root.queue_free()
 			rerender.call())
 		grid.add_child(card)
-	b.add_child(UIW.scroll(grid))
+	# (the modal scrolls its body: a scroller of its own in there has no height and showed nothing on the phone)
+	b.add_child(grid)
 
 ## Paint: the lobby's Paint page (the livery editor) in a solo room.
 static func paint(app: App) -> void:
