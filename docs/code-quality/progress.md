@@ -5,8 +5,36 @@ together with `git log`.
 
 ## State
 
-- **Phase:** batches 2 (dead code) and 3 (typing) are done (2026-11-22). **Check-in 2 is waiting for the user.**
-  Next: batch 4, the duplication.
+- **Phase:** check-in 2 answered (2026-11-22). The four items below come first, then batch 4 (the duplication).
+- **Done after check-in 2:**
+  - The safety car: build-cars.py repoints an entry whose file is gone. data/cars.json is fixed here (it is
+    git-ignored); a race with race control no longer logs "Resource file not found".
+  - race_test's order check now orders by laps, then time, and the test prints a bot's pit state when its distance
+    stands still.
+  - **The "stuck" bot is not a bug.** The tracker does not advance a car's distance in the pit lane, and a bot on a
+    long stop near the end (driver change, repairs, tyres: 1 to 2 minutes) is classified at the flag where it is, as
+    the tracker means (cars in the garage when it falls). The diagnostic showed every "standing" bot moving at the
+    pit limiter or serving its stop.
+- **The user's answers at check-in 2:**
+  - Find the cause of the server's exhausted quota.
+  - Fix the safety car's missing lod1.glb now.
+  - Investigate the bot stuck in its pit box, and fix race_test's order check (editing that test is allowed).
+  - Then go on with batch 4.
+- **The server's quota, the cause (Cloudflare analytics: read-only, the user's own wrangler login):**
+  - The RoomDO class alone made a steady **~2,400 requests an hour until 13:00 UTC on 2026-11-20, then ~4,200 an
+    hour**, at night too, with every other class near 0. 4,200 x 24 is about 100,800 a day, just over the free tier's
+    100,000, so the quota ran out at about 21:00 UTC on 11-21.
+  - The traffic stopped there and did not come back after the reset (0 requests in a minute of the live log after
+    it). That is what WebSocket clients do when the server drops them; a room's alarm would have come back.
+  - A connected Godot client sends a clock ping every 3 s after its first burst, plus a keepalive every 20 s: about
+    1,380 messages an hour, and a Durable Object counts each received message. **Two or three clients left
+    connected to rooms around the clock** fit the numbers.
+  - No game is running on this PC now, and the phone is not on USB, so which clients it was is not known: this PC,
+    the user's other machine, the phone, or the old web game.
+  - **Fixes for the user to choose** (each needs an APK or a server deploy):
+    - ping every 15-30 s once the clock is synced;
+    - the server closes a lobby's connections after about 30 idle minutes;
+    - Cloudflare's paid Workers plan ($5 a month).
 - **Numbers at check-in 2**, against the start:
   - scripts: 151 (152);
   - lines: 34,140 (35,232: −1,092);
