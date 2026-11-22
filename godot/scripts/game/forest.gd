@@ -83,8 +83,8 @@ static func ensure_globals() -> void:
 		# writes every pass at half value into its 10-bit buffer and decodes x2, a multiply pass included: each one
 		# halves what it covers (measured: Zandvoort's road 35/255 on Mobile, 158 on Forward+, 155 on Mobile with a gain
 		# of 2). The circuits were tuned on Mobile, so Forward+ (the PC) halves too and every circuit looks the same on
-		# both.
-		var gain := 0.5 if RenderingServer.get_current_rendering_method() == "forward_plus" else 1.0
+		# both. The Compatibility renderer (phones since 2026-11-22) does not halve either: 0.5 there too.
+		var gain := 1.0 if RenderingServer.get_current_rendering_method() == "mobile" else 0.5
 		RenderingServer.global_shader_parameter_add("mul_gain", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, gain)
 
 ## The map's scattered forest (if any) and its trackside trees (null when there are neither). Called as
