@@ -25,6 +25,10 @@ var _wrong_panel := PanelContainer.new()
 var _reset_hint := Label.new()
 ## The driver's dial (bottom right): revs, gear, speed, lamps, fuel (as the web game's since 2026-11-13).
 var dial := HudDial.new()
+## A phone's speed in its place (the user's mobile references, 2026-11-22: less of the screen covered), and the lap
+## time alone in a pill at the top centre.
+var phone_speed := PhoneSpeed.new()
+var _timer_pill := PanelContainer.new()
 var _board := VBoxContainer.new()
 var _tl := HBoxContainer.new()
 var _tr := VBoxContainer.new()
@@ -102,17 +106,20 @@ func _build() -> void:
 	lap_block.add_theme_constant_override("separation", 0)
 	_lap_tag = _small(I18n.t("LAP"))
 	lap_block.add_child(_lap_tag)
-	_style(_lap, 38, 800)
+	_style(_lap, 30 if touch else 38, 800)
 	_lap.text = I18n.t("OUT")
 	lap_block.add_child(_lap)
 	_tl.add_child(lap_block)
 	var pos_block := VBoxContainer.new()
 	pos_block.add_theme_constant_override("separation", 0)
 	pos_block.add_child(_small(I18n.t("POS")))
-	_style(_pos, 38, 800)
+	_style(_pos, 30 if touch else 38, 800)
 	_pos.text = "1/1"
 	pos_block.add_child(_pos)
 	_tl.add_child(pos_block)
+	# (a phone: the position first, at the top right)
+	if touch:
+		_tl.move_child(pos_block, 0)
 	var board_panel := PanelContainer.new()
 	board_panel.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.45), Color(0, 0, 0, 0), 0, 6, Vector2(0, 4)))
 	board_panel.custom_minimum_size.x = 170
@@ -144,22 +151,33 @@ func _build() -> void:
 	_times_grid.add_child(_small(I18n.t("LAST")))
 	_times_grid.add_child(_last)
 	_times_cur_lbl = cur_lbl
-	_tr.add_child(_times_grid)
 	_style(_delta, 24, 800)
-	_tr.add_child(_delta)
-	_tr.add_child(overlays.delta_bar)
-	# the relative list: bottom left over the tyres, as in the sims (a phone keeps it here, its corners are the
-	# touch controls')
 	if touch:
-		_tr.add_child(overlays.relative)
+		# a phone: the lap time alone in a pill at the top centre, the delta small under it (no best / last, no delta
+		# bar, no relative list: the standings at the top right say where you are)
+		_timer_pill.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.5), Color(0, 0, 0, 0), 0, 6, Vector2(14, 1)))
+		_times_grid.remove_child(_cur)
+		_cur.add_theme_font_size_override("font_size", 22)
+		_timer_pill.add_child(_cur)
+		_tr.add_child(_timer_pill)
+		_delta.add_theme_font_size_override("font_size", 16)
+		_delta.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_tr.add_child(_delta)
+	else:
+		_tr.add_child(_times_grid)
+		_tr.add_child(_delta)
+		_tr.add_child(overlays.delta_bar)
 
 	# bottom right: the inputs widget beside the driver's dial (bottom centre on a phone)
 	_bc.add_theme_constant_override("separation", 12)
 	_bc.alignment = BoxContainer.ALIGNMENT_END
 	add_child(_bc)
-	overlays.inputs.size_flags_vertical = Control.SIZE_SHRINK_END
-	_bc.add_child(overlays.inputs)
-	_bc.add_child(dial)
+	if touch:
+		_bc.add_child(phone_speed)
+	else:
+		overlays.inputs.size_flags_vertical = Control.SIZE_SHRINK_END
+		_bc.add_child(overlays.inputs)
+		_bc.add_child(dial)
 
 	# the minimap or the circuit map: under the lap times (the bottom right corner is the dial's)
 	add_child(_br)
@@ -173,6 +191,8 @@ func _build() -> void:
 	if not touch:
 		_bl_col.add_child(overlays.relative)
 	_bl_col.add_child(status)
+	# (a phone shows no tyre panel: the screen is the road's)
+	_bl.visible = not touch
 	add_child(damage_panel)
 	add_child(overlays.spot_l)
 	add_child(overlays.spot_r)
@@ -215,7 +235,7 @@ func _build() -> void:
 	_osd.visible = false
 	add_child(_osd)
 	_style(_reset_hint, 15, 500)
-	_reset_hint.text = I18n.t("Tap R to reset to the track") if DisplayServer.is_touchscreen_available() else I18n.t("Press R to reset to the track")
+	_reset_hint.text = I18n.t("Menu › Reset to track") if touch else I18n.t("Press R to reset to the track")
 	_reset_hint.visible = false
 	add_child(_reset_hint)
 	add_child(timing)
@@ -247,18 +267,15 @@ func _layout() -> void:
 	_place_bc()
 	_bc.scale = Vector2(sc, sc)
 	if touch:
-		# the pedals and the steering pad take the bottom corners: the map sits at the right edge above the pedals'
-		# buttons, the tyres above the steering pad
+		# the references' phone layout: the icon column at the top left (TouchControls), the map beside it, the lap
+		# time at the top centre, position and standings at the top right, the speed at the bottom centre
 		var k := clampf(s.y / 400.0, 1.0, 4.0)
-		var u := float(TouchPrefs.get_pref("size"))
+		var ins := TouchControls.safe_insets(s)
 		var full: bool = Settings.data.overlays.trackMap
 		var mw: float = CircuitMap.W if full else MiniMap.SIZE
-		var msc := sc * (190.0 if full else 136.0) / mw
-		_br.position = Vector2(s.x - 14.0 - mw * msc, s.y * 0.25)
+		var msc := sc * 120.0 / mw
+		_br.position = Vector2(12.0 * k + float(ins[0]) + TouchControls.ICON * k + 12.0 * k, 8.0 * k + float(ins[1]))
 		_br.scale = Vector2(msc, msc)
-		var steer_top := s.y - 12.0 * k - 118.0 * u * k
-		_bl.position = Vector2(14, steer_top - 10.0 - _bl_height() * sc * 0.8)
-		_bl.scale = Vector2(sc * 0.8, sc * 0.8)
 	else:
 		_place_map()
 		_bl.position = Vector2(18, s.y - 18.0 - _bl_height() * sc)
@@ -317,7 +334,7 @@ func _place_bc() -> void:
 	var sc := hud_scale()
 	var m := _bc.get_combined_minimum_size() * sc
 	if touch:
-		_bc.position = Vector2((s.x - m.x) / 2.0, s.y - 22.0 - m.y)
+		_bc.position = Vector2((s.x - m.x) / 2.0, s.y - 8.0 - float(TouchControls.safe_insets(s)[3]) - m.y)
 	else:
 		_bc.position = Vector2(s.x - 18.0 - m.x, s.y - 14.0 - m.y)
 
@@ -345,7 +362,8 @@ func _stack_banners() -> void:
 	var s := size
 	var y := 14.0
 	if touch:
-		y = 6.0 * clampf(s.y / 400.0, 1.0, 4.0) + 40.0 * clampf(s.y / 400.0, 1.0, 4.0) + 8.0
+		# under the lap time's pill
+		y = _tr.position.y + _tr.get_combined_minimum_size().y * hud_scale() + 6.0
 	if _mirror_on:
 		y = maxf(y, RearMirror.screen_rect(s).end.y + 8.0)
 	for p: Control in [_flag_panel, _fin_panel, _pit_panel, _msg_panel]:
@@ -435,6 +453,8 @@ func update_state(s: Dictionary) -> void:
 		"limiter": s.limiter, "abs": s.abs, "tc": s.tc, "headlights": s.get("headlights", false),
 		"engine": float(s.damageZones[4]) if (s.damageZones as Array).size() > 4 else 0.0, "fuel": s.get("fuel", {}), "fuelLow": s.fuelLow,
 	})
+	if touch:
+		phone_speed.set_values(v, "mph" if mph else "km/h", s.gear, s.manual, s.rpm, s.limiter)
 	_lap.text = s.lapLabel
 	var pen_key := "%s|%s" % [s.lapPenaltyMs, s.get("lapInvalid", false)]
 	if pen_key != _last_pen_key:
@@ -496,7 +516,7 @@ func update_state(s: Dictionary) -> void:
 			c.modulate.a = float(hs.opacity)
 		_board.get_parent().visible = hs.timing
 		_times_grid.visible = hs.lapInfo
-		_bl.visible = hs.tyres and not _spectating
+		_bl.visible = hs.tyres and not _spectating and not touch
 		dial.show_ring = hs.revLights
 		_br.visible = hs.map
 		_layout()
@@ -507,7 +527,13 @@ func _layout_dynamic() -> void:
 	# the blocks that change width follow their anchors
 	var s := size
 	var sc := hud_scale()
-	_tr.position.x = s.x - 20.0 - _tr.get_combined_minimum_size().x * sc
+	if touch:
+		var ins := TouchControls.safe_insets(s)
+		var top := 8.0 * clampf(s.y / 400.0, 1.0, 4.0) + float(ins[1])
+		_tr.position = Vector2((s.x - _tr.get_combined_minimum_size().x * sc) / 2.0, top)
+		_tl.position = Vector2(s.x - 14.0 - float(ins[2]) - _tl.get_combined_minimum_size().x * sc, top - 6.0)
+	else:
+		_tr.position.x = s.x - 20.0 - _tr.get_combined_minimum_size().x * sc
 	_place_bc()
 	if not touch:
 		_place_map()
@@ -515,7 +541,8 @@ func _layout_dynamic() -> void:
 	_wrong_panel.position.x = (s.x - _wrong_panel.get_combined_minimum_size().x) / 2.0
 	_stack_banners()
 	if touch and _board_panel != null:
-		_board_panel.position = Vector2(20, 18 + _tl.get_combined_minimum_size().y * sc + 6.0)
+		var bw := _board_panel.get_combined_minimum_size().x * sc
+		_board_panel.position = Vector2(s.x - 14.0 - float(TouchControls.safe_insets(s)[2]) - bw, _tl.position.y + _tl.get_combined_minimum_size().y * sc + 4.0)
 		_board_panel.scale = Vector2(sc, sc)
 	_apply_layout(false)
 

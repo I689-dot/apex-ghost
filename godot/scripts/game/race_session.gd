@@ -908,7 +908,8 @@ func _process_inner(dt: float) -> void:
 	update_bot_pits(server_now)
 	kb.end_frame()
 	if mirror != null:
-		mirror.visible = Settings.data.mirror and cinematic == null and not tv_on and cockpit.looking_forward and not kb.held("lookBack")
+		# (no mirror on a phone: the references' HUD leaves the top of the road clear)
+		mirror.visible = Settings.data.mirror and not UIKit.touch() and cinematic == null and not tv_on and cockpit.looking_forward and not kb.held("lookBack")
 
 func handle_keys(server_now: float) -> void:
 	var show_timing := kb.held("timing")

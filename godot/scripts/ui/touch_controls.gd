@@ -20,6 +20,14 @@ class Widget:
 	var visible := true
 	var value_cb: Callable
 	var name := ""
+	## Drawn as this icon instead of a label ("menu", "tune", "camera", "chat").
+	var icon := ""
+	## The pedals' and the steering's drawing, made when the layout changes (_shape): outlines (an outer hairline and
+	## an inner one per part), the halftone dots (x, y, radius) and the steering's chevrons.
+	var outlines: Array = []
+	var inners: Array = []
+	var dots := PackedVector3Array()
+	var chevrons: Array = []
 
 var widgets: Array = []
 var _fingers := {} # touch index -> {widget, origin_x}
@@ -61,6 +69,17 @@ func set_active(on: bool) -> void:
 		_release_all()
 	queue_redraw()
 
+## The phone's icon column at the top left (pause, aids, camera, chat), each this wide before the screen's factor k.
+const ICON := 30.0
+
+## The parts of the screen a notch or the system bars cover, in viewport units: [left, top, right, bottom].
+static func safe_insets(vp: Vector2) -> Array:
+	var sa := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if sa.size.x <= 0 or win.x <= 0:
+		return [0.0, 0.0, 0.0, 0.0]
+	return [float(sa.position.x) * vp.x / win.x, float(sa.position.y) * vp.y / win.y, (win.x - sa.end.x) * vp.x / win.x, (win.y - sa.end.y) * vp.y / win.y]
+
 func _scale() -> float:
 	return float(TouchPrefs.get_pref("size"))
 
@@ -76,17 +95,11 @@ func _layout() -> void:
 	# a phone's display: reference layout is 1 px per CSS px of a ~850 px wide landscape screen; scale to the real one
 	var k := clampf(vp.y / 400.0, 1.0, 4.0)
 	var margin := 12.0 * k
-	var sa := DisplayServer.get_display_safe_area()
-	var win := DisplayServer.window_get_size()
-	var inset_l := 0.0
-	var inset_r := 0.0
-	var inset_b := 0.0
-	var inset_t := 0.0
-	if sa.size.x > 0 and win.x > 0:
-		inset_l = float(sa.position.x) * vp.x / win.x
-		inset_t = float(sa.position.y) * vp.y / win.y
-		inset_r = (win.x - sa.end.x) * vp.x / win.x
-		inset_b = (win.y - sa.end.y) * vp.y / win.y
+	var ins := safe_insets(vp)
+	var inset_l: float = ins[0]
+	var inset_t: float = ins[1]
+	var inset_r: float = ins[2]
+	var inset_b: float = ins[3]
 	safe_area = Rect2(inset_l, inset_t, vp.x - inset_l - inset_r, vp.y - inset_t - inset_b)
 	# right: pedals
 	var thr_w := 96.0 * u * k
@@ -111,38 +124,38 @@ func _layout() -> void:
 	if _mode != "tilt":
 		var steer := _widget("steer", Rect2(margin + inset_l, bottom - 118.0 * u * k, 250.0 * u * k, 118.0 * u * k), "", "", Color.WHITE)
 		steer.name = "steer"
-	# gears above the pedals: + - (manual gearbox), handbrake
-	var bw := 52.0 * k
-	var bh := 44.0 * k
-	var gy := bottom - thr_h - 8.0 * k - bh
-	var hb := _widget("hold", Rect2(right - bw, gy, bw, bh), "HB", "handbrake", Color.WHITE)
+	# the handbrake, small, above the throttle
+	var hbw := 44.0 * k
+	var hbh := 36.0 * k
+	var hb := _widget("hold", Rect2(right - hbw, bottom - thr_h - 8.0 * k - hbh, hbw, hbh), "HB", "handbrake", Color.WHITE)
 	hb.name = "hb"
-	var down_b := _widget("button", Rect2(right - bw * 2 - 8.0 * k, gy, bw, bh), "-", "shiftDown", Color.WHITE)
+	# the gears (manual gearbox) either side of the speed at the bottom centre (PhoneSpeed), as the references
+	var hud_sc := float(Settings.data.hud.scale)
+	var gw := 34.0 * k
+	var gh := 58.0 * k
+	var half := PhoneSpeed.SIZE.x * hud_sc / 2.0 + 10.0 * k
+	var down_b := _widget("button", Rect2(vp.x / 2.0 - half - gw, bottom - gh, gw, gh), "−", "shiftDown", Color.WHITE)
 	down_b.name = "down"
-	var up_b := _widget("button", Rect2(right - bw * 3 - 16.0 * k, gy, bw, bh), "+", "shiftUp", Color.WHITE)
+	var up_b := _widget("button", Rect2(vp.x / 2.0 + half, bottom - gh, gw, gh), "+", "shiftUp", Color.WHITE)
 	up_b.name = "up"
-	# top bar: pause, timing, back, reset, camera, gearbox
-	var tw := 52.0 * k
-	var th := 40.0 * k
-	var tx := vp.x / 2.0 - (tw * 6 + 8.0 * k * 5) / 2.0 - 30.0 * k
-	var ty := 6.0 * k + inset_t
-	var specs := [["II", "pause", "button", "pause"], ["TIMES", "timing", "hold", "timing"], ["BACK", "lookBack", "hold", "back"],
-		["R", "resetCar", "button", "reset"], ["CAM", "camera", "button", "cam"], ["AUTO", "toggleGearbox", "button", "gearbox"]]
-	for i in specs.size():
-		var x := tx + i * (tw + 8.0 * k) + (172.0 * k if i >= 3 else 0.0)
-		var w := _widget(specs[i][2], Rect2(x, ty, tw, th), I18n.t(specs[i][0]) if specs[i][0] in ["TIMES", "BACK"] else specs[i][0], specs[i][1], Color.WHITE)
-		w.name = specs[i][3]
-	# the tuning row (brake bias, TC, ABS) opens from TUNE, under the buttons on the right
-	var tune := _widget("button", Rect2(tx + 3 * (tw + 8.0 * k), ty, tw, th), "TUNE", "", Color.WHITE)
-	tune.name = "tune"
-	var rows := [["BB-", "brakeBiasDown", "bb_down"], ["BB+", "brakeBiasUp", "bb_up"], ["TC", "tcCycle", "tc"], ["ABS", "absToggle", "abs"]]
+	# the icon column at the top left: pause (the menu: reset, settings, leave), the aids, the camera, the chat
+	var isz := ICON * k
+	var ix := margin + inset_l
+	var iy := 8.0 * k + inset_t
+	var icons := [["menu", "pause", "pause"], ["tune", "", "tune"], ["camera", "camera", "cam"], ["chat", "chat", "chat"]]
+	for i in icons.size():
+		var iw := _widget("button", Rect2(ix, iy + i * (isz + 8.0 * k), isz, isz), "", icons[i][1], Color.WHITE)
+		iw.icon = icons[i][0]
+		iw.name = icons[i][2]
+	# the aids row (brake bias, TC, ABS, the gearbox, the delta) opens beside the aids icon
+	var tw := 50.0 * k
+	var th := isz
+	var tune_y := iy + isz + 8.0 * k
+	var rows := [["BB−", "brakeBiasDown", "bb_down"], ["BB+", "brakeBiasUp", "bb_up"], ["TC", "tcCycle", "tc"], ["ABS", "absToggle", "abs"],
+		["AUTO", "toggleGearbox", "gearbox"], ["DELTA", "deltaMode", "delta"]]
 	for j in rows.size():
-		var tb := _widget("button", Rect2(tx + (3 + j) * (tw + 8.0 * k) + 172.0 * k, ty + th + 6.0 * k, tw, th), rows[j][0], rows[j][1], Color.WHITE)
+		var tb := _widget("button", Rect2(ix + isz + 10.0 * k + j * (tw + 6.0 * k), tune_y, tw, th), rows[j][0], rows[j][1], Color.WHITE)
 		tb.name = rows[j][2]
-	var chat_btn := _widget("button", Rect2(tx + 3 * (tw + 8.0 * k) + 172.0 * k - (tw + 8.0 * k), ty + th + 6.0 * k, tw, th), "CHAT", "chat", Color.WHITE)
-	chat_btn.name = "chat"
-	var dbtn := _widget("button", Rect2(tx + 6 * (tw + 8.0 * k) + 172.0 * k, ty, tw, th), "DELTA", "deltaMode", Color.WHITE)
-	dbtn.name = "delta"
 	# intro: skip; spectator: arrows
 	var skip := _widget("button", Rect2(vp.x - margin - inset_r - 150.0 * k, 56.0 * k + inset_t, 150.0 * k, 42.0 * k), I18n.t("Skip intro"), "", Color.WHITE)
 	skip.name = "skip"
@@ -151,8 +164,10 @@ func _layout() -> void:
 	var sr := _widget("button", Rect2(vp.x / 2.0 + 180.0 * k, vp.y - 14.0 * k - 54.0 * k - inset_b, 64.0 * k, 54.0 * k), ">", "", Color.WHITE)
 	sr.name = "spec_right"
 	_release_all()
-	if _mode == "tilt":
-		pass
+	var kk := clampf(vp.y / 400.0, 1.0, 4.0)
+	for w: Widget in widgets:
+		if w.kind == "pedal" or w.kind == "steer":
+			_shape(w, kk)
 	queue_redraw()
 
 ## The race has a text chat (rooms this game hosts): the CHAT button shows.
@@ -184,12 +199,12 @@ func _is_shown(w: Widget) -> bool:
 	if n == "spec_left" or n == "spec_right":
 		return spectating
 	if cine or boxed:
-		return n in ["pause", "timing"] and not cine
+		return n == "pause" and not cine
 	if spectating:
-		return n in ["pause", "timing"]
+		return n == "pause"
 	if n == "up" or n == "down":
 		return bool(Settings.data.manualGearbox)
-	if n in ["bb_down", "bb_up", "tc", "abs"]:
+	if n in ["bb_down", "bb_up", "tc", "abs", "gearbox", "delta"]:
 		return tune_open
 	if n == "chat":
 		return chat_enabled
@@ -367,39 +382,93 @@ func _landscape_flipped() -> bool:
 
 # ----------------------------------------------------------------- draw ---
 
+## A part's outline as points over its rect (shares of the width and height), in screen units.
+static func _poly(r: Rect2, pts: Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p: Vector2 in pts:
+		out.append(r.position + p * r.size)
+	return out
+
+## The references' controls: hairline outlines, a second one inside, halftone dots that grow towards a focus and fade
+## to the edges; the steering as two pointed pads with a solid chevron each. Made once a layout.
+func _shape(w: Widget, k: float) -> void:
+	w.outlines.clear()
+	w.inners.clear()
+	w.chevrons.clear()
+	w.dots = PackedVector3Array()
+	var parts: Array = [] # [outline, focus point, reach]
+	if w.name == "throttle":
+		var o := _poly(w.rect, [Vector2(0.24, 0.0), Vector2(0.9, 0.0), Vector2(1.0, 0.05), Vector2(1.0, 0.95), Vector2(0.92, 1.0),
+			Vector2(0.08, 1.0), Vector2(0.0, 0.95), Vector2(0.0, 0.52), Vector2(0.24, 0.44)])
+		parts.append([o, w.rect.position + w.rect.size * Vector2(0.62, 0.5), w.rect.size.y * 0.55])
+	elif w.name == "brake":
+		var o2 := _poly(w.rect, [Vector2(0.06, 0.0), Vector2(0.84, 0.0), Vector2(1.0, 0.24), Vector2(0.96, 0.9), Vector2(0.88, 1.0),
+			Vector2(0.08, 1.0), Vector2(0.0, 0.88), Vector2(0.0, 0.12)])
+		parts.append([o2, w.rect.position + w.rect.size * Vector2(0.72, 0.62), w.rect.size.x * 0.6])
+	elif w.kind == "steer":
+		var gap := 0.04
+		var lr := Rect2(w.rect.position, Vector2(w.rect.size.x * (0.5 - gap), w.rect.size.y))
+		var rr := Rect2(w.rect.position + Vector2(w.rect.size.x * (0.5 + gap), 0), Vector2(w.rect.size.x * (0.5 - gap), w.rect.size.y))
+		var ol := _poly(lr, [Vector2(0.0, 0.5), Vector2(0.24, 0.02), Vector2(1.0, 0.02), Vector2(1.0, 0.98), Vector2(0.24, 0.98)])
+		var orr := _poly(rr, [Vector2(0.0, 0.02), Vector2(0.76, 0.02), Vector2(1.0, 0.5), Vector2(0.76, 0.98), Vector2(0.0, 0.98)])
+		parts.append([ol, lr.position + lr.size * Vector2(0.12, 0.5), lr.size.x * 0.55])
+		parts.append([orr, rr.position + rr.size * Vector2(0.88, 0.5), rr.size.x * 0.55])
+		var ch := lr.size.y * 0.16
+		var cl := lr.position + lr.size * Vector2(0.36, 0.5)
+		w.chevrons.append(PackedVector2Array([cl + Vector2(-ch * 0.7, 0), cl + Vector2(ch * 0.35, -ch), cl + Vector2(ch * 0.35, ch)]))
+		var cr := rr.position + rr.size * Vector2(0.64, 0.5)
+		w.chevrons.append(PackedVector2Array([cr + Vector2(ch * 0.7, 0), cr + Vector2(-ch * 0.35, -ch), cr + Vector2(-ch * 0.35, ch)]))
+	var step := 7.0 * k
+	var rmax := 1.9 * k
+	for part: Array in parts:
+		var o3: PackedVector2Array = part[0]
+		w.outlines.append(o3)
+		var inner := Geometry2D.offset_polygon(o3, -4.0 * k)
+		w.inners.append(inner[0] if not inner.is_empty() else PackedVector2Array())
+		var focus: Vector2 = part[1]
+		var reach: float = part[2]
+		var box := Rect2(o3[0], Vector2.ZERO)
+		for q: Vector2 in o3:
+			box = box.expand(q)
+		var y := box.position.y + step
+		while y < box.end.y - step * 0.5:
+			var x := box.position.x + step
+			while x < box.end.x - step * 0.5:
+				var pt := Vector2(x, y)
+				var f := clampf(1.0 - pt.distance_to(focus) / reach, 0.0, 1.0)
+				var rad := rmax * pow(f, 0.8)
+				if rad > 0.35 * k and Geometry2D.is_point_in_polygon(pt, o3):
+					w.dots.append(Vector3(x, y, rad))
+				x += step
+			y += step
+
 func _draw() -> void:
 	if not show_controls:
 		return
-	var a := _alpha()
+	var a := _alpha() / 0.7
 	var k := clampf(get_viewport_rect().size.y / 400.0, 1.0, 4.0)
 	var f_d := UIKit.font(true, 800)
 	for w: Widget in widgets:
 		if not _is_shown(w):
 			continue
-		var fill := Color(10 / 255.0, 11 / 255.0, 14 / 255.0, 0.42)
-		var border := Color(1, 1, 1, 0.35)
-		if w.kind == "pedal":
-			border = Color(w.color, 0.7)
-			if w.down:
-				fill = Color(w.color, 0.45)
-		elif w.down:
-			fill = Color(1, 1, 1, 0.3)
-			border = Color.WHITE
-		var radius := 18 if w.kind == "pedal" else (22 if w.kind == "steer" else 10)
-		var sb := UIKit.box(Color(fill.r, fill.g, fill.b, fill.a * a / 0.7), Color(border.r, border.g, border.b, border.a * a / 0.7), 2, int(radius * k * 0.7))
-		draw_style_box(sb, w.rect)
-		if w.kind == "steer":
-			_draw_steer(w, a, k)
+		if w.icon != "":
+			_draw_icon(w, a, k)
 			continue
+		if w.kind == "pedal" or w.kind == "steer":
+			_draw_part(w, a, k)
+			continue
+		# the small buttons: a translucent glass chip
+		var fill := Color(1, 1, 1, 0.28 * a) if w.down else Color(0.02, 0.03, 0.05, 0.28 * a)
+		draw_style_box(UIKit.box(fill, Color(1, 1, 1, 0.45 * a), 1, int(7 * k)), w.rect)
 		var text := w.label
 		if w.name == "gearbox":
 			text = "MAN" if Settings.data.manualGearbox else "AUTO"
-		var fs := int((14.0 if w.kind == "pedal" else 15.0) * k)
-		if w.kind == "pedal":
-			draw_string(f_d, Vector2(w.rect.position.x, w.rect.end.y - 10.0 * k), text, HORIZONTAL_ALIGNMENT_CENTER, w.rect.size.x, fs, Color(1, 1, 1, a))
-		else:
-			var tsz := f_d.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
-			draw_string(f_d, Vector2(w.rect.position.x, w.rect.position.y + w.rect.size.y / 2.0 + tsz.y * 0.3), text, HORIZONTAL_ALIGNMENT_CENTER, w.rect.size.x, fs, Color(1, 1, 1, a))
+		if w.name == "up" or w.name == "down":
+			_draw_shift(w, a, k)
+			continue
+		var fs := int(13.0 * k)
+		var tsz := f_d.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
+		draw_string(f_d, Vector2(w.rect.position.x, w.rect.position.y + w.rect.size.y / 2.0 + tsz.y * 0.3), text, HORIZONTAL_ALIGNMENT_CENTER, w.rect.size.x, fs, Color(1, 1, 1, 0.9 * a))
 	# tilt indicator above the brake pedal
 	if _mode == "tilt":
 		var b := _w("brake")
@@ -410,21 +479,62 @@ func _draw() -> void:
 			draw_circle(Vector2(bar.position.x + bar.size.x / 2.0 - _tilt_value * bar.size.x * 0.43, bar.position.y + bar.size.y / 2.0), 7.0 * k, knob_c)
 			draw_string(UIKit.font(true, 800), Vector2(bar.position.x, bar.end.y - 5.0 * k), I18n.t("TILT"), HORIZONTAL_ALIGNMENT_CENTER, bar.size.x, int(11 * k), Color(1, 1, 1, 0.55))
 
-func _draw_steer(w: Widget, a: float, k: float) -> void:
-	var half := w.rect.size.x / 2.0
-	var left_r := Rect2(w.rect.position, Vector2(half, w.rect.size.y))
-	var right_r := Rect2(w.rect.position + Vector2(half, 0), Vector2(half, w.rect.size.y))
-	if _mode != "slider":
-		if _steer_value > 0.0:
-			draw_rect(left_r, Color(1, 1, 1, 0.28 * a / 0.7))
-		elif _steer_value < 0.0:
-			draw_rect(right_r, Color(1, 1, 1, 0.28 * a / 0.7))
-		draw_line(Vector2(w.rect.position.x + half, w.rect.position.y), Vector2(w.rect.position.x + half, w.rect.end.y), Color(1, 1, 1, 0.18), 1.0)
-	var f := UIKit.font(true, 800)
-	var fs := int(38.0 * k * (0.6 if _mode == "slider" else 1.0))
-	var col := Color(1, 1, 1, 0.85 if _mode != "slider" else 0.4)
-	draw_string(f, Vector2(left_r.position.x, w.rect.get_center().y + fs * 0.3), "<", HORIZONTAL_ALIGNMENT_CENTER, half, fs, col)
-	draw_string(f, Vector2(right_r.position.x, w.rect.get_center().y + fs * 0.3), ">", HORIZONTAL_ALIGNMENT_CENTER, half, fs, col)
-	if _mode == "slider":
-		var cx := w.rect.get_center().x - _steer_value * w.rect.size.x * 0.34
-		draw_circle(Vector2(cx, w.rect.get_center().y), 32.0 * k * _scale() * 0.5, Color(1, 1, 1, 0.55))
+## A pedal or the steering: hairlines and halftone, brighter while pressed (the steering lights the side held).
+func _draw_part(w: Widget, a: float, k: float) -> void:
+	for i in w.outlines.size():
+		var lit := w.down
+		if w.kind == "steer":
+			lit = (i == 0 and _steer_value > 0.0) or (i == 1 and _steer_value < 0.0)
+		var o: PackedVector2Array = w.outlines[i]
+		if lit:
+			draw_colored_polygon(o, Color(1, 1, 1, 0.1 * a))
+		var closed := o.duplicate()
+		closed.append(o[0])
+		draw_polyline(closed, Color(1, 1, 1, (0.85 if lit else 0.5) * a), 1.4 * k * 0.8, true)
+		var inner: PackedVector2Array = w.inners[i]
+		if inner.size() > 2:
+			var ci := inner.duplicate()
+			ci.append(inner[0])
+			draw_polyline(ci, Color(1, 1, 1, (0.4 if lit else 0.2) * a), 1.0 * k * 0.7, true)
+	var dot := Color(1, 1, 1, (0.55 if w.down else 0.28) * a)
+	for d: Vector3 in w.dots:
+		draw_circle(Vector2(d.x, d.y), d.z, dot)
+	for c: PackedVector2Array in w.chevrons:
+		draw_colored_polygon(c, Color(1, 1, 1, 0.78 * a))
+	if _mode == "slider" and w.kind == "steer":
+		var kx := w.rect.get_center().x - _steer_value * w.rect.size.x * 0.34
+		draw_circle(Vector2(kx, w.rect.get_center().y), 32.0 * k * _scale() * 0.5, Color(1, 1, 1, 0.45 * a))
+
+## A gear button as the references': a slim bracket with an arrow.
+func _draw_shift(w: Widget, a: float, k: float) -> void:
+	var up := w.name == "up"
+	var c := w.rect.get_center()
+	var col := Color(1, 1, 1, (1.0 if w.down else 0.8) * a)
+	var h := w.rect.size.y * 0.12
+	var tip := c + Vector2(0, -h if up else h)
+	draw_colored_polygon(PackedVector2Array([tip, c + Vector2(-h, h if up else -h), c + Vector2(h, h if up else -h)]), col)
+
+## The icon column's icons: drawn with lines over a faint glass disc.
+func _draw_icon(w: Widget, a: float, k: float) -> void:
+	var c := w.rect.get_center()
+	var r := w.rect.size.x / 2.0
+	draw_circle(c, r, Color(0.02, 0.03, 0.05, (0.42 if w.down else 0.22) * a))
+	draw_arc(c, r - 0.5, 0.0, TAU, 28, Color(1, 1, 1, 0.25 * a), 1.0, true)
+	var col := Color(1, 1, 1, 0.92 * a)
+	var t := 2.0 * k * 0.8
+	var u := r * 0.46
+	match w.icon:
+		"menu":
+			for dy: float in [-u * 0.6, 0.0, u * 0.6]:
+				draw_line(c + Vector2(-u, dy), c + Vector2(u, dy), col, t, true)
+		"tune":
+			draw_line(c + Vector2(-u, -u * 0.45), c + Vector2(u, -u * 0.45), col, t, true)
+			draw_line(c + Vector2(-u, u * 0.45), c + Vector2(u, u * 0.45), col, t, true)
+			draw_circle(c + Vector2(u * 0.35, -u * 0.45), t * 1.8, col)
+			draw_circle(c + Vector2(-u * 0.4, u * 0.45), t * 1.8, col)
+		"camera":
+			draw_rect(Rect2(c + Vector2(-u, -u * 0.6), Vector2(u * 2.0, u * 1.35)), col, false, t)
+			draw_arc(c + Vector2(0, u * 0.08), u * 0.42, 0.0, TAU, 20, col, t, true)
+		"chat":
+			draw_rect(Rect2(c + Vector2(-u, -u * 0.7), Vector2(u * 2.0, u * 1.2)), col, false, t)
+			draw_line(c + Vector2(-u * 0.4, u * 0.5), c + Vector2(-u * 0.7, u * 0.95), col, t, true)
