@@ -145,8 +145,7 @@ static func _paint(m: StandardMaterial3D) -> void:
 			_painted[t] = ImageTexture.create_from_image(img)
 	m.albedo_texture = _painted[t]
 	m.albedo_color = Color(1, 1, 1, m.albedo_color.a)
-	# flat paint: no ground-detail pass (a multiply pass at half value on both renderers: Forest.ensure_globals'
-	# mul_gain), and little sheen (at a low angle the sky's reflection greyed it)
+	# flat paint: no ground-detail pass (its noise and grain), and little sheen (at a low angle the sky's reflection greyed it)
 	m.next_pass = null
 	m.metallic_specular = 0.15
 	m.roughness = 0.9
@@ -292,11 +291,8 @@ const LAWN_EDGE := 0.85
 ## shader multiplies it) and shading, no specular.
 static func _lawn(m: StandardMaterial3D) -> void:
 	GroundDetail.use_spa_lawn(m)
+	# (the ground-detail pass of High / Ultra is neutral on average: the same colour with or without it)
 	var t := global_tint("@lawn") * LAWN_EDGE
-	# the ground-detail pass (High, Ultra) multiplies at half value on both renderers (Forest.ensure_globals' mul_gain):
-	# twice the colour under it
-	if m.next_pass != null:
-		t *= 2.0
 	var c := GroundDetail.LAWN_TINT
 	m.albedo_color = Color(_enc(c.r * t.x), _enc(c.g * t.y), _enc(c.b * t.z))
 	m.metallic_specular = 0.0

@@ -70,6 +70,10 @@ void fragment() {
 		float g = texture(detail_tex, wp / fine).r * 0.6 + texture(detail_tex, wp / coarse + 0.37).r * 0.4;
 		f *= 1.0 + (g - 0.5) * detail * 2.0;
 	}
-	ALBEDO = f * mul_gain;
+	// neutral on average: twice mul_gain undoes the halving every multiply pass gets (Forest.ensure_globals), so High /
+	// Ultra (this pass) and Low / Medium (none) show a surface in the same colour. At half value it darkened the road by
+	// High (Nürburgring GP: 165 / 255 on Medium, 134 on High) and only where a pass lay: a decal layer over the road
+	// (none of its own) kept its colour, two tones on one stretch
+	ALBEDO = f * mul_gain * 2.0;
 	ALPHA = 1.0;
 }
