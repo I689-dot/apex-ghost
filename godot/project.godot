@@ -31,6 +31,10 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/handheld/orientation=4
 
+[input_devices]
+
+sensors/enable_accelerometer=true
+
 [physics]
 3d/physics_engine="Jolt Physics"
 common/physics_ticks_per_second=120
