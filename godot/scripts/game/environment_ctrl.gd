@@ -81,7 +81,7 @@ func _init(weather_plan: Dictionary, q: Dictionary) -> void:
 	world_env.environment = env
 	add_child(world_env)
 	# the sun
-	sun.shadow_enabled = bool(q.shadows)
+	sun.shadow_enabled = sun_shadows(q)
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	sun.directional_shadow_max_distance = maxf(60.0, float(q.shadowRange) * 3.0)
 	sun.shadow_bias = 0.02
@@ -292,7 +292,10 @@ func _apply_eye() -> void:
 func _apply_post(q: Dictionary) -> void:
 	_apply_eye()
 	# bloom (only the sun, headlights and floodlights pass the threshold) and the filmic grade of High / Ultra
-	env.glow_enabled = bool(q.bloom)
+	# not on the Compatibility renderer (phones): with glow on, its multiply-blended passes (road wear, ground detail)
+	# blacken what they cover (measured 2026-11-23, Nürburgring GP, Medium plus bloom: the road 29 / 255 against 135)
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	env.glow_enabled = bool(q.bloom) and not compat
 	env.glow_hdr_threshold = 4.0
 	env.glow_intensity = 0.32
 	env.glow_bloom = 0.0
@@ -300,7 +303,11 @@ func _apply_post(q: Dictionary) -> void:
 	var d: Dictionary = Settings.data.display
 	var user_grade := not is_equal_approx(float(d.contrast), 1.0) or not is_equal_approx(float(d.saturation), 1.0)
 	var lk := not look.is_empty() and (look.has("contrast") or look.has("saturation"))
-	env.adjustment_enabled = bool(q.grade) or user_grade or lk
+	# always on the Compatibility renderer (phones), neutral without the grade: without a post pass it tonemaps every
+	# material's output in its shader, a multiply pass's too, so the road wear (neutral but for the rubber) darkened the
+	# road on Low / Medium and not on High (measured 2026-11-23, Nürburgring GP: 133 / 255 on Medium, 168 without the
+	# pass, 164 on High with or without it)
+	env.adjustment_enabled = bool(q.grade) or user_grade or lk or compat
 	env.adjustment_contrast = (float(look.get("contrast", 1.06)) if bool(q.grade) or lk else 1.0) * float(d.contrast)
 	env.adjustment_saturation = float(look.get("saturation", 1.0)) * float(d.saturation)
 	# ambient occlusion (the "ao" setting; it was carried in the presets but never switched on): soft shade where
@@ -323,9 +330,16 @@ func _apply_post(q: Dictionary) -> void:
 	# the sun's cascades: two are enough on a phone
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 
+## Whether the sun casts shadows. Always on the Compatibility renderer (phones): there a sun without shadows lights the
+## scene about a fifth less than one with them (measured 2026-11-23, Nürburgring GP on Low: the road 125 / 255 against
+## 165 with the sun's shadow on, a building 121 against 148; Forward+ shows no such step), so Low would be darker than
+## Medium. Low keeps its small shadow map and short range there.
+static func sun_shadows(q: Dictionary) -> bool:
+	return bool(q.shadows) or RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
 func set_quality(q: Dictionary) -> void:
 	quality = q
-	sun.shadow_enabled = bool(q.shadows)
+	sun.shadow_enabled = sun_shadows(q)
 	sun.directional_shadow_max_distance = maxf(60.0, float(q.shadowRange) * 3.0)
 	RenderingServer.directional_shadow_atlas_set_size(clampi(int(q.shadowMapSize), 1024, 8192), true)
 	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
