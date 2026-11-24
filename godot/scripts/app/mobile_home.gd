@@ -147,7 +147,7 @@ static func _bottom_bar(app: App, rerender: Callable) -> Control:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_top = -76
 	var row := UIW.hbox(6)
-	for it: Array in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "items"), false],
+	for it: Array in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "foryou"), Shop.has_free() or Shop.starter_left_s() > 0],
 			["car", I18n.t("Cars"), func() -> void: MobileCars.show(app), not Garage.unrevealed().is_empty()],
 			["brush", I18n.t("Paint"), func() -> void: paint(app), false],
 			["list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0]]:
@@ -438,24 +438,9 @@ static func paint(app: App) -> void:
 	LobbyScreen._page = "paint"
 	app.render_lobby()
 
-## The store on its own screen (the classic menu's Store tab), back to the home.
+## The phone store (MobileStore), on its category: the PC store page's tab names still work (coins, items, offers).
 static func open_store(app: App, tab: String) -> void:
-	StoreScreen._tab = tab
-	app.screen = "m_store"
-	app.back_to = func() -> void: app.show_menu()
-	var holder := Control.new()
-	UIKit.full(holder)
-	var _self := {}
-	_self.render = func() -> void:
-		for c in holder.get_children():
-			c.queue_free()
-		var top := UIW.top_bar({"title": I18n.t("Store"), "back": func() -> void: app.show_menu(),
-			"right": [MobileUI.currency("credit", Progression.credits(), func() -> void: pass), MobileUI.currency("coin", StoreScreen.coins(), func() -> void: pass)]})
-		var scr := UIW.screen(top, StoreScreen.build(app, _self.render))
-		UIKit.full(scr)
-		holder.add_child(scr)
-	_self.render.call()
-	app.set_ui(holder)
+	MobileStore.show(app, {"items": "cosmetics", "offers": "foryou"}.get(tab, tab))
 
 ## After an offline session (App.show_results, the mobile layout): what it gave, over the results, as the references'
 ## TOTAL REWARDS panel: a cup race's trophies and credits, the pass XP, the contracts advanced, a daily-wins chest.

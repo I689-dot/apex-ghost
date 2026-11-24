@@ -70,4 +70,9 @@ func _run() -> void:
 	await _shot("cars_locked", 2.5)
 	MobileCars.reveal(app, "2024_porsche_992_gt3_r", func() -> void: pass)
 	await _shot("car_reveal", 2.5)
+	await _clear_overlays()
+	# the store (MobileStore, Shop)
+	for c in ["foryou", "deals", "cars", "coins", "vip", "free"]:
+		MobileStore.show(app, c)
+		await _shot("store_" + c, 1.5)
 	get_tree().quit(0)

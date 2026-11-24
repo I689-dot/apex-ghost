@@ -104,9 +104,9 @@ static func build(app: App, rerender: Callable) -> Control:
 		"offers":
 			body = _offers(app, rerender)
 		"redeem":
-			body = _redeem(rerender)
+			body = redeem_panel(rerender)
 		"invite":
-			body = _invite()
+			body = invite_panel()
 		_:
 			body = _coins(app, rerender)
 	var sc := UIW.scroll(body)
@@ -232,6 +232,10 @@ static func _pack_card(app: App, pack: Dictionary, tier: int, rerender: Callable
 	return b
 
 ## The checkout: what is bought, the payment method and its fields, the pay button (off in the preview).
+## The checkout preview for something bought with money (the phone store, MobileStore): no payment is taken.
+static func checkout(app: App, title: String, lines: Array, price: float) -> void:
+	_checkout(app, title, lines, price, Callable())
+
 static func _checkout(app: App, title: String, lines: Array, price: float, _rerender: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 620)
 	var body: VBoxContainer = m.body
@@ -349,6 +353,10 @@ static func _item_card(app: App, it: Dictionary, car: Dictionary, rerender: Call
 	return b
 
 ## Spending coins: the item, the balance before and after (the preview's own balance: nothing is saved).
+## Unlocking an item with coins (the phone store's Cosmetics): the same preview as the Paint & items tab.
+static func spend_item(app: App, it: Dictionary, rerender: Callable) -> void:
+	_spend(app, it, rerender)
+
 static func _spend(app: App, it: Dictionary, rerender: Callable) -> void:
 	var m := UIW.modal(app.overlay_layer, 480)
 	var body: VBoxContainer = m.body
@@ -437,7 +445,7 @@ static func _offers(app: App, rerender: Callable) -> Control:
 
 # ---------------------------------------------------------------- redeem ---
 
-static func _redeem(rerender: Callable) -> Control:
+static func redeem_panel(rerender: Callable) -> Control:
 	var col := UIW.vbox(12)
 	col.custom_minimum_size = Vector2(minf(640.0, 600.0), 0)
 	col.add_child(UIKit.label(I18n.t("Promotional code").to_upper(), 30, UIKit.TEXT, true, 700))
@@ -503,7 +511,7 @@ static func invite_code() -> String:
 		h /= alphabet.length()
 	return "CG-" + s
 
-static func _invite() -> Control:
+static func invite_panel() -> Control:
 	var row := HFlowContainer.new()
 	row.add_theme_constant_override("h_separation", 14)
 	row.add_theme_constant_override("v_separation", 14)

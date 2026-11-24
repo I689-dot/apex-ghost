@@ -37,10 +37,10 @@ Home and navigation
 - [ ] 5 Profile page: name, flag, level, most-driven car, badges, stats by discipline, copy player ID.
 
 Cars
-- [ ] 6 Car picker: rating bands down the left, search, stat bars with numbers.
-- [ ] 7 Rarity and star level on every car card.
-- [ ] 8 Full-screen "new car unlocked" reveal.
-- [ ] B Blueprints: a car unlocks with N blueprints or its credit price.
+- [x] 6 (1a332fd) Car picker: rating bands down the left, search, stat bars with numbers.
+- [x] 7 (1a332fd) Rarity and star level on every car card.
+- [x] 8 (1a332fd) Full-screen "new car unlocked" reveal.
+- [x] B (1a332fd) Blueprints: a car unlocks with N blueprints or its credit price.
 - [ ] A Upgrades (engine, gearbox, turbo, weight, tyres; stages) used in the career only.
 
 Customisation
@@ -63,18 +63,18 @@ After the race
 
 Ads
 - [ ] 21 "Watch ad" as an alternative price (paint, items), daily limit.
-- [ ] 22 Ad ladder (1, 2, 3 ads for bigger packs).
-- [ ] 23 Free pack / free reward by ad in the store's Free tab.
+- [x] 22 (store, phase 2) Ad ladder (1, 2, 3 ads for bigger packs).
+- [x] 23 (store, phase 2) Free pack / free reward by ad in the store's Free tab.
 - [ ] 24 Try a locked car for one race by ad.
-- [ ] 25 Interstitials only between races, never before one; paid "Remove ads".
+- [~] 25 (the Remove ads offer is in the store; interstitials already only between races) Interstitials only between races, never before one; paid "Remove ads".
 
 Shop
-- [ ] 27 Store with categories down the left (For you / Deals / Cars / Coins / Cosmetics / VIP / Free).
-- [ ] 28 Coin packs tagged "+25 %", "Most popular", "Best value".
-- [ ] 29 Cheap starter offer with a timer, the first days.
-- [ ] 30 Rotating daily / weekly / monthly deals with a refresh timer.
-- [ ] 31 "Costs real money" on paid items; Restore purchases and Delete my data in Settings.
-- [ ] E VIP subscription page.
+- [x] 27 (store, phase 2) Store with categories down the left (For you / Deals / Cars / Coins / Cosmetics / VIP / Free).
+- [x] 28 (store, phase 2) Coin packs tagged "+25 %", "Most popular", "Best value".
+- [x] 29 (store, phase 2) Cheap starter offer with a timer, the first days.
+- [x] 30 (store, phase 2) Rotating daily / weekly / monthly deals with a refresh timer.
+- [~] 31 ("Costs real money" done in the store; Restore purchases / Delete my data in Settings still to do) "Costs real money" on paid items; Restore purchases and Delete my data in Settings.
+- [x] E (store, phase 2) VIP subscription page.
 
 Retention and social
 - [ ] 32 7-day login calendar, big reward on day 7.

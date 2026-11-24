@@ -202,7 +202,7 @@ static func claim_pass(tier: int, premium: bool) -> Array:
 	if not pass_claimable(tier, premium):
 		return []
 	var rw := pass_reward(tier, premium)
-	_grant(rw)
+	grant(rw)
 	(data().passClaimed["premium" if premium else "free"] as Array).append(tier)
 	save()
 	return rw
@@ -378,7 +378,7 @@ static func add_credits(n: int) -> void:
 static func credits() -> int:
 	return int(CareerData.load_career().coins)
 
-static func _grant(rw: Array) -> void:
+static func grant(rw: Array) -> void:
 	match rw[0]:
 		"credits":
 			add_credits(int(rw[1]))
