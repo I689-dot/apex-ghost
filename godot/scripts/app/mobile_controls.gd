@@ -63,7 +63,9 @@ static func _build(app: App, then: Callable, skip: Callable, rerender: Callable)
 				rerender.call())
 			inv.mouse_filter = Control.MOUSE_FILTER_STOP
 			c.add_child(inv)
-			c.add_child(UIW.muted(I18n.t("Lean the phone left: the dot should go left."), 13))
+			var hint := UIW.muted(I18n.t("Lean the phone left: the dot should go left."), 13)
+			hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			c.add_child(hint)
 		b.get_node("content").add_child(UIW.margins(c, 14, 10, 14, 10))
 		b.pressed.connect(func() -> void: TouchPrefs.set_pref("steer", mode); rerender.call())
 		row.add_child(b)

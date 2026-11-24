@@ -24,7 +24,9 @@ const INTERSTITIAL_EVERY := 3
 
 ## [id, class (licence letter), name, races: [trackId, laps, bots, AI difficulty], trophies needed, credits a trophy]
 const CUPS := [
-	["rookie_cup", "R", "Rookie Cup", [["zandvoort", 3, 7, 0.88], ["nurburgring_short", 3, 7, 0.9], ["silverstone", 2, 7, 0.9]], 0, 1500],
+	# (the Rookie Cup on circuits in the app: a new driver's first rival race needs no download; its third race was
+	# Silverstone, a track pack, before 2026-11-24)
+	["rookie_cup", "R", "Rookie Cup", [["zandvoort", 3, 7, 0.88], ["nurburgring_short", 3, 7, 0.9], ["nurburgring_gp_2022", 2, 7, 0.9]], 0, 1500],
 	["d_trophy", "D", "Class D Trophy", [["barcelona", 3, 9, 0.92], ["spa", 2, 9, 0.92], ["zandvoort", 4, 9, 0.93], ["shanghai", 2, 9, 0.93]], 6, 2000],
 	["c_series", "C", "Class C Series", [["nurburgring_gp_2022", 3, 9, 0.95], ["silverstone", 3, 9, 0.95], ["barcelona", 4, 9, 0.96], ["spa", 3, 9, 0.96]], 16, 2600],
 	["b_grand_prix", "B", "Class B Grand Prix", [["shanghai", 3, 11, 0.98], ["zandvoort", 5, 11, 0.98], ["spa", 3, 11, 0.99], ["silverstone", 4, 11, 0.99], ["nurburgring_gp_2022", 4, 11, 1.0]], 30, 3400],

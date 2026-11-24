@@ -61,16 +61,19 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	root.add_child(top)
 
-	# left: name, rarity, rating, stats
-	var left := UIW.vbox(8)
-	left.position = Vector2(22, 70)
+	# left: name, rarity, rating, stats. A phone has about 480 units of height (UIKit.ui_scale): there each stat is one
+	# line with its bar beside it and the maker is left out, so the column ends above the car strip (it ran into it)
+	var touch := UIKit.touch()
+	var left := UIW.vbox(4 if touch else 8)
+	left.position = Vector2(22, 62 if touch else 70)
 	left.custom_minimum_size = Vector2(330, 0)
-	left.add_child(UIKit.label(str(car.get("manufacturer", "")).to_upper(), 15, UIKit.SOFT, true, 600))
-	left.add_child(UIKit.label(str(car.name).to_upper(), 26, UIKit.TEXT, true, 800))
+	if not touch:
+		left.add_child(UIKit.label(str(car.get("manufacturer", "")).to_upper(), 15, UIKit.SOFT, true, 600))
+	left.add_child(UIKit.label(str(car.name).to_upper(), 22 if touch else 26, UIKit.TEXT, true, 800))
 	left.add_child(MobileUI.rarity_tag(car.id, Garage.stars(car.id)))
 	var s := Garage.stats(car)
 	var pr := UIW.hbox(8)
-	pr.add_child(UIKit.label(str(int(s.pr) + Garage.upgrade_pr(car.id)), 34, UIKit.TEXT, true, 800))
+	pr.add_child(UIKit.label(str(int(s.pr) + Garage.upgrade_pr(car.id)), 26 if touch else 34, UIKit.TEXT, true, 800))
 	pr.add_child(UIKit.label(I18n.t("PR"), 16, UIKit.SOFT, true, 700))
 	if Garage.upgrade_pr(car.id) > 0:
 		pr.add_child(UIKit.label(I18n.t("(+{n} career parts)", {"n": Garage.upgrade_pr(car.id)}), 14, UIKit.GOOD, true, 600))
@@ -78,13 +81,18 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	for row: Array in [[I18n.t("Top speed"), "%d km/h" % roundi(s.top), "top", s.top], [I18n.t("Power"), "%d hp/t" % roundi(s.hpT), "hpT", s.hpT],
 			[I18n.t("Downforce"), "%.2f m²" % s.downforce, "downforce", s.downforce], [I18n.t("Braking"), "%.1f kN·m/t" % s.brake, "brake", s.brake]]:
 		var line := UIW.hbox(8)
-		var n := UIKit.label(String(row[0]).to_upper(), 15, UIKit.SOFT, true, 600)
+		var n := UIKit.label(String(row[0]).to_upper(), 14 if touch else 15, UIKit.SOFT, true, 600)
 		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		line.add_child(n)
-		line.add_child(UIKit.label(row[1], 17, UIKit.TEXT, true, 700))
-		left.add_child(line)
 		var b := MobileUI.bar(Garage.stat_share(row[2], row[3]), UIKit.TEXT, 4)
-		left.add_child(b)
+		if touch:
+			b.custom_minimum_size = Vector2(90, 4)
+			b.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			line.add_child(b)
+		line.add_child(UIKit.label(row[1], 15 if touch else 17, UIKit.TEXT, true, 700))
+		left.add_child(line)
+		if not touch:
+			left.add_child(b)
 	root.add_child(left)
 
 	# right: select, or what unlocking takes
@@ -93,7 +101,7 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	right.alignment = BoxContainer.ALIGNMENT_END
 	if owned:
 		var uid: String = car.id
-		right.add_child(MobileUI.buy_button(I18n.t("Upgrade"), I18n.t("Career"), "", func() -> void: upgrades(app, uid, rerender)))
+		right.add_child(MobileUI.buy_button(I18n.t("Upgrade"), "", "", func() -> void: upgrades(app, uid, rerender)))
 		if car.id == CarStudio.my_car().get("id", ""):
 			right.add_child(MobileUI.badge(I18n.t("In your garage · driving").to_upper(), Color(0, 0, 0, 0.7), UIKit.GOOD))
 		else:
@@ -132,7 +140,7 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	# bottom: rarity tabs, search, the line-up
 	var bottom := UIW.vbox(8)
 	bottom.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_top = -200
+	bottom.offset_top = -150 if touch else -200
 	bottom.offset_left = 22
 	bottom.offset_right = -22
 	bottom.offset_bottom = -10
@@ -160,7 +168,7 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	var sc := UIW.scroll(strip)
 	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
-	sc.custom_minimum_size = Vector2(0, 130)
+	sc.custom_minimum_size = Vector2(0, 96 if touch else 130)
 	bottom.add_child(sc)
 	root.add_child(bottom)
 	return root
@@ -223,10 +231,10 @@ static func upgrades(app: App, id: String, on_change: Callable) -> void:
 ## A card of the line-up: its picture, name, rarity edge, a padlock when locked.
 static func _card(c: Dictionary, on: bool, cb: Callable) -> Button:
 	var b := UIW.card_button(on, 6)
-	b.custom_minimum_size = Vector2(200, 126)
+	b.custom_minimum_size = Vector2(160, 92) if UIKit.touch() else Vector2(200, 126)
 	var col := UIW.vbox(2)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var pic := CarStudio.picture_rect(c, CarStudio.my_livery(), Vector2(0, 80))
+	var pic := CarStudio.picture_rect(c, CarStudio.my_livery(), Vector2(0, 52 if UIKit.touch() else 80))
 	if not Garage.owns(c.id):
 		pic.modulate = Color(0.55, 0.55, 0.6)
 	col.add_child(pic)

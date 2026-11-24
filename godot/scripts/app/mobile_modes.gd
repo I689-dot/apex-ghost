@@ -237,12 +237,56 @@ static func show_cup(app: App, id: String) -> void:
 	holder.add_child(scr)
 	app.set_ui(holder)
 
+## A circuit not on the phone yet (a track pack: Packs): its size, DOWNLOAD with a progress bar, then `then` (the
+## race). Before, a toast pointed at Settings › Gameplay › Interface and the race did not start (found on the Pixel
+## 10a, 2026-11-24: the Rookie Cup's Silverstone race).
+static func offer_download(app: App, layout_id: String, then: Callable) -> void:
+	var pid := Packs.pack_of(layout_id)
+	var m := UIW.modal(app.overlay_layer, 560)
+	var b: VBoxContainer = m.body
+	var name := I18n.t(str(app.track_entry(layout_id).get("name", layout_id)))
+	UIW.modal_head(b, I18n.t("Download the circuit"), func() -> void: Packs.cancel(pid); m.root.queue_free(), name)
+	var info := UIKit.label("", 17, UIKit.SOFT)
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	b.add_child(info)
+	var bar := MobileUI.bar(0.0, MobileUI.TEAL, 8)
+	b.add_child(bar)
+	var go := MobileUI.main_button(I18n.t("Download"), Callable())
+	go.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.add_child(go)
+	var show := func() -> void:
+		if not is_instance_valid(info):
+			return
+		var job: Dictionary = Packs.jobs.get(pid, {})
+		var mb := Packs.size_mb(pid)
+		if Packs.present(pid):
+			m.root.queue_free()
+			then.call()
+			return
+		if not job.is_empty() and str(job.get("error", "")) == "":
+			var frac := float(job.done) / maxf(1.0, float(job.total))
+			info.text = I18n.t("Downloading… {d} of {t} MB", {"d": roundi(float(job.done) / 1e6), "t": roundi(mb)})
+			(bar.get_child(0) as Control).anchor_right = clampf(frac, 0.0, 1.0)
+			go.disabled = true
+		elif mb > 0.0:
+			info.text = (str(job.get("error", "")) + "\n" if not job.is_empty() else "") + I18n.t("{n} needs a download of {mb} MB, once. Wi-Fi is best.", {"n": name, "mb": roundi(mb)})
+			go.disabled = false
+		else:
+			info.text = I18n.t("Looking for the download… (no connection: try again online)")
+			go.disabled = true
+	go.pressed.connect(func() -> void: Packs.download(pid); show.call())
+	var on_change := func(id: String) -> void: if id == pid: show.call()
+	Packs.changed.connect(on_change)
+	m.root.tree_exited.connect(func() -> void: Packs.changed.disconnect(on_change))
+	Packs.refresh()
+	show.call()
+
 ## A cup race: a solo room on its circuit, a short qualifying, the race over its laps against its rivals at its AI level;
 ## the results score it (Progression.score_event).
 static func start_cup_race(app: App, cup_id: String, race: int) -> void:
 	var r: Array = Progression.cup(cup_id)[3][race]
 	if not Packs.ready_for(str(r[0])):
-		app.toast(I18n.t("Download the circuit first (Settings › Gameplay › Interface)."))
+		offer_download(app, str(r[0]), func() -> void: start_cup_race(app, cup_id, race))
 		return
 	Progression.set_event(cup_id, race)
 	Progression.data().event.difficulty = Settings.data.ai.difficulty
@@ -366,6 +410,6 @@ static func _quick(app: App, cards: HBoxContainer) -> void:
 		var id: String = t.id
 		cards.add_child(_mode_card(I18n.t(str(t.name)), MobileUI.photo(str(t.get("map", "")), "aerial"), I18n.t("{km} km · 3 laps", {"km": "%.1f" % (float(t.length) / 1000.0)}), func() -> void:
 			if not Packs.ready_for(id):
-				app.toast(I18n.t("Download the circuit first (Settings › Gameplay › Interface)."))
+				offer_download(app, id, func() -> void: _solo(app, id, 3, 9, 2))
 				return
 			await _solo(app, id, 3, 9, 2), "", Vector2(240, 0)))
