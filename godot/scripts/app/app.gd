@@ -715,6 +715,7 @@ func show_results(m: Dictionary) -> void:
 			"position": mine.position if ok else 0, "field": m.rows.size(),
 			"start": session.race.grid.find(me) + 1, "difficulty": Settings.data.ai.difficulty,
 			"map": str(track_entry(pending_race.get("trackId", "")).get("map", "")),
+			"carId": str(my_info().get("carId", "")),
 		}, true)
 		gain = CareerData.add_session(s)
 		# the mobile layout's progression: pass XP, contracts, chests; a career cup race's trophies

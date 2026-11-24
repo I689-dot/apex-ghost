@@ -31,7 +31,7 @@ static func build(app: App) -> Control:
 	root.add_child(_place(_driver(app), Control.PRESET_TOP_LEFT, Vector2(16, 12)))
 	# top right: icons and currencies
 	var tr := UIW.hbox(8)
-	tr.add_child(MobileUI.icon_button("list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0))
+	tr.add_child(MobileUI.icon_button("calendar", I18n.t("Daily"), func() -> void: MobileDaily.show(app), Progression.login_ready() or Progression.goals_ready() > 0))
 	tr.add_child(MobileUI.icon_button("people", I18n.t("Friends"), func() -> void: app.show_classic_menu("friends")))
 	# (as the classic menu: a change applies at once to the audio, the graphics and a session)
 	tr.add_child(MobileUI.icon_button("gear", I18n.t("Settings"), func() -> void: app.open_settings()))
@@ -138,6 +138,8 @@ static func build(app: App) -> Control:
 
 	# the bottom bar
 	root.add_child(_bottom_bar(app, rerender))
+	# the login calendar, the first time today
+	MobileDaily.maybe_auto(app)
 	return root
 
 ## The bar along the bottom: Shop, Cars, Paint, Contracts and RACE.
@@ -150,7 +152,7 @@ static func _bottom_bar(app: App, rerender: Callable) -> Control:
 	for it: Array in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "foryou"), Shop.has_free() or Shop.starter_left_s() > 0],
 			["car", I18n.t("Cars"), func() -> void: MobileCars.show(app), not Garage.unrevealed().is_empty()],
 			["brush", I18n.t("Paint"), func() -> void: paint(app), false],
-			["list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0]]:
+			["calendar", I18n.t("Daily"), func() -> void: MobileDaily.show(app), Progression.login_ready() or Progression.goals_ready() > 0]]:
 		var b := Button.new()
 		b.focus_mode = Control.FOCUS_ALL
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -226,7 +228,7 @@ static func _driver(app: App) -> Control:
 	b.add_child(row)
 	b.custom_minimum_size = row.get_combined_minimum_size() + Vector2(16, 12)
 	row.position = Vector2(8, 6)
-	b.pressed.connect(func() -> void: app.show_career())
+	b.pressed.connect(func() -> void: MobileProfile.show(app))
 	return b
 
 static func _pass_card(app: App) -> Control:

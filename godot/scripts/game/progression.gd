@@ -42,6 +42,20 @@ const CONTRACTS := [
 	["overtakes", "Gain {n} places in races", [3, 6], 3000, 120],
 ]
 
+## Daily goals a day (5 of the CONTRACTS kinds; 3 before 2026-11-24), each also BLUEPRINTS_GOAL blueprints for the goal
+## car (Garage.goal: references 078, "complete daily goals to get blueprints for this car").
+const DAILY_GOALS := 5
+const BLUEPRINTS_GOAL := 2
+## Weekly goals: [kind, target, credits, pass XP, blueprints]; the same every week, progressed by the same sessions.
+const WEEKLY := [
+	["finish", 12, 40000, 400, 6],
+	["win", 4, 50000, 500, 8],
+	["clean", 30, 30000, 300, 6],
+]
+## The 7-day login calendar (reference 055): a reward a day the game is opened, the seventh the big one; a missed day
+## does not start it again.
+const LOGIN := [["credits", 5000], ["blueprints", 2], ["credits", 10000], ["passXp", 250], ["blueprints", 4], ["credits", 25000], ["blueprints", 10]]
+
 ## The pass's rewards: [kind, amount] by tier (1-based); premium doubles credits and adds paint and pass XP boosts.
 static func pass_reward(tier: int, premium: bool) -> Array:
 	if premium:
@@ -61,6 +75,7 @@ static func _start() -> Dictionary:
 		"cups": {}, "passXp": 0, "passSeason": _season_index(), "passClaimed": {"free": [], "premium": []}, "passPremium": false,
 		"contractsDay": "", "contracts": [], "winsDay": "", "wins": 0, "chests": 0,
 		"freeBonusAt": 0, "racesSinceAd": 0, "rated": false, "ratePromptAt": 0, "event": {},
+		"login": {"streak": 0, "last": ""}, "weekIndex": -1, "weekly": [], "carUse": {},
 	}
 
 static func data() -> Dictionary:
@@ -224,14 +239,22 @@ static func _daily() -> void:
 	if d.winsDay != day:
 		d.winsDay = day
 		d.wins = 0
-	if d.contractsDay == day and (d.contracts as Array).size() == 3:
+	var week := int(Time.get_unix_time_from_system() / (7 * 86400.0))
+	if int(d.weekIndex) != week:
+		d.weekIndex = week
+		d.weekly = []
+		for w: Array in WEEKLY:
+			d.weekly.append({"kind": w[0], "target": w[1], "progress": 0, "claimed": false})
+	# today's goals stay as they are (a player updating mid-day keeps their three and their progress; the five come with
+	# the next day)
+	if d.contractsDay == day and not (d.contracts as Array).is_empty():
 		return
 	d.contractsDay = day
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(day)
 	var kinds := range(CONTRACTS.size())
 	var picked: Array = []
-	while picked.size() < 3:
+	while picked.size() < DAILY_GOALS:
 		var k: int = kinds[rng.randi() % kinds.size()]
 		if not picked.has(k):
 			picked.append(k)
@@ -253,6 +276,7 @@ static func contract_reward(c: Dictionary) -> Array:
 			return [k[3], k[4]]
 	return [0, 0]
 
+## A daily goal done: its credits, pass XP and blueprints. [credits, xp, (blueprints: Garage.grant_goal)] or [].
 static func claim_contract(i: int) -> Array:
 	var c: Dictionary = data().contracts[i]
 	if c.claimed or int(c.progress) < int(c.target):
@@ -261,8 +285,70 @@ static func claim_contract(i: int) -> Array:
 	var r := contract_reward(c)
 	add_credits(r[0])
 	add_pass_xp(r[1])
+	var bp := Garage.grant_goal(BLUEPRINTS_GOAL)
+	if not bp.is_empty():
+		r.append(bp)
 	save()
 	return r
+
+## A weekly goal done: [credits, xp, (blueprints)] or [].
+static func claim_weekly(i: int) -> Array:
+	var c: Dictionary = data().weekly[i]
+	if c.claimed or int(c.progress) < int(c.target):
+		return []
+	c.claimed = true
+	var w: Array = WEEKLY[i]
+	var r: Array = [w[2], w[3]]
+	add_credits(w[2])
+	add_pass_xp(w[3])
+	var bp := Garage.grant_goal(int(w[4]))
+	if not bp.is_empty():
+		r.append(bp)
+	save()
+	return r
+
+static func weekly_left_s() -> int:
+	var week := int(Time.get_unix_time_from_system() / (7 * 86400.0))
+	return int((week + 1) * 7 * 86400 - Time.get_unix_time_from_system())
+
+## Daily and weekly goals done and not claimed (their red dot).
+static func goals_ready() -> int:
+	var n := contracts_ready()
+	for c: Dictionary in data().weekly:
+		if not c.claimed and int(c.progress) >= int(c.target):
+			n += 1
+	return n
+
+# ----------------------------------------------------------------- login ---
+
+static func login_ready() -> bool:
+	return str(data().login.last) != today()
+
+## The calendar's day to claim next (0..6).
+static func login_day() -> int:
+	return int(data().login.streak) % LOGIN.size()
+
+## Today's login reward: its line, or "" when claimed today.
+static func claim_login() -> String:
+	if not login_ready():
+		return ""
+	var l: Dictionary = data().login
+	var rw: Array = LOGIN[login_day()]
+	l.streak = int(l.streak) + 1
+	l.last = today()
+	var line := Shop.grant(rw)
+	save()
+	return line
+
+## Races driven in each car (the profile's most-driven car).
+static func most_driven() -> String:
+	var best := ""
+	var n := 0
+	for id: String in (data().carUse as Dictionary):
+		if int(data().carUse[id]) > n:
+			n = int(data().carUse[id])
+			best = id
+	return best
 
 static func contracts_ready() -> int:
 	var n := 0
@@ -286,20 +372,12 @@ static func record_session(s: Dictionary) -> Dictionary:
 		xp += 60 + maxi(0, field - pos) * 12
 	var advanced: Array = []
 	for i in (d.contracts as Array).size():
-		var c: Dictionary = d.contracts[i]
-		if c.claimed or int(c.progress) >= int(c.target):
-			continue
-		var add := 0.0
-		match c.kind:
-			"finish": add = 1 if race and pos > 0 else 0
-			"win": add = 1 if race and pos == 1 and field > 1 else 0
-			"podium": add = 1 if race and pos > 0 and pos <= 3 and field > 1 else 0
-			"clean": add = int(s.get("cleanLaps", 0))
-			"km": add = floorf(float(s.get("km", 0.0)))
-			"overtakes": add = maxi(0, int(s.get("start", pos)) - pos) if race and pos > 0 else 0
-		if add > 0:
-			c.progress = mini(int(c.target), int(c.progress) + int(add))
+		if _advance(d.contracts[i], s, race, pos, field):
 			advanced.append(i)
+	for w: Dictionary in d.weekly:
+		_advance(w, s, race, pos, field)
+	if race and str(s.get("carId", "")) != "":
+		d.carUse[str(s.carId)] = int((d.carUse as Dictionary).get(str(s.carId), 0)) + 1
 	var chest := false
 	if race and pos == 1 and field > 1 and int(d.wins) < DAILY_WINS:
 		d.wins = int(d.wins) + 1
@@ -310,6 +388,23 @@ static func record_session(s: Dictionary) -> Dictionary:
 		d.racesSinceAd = int(d.racesSinceAd) + 1
 	save()
 	return {"passXp": xp, "contracts": advanced, "chest": chest}
+
+## A goal (daily or weekly) moved on by a session; true when it advanced.
+static func _advance(c: Dictionary, s: Dictionary, race: bool, pos: int, field: int) -> bool:
+	if c.claimed or int(c.progress) >= int(c.target):
+		return false
+	var add := 0.0
+	match c.kind:
+		"finish": add = 1 if race and pos > 0 else 0
+		"win": add = 1 if race and pos == 1 and field > 1 else 0
+		"podium": add = 1 if race and pos > 0 and pos <= 3 and field > 1 else 0
+		"clean": add = int(s.get("cleanLaps", 0))
+		"km": add = floorf(float(s.get("km", 0.0)))
+		"overtakes": add = maxi(0, int(s.get("start", pos)) - pos) if race and pos > 0 else 0
+	if add <= 0:
+		return false
+	c.progress = mini(int(c.target), int(c.progress) + int(add))
+	return true
 
 ## A daily-wins chest: credits, pass XP and blueprints. [credits, xp, (blueprints)] or [] with none to open.
 static func open_chest() -> Array:

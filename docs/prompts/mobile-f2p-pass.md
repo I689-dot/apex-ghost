@@ -31,10 +31,10 @@ My own calls on the way (say so in the reply when one lands):
 ## The list (numbers as in the proposal; status: todo / done <commit>)
 
 Home and navigation
-- [ ] 1 Red dots on every button with something to claim.
+- [~] 1 (red dots on Shop, Cars, Daily, the store's categories; more as screens land) Red dots on every button with something to claim.
 - [ ] 2 One column of live events with countdowns (pass, featured event, offer, new season).
-- [ ] 3 Bottom tabs (Career / Pass / Events / Daily / Online), locked ones shown with a padlock until reached.
-- [ ] 5 Profile page: name, flag, level, most-driven car, badges, stats by discipline, copy player ID.
+- [~] 3 (Events and Online racing locked until the first trophy / race; the home's bar has Daily) Bottom tabs (Career / Pass / Events / Daily / Online), locked ones shown with a padlock until reached.
+- [x] 5 (phase 3) Profile page: name, flag, level, most-driven car, badges, stats by discipline, copy player ID.
 
 Cars
 - [x] 6 (1a332fd) Car picker: rating bands down the left, search, stat bars with numbers.
@@ -77,8 +77,8 @@ Shop
 - [x] E (store, phase 2) VIP subscription page.
 
 Retention and social
-- [ ] 32 7-day login calendar, big reward on day 7.
-- [ ] 33 Daily goals (5) and weekly goals, towards a car's blueprints.
+- [x] 32 (phase 3) 7-day login calendar, big reward on day 7.
+- [x] 33 (phase 3) Daily goals (5) and weekly goals, towards a car's blueprints.
 - [ ] 35 Friends: add by player ID, share an invite.
 - [ ] 37 "What's new" tab.
 - [ ] 38 Notification permission asked after a good moment (only once notifications exist).

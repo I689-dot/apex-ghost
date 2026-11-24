@@ -33,6 +33,8 @@ func _run() -> void:
 	p.chests = 1
 	p.freeBonusAt = 0
 	(p.contracts as Array)[0].progress = (p.contracts as Array)[0].target
+	# the login reward taken today (else the calendar opens over the home by itself)
+	p.login = {"streak": 2, "last": Progression.today()}
 	app = load("res://scripts/app/app.gd").new()
 	add_child(app)
 	await get_tree().create_timer(1.0).timeout
@@ -75,4 +77,11 @@ func _run() -> void:
 	for c in ["foryou", "deals", "cars", "coins", "vip", "free"]:
 		MobileStore.show(app, c)
 		await _shot("store_" + c, 1.5)
+	# the daily screen and the profile (the calendar with today's reward waiting)
+	p.login = {"streak": 2, "last": ""}
+	for t in ["login", "daily", "weekly"]:
+		MobileDaily.show(app, t)
+		await _shot("daily_" + t, 1.5)
+	MobileProfile.show(app)
+	await _shot("profile", 1.5)
 	get_tree().quit(0)

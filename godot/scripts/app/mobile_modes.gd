@@ -11,6 +11,8 @@ static var _cat := "career"
 static func show(app: App, cat: String = "") -> void:
 	if cat != "":
 		_cat = cat
+	if locked(_cat) != "":
+		_cat = "career"
 	app.screen = "m_modes"
 	app.back_to = func() -> void: app.show_menu()
 	app.set_backdrop("aerial")
@@ -29,7 +31,13 @@ static func show(app: App, cat: String = "") -> void:
 	cats.alignment = BoxContainer.ALIGNMENT_CENTER
 	for c: Array in [["career", I18n.t("Career")], ["events", I18n.t("Events")], ["online", I18n.t("Online racing")], ["quick", I18n.t("Quick race")]]:
 		var b := Button.new()
+		var need := locked(str(c[0]))
 		b.text = String(c[1]).to_upper()
+		if need != "":
+			var lk := MobileUI.Icon.make("lock", 20, UIKit.SOFT)
+			lk.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+			lk.position = Vector2(-30, -10)
+			b.add_child(lk)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.focus_mode = Control.FOCUS_ALL
 		b.custom_minimum_size = Vector2(200, 56)
@@ -40,7 +48,11 @@ static func show(app: App, cat: String = "") -> void:
 		for st: String in ["normal", "hover", "pressed", "focus"]:
 			b.add_theme_stylebox_override(st, UIKit.box(Color(1, 1, 1, 0.16 if on else (0.08 if st == "hover" else 0.0)), Color(0, 0, 0, 0), 0, 6, Vector2(16, 6)))
 		var k: String = c[0]
-		b.pressed.connect(func() -> void: show(app, k))
+		b.pressed.connect(func() -> void:
+			if need != "":
+				app.toast(need)
+				return
+			show(app, k))
 		cats.add_child(b if not on else UIW.default_focus(b))
 	row.add_child(cats)
 	var cards := UIW.hbox(12)
@@ -65,6 +77,16 @@ static func show(app: App, cat: String = "") -> void:
 	UIKit.full(scr)
 	holder.add_child(scr)
 	app.set_ui(holder)
+
+## What a category still needs before it opens ("" when open): the references' locked tabs (090), so a new player
+## meets the career first. Events after the first trophy, online racing after the first race finished.
+static func locked(cat: String) -> String:
+	match cat:
+		"events":
+			return "" if Progression.total_trophies() >= 1 else I18n.t("Events open with your first career trophy.")
+		"online":
+			return "" if int(CareerData.load_career().races) >= 1 else I18n.t("Online racing opens after your first race.")
+	return ""
 
 ## A mode card: the photo, the title strip, the line at the bottom, a lock with its condition.
 static func _mode_card(title: String, photo: String, sub: String, cb: Callable, lock: String = "", size: Vector2 = Vector2(280, 0)) -> Button:
