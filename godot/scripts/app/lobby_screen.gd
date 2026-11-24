@@ -34,7 +34,9 @@ static func back_page() -> bool:
 	return true
 
 static func _cars(app: App) -> Array:
-	return app.cars.cars.filter(func(c: Dictionary) -> bool: return c.role != "safety")
+	# the phone layout's solo rooms offer the cars you own (Garage); online rooms and the PC menu every car
+	var garage := app.mobile_layout() and not app.room.is_empty() and LocalRoom.is_local_code(str(app.room.get("code", "")))
+	return app.cars.cars.filter(func(c: Dictionary) -> bool: return c.role != "safety" and (not garage or Garage.owns(c.id)))
 
 static func _car_by_id(cars: Array, id: Variant) -> Dictionary:
 	for c: Dictionary in cars:

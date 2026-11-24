@@ -61,4 +61,13 @@ func _run() -> void:
 	await _clear_overlays()
 	MobileHome._rate(app)
 	await _shot("rate")
+	await _clear_overlays()
+	# the garage (Garage, MobileCars): an owned car, a locked one with blueprints, the reveal
+	p.garage = {"owned": ["vantage_gt3_evo_heart_of_racing", "ford_mustang_gt3"], "bp": {"2020_audi_r8_lms_evo": 13}, "revealed": ["vantage_gt3_evo_heart_of_racing", "ford_mustang_gt3"], "goal": "2020_audi_r8_lms_evo"}
+	MobileCars.show(app, "vantage_gt3_evo_heart_of_racing")
+	await _shot("cars_owned", 2.5)
+	MobileCars.show(app, "2020_audi_r8_lms_evo")
+	await _shot("cars_locked", 2.5)
+	MobileCars.reveal(app, "2024_porsche_992_gt3_r", func() -> void: pass)
+	await _shot("car_reveal", 2.5)
 	get_tree().quit(0)

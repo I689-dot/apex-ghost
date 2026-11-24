@@ -70,7 +70,10 @@ static func build(app: App) -> Control:
 		if r.is_empty():
 			app.toast(I18n.t("Win races to fill the daily chests."))
 			return
-		MobileUI.reward_popup(app, I18n.t("Chest opened"), [I18n.t("{n} credits", {"n": StoreScreen.fmt(r[0])}), I18n.t("{n} pass XP", {"n": r[1]})])
+		var lines: Array = [I18n.t("{n} credits", {"n": StoreScreen.fmt(r[0])}), I18n.t("{n} pass XP", {"n": r[1]})]
+		if r.size() > 2:
+			lines.append(MobileHome.blueprint_text(r[2]))
+		MobileUI.reward_popup(app, I18n.t("Chest opened"), lines)
 		rerender.call()))
 	right.add_child(tiles)
 	var champ := Button.new()
@@ -145,7 +148,7 @@ static func _bottom_bar(app: App, rerender: Callable) -> Control:
 	bar.offset_top = -76
 	var row := UIW.hbox(6)
 	for it: Array in [["cart", I18n.t("Shop"), func() -> void: open_store(app, "items"), false],
-			["car", I18n.t("Cars"), func() -> void: cars(app, rerender), false],
+			["car", I18n.t("Cars"), func() -> void: MobileCars.show(app), not Garage.unrevealed().is_empty()],
 			["brush", I18n.t("Paint"), func() -> void: paint(app), false],
 			["list", I18n.t("Contracts"), func() -> void: contracts(app, rerender), Progression.contracts_ready() > 0]]:
 		var b := Button.new()
@@ -333,7 +336,7 @@ static func nick() -> String:
 	return n if n != "" else I18n.t("Driver")
 
 static func _cycle_car(step: int) -> void:
-	var cars := CarsDb.selectable()
+	var cars := CarsDb.selectable().filter(func(c: Dictionary) -> bool: return Garage.owns(c.id))
 	if cars.is_empty():
 		return
 	var i := 0
@@ -372,11 +375,21 @@ static func free_bonus(app: App, rerender: Callable) -> void:
 				return
 			var r := Progression.claim_free_bonus()
 			if not r.is_empty():
-				MobileUI.reward_popup(app, I18n.t("Free bonus"), [I18n.t("{n} credits", {"n": StoreScreen.fmt(r[0])}), I18n.t("{n} pass XP", {"n": r[1]})])
+				var lines: Array = [I18n.t("{n} credits", {"n": StoreScreen.fmt(r[0])}), I18n.t("{n} pass XP", {"n": r[1]})]
+				if r.size() > 2:
+					lines.append(MobileHome.blueprint_text(r[2]))
+				MobileUI.reward_popup(app, I18n.t("Free bonus"), lines)
 			rerender.call()), true)
 	go.size_flags_horizontal = Control.SIZE_SHRINK_END
 	b.add_child(go)
 	go.grab_focus.call_deferred()
+
+## A grant of blueprints ([car id, n, unlocked], Garage.grant_goal) as a reward line.
+static func blueprint_text(bp: Array) -> String:
+	var name := str(CarsDb.by_id(str(bp[0])).get("name", ""))
+	if bp[2]:
+		return I18n.t("{n} blueprints: {car} unlocked!", {"n": int(bp[1]), "car": name})
+	return I18n.t("{n} blueprints for the {car}", {"n": int(bp[1]), "car": name})
 
 ## The day's three contracts, each claimable when done.
 static func contracts(app: App, rerender: Callable) -> void:
@@ -414,34 +427,6 @@ static func contracts(app: App, rerender: Callable) -> void:
 			row.add_child(claim)
 		b.add_child(UIW.row_line(row))
 	b.add_child(UIW.muted(I18n.t("New contracts every day. Offline races count."), 14))
-
-## The car list: pick the car the home shows and the lobby picks first.
-static func cars(app: App, rerender: Callable) -> void:
-	var m := UIW.modal(app.overlay_layer, 980, true)
-	var b: VBoxContainer = m.body
-	UIW.modal_head(b, I18n.t("Cars"), func() -> void: m.root.queue_free())
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	var mine := CarStudio.my_car()
-	for c: Dictionary in CarsDb.selectable():
-		var card := UIW.card_button(c.id == mine.get("id"), 6)
-		card.custom_minimum_size = Vector2(220, 150)
-		var col := UIW.vbox(2)
-		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		col.add_child(CarStudio.picture_rect(c, CarStudio.my_livery(), Vector2(0, 100)))
-		col.add_child(UIKit.label(str(c.name).to_upper(), 16, UIKit.TEXT, true, 600))
-		card.get_node("content").add_child(UIW.margins(col, 8, 4, 8, 4))
-		var id: String = c.id
-		card.pressed.connect(func() -> void:
-			Settings.data.lastCar = id
-			Settings.save()
-			m.root.queue_free()
-			rerender.call())
-		grid.add_child(card)
-	# (the modal scrolls its body: a scroller of its own in there has no height and showed nothing on the phone)
-	b.add_child(grid)
 
 ## Paint: the lobby's Paint page (the livery editor) in a solo room.
 static func paint(app: App) -> void:

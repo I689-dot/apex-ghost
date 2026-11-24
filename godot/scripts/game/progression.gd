@@ -311,7 +311,7 @@ static func record_session(s: Dictionary) -> Dictionary:
 	save()
 	return {"passXp": xp, "contracts": advanced, "chest": chest}
 
-## A daily-wins chest: credits and pass XP. [credits, xp] or [] with none to open.
+## A daily-wins chest: credits, pass XP and blueprints. [credits, xp, (blueprints)] or [] with none to open.
 static func open_chest() -> Array:
 	var d := data()
 	if int(d.chests) <= 0:
@@ -319,9 +319,13 @@ static func open_chest() -> Array:
 	d.chests = int(d.chests) - 1
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var r := [rng.randi_range(4, 12) * 500, rng.randi_range(2, 5) * 40]
+	var r: Array = [rng.randi_range(4, 12) * 500, rng.randi_range(2, 5) * 40]
 	add_credits(r[0])
 	d.passXp = int(d.passXp) + r[1]
+	# blueprints for the car being collected (Garage.goal), 1 to 3
+	var bp := Garage.grant_goal(rng.randi_range(1, 3))
+	if not bp.is_empty():
+		r.append(bp)
 	save()
 	return r
 
@@ -335,9 +339,12 @@ static func claim_free_bonus() -> Array:
 	if free_bonus_left_s() > 0:
 		return []
 	data().freeBonusAt = now()
-	var r := [5000, 150]
+	var r: Array = [5000, 150]
 	add_credits(r[0])
 	data().passXp = int(data().passXp) + r[1]
+	var bp := Garage.grant_goal(2)
+	if not bp.is_empty():
+		r.append(bp)
 	save()
 	return r
 

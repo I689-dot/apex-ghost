@@ -9,6 +9,9 @@ const STRIP := Color(0, 0, 0, 0.72)
 const GOLD := Color("f5c542")
 const PURPLE := Color("7b3fe4")
 const TEAL := Color("1fb6a6")
+## The genre's conventions (docs/prompts/mobile-f2p-pass.md, F): green pays or buys, yellow is the screen's main action.
+const BUY := Color("2fb84a")
+const MAIN := Color("f2c21b")
 
 ## A circuit's menu photo: kind hero / pole / grid / aerial / straight, by the layout's map.
 static func photo(map: String, kind: String = "hero") -> String:
@@ -88,6 +91,56 @@ static func _slant(c: Color) -> StyleBoxFlat:
 	s.shadow_color = Color(c, 0.45)
 	s.shadow_size = 10
 	return s
+
+## A green buy button: the label on the left, the price (with its currency icon, if any) on the right.
+static func buy_button(text: String, price: String, icon_kind: String, cb: Callable) -> Button:
+	return _flat_button(text, price, icon_kind, BUY, Color.WHITE, cb)
+
+## The screen's main action, yellow (SELECT, CONTINUE, CLAIM).
+static func main_button(text: String, cb: Callable) -> Button:
+	return _flat_button(text, "", "", MAIN, UIKit.INK, cb)
+
+static func _flat_button(text: String, price: String, icon_kind: String, c: Color, fg: Color, cb: Callable) -> Button:
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_ALL
+	b.custom_minimum_size = Vector2(220, 58)
+	for st: String in ["normal", "hover", "pressed", "disabled"]:
+		var col := c
+		match st:
+			"hover": col = c.lightened(0.12)
+			"pressed": col = c.darkened(0.15)
+			"disabled": col = Color(0.3, 0.32, 0.36)
+		var sb := UIKit.box(col, Color(1, 1, 1, 0.25), 1, 4, Vector2(16, 6))
+		sb.skew = Vector2(0.18, 0)
+		b.add_theme_stylebox_override(st, sb)
+	b.add_theme_stylebox_override("focus", UIKit.focus_ring(4))
+	var row := UIW.hbox(10)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UIKit.full(row)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var t := UIKit.label(text.to_upper(), 22, fg, true, 800)
+	t.add_theme_font_override("font", UIKit.font(true, 800, true))
+	if price != "":
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(UIW.margins(t, 18, 0, 0, 0) if price != "" else t)
+	if price != "":
+		if icon_kind != "":
+			row.add_child(Icon.make(icon_kind, 22, fg))
+		row.add_child(UIW.margins(UIKit.label(price, 22, fg, true, 800), 0, 0, 18, 0))
+	b.add_child(row)
+	b.pressed.connect(cb)
+	return b
+
+## A car's rarity as the references' coloured tag, with its stars (upgrade level, 0..3).
+static func rarity_tag(id: String, stars: int = -1) -> Control:
+	var row := UIW.hbox(6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var r := Garage.rarity(id)
+	if stars >= 0:
+		for i in 3:
+			row.add_child(Icon.make("star", 16, GOLD if i < stars else Color(1, 1, 1, 0.25)))
+	row.add_child(badge(I18n.t(Garage.RARITY_NAME[r]).to_upper(), Garage.RARITY_COLOUR[r], Color.WHITE))
+	return row
 
 ## A currency pill: the icon, the amount, a + that opens the store.
 static func currency(kind: String, amount: int, on_plus: Callable) -> Control:
@@ -277,6 +330,14 @@ class Icon:
 				draw_arc(Vector2(s, s) * 0.5, s * 0.42, 0, TAU, 24, c, w)
 				draw_polyline(PackedVector2Array([Vector2(0.5, 0.08) * s, Vector2(0.32, 0.5) * s, Vector2(0.5, 0.92) * s]), c, w * 0.8)
 				draw_polyline(PackedVector2Array([Vector2(0.5, 0.08) * s, Vector2(0.68, 0.5) * s, Vector2(0.5, 0.92) * s]), c, w * 0.8)
+			"blueprint":
+				draw_rect(Rect2(Vector2(0.2, 0.12) * s, Vector2(0.6, 0.76) * s), c, false, w)
+				draw_rect(Rect2(Vector2(0.12, 0.2) * s, Vector2(0.6, 0.76) * s), Color(c, 0.35))
+				draw_line(Vector2(0.3, 0.42) * s, Vector2(0.62, 0.42) * s, c, w)
+				draw_line(Vector2(0.3, 0.58) * s, Vector2(0.56, 0.58) * s, c, w)
+			"search":
+				draw_arc(Vector2(0.42, 0.42) * s, s * 0.26, 0, TAU, 20, c, w * 1.3)
+				draw_line(Vector2(0.62, 0.62) * s, Vector2(0.88, 0.88) * s, c, w * 1.6)
 			"clock":
 				draw_arc(Vector2(s, s) * 0.5, s * 0.42, 0, TAU, 24, c, w)
 				draw_line(Vector2(s, s) * 0.5, Vector2(0.5, 0.22) * s, c, w)
