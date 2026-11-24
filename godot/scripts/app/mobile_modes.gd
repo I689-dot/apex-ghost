@@ -149,16 +149,20 @@ static func _cup_card(app: App, c: Array, open: bool) -> Button:
 	var tr := UIW.hbox(8)
 	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if open:
-		tr.add_child(MobileUI.badge("%d/%d" % [Progression.cup_trophies(id), 3 * races.size()], Color(0, 0, 0, 0.8), MobileUI.GOLD, "trophy"))
+		tr.add_child(MobileUI.badge("%d/%d" % [Progression.cup_trophies(id), 3 * races.size()], Color(0, 0, 0, 0.8), MobileUI.GOLD, "star"))
+		tr.add_child(MobileUI.badge(I18n.t("{n} PR", {"n": int(Progression.RECOMMENDED_PR.get(id, 0))}), Color(0, 0, 0, 0.8), UIKit.TEXT))
 	else:
 		tr.add_child(MobileUI.badge(I18n.t("Unlock: {n}", {"n": int(c[4])}), Color(UIKit.BAD, 0.9), Color.WHITE, "lock"))
-		tr.add_child(MobileUI.badge("%d" % Progression.total_trophies(), Color(0, 0, 0, 0.8), MobileUI.GOLD, "trophy"))
+		tr.add_child(MobileUI.badge("%d" % Progression.total_trophies(), Color(0, 0, 0, 0.8), MobileUI.GOLD, "star"))
 	col.add_child(tr)
+	var boss := str(Progression.BOSSES.get(id, ""))
+	if boss != "":
+		col.add_child(MobileUI.badge(I18n.t("Rival: {n}", {"n": boss}).to_upper(), MobileUI.GOOD_BG if Progression.boss_beaten(id) else Color(MobileUI.PURPLE, 0.9), Color.WHITE))
 	MobileUI.card_body(b).add_child(col)
 	if open:
 		b.pressed.connect(func() -> void: show_cup(app, id))
 	else:
-		b.pressed.connect(func() -> void: app.toast(I18n.t("Earn {n} trophies in the career to open this cup.", {"n": int(c[4])})))
+		b.pressed.connect(func() -> void: app.toast(I18n.t("Earn {n} stars in the career, or beat the rival of the cup before, to open this cup.", {"n": int(c[4])})))
 	return b
 
 ## A cup's page: its races as cards (circuit, laps, the AI's level, your best trophies, start).
@@ -176,8 +180,13 @@ static func show_cup(app: App, id: String) -> void:
 	shade.color = Color(0.0, 0.01, 0.03, 0.6)
 	UIKit.full(shade)
 	holder.add_child(shade)
+	# your car's rating (parts included) against the cup's (reference 091)
+	var mine := CarStudio.my_car()
+	var my_pr := int(Garage.stats(mine).pr) + Garage.upgrade_pr(str(mine.get("id", "")))
+	var rec := int(Progression.RECOMMENDED_PR.get(id, 0))
 	var top := UIW.top_bar({"title": I18n.t(c[2]), "back": func() -> void: show(app, "career"),
-		"right": [MobileUI.badge("%d/%d" % [Progression.cup_trophies(id), 3 * races.size()], Color(0, 0, 0, 0.7), MobileUI.GOLD, "trophy")]})
+		"right": [MobileUI.badge(I18n.t("Recommended {r} PR · yours {m}", {"r": rec, "m": my_pr}), Color(0, 0, 0, 0.7), UIKit.GOOD if my_pr >= rec else UIKit.BAD),
+			MobileUI.badge("%d/%d" % [Progression.cup_trophies(id), 3 * races.size()], Color(0, 0, 0, 0.7), MobileUI.GOLD, "star")]})
 	var row := UIW.hbox(12)
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	row.custom_minimum_size = Vector2(0, 420)
@@ -185,7 +194,8 @@ static func show_cup(app: App, id: String) -> void:
 	for i in races.size():
 		var r: Array = races[i]
 		var tr := app.track_entry(r[0])
-		var b := MobileUI.card(I18n.t("Race {n}", {"n": i + 1}), MobileUI.photo(MobileUI.map_of(app, r[0]), "aerial"), 0.95)
+		var rival := Progression.boss_of(id, i)
+		var b := MobileUI.card(I18n.t("Race {n}", {"n": i + 1}) + (" · " + I18n.t("Rival race") if rival != "" else ""), MobileUI.photo(MobileUI.map_of(app, r[0]), "aerial"), 0.95)
 		b.custom_minimum_size = Vector2(270, 0)
 		b.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		var col := UIW.vbox(6)
@@ -198,7 +208,9 @@ static func show_cup(app: App, id: String) -> void:
 		nm.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		col.add_child(nm)
 		col.add_child(UIKit.label(I18n.t("{l} laps · {b} rivals · AI {d}%", {"l": r[1], "b": r[2], "d": roundi(float(r[3]) * 100.0)}), 15, UIKit.SOFT, true, 600))
-		col.add_child(MobileUI.trophies(int(res[i]), 3, 22))
+		if rival != "":
+			col.add_child(MobileUI.badge(I18n.t("Beat {n}", {"n": rival}).to_upper(), UIKit.GOOD if Progression.boss_beaten(id) else Color(MobileUI.PURPLE, 0.95), Color.WHITE))
+		col.add_child(MobileUI.stars(int(res[i]), 3, 24))
 		var idx := i
 		var go := MobileUI.race_button(I18n.t("Start"), func() -> void: start_cup_race(app, id, idx))
 		go.custom_minimum_size = Vector2(0, 50)
@@ -209,7 +221,15 @@ static func show_cup(app: App, id: String) -> void:
 		row.add_child(b)
 	var sc := UIW.hscroll(row)
 	var body := UIW.vbox(10)
-	body.add_child(UIW.muted(I18n.t("A win gives 3 trophies, a podium 2, a top-six finish 1. Your best result of each race counts."), 15))
+	var objs := UIW.hbox(18)
+	for k in Progression.STAR_TEXT.size():
+		var o := UIW.hbox(6)
+		o.add_child(MobileUI.stars(k + 1, k + 1, 18))
+		o.add_child(UIKit.label(I18n.t(Progression.STAR_TEXT[k]), 16, UIKit.SOFT, true, 600))
+		objs.add_child(o)
+	body.add_child(objs)
+	if Progression.BOSSES.has(id):
+		body.add_child(UIW.muted(I18n.t("Beat {n} in the last race to open the next cup at once. Your best result of each race counts.", {"n": Progression.BOSSES[id]}), 15))
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(sc)
 	var scr := UIW.screen(top, UIW.margins(body, 22, 14, 0, 22))
@@ -227,7 +247,7 @@ static func start_cup_race(app: App, cup_id: String, race: int) -> void:
 	Progression.set_event(cup_id, race)
 	Progression.data().event.difficulty = Settings.data.ai.difficulty
 	Settings.data.ai.difficulty = float(r[3])
-	await _solo(app, str(r[0]), int(r[1]), int(r[2]), 2)
+	await _solo(app, str(r[0]), int(r[1]), int(r[2]), 2, Progression.boss_of(cup_id, race))
 
 ## The week's featured race: a circuit by the week of the year, double credits from its trophies.
 static func weekly(app: App) -> Dictionary:
@@ -239,7 +259,7 @@ static func weekly(app: App) -> Dictionary:
 	var left := int((week + 1) * 7 * 86400 - Time.get_unix_time_from_system())
 	return {"track": tid, "name": I18n.t("{track} sprint", {"track": I18n.t(str(app.track_entry(tid).get("name", tid)))}), "left_s": left, "laps": 4, "bots": 11}
 
-static func _solo(app: App, track: String, laps: int, bots: int, quali_min: int) -> void:
+static func _solo(app: App, track: String, laps: int, bots: int, quali_min: int, boss: String = "") -> void:
 	app.set_ui(Control.new())
 	var err := await app.join(LocalRoom.create(), MobileHome.nick())
 	if err != "":
@@ -252,7 +272,8 @@ static func _solo(app: App, track: String, laps: int, bots: int, quali_min: int)
 	app.send({"t": "setRaceMinutes", "minutes": 0})
 	app.send({"t": "setRaceLaps", "laps": laps})
 	for i in bots:
-		app.send({"t": "addBot"})
+		# the cup's rival, by name, first (SessionBots makes them the fastest)
+		app.send({"t": "addBot", "nick": boss} if i == 0 and boss != "" else {"t": "addBot"})
 
 # ---------------------------------------------------------------- events ---
 

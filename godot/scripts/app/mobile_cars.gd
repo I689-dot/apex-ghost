@@ -67,11 +67,13 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	left.custom_minimum_size = Vector2(330, 0)
 	left.add_child(UIKit.label(str(car.get("manufacturer", "")).to_upper(), 15, UIKit.SOFT, true, 600))
 	left.add_child(UIKit.label(str(car.name).to_upper(), 26, UIKit.TEXT, true, 800))
-	left.add_child(MobileUI.rarity_tag(car.id, 0))
+	left.add_child(MobileUI.rarity_tag(car.id, Garage.stars(car.id)))
 	var s := Garage.stats(car)
 	var pr := UIW.hbox(8)
-	pr.add_child(UIKit.label(str(s.pr), 34, UIKit.TEXT, true, 800))
+	pr.add_child(UIKit.label(str(int(s.pr) + Garage.upgrade_pr(car.id)), 34, UIKit.TEXT, true, 800))
 	pr.add_child(UIKit.label(I18n.t("PR"), 16, UIKit.SOFT, true, 700))
+	if Garage.upgrade_pr(car.id) > 0:
+		pr.add_child(UIKit.label(I18n.t("(+{n} career parts)", {"n": Garage.upgrade_pr(car.id)}), 14, UIKit.GOOD, true, 600))
 	left.add_child(pr)
 	for row: Array in [[I18n.t("Top speed"), "%d km/h" % roundi(s.top), "top", s.top], [I18n.t("Power"), "%d hp/t" % roundi(s.hpT), "hpT", s.hpT],
 			[I18n.t("Downforce"), "%.2f m²" % s.downforce, "downforce", s.downforce], [I18n.t("Braking"), "%.1f kN·m/t" % s.brake, "brake", s.brake]]:
@@ -90,6 +92,8 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	right.custom_minimum_size = Vector2(300, 0)
 	right.alignment = BoxContainer.ALIGNMENT_END
 	if owned:
+		var uid: String = car.id
+		right.add_child(MobileUI.buy_button(I18n.t("Upgrade"), I18n.t("Career"), "", func() -> void: upgrades(app, uid, rerender)))
 		if car.id == CarStudio.my_car().get("id", ""):
 			right.add_child(MobileUI.badge(I18n.t("In your garage · driving").to_upper(), Color(0, 0, 0, 0.7), UIKit.GOOD))
 		else:
@@ -149,6 +153,61 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 	bottom.add_child(sc)
 	root.add_child(bottom)
 	return root
+
+## The car's performance parts (references 048-054; decision A: they count in the career only): the parts as tabs, the
+## chosen one's stage dots and effect, the rating it adds, UPGRADE for credits or one stage by an ad (a few a day).
+static func upgrades(app: App, id: String, on_change: Callable) -> void:
+	var m := UIW.modal(app.overlay_layer, 900)
+	var st := {"part": "engine"}
+	var _self := {}
+	_self.render = func() -> void:
+		var b: VBoxContainer = m.body
+		for c in b.get_children():
+			c.queue_free()
+		UIW.modal_head(b, I18n.t("Upgrade"), func() -> void: m.root.queue_free(); on_change.call(), str(CarsDb.by_id(id).get("name", "")))
+		var tabs := UIW.hbox(6)
+		for p: Array in Garage.PARTS:
+			var key: String = p[0]
+			var tb := UIW.TabButton.new("%s  %d/%d" % [I18n.t(p[1]).to_upper(), Garage.stage(id, key), Garage.MAX_STAGE], st.part == key, true)
+			tb.pressed.connect(func() -> void: st.part = key; _self.render.call())
+			tabs.add_child(tb)
+		b.add_child(tabs)
+		var part: Array = []
+		for p: Array in Garage.PARTS:
+			if p[0] == st.part:
+				part = p
+		var row := UIW.hbox(16)
+		var info := UIW.vbox(8)
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.add_child(UIKit.label(I18n.t(part[1]).to_upper(), 40, UIKit.TEXT, true, 800))
+		var dots := UIW.hbox(6)
+		for i in Garage.MAX_STAGE:
+			dots.add_child(MobileUI.Icon.make("dot", 18, MobileUI.BUY if i < Garage.stage(id, st.part) else Color(1, 1, 1, 0.2)))
+		info.add_child(dots)
+		info.add_child(UIKit.label(I18n.t("Each stage: {e} · +{pr} PR", {"e": I18n.t(part[3]), "pr": int(part[2])}), 18, UIKit.SOFT, true, 600))
+		info.add_child(UIKit.label(I18n.t("Rating with parts: {n} PR", {"n": int(Garage.stats(CarsDb.by_id(id)).pr) + Garage.upgrade_pr(id)}), 20, UIKit.TEXT, true, 700))
+		info.add_child(UIW.muted(I18n.t("Parts count in career races only: online and quick races stay equal."), 14))
+		row.add_child(info)
+		var acts := UIW.vbox(10)
+		acts.custom_minimum_size = Vector2(300, 0)
+		if Garage.stage(id, st.part) >= Garage.MAX_STAGE:
+			acts.add_child(UIKit.label(I18n.t("Fully upgraded"), 22, UIKit.GOOD, true, 800))
+		else:
+			acts.add_child(MobileUI.buy_button(I18n.t("Upgrade"), StoreScreen.fmt(Garage.stage_cost(id, st.part)), "credit", func() -> void:
+				if Garage.upgrade(id, st.part):
+					_self.render.call()
+				else:
+					app.toast(I18n.t("Not enough credits."))))
+			var ad := MobileUI.buy_button(I18n.t("Watch ad"), I18n.t("{n} left today", {"n": Garage.ad_stages_left()}), "tv", func() -> void:
+				MobileAds.rewarded(app, I18n.t("One {part} stage", {"part": I18n.t(part[1])}), func(ok: bool) -> void:
+					if ok:
+						Garage.upgrade(id, st.part, true)
+					_self.render.call()))
+			ad.disabled = Garage.ad_stages_left() <= 0
+			acts.add_child(ad)
+		row.add_child(acts)
+		b.add_child(row)
+	_self.render.call()
 
 ## A card of the line-up: its picture, name, rarity edge, a padlock when locked.
 static func _card(c: Dictionary, on: bool, cb: Callable) -> Button:

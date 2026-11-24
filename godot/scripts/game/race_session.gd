@@ -84,6 +84,9 @@ func load_session(progress: Callable) -> void:
 	var grid: Dictionary = track_data.grid[slot] if slot < track_data.grid.size() else track_data.grid[0]
 	# the setup chosen in the lobby (wing, brake balance) changes the car's specs for the physics
 	var tuned := CarSetup.apply_setup(my_entry, Settings.data.carSetup)
+	# a career race on the phone: the car's performance parts (Garage, decision A: the career only)
+	if Progression.career_race_active() and LocalRoom.is_local_code(conn.code):
+		tuned = Garage.apply_upgrades(tuned)
 	vehicle = Vehicle.new()
 	vehicle.auto_step = true
 	vehicle.setup_car(tuned, track.ground_query, Settings.data.assists.duplicate(), damage)
@@ -165,6 +168,9 @@ func load_session(progress: Callable) -> void:
 	var line: Variant = await RacingLinePrep.finish(line_task)
 	if line != null:
 		AiDriver.prime_racing_line(track_data, line)
+	# a phone career race's rival (a bot of that name in a solo room)
+	if LocalRoom.is_local_code(conn.code):
+		boss_name = Progression.current_boss()
 	_create_local_bots(entries)
 	# contact rule: a collision box for every car not simulated here (the bots I simulate are real vehicles)
 	if contact:

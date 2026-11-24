@@ -386,7 +386,7 @@ func _handle(p: Player, msg: Dictionary) -> void:
 			if p.conn != null:
 				p.conn.close(1000, "left")
 		"addBot":
-			_add_bot(p)
+			_add_bot(p, str(msg.get("nick", "")))
 		"setConditions":
 			if p.id != host_id or phase != "lobby":
 				return
@@ -540,7 +540,7 @@ func _update_bot_tyres() -> void:
 
 ## Host adds an AI driver with a random free car (respects the car locks). With every car taken (the line-up has fewer
 ## cars than the room has places), the bot shares one of the cars the fewest drivers have: the grid still fills.
-func _add_bot(host: Player) -> void:
+func _add_bot(host: Player, want_nick: String = "") -> void:
 	if host.id != host_id or phase != "lobby":
 		return
 	if players.size() >= Const.MAX_PLAYERS:
@@ -568,7 +568,9 @@ func _add_bot(host: Player) -> void:
 	var free_names: Array = BOT_DRIVERS.filter(func(d: Array) -> bool: return not used.has(d[0]))
 	var nick: String
 	var country: Variant = null
-	if free_names.size() > 0:
+	if want_nick != "" and not used.has(want_nick):
+		nick = want_nick
+	elif free_names.size() > 0:
 		var d: Array = free_names[int(floorf(_rand() * free_names.size()))]
 		nick = d[0]
 		country = d[1]

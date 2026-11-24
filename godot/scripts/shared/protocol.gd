@@ -106,7 +106,9 @@ static func parse_client_msg(raw: String) -> Dictionary:
 			var lv: Variant = v.get("livery")
 			return {"t": "setLivery", "livery": clean_livery(lv)} if typeof(lv) == TYPE_DICTIONARY and not clean_livery(lv).is_empty() else {}
 		"addBot":
-			return {"t": "addBot"}
+			# an optional name (the phone career's boss: MobileModes), a valid nickname or nothing
+			var bn := Validation.sanitize_nickname(v.get("nick")) if v.has("nick") else {"ok": false}
+			return {"t": "addBot", "nick": bn.nick} if bn.ok else {"t": "addBot"}
 		"removeBot":
 			return {"t": "removeBot", "id": v.id} if _str(v.get("id"), 32) else {}
 		"setSession":

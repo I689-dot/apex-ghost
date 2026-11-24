@@ -155,3 +155,95 @@ static func stat_share(key: String, value: float) -> float:
 	if hi - lo < 1e-6:
 		return 1.0
 	return 0.35 + 0.65 * clampf((value - lo) / (hi - lo), 0.0, 1.0)
+
+# -------------------------------------------------------------- upgrades ---
+# Performance parts (decision A: the single-player career only; references 013-016, 048-054). Each part has stages;
+# a stage costs credits (or one ad, a few a day) and raises the car's rating. They change the car's specs only in a
+# career race (Progression's event: RaceSession applies apply_upgrades); online, quick races and the PC menu drive the
+# car as it comes.
+
+## [id, name, PR a stage, what a stage does]
+const PARTS := [
+	["engine", "Engine", 3, "+1.2 % torque"],
+	["turbo", "Turbo", 2, "+0.8 % torque"],
+	["gearbox", "Gearbox", 1, "4 ms quicker shifts"],
+	["weight", "Weight", 2, "−0.8 % mass"],
+	["tyres", "Tyres", 3, "+0.6 % grip"],
+]
+const MAX_STAGE := 5
+## A stage's credits: this times the stage, times the rarity's factor.
+const STAGE_CREDITS := 8000
+const RARITY_FACTOR := {"common": 1.0, "rare": 1.5, "epic": 2.0, "legendary": 3.0}
+## Stages bought with an ad (the references' "PLAY AD or 20,000"), a day.
+const AD_STAGES_DAY := 2
+
+static func stage(id: String, part: String) -> int:
+	var u: Dictionary = (_g().get("upg", {}) as Dictionary).get(id, {})
+	return int(u.get(part, 0))
+
+static func stage_cost(id: String, part: String) -> int:
+	return roundi(STAGE_CREDITS * (stage(id, part) + 1) * float(RARITY_FACTOR[rarity(id)]))
+
+## The rating the parts add (on top of stats().pr).
+static func upgrade_pr(id: String) -> int:
+	var n := 0
+	for p: Array in PARTS:
+		n += stage(id, p[0]) * int(p[2])
+	return n
+
+## 0..3 stars: how far the car is upgraded (shown on its cards).
+static func stars(id: String) -> int:
+	var total := 0
+	for p: Array in PARTS:
+		total += stage(id, p[0])
+	return mini(3, total * 3 / (PARTS.size() * MAX_STAGE))
+
+## One stage of a part; `by_ad`: paid with an ad (AD_STAGES_DAY a day), else with credits. False when it cannot.
+static func upgrade(id: String, part: String, by_ad: bool = false) -> bool:
+	if not owns(id) or stage(id, part) >= MAX_STAGE:
+		return false
+	var g := _g()
+	if by_ad:
+		if ad_stages_left() <= 0:
+			return false
+		var day := Progression.today()
+		if str(g.get("adDay", "")) != day:
+			g.adDay = day
+			g.adStages = 0
+		g.adStages = int(g.get("adStages", 0)) + 1
+	else:
+		var cost := stage_cost(id, part)
+		if Progression.credits() < cost:
+			return false
+		Progression.add_credits(-cost)
+	if not g.has("upg"):
+		g.upg = {}
+	var u: Dictionary = (g.upg as Dictionary).get(id, {})
+	u[part] = int(u.get(part, 0)) + 1
+	g.upg[id] = u
+	Progression.save()
+	return true
+
+static func ad_stages_left() -> int:
+	var g := _g()
+	if str(g.get("adDay", "")) != Progression.today():
+		return AD_STAGES_DAY
+	return maxi(0, AD_STAGES_DAY - int(g.get("adStages", 0)))
+
+## The parts' effect on a car's specs (a copy, as CarSetup.apply_setup gives): torque, shifts, mass, grip.
+static func apply_upgrades(tuned: Dictionary) -> Dictionary:
+	var id := str(tuned.get("id", ""))
+	if id == "" or upgrade_pr(id) == 0:
+		return tuned
+	var out := tuned.duplicate(true)
+	var s: Dictionary = out.specs
+	var torque := 1.0 + 0.012 * stage(id, "engine") + 0.008 * stage(id, "turbo")
+	var curve: Array = []
+	for pt: Array in s.torqueCurve:
+		curve.append([pt[0], float(pt[1]) * torque])
+	s.torqueCurve = curve
+	s.powerKw = float(s.powerKw) * torque
+	s.shiftTimeMs = maxf(30.0, float(s.shiftTimeMs) - 4.0 * stage(id, "gearbox"))
+	s.massKg = float(s.massKg) * (1.0 - 0.008 * stage(id, "weight"))
+	s.tyreGrip = float(s.tyreGrip) * (1.0 + 0.006 * stage(id, "tyres"))
+	return out

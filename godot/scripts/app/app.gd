@@ -726,7 +726,14 @@ func show_results(m: Dictionary) -> void:
 			if want == "" or want == str(pending_race.get("trackId", "")):
 				if pev.has("difficulty"):
 					Settings.data.ai.difficulty = float(pev.difficulty)
-				ev_result = Progression.score_event(s.position, s.field)
+				var boss := Progression.current_boss()
+				if boss != "":
+					var bpos := 0
+					for r: Dictionary in m.rows:
+						if str(r.get("nick", "")) == boss:
+							bpos = int(r.get("position", 0))
+					Progression.record_boss(str(pev.cup), int(s.position) > 0 and (bpos == 0 or int(s.position) < bpos))
+				ev_result = Progression.score_event(s.position, s.field, s)
 	_drop_session()
 	screen = "results"
 	set_backdrop("pole", pending_race.get("trackId", ""))

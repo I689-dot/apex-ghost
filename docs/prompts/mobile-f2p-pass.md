@@ -41,16 +41,16 @@ Cars
 - [x] 7 (1a332fd) Rarity and star level on every car card.
 - [x] 8 (1a332fd) Full-screen "new car unlocked" reveal.
 - [x] B (1a332fd) Blueprints: a car unlocks with N blueprints or its credit price.
-- [ ] A Upgrades (engine, gearbox, turbo, weight, tyres; stages) used in the career only.
+- [x] A (phase 4) Upgrades (engine, gearbox, turbo, weight, tyres; stages) used in the career only.
 
 Customisation
 - [ ] 9 Paint as a bottom bar of categories (body, decal, rims, smoke, spoiler, window tint, plate), price and preview.
 - [ ] 10 Some paints unlocked by challenges.
 
 Career
-- [ ] 12 Chapters with a rival boss; boss wins open the next modes.
-- [ ] 13 Three star objectives per race (finish / time / clean); stars open the next season.
-- [ ] 15 Recommended car rating on every event.
+- [x] 12 (phase 4) Chapters with a rival boss; boss wins open the next modes.
+- [x] 13 (phase 4: the trophies shown as stars with named objectives; the third a win or a clean podium) Three star objectives per race (finish / time / clean); stars open the next season.
+- [x] 15 (phase 4) Recommended car rating on every event.
 
 Race HUD
 - [ ] 16 Objective panel and a rival marker with the distance.
@@ -62,7 +62,7 @@ After the race
 - [ ] 20 Pass and goal progress on the results.
 
 Ads
-- [ ] 21 "Watch ad" as an alternative price (paint, items), daily limit.
+- [~] 21 (upgrade stages by ad, 2 a day; paint by ad still to do) "Watch ad" as an alternative price (paint, items), daily limit.
 - [x] 22 (store, phase 2) Ad ladder (1, 2, 3 ads for bigger packs).
 - [x] 23 (store, phase 2) Free pack / free reward by ad in the store's Free tab.
 - [ ] 24 Try a locked car for one race by ad.

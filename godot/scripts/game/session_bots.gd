@@ -4,6 +4,13 @@ extends SessionContact
 ## driven each step with a cap behind slower cars and under yellow flags) and the state they send (the layers:
 ## SessionBase, session_base.gd).
 
+## The rival of a phone career race (MobileModes adds a bot of that name; Progression.current_boss), "" for none, set
+## by RaceSession before the bots are made; the bot found with it (rival_id: the HUD's rival marker).
+var boss_name := ""
+var rival_id := ""
+## How much faster the rival is than the field's best (its share of the AI difficulty).
+const BOSS_SKILL := 1.03
+
 ## The host simulates every bot: a Vehicle + AiDriver in this physics world.
 func _create_local_bots(entries: Dictionary) -> void:
 	var mp: Variant = _player(me)
@@ -35,6 +42,11 @@ func _create_local_bots(entries: Dictionary) -> void:
 		# skill and racing line differ per bot so they spread out (deterministic per slot); the player's AI difficulty
 		# scales every bot's pace
 		var skill: float = (0.88 + ((r.slot * 37) % 10) / 100.0) * float(Settings.data.ai.difficulty)
+		# a phone career race's rival (Progression.current_boss: a bot of that name in a solo room) drives at the top of
+		# the field's spread and a little over: the race to beat (the HUD marks them: rival_id)
+		if boss_name != "" and str(names.get(r.id, "")) == boss_name:
+			skill = 1.0 * float(Settings.data.ai.difficulty) * BOSS_SKILL
+			rival_id = r.id
 		var lane: float = (((r.slot * 7) % 5) - 2) * 0.45
 		var b := LocalBot.new()
 		b.vehicle = v

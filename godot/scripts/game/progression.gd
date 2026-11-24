@@ -32,6 +32,17 @@ const CUPS := [
 	["pro_endurance", "P", "Pro Endurance", [["nurburgring_24h", 1, 11, 1.05], ["spa", 8, 11, 1.06], ["silverstone", 8, 11, 1.06]], 66, 6000],
 ]
 
+## The career's chapters are its cups; each has a rival, met in its last race (references 080-084: "Beat Zeke"). Beating
+## the rival there opens the next cup at once, whatever its trophies. Invented names (the game carries no real ones).
+const BOSSES := {
+	"rookie_cup": "Nico Varga", "d_trophy": "Elena Roux", "c_series": "Dario Castell",
+	"b_grand_prix": "Ingrid Solheim", "a_masters": "Ken Arata", "pro_endurance": "Viktor Hale",
+}
+## The car rating (Garage PR, parts included) a cup is meant for (reference 091's recommended rank).
+const RECOMMENDED_PR := {"rookie_cup": 590, "d_trophy": 600, "c_series": 610, "b_grand_prix": 622, "a_masters": 635, "pro_endurance": 650}
+## The three stars of a race (they are the trophies: 1 a top six, 2 a podium, 3 a win or a podium without an incident).
+const STAR_TEXT := ["Finish in the top 6", "Finish on the podium", "Win, or a clean podium"]
+
 ## Contract kinds: [kind, text (with {n}), target range [lo, hi], credits, pass XP]
 const CONTRACTS := [
 	["finish", "Finish {n} races", [2, 3], 3000, 120],
@@ -136,7 +147,39 @@ static func total_trophies() -> int:
 	return n
 
 static func cup_open(id: String) -> bool:
-	return total_trophies() >= int(cup(id)[4])
+	if total_trophies() >= int(cup(id)[4]):
+		return true
+	# the previous cup's rival beaten
+	for i in range(1, CUPS.size()):
+		if CUPS[i][0] == id:
+			return bool((data().get("bosses", {}) as Dictionary).get(CUPS[i - 1][0], false))
+	return false
+
+## The rival of a cup race: their name in its last race, else "".
+static func boss_of(cup_id: String, race: int) -> String:
+	var c := cup(cup_id)
+	if c.is_empty() or race != (c[3] as Array).size() - 1:
+		return ""
+	return str(BOSSES.get(cup_id, ""))
+
+static func boss_beaten(cup_id: String) -> bool:
+	return bool((data().get("bosses", {}) as Dictionary).get(cup_id, false))
+
+## The rival race's result: beaten when you finished ahead of them.
+static func record_boss(cup_id: String, beaten: bool) -> void:
+	if not beaten:
+		return
+	if not data().has("bosses"):
+		data().bosses = {}
+	data().bosses[cup_id] = true
+	save()
+
+## The boss of the career race being driven ("" for none).
+static func current_boss() -> String:
+	var ev: Dictionary = data().event
+	if ev.is_empty() or str(ev.get("cup", "")) == "weekly":
+		return ""
+	return boss_of(str(ev.cup), int(ev.get("race", 0)))
 
 static func trophies_for(position: int, field: int) -> int:
 	if position <= 0:
@@ -156,8 +199,13 @@ static func clear_event() -> void:
 	data().event = {}
 	save()
 
+## A cup race of the career being driven now (not the week's featured race): Garage's parts apply.
+static func career_race_active() -> bool:
+	var ev: Dictionary = data().event
+	return not ev.is_empty() and str(ev.get("cup", "")) != "weekly" and now() - int(ev.get("at", 0)) < 3 * 3600
+
 ## A finished cup race: its trophies (the best kept) and credits for the new ones. {trophies, gained, credits}
-static func score_event(position: int, field: int) -> Dictionary:
+static func score_event(position: int, field: int, s: Dictionary = {}) -> Dictionary:
 	var d := data()
 	var ev: Dictionary = d.event
 	if ev.is_empty():
@@ -175,6 +223,9 @@ static func score_event(position: int, field: int) -> Dictionary:
 	var r := cup_results(id)
 	var i: int = ev.race
 	var got := trophies_for(position, field)
+	# the third star: a win, or a podium without an incident (the session's count, when given)
+	if got == 2 and int(s.get("incidents", -1)) == 0:
+		got = 3
 	var gained := maxi(0, got - int(r[i]))
 	r[i] = maxi(int(r[i]), got)
 	d.cups[id] = r

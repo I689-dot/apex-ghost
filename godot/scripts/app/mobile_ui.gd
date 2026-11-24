@@ -195,6 +195,17 @@ static func bar(frac: float, c: Color = GOLD, h: int = 6) -> Control:
 	back.add_child(fill)
 	return back
 
+## The green behind something done (a rival beaten).
+const GOOD_BG := Color(0.12, 0.55, 0.3, 0.95)
+
+## A row of stars earned of a race (0..3): the career's objectives.
+static func stars(n: int, of: int = 3, size: int = 18) -> HBoxContainer:
+	var row := UIW.hbox(2)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for i in of:
+		row.add_child(Icon.make("star", size, GOLD if i < n else Color(1, 1, 1, 0.22)))
+	return row
+
 ## A row of trophies earned of a race (0..3).
 static func trophies(n: int, of: int = 3, size: int = 18) -> HBoxContainer:
 	var row := UIW.hbox(2)
