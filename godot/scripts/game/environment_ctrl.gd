@@ -7,6 +7,10 @@ extends Node3D
 const NIGHT_C := Color(0.012, 0.016, 0.03)
 const OVERCAST_C := Color(0.62, 0.66, 0.7)
 const LUT_SIZE := Vector2i(128, 64)
+## Where the sun's shadow cascades end, as shares of its reach: four cascades (a 4096 map and up), and the one split of
+## two. Short first cascades: the car's shadow sharp (Ultra's reach 600 m: 24, 72, 210 m; High's 360 m: 22 m).
+const SHADOW_SPLITS_4 := Vector3(0.04, 0.12, 0.35)
+const SHADOW_SPLIT_2 := 0.06
 
 ## Tests and look comparisons: the sun's {elevation, azimuth} (radians) instead of the clock's (empty: off).
 static var sun_override := {}
@@ -81,15 +85,12 @@ func _init(weather_plan: Dictionary, q: Dictionary) -> void:
 	world_env.environment = env
 	add_child(world_env)
 	# the sun
-	sun.shadow_enabled = sun_shadows(q)
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_max_distance = maxf(60.0, float(q.shadowRange) * 3.0)
 	sun.shadow_bias = 0.02
 	sun.shadow_normal_bias = 1.0
 	sun.light_angular_distance = 0.5
 	add_child(sun)
 	_build_rain()
-	RenderingServer.directional_shadow_atlas_set_size(clampi(int(q.shadowMapSize), 1024, 8192), true)
+	_apply_shadows(q)
 	_apply_post(q)
 
 func _build_rain() -> void:
@@ -327,8 +328,40 @@ func _apply_post(q: Dictionary) -> void:
 	env.ssr_fade_in = 0.15
 	env.ssr_fade_out = 2.0
 	env.ssr_depth_tolerance = 0.3
-	# the sun's cascades: two are enough on a phone
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if int(q.shadowMapSize) >= 4096 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+
+## The sun's shadow from the quality: on or off, its reach, its map and cascades, its edge filter.
+func _apply_shadows(q: Dictionary) -> void:
+	sun.shadow_enabled = sun_shadows(q)
+	sun.directional_shadow_max_distance = maxf(60.0, float(q.shadowRange) * 3.0)
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	var atlas := clampi(int(q.shadowMapSize), 1024, 8192)
+	# phones: at least 2048 (Low's 1024 drew the car's shadow in steps several centimetres wide on the Pixel 10a; the
+	# shorter first cascade alone did not change it there)
+	if compat:
+		atlas = maxi(atlas, 2048)
+	RenderingServer.directional_shadow_atlas_set_size(atlas, true)
+	# the cascades: two are enough on a phone. The first, where the car and its own shadow are, is kept short so its
+	# texels are small: at Godot's default split (a tenth of the reach) the car's shadow came out in stair-steps on High
+	# and on phones (the user, 2026-11-23: "look rectangular with many corners instead of smooth")
+	if int(q.shadowMapSize) >= 4096:
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+		sun.directional_shadow_split_1 = SHADOW_SPLITS_4.x
+		sun.directional_shadow_split_2 = SHADOW_SPLITS_4.y
+		sun.directional_shadow_split_3 = SHADOW_SPLITS_4.z
+	else:
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.directional_shadow_split_1 = SHADOW_SPLIT_2
+	# no seam where one cascade hands over to the next. Not on the Compatibility renderer: on the Pixel 10a the car's own
+	# shadow vanished with it (the first cascade's shadows gone, the far ones kept)
+	sun.directional_shadow_blend_splits = not compat
+	# the edges: the preset's soft shadows (High, Ultra) filter with the most samples (Spa at 1080p, High: 153 -> 128 fps
+	# with the short cascade, 148 with the medium filter, which left a visible grain); the others a light filter, not hard
+	# texels. The Compatibility renderer (phones) blurs far more for the same setting: its light filter smeared the car's
+	# shadow away on the Pixel 10a; the lightest one keeps its shape with soft edges
+	var filter := RenderingServer.SHADOW_QUALITY_SOFT_HIGH if bool(q.softShadows) else RenderingServer.SHADOW_QUALITY_SOFT_LOW
+	if compat:
+		filter = RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW
+	RenderingServer.directional_soft_shadow_filter_set_quality(filter)
 
 ## Whether the sun casts shadows. Always on the Compatibility renderer (phones): there a sun without shadows lights the
 ## scene about a fifth less than one with them (measured 2026-11-23, Nürburgring GP on Low: the road 125 / 255 against
@@ -339,8 +372,6 @@ static func sun_shadows(q: Dictionary) -> bool:
 
 func set_quality(q: Dictionary) -> void:
 	quality = q
-	sun.shadow_enabled = sun_shadows(q)
-	sun.directional_shadow_max_distance = maxf(60.0, float(q.shadowRange) * 3.0)
-	RenderingServer.directional_shadow_atlas_set_size(clampi(int(q.shadowMapSize), 1024, 8192), true)
+	_apply_shadows(q)
 	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
 	_apply_post(q)
