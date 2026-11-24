@@ -51,6 +51,35 @@ static func rarity(id: String) -> String:
 static func owns(id: String) -> bool:
 	return (_g().owned as Array).has(id)
 
+## A car you may race now: yours, or the one on trial (try_car).
+static func usable(id: String) -> bool:
+	return owns(id) or str(_g().get("trial", "")) == id
+
+## A locked car for one race (reference 028: "PLAY AD" on a locked car): it becomes the car you drive until the next
+## results (end_trial gives your own back).
+static func try_car(id: String) -> void:
+	var g := _g()
+	if str(g.get("trial", "")) == "":
+		g.trialPrev = str(Settings.data.get("lastCar", ""))
+	g.trial = id
+	Settings.data.lastCar = id
+	Settings.save()
+	Progression.save()
+
+static func trial() -> String:
+	return str(_g().get("trial", ""))
+
+## After a race: the car on trial goes back, your own comes back.
+static func end_trial() -> void:
+	var g := _g()
+	if str(g.get("trial", "")) == "":
+		return
+	if str(Settings.data.get("lastCar", "")) == str(g.trial):
+		Settings.data.lastCar = str(g.get("trialPrev", ""))
+		Settings.save()
+	g.trial = ""
+	Progression.save()
+
 static func owned() -> Array:
 	return (_g().owned as Array).duplicate()
 

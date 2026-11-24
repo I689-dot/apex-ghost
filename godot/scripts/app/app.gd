@@ -560,6 +560,17 @@ func start_loading(race: Dictionary, start_at: Variant) -> void:
 	col.add_child(UIKit.label(info, 20, UIKit.SOFT))
 	col.add_child(bar)
 	col.add_child(label)
+	# the phone: a tip, a new one every few seconds (MobileUI.TIPS)
+	if mobile_layout():
+		var tip := UIKit.label(I18n.t(MobileUI.TIPS[randi() % MobileUI.TIPS.size()]), 18, UIKit.TEXT, true, 600)
+		tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tip.custom_minimum_size = Vector2(620, 0)
+		col.add_child(tip)
+		var tt := Timer.new()
+		tt.wait_time = 6.0
+		tt.autostart = true
+		tt.timeout.connect(func() -> void: tip.text = I18n.t(MobileUI.TIPS[randi() % MobileUI.TIPS.size()]))
+		col.add_child(tt)
 	var root := Control.new()
 	var my_car: Variant = null
 	for c: Dictionary in cars.cars:
@@ -743,6 +754,9 @@ func show_results(m: Dictionary) -> void:
 					Progression.record_boss(str(pev.cup), int(s.position) > 0 and (bpos == 0 or int(s.position) < bpos))
 				ev_result = Progression.score_event(s.position, s.field, s)
 	_drop_session()
+	# a car tried for one race goes back (Garage.try_car)
+	if m.kind == "race":
+		Garage.end_trial()
 	screen = "results"
 	set_backdrop("pole", pending_race.get("trackId", ""))
 	if mobile_layout() and not prog.is_empty() and m.kind == "race":

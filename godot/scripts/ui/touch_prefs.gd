@@ -4,7 +4,8 @@ extends RefCounted
 ## drag slider, or tilting the phone like a wheel), button size, vibration, opacity. Saved to user://touch.json.
 
 const SAVE_PATH := "user://touch.json"
-const DEFAULTS := {"steer": "buttons", "tiltRange": 28.0, "tiltInvert": false, "size": 1.0, "haptics": true, "opacity": 0.7}
+## chosen: the control type picked on the first-launch screen (MobileControls)
+const DEFAULTS := {"steer": "buttons", "tiltRange": 28.0, "tiltInvert": false, "size": 1.0, "haptics": true, "opacity": 0.7, "chosen": false}
 
 static var data: Dictionary = {}
 static var _listeners: Array[Callable] = []

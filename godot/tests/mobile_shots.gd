@@ -98,4 +98,6 @@ func _run() -> void:
 		await _shot("daily_" + t, 1.5)
 	MobileProfile.show(app)
 	await _shot("profile", 1.5)
+	MobileControls.show(app, func() -> void: pass, func() -> void: pass)
+	await _shot("controls", 1.0)
 	get_tree().quit(0)

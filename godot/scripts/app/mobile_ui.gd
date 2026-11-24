@@ -21,6 +21,21 @@ static func layout_on() -> bool:
 	var l := str(Settings.data.display.get("menuLayout", "auto"))
 	return l == "mobile" or (l == "auto" and UIKit.touch())
 
+## Tips on the phone's loading screen (docs/prompts/mobile-f2p-pass.md 41; references 035, 082): how to play and
+## what the game gives, one at a time.
+const TIPS := [
+	"Brake in a straight line, then turn: a locked wheel does not steer.",
+	"Clean laps, overtakes and a slipstream held pay credits in offline races.",
+	"Daily goals give blueprints for the car you are collecting.",
+	"Performance parts count in the career only: online races stay equal.",
+	"Beat a cup's rival in its last race to open the next cup at once.",
+	"Come back every day: the login calendar's seventh day is the big one.",
+	"Tilt the wrong way? Settings › Controls has an Invert switch.",
+	"Watch an ad after a race to double its credits.",
+	"Try a locked car for one race from the Cars screen.",
+	"Change the steering, the buttons' size and their opacity in Settings › Controls.",
+]
+
 ## A circuit's menu photo: kind hero / pole / grid / aerial / straight, by the layout's map.
 static func photo(map: String, kind: String = "hero") -> String:
 	var sfx := "" if map == "" or map == "nurburgring" or map == "nordschleife" else "_" + map

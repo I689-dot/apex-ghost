@@ -33,6 +33,7 @@ static func build(app: App) -> Control:
 	var tr := UIW.hbox(8)
 	tr.add_child(MobileUI.icon_button("calendar", I18n.t("Daily"), func() -> void: MobileDaily.show(app), Progression.login_ready() or Progression.goals_ready() > 0))
 	tr.add_child(MobileUI.icon_button("people", I18n.t("Friends"), func() -> void: app.show_classic_menu("friends")))
+	tr.add_child(MobileUI.icon_button("mail", I18n.t("What's new"), func() -> void: MobileNews.show(app, rerender), MobileNews.unseen()))
 	# (as the classic menu: a change applies at once to the audio, the graphics and a session)
 	tr.add_child(MobileUI.icon_button("gear", I18n.t("Settings"), func() -> void: app.open_settings()))
 	tr.add_child(MobileUI.currency("credit", Progression.credits(), func() -> void: open_store(app, "coins")))
@@ -138,8 +139,16 @@ static func build(app: App) -> Control:
 
 	# the bottom bar
 	root.add_child(_bottom_bar(app, rerender))
-	# the login calendar, the first time today
-	MobileDaily.maybe_auto(app)
+	# the first launch: the control type (MobileControls); else the login calendar, the first time today
+	if MobileControls.needed():
+		# a new driver goes straight into the first career race (references 039-042), or skips to the garage
+		var first := int(CareerData.load_career().races) == 0 and Progression.total_trophies() == 0
+		if first:
+			MobileControls.show.call_deferred(app, func() -> void: MobileModes.start_cup_race(app, "rookie_cup", 0), func() -> void: app.show_menu())
+		else:
+			MobileControls.show.call_deferred(app, func() -> void: app.show_menu())
+	else:
+		MobileDaily.maybe_auto(app)
 	return root
 
 ## The bar along the bottom: Shop, Cars, Paint, Contracts and RACE.
@@ -298,12 +307,18 @@ static func _offer_card(app: App) -> Control:
 	var col := UIW.vbox(0)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(UIKit.label(I18n.t("Welcome pack").to_upper(), 20, UIKit.TEXT, true, 700))
-	col.add_child(UIKit.label(I18n.t("{n} coins", {"n": StoreScreen.fmt(int(StoreScreen.WELCOME.coins))}), 15, UIKit.SOFT))
+	# the live offer (docs/prompts/mobile-f2p-pass.md 2): the starter pack while it lasts, else the day's deal, with
+	# its countdown
+	var starter := Shop.starter_left_s()
+	var d := Shop.deal("day")
+	var title := I18n.t("Starter pack") if starter > 0 else I18n.t(d.deal[1])
+	var tag := I18n.t("Once only") if starter > 0 else str(d.deal[4])
+	col.add_child(UIKit.label(title.to_upper(), 20, UIKit.TEXT, true, 700))
+	col.add_child(MobileUI.badge(Progression.fmt_left(starter if starter > 0 else int(d.left_s)), Color(0, 0, 0, 0.75), UIKit.TEXT, "clock"))
 	row.add_child(col)
-	row.add_child(MobileUI.badge("-35%", UIKit.BAD))
+	row.add_child(MobileUI.badge(tag, UIKit.BAD))
 	body.add_child(row)
-	b.pressed.connect(func() -> void: open_store(app, "offers"))
+	b.pressed.connect(func() -> void: open_store(app, "foryou" if starter > 0 else "deals"))
 	return b
 
 static func _tile(icon: String, title: String, sub: String, hot: bool, cb: Callable) -> Button:

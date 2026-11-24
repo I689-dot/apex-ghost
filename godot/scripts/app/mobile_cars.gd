@@ -111,6 +111,17 @@ static func _build(app: App, st: Dictionary, rerender: Callable) -> Control:
 			else:
 				app.toast(I18n.t("Not enough credits: race, open chests or get more in the store.")))
 		right.add_child(buy)
+		# one race in it by an ad (reference 028)
+		var tid: String = car.id
+		right.add_child(MobileUI.main_button(I18n.t("Try it · one race") if Garage.trial() != tid else I18n.t("On trial: race it now"), func() -> void:
+			if Garage.trial() == tid:
+				MobileModes.show(app)
+				return
+			MobileAds.rewarded(app, I18n.t("One race in the {car}", {"car": str(car.name)}), func(ok: bool) -> void:
+				if ok:
+					Garage.try_car(tid)
+					app.toast(I18n.t("The {car} is yours for one race.", {"car": str(car.name)}))
+				rerender.call())))
 	var rh := Control.new()
 	rh.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	rh.mouse_filter = Control.MOUSE_FILTER_IGNORE

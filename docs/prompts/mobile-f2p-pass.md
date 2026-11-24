@@ -32,7 +32,7 @@ My own calls on the way (say so in the reply when one lands):
 
 Home and navigation
 - [~] 1 (red dots on Shop, Cars, Daily, the store's categories; more as screens land) Red dots on every button with something to claim.
-- [ ] 2 One column of live events with countdowns (pass, featured event, offer, new season).
+- [x] 2 (the left column: pass, featured event, the live offer with its countdown) One column of live events with countdowns (pass, featured event, offer, new season).
 - [~] 3 (Events and Online racing locked until the first trophy / race; the home's bar has Daily) Bottom tabs (Career / Pass / Events / Daily / Online), locked ones shown with a padlock until reached.
 - [x] 5 (phase 3) Profile page: name, flag, level, most-driven car, badges, stats by discipline, copy player ID.
 
@@ -65,7 +65,7 @@ Ads
 - [~] 21 (upgrade stages by ad, 2 a day; paint by ad still to do) "Watch ad" as an alternative price (paint, items), daily limit.
 - [x] 22 (store, phase 2) Ad ladder (1, 2, 3 ads for bigger packs).
 - [x] 23 (store, phase 2) Free pack / free reward by ad in the store's Free tab.
-- [ ] 24 Try a locked car for one race by ad.
+- [x] 24 (phase 6) Try a locked car for one race by ad.
 - [~] 25 (the Remove ads offer is in the store; interstitials already only between races) Interstitials only between races, never before one; paid "Remove ads".
 
 Shop
@@ -73,20 +73,20 @@ Shop
 - [x] 28 (store, phase 2) Coin packs tagged "+25 %", "Most popular", "Best value".
 - [x] 29 (store, phase 2) Cheap starter offer with a timer, the first days.
 - [x] 30 (store, phase 2) Rotating daily / weekly / monthly deals with a refresh timer.
-- [~] 31 ("Costs real money" done in the store; Restore purchases / Delete my data in Settings still to do) "Costs real money" on paid items; Restore purchases and Delete my data in Settings.
+- [x] 31 (Restore purchases added beside Delete account; it answers that payments are not on yet) "Costs real money" on paid items; Restore purchases and Delete my data in Settings.
 - [x] E (store, phase 2) VIP subscription page.
 
 Retention and social
 - [x] 32 (phase 3) 7-day login calendar, big reward on day 7.
 - [x] 33 (phase 3) Daily goals (5) and weekly goals, towards a car's blueprints.
-- [ ] 35 Friends: add by player ID, share an invite.
-- [ ] 37 "What's new" tab.
+- [x] 35 (the driver name is the player ID: copy it, copy an invite, open Friends) Friends: add by player ID, share an invite.
+- [x] 37 "What's new" tab.
 - [ ] 38 Notification permission asked after a good moment (only once notifications exist).
 
 First launch
-- [ ] 39 Choose controls on first launch with pictures.
-- [ ] 40 A first race straight away, with a skip.
-- [ ] 41 Tips and quotes on loading screens.
+- [x] 39 (with a live tilt bar and Invert) Choose controls on first launch with pictures.
+- [x] 40 (after the controls, the Rookie Cup's first race; Skip goes to the garage) A first race straight away, with a skip.
+- [x] 41 Tips and quotes on loading screens.
 - [ ] 42 Small install, circuits and cars downloaded after (Play Asset Delivery: Play's base download limit).
 
 ## Order

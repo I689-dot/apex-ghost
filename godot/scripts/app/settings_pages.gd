@@ -26,7 +26,7 @@ const STARTERS := [
 ]
 
 ## What a saved preset leaves out: who you are, your car and its paint, your saved car setups and the presets themselves.
-const NOT_IN_PRESETS := ["profiles", "nickname", "livery", "lastCar", "savedSetups", "carSetup", "introSeen", "lastTrack"]
+const NOT_IN_PRESETS := ["profiles", "nickname", "livery", "lastCar", "savedSetups", "carSetup", "introSeen", "lastTrack", "newsSeen"]
 
 # ---------------------------------------------------------------- assists ---
 
@@ -205,6 +205,11 @@ static func account(col: Control, app: App, changed: Callable, refresh: Callable
 	if not S.has("privacy"):
 		S["privacy"] = {"showOnline": true}
 	SettingsPanel._toggle(col, I18n.t("Show friends where I am"), I18n.t("Off: you appear offline to your friends (menu, lobby or racing)."), S.privacy, "showOnline", changed)
+	# purchases made on another phone or before reinstalling (the stores require the button; docs/prompts/mobile-f2p-pass.md
+	# 31): Google Play Billing will be asked for them once payments are switched on; until then nothing is ever bought
+	SettingsPanel._head(col, I18n.t("Purchases"))
+	col.add_child(SettingsPanel._row(I18n.t("Restore my purchases"), UIKit.button(I18n.t("Restore"), func() -> void:
+		app.toast(I18n.t("Nothing to restore: payments are not switched on yet."))), I18n.t("Brings back what you bought on another phone or before reinstalling.")))
 	SettingsPanel._head(col, I18n.t("Delete account"))
 	col.add_child(SettingsPanel._row(I18n.t("Delete my account"), UIKit.button(I18n.t("Delete…"), func() -> void: _delete_modal(app)), I18n.t("Your account, laps, results and friends are deleted for good.")))
 

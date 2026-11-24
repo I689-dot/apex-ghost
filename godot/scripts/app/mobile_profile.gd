@@ -34,12 +34,17 @@ static func show(app: App) -> void:
 	var lic := str(c.licence)
 	wc.add_child(UIKit.label(I18n.t("Licence {l} · Safety {sr} · Rating {r}", {"l": I18n.t(CareerData.LICENCE_NAME.get(lic, lic)), "sr": "%.2f" % float(c.sr), "r": int(c.get("rating", CareerData.RATING_START))}), 16, UIKit.SOFT, true, 600))
 	if a != null:
-		var id := str(a.user.get("id", ""))
+		# friends add each other by driver name (unique per account: Account.add_friend), so the name is the player ID
+		var nick := str(a.user.nick)
 		var ids := UIW.hbox(8)
-		ids.add_child(UIKit.label(I18n.t("Player ID") + "  " + id.left(8), 16, UIKit.TEXT, true, 700))
+		ids.add_child(UIKit.label(I18n.t("Player ID") + "  " + nick, 16, UIKit.TEXT, true, 700))
 		ids.add_child(UIKit.button(I18n.t("Copy ID"), func() -> void:
-			DisplayServer.clipboard_set(id)
-			app.toast(I18n.t("Player ID copied: send it to a friend to add you."))))
+			DisplayServer.clipboard_set(nick)
+			app.toast(I18n.t("Player ID copied: a friend adds you with it in Friends."))))
+		ids.add_child(UIKit.button(I18n.t("Invite a friend"), func() -> void:
+			DisplayServer.clipboard_set(I18n.t("Race me in GridCorsa! Add me as {nick}, and use my invite code {code} for free coins.", {"nick": nick, "code": StoreScreen.invite_code()}))
+			app.toast(I18n.t("Invite copied: paste it in a message to a friend."))))
+		ids.add_child(UIKit.button(I18n.t("Friends"), func() -> void: app.show_classic_menu("friends")))
 		wc.add_child(ids)
 	else:
 		wc.add_child(UIW.muted(I18n.t("Sign in to get a player ID your friends can add."), 14))
