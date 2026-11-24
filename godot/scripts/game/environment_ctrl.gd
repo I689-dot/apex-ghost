@@ -22,6 +22,7 @@ var quality: Dictionary
 var world_env := WorldEnvironment.new()
 var env := Environment.new()
 var sky_mat := ShaderMaterial.new()
+var _noise3d: NoiseTexture3D = null
 var sun := DirectionalLight3D.new()
 var lut_viewport := SubViewport.new()
 var lut_mat := ShaderMaterial.new()
@@ -63,10 +64,7 @@ func _init(weather_plan: Dictionary, q: Dictionary) -> void:
 	rect.material = lut_mat
 	lut_viewport.add_child(rect)
 	add_child(lut_viewport)
-	sky_mat.shader = load("res://shaders/sky.gdshader")
-	sky_mat.set_shader_parameter("tLut", lut_viewport.get_texture())
-	sky_mat.set_shader_parameter("tNoise", load("res://assets_static/sky/cloud_noise.png"))
-	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
+	_apply_sky(q)
 	_apply_post(q)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
@@ -329,6 +327,44 @@ func _apply_post(q: Dictionary) -> void:
 	env.ssr_fade_out = 2.0
 	env.ssr_depth_tolerance = 0.3
 
+## The sky's shader for the quality: ray-marched cumulus (sky_volumetric.gdshader) on the PC from the preset's highest
+## cloud detail (High, Ultra), the flat cloud layer (sky.gdshader) otherwise and on phones (the Compatibility renderer:
+## no half-resolution sky pass, and a phone's GPU). The other parameters are the same names in both.
+func _apply_sky(q: Dictionary) -> void:
+	var volumetric := int(q.cloudDetail) >= 2 and RenderingServer.get_current_rendering_method() == "forward_plus"
+	var path := "res://shaders/sky_volumetric.gdshader" if volumetric else "res://shaders/sky.gdshader"
+	if sky_mat.shader == null or sky_mat.shader.resource_path != path:
+		sky_mat.shader = load(path)
+		sky_mat.set_shader_parameter("tLut", lut_viewport.get_texture())
+		sky_mat.set_shader_parameter("tNoise", load("res://assets_static/sky/cloud_noise.png"))
+	if volumetric:
+		if _noise3d == null:
+			_noise3d = _cloud_noise_3d()
+		sky_mat.set_shader_parameter("tNoise3D", _noise3d)
+		# Ultra: more samples along the ray (finer billows, fewer gaps)
+		sky_mat.set_shader_parameter("STEPS", 56 if int(q.shadowMapSize) >= 8192 else 40)
+	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
+
+## The volumetric clouds' billows: inverted cellular noise (round lumps) in fractal octaves, tiling, 64 texels a side.
+## Made once (NoiseTexture3D builds it in a thread; until then the clouds are smooth).
+func _cloud_noise_3d() -> NoiseTexture3D:
+	var fn := FastNoiseLite.new()
+	fn.noise_type = FastNoiseLite.TYPE_CELLULAR
+	fn.cellular_return_type = FastNoiseLite.RETURN_DISTANCE
+	fn.fractal_type = FastNoiseLite.FRACTAL_FBM
+	fn.fractal_octaves = 3
+	fn.frequency = 0.06
+	fn.seed = 11
+	var t := NoiseTexture3D.new()
+	t.width = 64
+	t.height = 64
+	t.depth = 64
+	t.seamless = true
+	t.invert = true
+	t.normalize = true
+	t.noise = fn
+	return t
+
 ## The sun's shadow from the quality: on or off, its reach, its map and cascades, its edge filter.
 func _apply_shadows(q: Dictionary) -> void:
 	sun.shadow_enabled = sun_shadows(q)
@@ -373,5 +409,5 @@ static func sun_shadows(q: Dictionary) -> bool:
 func set_quality(q: Dictionary) -> void:
 	quality = q
 	_apply_shadows(q)
-	sky_mat.set_shader_parameter("CLOUD_DETAIL", int(q.cloudDetail))
+	_apply_sky(q)
 	_apply_post(q)
