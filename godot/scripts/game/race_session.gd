@@ -116,9 +116,13 @@ func load_session(progress: Callable) -> void:
 		_add_track_probes(not bool(q.get("carProbe", false)))
 	InputState.wheel.carLockDeg = float(SteeringLock.lock_deg(my_entry.id))
 	# a PC lights the road with real beams on every quality (two spot lights, shadows from High up); a phone keeps the
-	# projected light pool unless its preset has the spots
+	# projected light pool unless its preset has the spots. No beam shadows on the Compatibility renderer (phones): a
+	# shadowed light draws what it reaches in a pass of its own there, even unlit by day, and the lawn's grass layers
+	# came out about twice as bright on High and Ultra (measured 2026-11-24, Nürburgring GP: 187 / 191 / 111 against
+	# Medium's 95 / 136 / 32; 98 / 139 / 34 without the beam shadows)
+	var beam_shadows := bool(q.ownHeadlightShadows) and RenderingServer.get_current_rendering_method() != "gl_compatibility"
 	if bool(q.ownHeadlightSpots) or not OS.has_feature("mobile"):
-		my_visual.add_headlights(bool(q.ownHeadlightShadows))
+		my_visual.add_headlights(beam_shadows)
 	# (the presets without the spots also take the cockpit's cheaper glass)
 	if not bool(q.ownHeadlightSpots):
 		my_visual.simplify_for_cockpit()
