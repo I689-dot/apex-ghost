@@ -148,6 +148,19 @@ func _run() -> void:
 	while elapsed < seconds:
 		await get_tree().process_frame
 		elapsed += get_process_delta_time()
+		# PAD='{"throttle": 1.0, "handbrake": 1.0, "steer": 0.4}' from PAD_AT s: that input held (as touch controls give
+		# it) and the AI's driving stopped: a slide, a lock-up or a burnout to look at (tyre smoke)
+		# SMOKE_AT=<s>: from then on, full tyre smoke from my car's rear wheels every frame (how the smoke looks)
+		if OS.get_environment("SMOKE_AT") != "" and elapsed >= float(OS.get_environment("SMOKE_AT")) and session.tyre_smoke != null and Engine.get_process_frames() % 4 == 0:
+			for w: Wheel in session.vehicle.wheels:
+				if not w.front:
+					session.tyre_smoke.puff(w.cp + Vector3.UP * 0.2, session.vehicle.linear_velocity * 0.3, 1.0, false)
+		# PAD2 / PAD2_AT: a second input from then on (full throttle down the straight, then the handbrake)
+		for pk: String in ["PAD", "PAD2"]:
+			if OS.get_environment(pk) != "" and elapsed >= float(OS.get_environment(pk + "_AT")) and (pk == "PAD2" or OS.get_environment("PAD2") == "" or elapsed < float(OS.get_environment("PAD2_AT"))):
+				session.autodrive = null
+				InputState.touch.merge(JSON.parse_string(OS.get_environment(pk)), true)
+				InputState.touch.active = true
 		if elapsed <= seconds * 0.5:
 			last_pf = Engine.get_physics_frames()
 		if elapsed > seconds * 0.5:

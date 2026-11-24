@@ -4,6 +4,10 @@ extends SessionHudFeed
 ## wet track, and the reflection probes over the track and the cars (the layers: SessionBase, session_base.gd).
 
 var _in_water := false
+## Tyre smoke and dust from every car with physics here (TyreSmoke).
+var tyre_smoke: TyreSmoke = null
+## Cars further than this from the camera puff no smoke (m): too small to see, and the pool is shared.
+const SMOKE_RANGE := 220.0
 
 func _apply_weather() -> void:
 	var w := weather
@@ -35,6 +39,8 @@ func _apply_weather() -> void:
 	track.apply_wetness(w.wetness)
 	if road_wear != null:
 		road_wear.set_wetness(w.wetness)
+	if tyre_smoke != null:
+		tyre_smoke.set_wetness(w.wetness)
 
 ## Spray behind every car near the camera on a wet track, and a splash (with its sound) where my wheels hit a puddle.
 func _update_spray(dt: float, cam_pos: Vector3) -> void:
@@ -68,6 +74,18 @@ func _update_spray(dt: float, cam_pos: Vector3) -> void:
 		if snd != null:
 			snd.splash(strength)
 	_in_water = hit
+
+## Smoke and dust from the sliding wheels of my car and the bots near the camera (other players' cars carry no tyre
+## state over the network).
+func _update_tyre_smoke(dt: float, cam_pos: Vector3) -> void:
+	if tyre_smoke == null:
+		return
+	if vehicle != null and cam_pos.distance_to(vehicle.global_position) < SMOKE_RANGE:
+		tyre_smoke.emit_from(vehicle, dt)
+	for r: Remote in remotes.values():
+		if r.bot != null and cam_pos.distance_to(r.bot.vehicle.global_position) < SMOKE_RANGE:
+			tyre_smoke.emit_from(r.bot.vehicle, dt)
+	tyre_smoke.update_puffs(dt, cam_pos)
 
 ## Reflection probes along the lap for every car's paint, glass and rims (2026-11-21, the user: the cars looked like
 ## plastic, the same from every side): without them the other cars (and yours below High) reflected the sky alone, so

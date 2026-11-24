@@ -373,6 +373,8 @@ func _attach_world_extras(q: Dictionary) -> void:
 		mask = GrassMask.build(track.chunks, track_data, track.ground_materials)
 	wet_fx = WetFx.new()
 	add_child(wet_fx)
+	tyre_smoke = TyreSmoke.new(TyreSmoke.puffs_for(str(Settings.data.quality)))
+	add_child(tyre_smoke)
 	var gq: GroundQuery = track.ground_query
 	wet_fx.build(track_data, func(x: float, yt: float, z: float, md: float) -> Variant: return gq.height_below(x, yt, z, md), hash(str(track_data.id)))
 	shells = GrassShells.build(track, track.lawn_materials, track_data, mask)
@@ -873,6 +875,7 @@ func _process_inner(dt: float) -> void:
 		track.update_visibility(cam_pos, q)
 		Prof.e("track.vis")
 	_update_spray(dt, cam_pos)
+	_update_tyre_smoke(dt, cam_pos)
 	if windshield != null and not spectator:
 		windshield.update_fx(dt, weather.rain, v.telemetry.speed, get_viewport().get_visible_rect().size.aspect(), 1.0 - env.night * 0.8, cockpit.looking_forward and not outside and not pit_cam_on and not tv_on)
 		windshield.set_crack(damage.zones[0], cockpit.looking_forward and not outside and not pit_cam_on and not tv_on)

@@ -4,6 +4,12 @@ Outside assets and data used by the Godot app's own content (the Spa rebuild: `d
 The source files stay outside the repo; the built files are under the git-ignored `godot/assets/`. This is a private
 game: some licences below (CC-BY-NC, Fab Standard) allow that use only.
 
+## Effects
+
+| What | Source | Author | Licence | Used for |
+|---|---|---|---|---|
+| Smoke puff flipbook "Cloud02" (8 x 8 frames, TGA sheet saved as PNG) | [Unity Labs: free VFX image sequences and flipbooks](https://unity.com/blog/engine-platform/free-vfx-image-sequences-flipbooks) | Unity Technologies | CC0 | tyre smoke and dust (`assets_static/fx/smoke_puff_8x8.png`, `TyreSmoke`) |
+
 ## Spa-Francorchamps
 
 | What | Source | Author | Licence | Used for |
