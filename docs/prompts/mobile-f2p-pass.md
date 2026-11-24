@@ -53,13 +53,13 @@ Career
 - [x] 15 (phase 4) Recommended car rating on every event.
 
 Race HUD
-- [ ] 16 Objective panel and a rival marker with the distance.
-- [ ] 17 Callouts that pay: clean lap, overtake, slipstream, clean race.
+- [x] 16 (phase 5; to check in a real race on the phone) Objective panel and a rival marker with the distance.
+- [x] 17 (phase 5: overtake 250, clean lap 300, slipstream 100) Callouts that pay: clean lap, overtake, slipstream, clean race.
 
 After the race
-- [ ] 18 Results: each driver's card (car, rarity, gap), then the rewards by category.
-- [ ] 19 A big "×2 earnings · watch ad / miss out" card.
-- [ ] 20 Pass and goal progress on the results.
+- [x] 18 (phase 5) Results: each driver's card (car, rarity, gap), then the rewards by category.
+- [x] 19 (phase 5) A big "×2 earnings · watch ad / miss out" card.
+- [x] 20 (phase 5: the pass bar; the goals advanced listed) Pass and goal progress on the results.
 
 Ads
 - [~] 21 (upgrade stages by ad, 2 a day; paint by ad still to do) "Watch ad" as an alternative price (paint, items), daily limit.

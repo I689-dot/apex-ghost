@@ -13,6 +13,14 @@ const TEAL := Color("1fb6a6")
 const BUY := Color("2fb84a")
 const MAIN := Color("f2c21b")
 
+## The phone layout is in use (Display › Menu layout; APEX_MOBILE_UI=1 forces it): App.mobile_layout, and the race
+## session's phone-only layers (RaceObjective).
+static func layout_on() -> bool:
+	if OS.get_environment("APEX_MOBILE_UI") != "":
+		return true
+	var l := str(Settings.data.display.get("menuLayout", "auto"))
+	return l == "mobile" or (l == "auto" and UIKit.touch())
+
 ## A circuit's menu photo: kind hero / pole / grid / aerial / straight, by the layout's map.
 static func photo(map: String, kind: String = "hero") -> String:
 	var sfx := "" if map == "" or map == "nurburgring" or map == "nordschleife" else "_" + map
@@ -346,6 +354,11 @@ class Icon:
 				draw_rect(Rect2(Vector2(0.12, 0.2) * s, Vector2(0.6, 0.76) * s), Color(c, 0.35))
 				draw_line(Vector2(0.3, 0.42) * s, Vector2(0.62, 0.42) * s, c, w)
 				draw_line(Vector2(0.3, 0.58) * s, Vector2(0.56, 0.58) * s, c, w)
+			"check":
+				draw_arc(Vector2(s, s) * 0.5, s * 0.44, 0, TAU, 24, c, w)
+				draw_polyline(PackedVector2Array([Vector2(0.28, 0.52) * s, Vector2(0.44, 0.68) * s, Vector2(0.74, 0.34) * s]), c, w * 1.4)
+			"ring":
+				draw_arc(Vector2(s, s) * 0.5, s * 0.44, 0, TAU, 24, c, w)
 			"search":
 				draw_arc(Vector2(0.42, 0.42) * s, s * 0.26, 0, TAU, 20, c, w * 1.3)
 				draw_line(Vector2(0.62, 0.62) * s, Vector2(0.88, 0.88) * s, c, w * 1.6)

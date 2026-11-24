@@ -199,6 +199,10 @@ func load_session(progress: Callable) -> void:
 	for p: Dictionary in room.players:
 		hud.set_driver(p.id, p.get("country"), p.get("num"))
 	timing = hud.timing
+	# the phone's offline races: the objective, the rival's marker and the callouts (RaceObjective)
+	if LocalRoom.is_local_code(conn.code) and MobileUI.layout_on() and not spectator and race.kind == "race":
+		objective = RaceObjective.new(boss_name)
+		hud.add_child(objective)
 	if LocalRoom.is_local_code(conn.code):
 		chat = ChatPanel.new()
 		chat.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)

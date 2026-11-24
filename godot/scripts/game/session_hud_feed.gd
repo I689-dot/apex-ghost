@@ -4,6 +4,9 @@ extends SessionPits
 ## countdown, the start hint, the spectator's board) (the layers: SessionBase, session_base.gd).
 
 ## Start of my current lap (server clock), from the local mirror of the lap logic.
+## The phone's objective layer in an offline race (RaceObjective), null elsewhere.
+var objective: RaceObjective = null
+
 func lap_start_ms() -> float:
 	var p: RaceTracker.PlayerRaceState = local_tracker.players.get(me) if local_tracker != null else null
 	if p != null:
@@ -218,6 +221,14 @@ func update_race_ui(server_now: float, race_t: float, dt: float) -> void:
 	}
 	state.merge(rc_hud)
 	hud.update_state(state)
+	if objective != null:
+		var rival_pos: Variant = null
+		if rival_id != "" and remotes.has(rival_id):
+			var rr: Remote = remotes[rival_id]
+			rival_pos = rr.visual.global_position
+			var rs: Variant = _standing(rival_id)
+			objective.set_rival_behind(rs != null and me_s != null and int(me_s.position) < int(rs.position))
+		objective.update(dt, position if me_s != null else 0, p, rival_pos, get_viewport().get_camera_3d(), int(career.cleanLaps), v.wake.strength, race_t >= 0.0 and finished_ms == null)
 	hud.update_damage(damage, kb.held("damage"))
 	if race_t >= 0.0 and finished_ms == null:
 		career.km += (tel.speed * dt) / 1000.0

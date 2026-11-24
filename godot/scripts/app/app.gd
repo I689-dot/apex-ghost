@@ -295,10 +295,7 @@ func show_menu(error: String = "") -> void:
 ## The phone layout (MobileHome, after RESOURCES/UI-MOBILE-REFERENCE) or the PC's (MenuScreen): Display › Menu layout,
 ## "auto" picks the phone layout on a touch screen. APEX_MOBILE_UI=1 forces it (screenshots on the PC).
 func mobile_layout() -> bool:
-	if OS.get_environment("APEX_MOBILE_UI") != "":
-		return true
-	var l := str(Settings.data.display.get("menuLayout", "auto"))
-	return l == "mobile" or (l == "auto" and UIKit.touch())
+	return MobileUI.layout_on()
 
 ## The PC menu's tab (Friends, Online) from the mobile layout, with back to the home.
 func show_classic_menu(tab: String) -> void:
@@ -701,8 +698,14 @@ func show_results(m: Dictionary) -> void:
 	var prog := {}
 	var ev_result := {}
 	var stats := {}
+	# the phone's race callouts (RaceObjective): their credits, paid with the results
+	var bonus := {}
+	var boss := ""
 	if session != null:
 		stats = session.career_stats()
+		if session.objective != null:
+			bonus = session.objective.bonus.duplicate()
+			boss = session.boss_name
 	if not stats.is_empty() and conn != null and LocalRoom.is_local_code(conn.code) and not spectating:
 		var mine: Variant = null
 		for r: Dictionary in m.rows:
@@ -720,23 +723,35 @@ func show_results(m: Dictionary) -> void:
 		gain = CareerData.add_session(s)
 		# the mobile layout's progression: pass XP, contracts, chests; a career cup race's trophies
 		prog = Progression.record_session(s)
+		var paid := 0
+		for k: String in bonus:
+			paid += int(bonus[k])
+		if paid > 0:
+			Progression.add_credits(paid)
 		var pev: Dictionary = Progression.data().event
 		if m.kind == "race" and not pev.is_empty():
 			var want := str(app_event_track(pev))
 			if want == "" or want == str(pending_race.get("trackId", "")):
 				if pev.has("difficulty"):
 					Settings.data.ai.difficulty = float(pev.difficulty)
-				var boss := Progression.current_boss()
-				if boss != "":
+				var rival := Progression.current_boss()
+				if rival != "":
 					var bpos := 0
 					for r: Dictionary in m.rows:
-						if str(r.get("nick", "")) == boss:
+						if str(r.get("nick", "")) == rival:
 							bpos = int(r.get("position", 0))
 					Progression.record_boss(str(pev.cup), int(s.position) > 0 and (bpos == 0 or int(s.position) < bpos))
 				ev_result = Progression.score_event(s.position, s.field, s)
 	_drop_session()
 	screen = "results"
 	set_backdrop("pole", pending_race.get("trackId", ""))
+	if mobile_layout() and not prog.is_empty() and m.kind == "race":
+		# the phone: its results first (driver cards), then the rewards over the full results page
+		MobileResults.show(self, m, me, boss, func() -> void:
+			screen = "results"
+			set_ui(ResultsScreen.build(self, m, gain))
+			MobileHome.race_rewards(self, prog, ev_result, gain, bonus))
+		return
 	set_ui(ResultsScreen.build(self, m, gain))
 	if mobile_layout() and not prog.is_empty():
 		MobileHome.race_rewards(self, prog, ev_result, gain)

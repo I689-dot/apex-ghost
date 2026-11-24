@@ -61,6 +61,17 @@ func _run() -> void:
 	MobileHome.race_rewards(app, {"passXp": 260, "contracts": [0], "chest": true}, {"trophies": 3, "gained": 2, "credits": 4000, "cup": "d_trophy", "race": 1}, {"coins": 6200})
 	await _shot("rewards")
 	await _clear_overlays()
+	# the phone results (MobileResults) and the rewards with the race's callouts (RaceObjective's bonus)
+	var rows := [
+		{"id": app.me, "nick": "You", "carId": "2024_porsche_992_gt3_r", "position": 1, "totalMs": 352170.0, "gapMs": null, "dnf": false},
+		{"id": "b1", "nick": "Elena Roux", "carId": "2020_audi_r8_lms_evo", "position": 2, "totalMs": 356808.0, "gapMs": 4638.0, "dnf": false},
+		{"id": "b2", "nick": "Luca Bellandi", "carId": "ford_mustang_gt3", "position": 3, "totalMs": 359120.0, "gapMs": 6950.0, "dnf": false},
+	]
+	MobileResults.show(app, {"kind": "race", "rows": rows}, app.me, "Elena Roux", func() -> void: pass)
+	await _shot("results", 2.0)
+	MobileHome.race_rewards(app, {"passXp": 300, "contracts": [0]}, {"trophies": 3, "gained": 1, "credits": 2000, "cup": "d_trophy", "race": 3}, {"coins": 5400}, {"overtake": 750, "clean_lap": 900, "slipstream": 200})
+	await _shot("rewards_x2")
+	await _clear_overlays()
 	MobileHome._rate(app)
 	await _shot("rate")
 	await _clear_overlays()

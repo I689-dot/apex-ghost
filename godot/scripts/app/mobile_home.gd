@@ -444,27 +444,32 @@ static func paint(app: App) -> void:
 static func open_store(app: App, tab: String) -> void:
 	MobileStore.show(app, {"items": "cosmetics", "offers": "foryou"}.get(tab, tab))
 
-## After an offline session (App.show_results, the mobile layout): what it gave, over the results, as the references'
-## TOTAL REWARDS panel: a cup race's trophies and credits, the pass XP, the contracts advanced, a daily-wins chest.
-## The credits can be doubled by watching a rewarded ad placeholder; closing it may show an interstitial (every few
-## races); after a win, once, the rate-us prompt.
-static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain: Variant) -> void:
+## After an offline session (App.show_results, the mobile layout): what it gave, as the references' rewards (033, 085,
+## 086): the race prize and the callouts' credits by category, a cup race's stars, the pass XP with the pass's bar, the
+## goals advanced, a daily-wins chest; then the big ×2 card: watch an ad to double the credits, or miss out. Closing may
+## show an interstitial (every few races, never after the ×2 ad); after a three-star race, once, the rate-us prompt.
+## bonus: the race's callouts ({overtake, clean_lap, slipstream} credits, already paid: RaceObjective).
+static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain: Variant, bonus: Dictionary = {}) -> void:
 	var lines: Array = []
 	var credits := int(ev.get("credits", 0))
-	if not ev.is_empty():
-		var what := I18n.t("Featured event") if ev.get("weekly", false) else I18n.t(Progression.cup(ev.cup)[2])
-		lines.append([what, I18n.t("{n} trophies", {"n": int(ev.trophies)}) + (I18n.t(" (+{g} new)", {"g": int(ev.gained)}) if int(ev.gained) > 0 and not ev.get("weekly", false) else "")])
 	if gain != null and int(gain.get("coins", 0)) > 0:
 		credits += int(gain.coins)
 	if credits > 0:
-		lines.append([I18n.t("Credits"), StoreScreen.fmt(credits)])
+		lines.append([I18n.t("Race prize"), StoreScreen.fmt(credits)])
+	for k: Array in [["overtake", I18n.t("Overtakes")], ["clean_lap", I18n.t("Clean laps")], ["slipstream", I18n.t("Slipstream")]]:
+		if int(bonus.get(k[0], 0)) > 0:
+			lines.append([k[1], StoreScreen.fmt(int(bonus[k[0]]))])
+			credits += int(bonus[k[0]])
+	if not ev.is_empty():
+		var what := I18n.t("Featured event") if ev.get("weekly", false) else I18n.t(Progression.cup(ev.cup)[2])
+		lines.append([what, I18n.t("{n} stars", {"n": int(ev.trophies)}) + (I18n.t(" (+{g} new)", {"g": int(ev.gained)}) if int(ev.gained) > 0 and not ev.get("weekly", false) else "")])
 	lines.append([I18n.t("Pass XP"), "+%d" % int(prog.get("passXp", 0))])
 	for i: int in prog.get("contracts", []):
 		var c: Dictionary = Progression.data().contracts[i]
 		lines.append([Progression.contract_text(c), "%d/%d" % [int(c.progress), int(c.target)]])
 	if prog.get("chest", false):
 		lines.append([I18n.t("Daily wins chest"), "+1"])
-	var m := UIW.modal(app.overlay_layer, 560)
+	var m := UIW.modal(app.overlay_layer, 760)
 	var b: VBoxContainer = m.body
 	var close_all := func(doubled: bool) -> void:
 		m.root.queue_free()
@@ -476,7 +481,7 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain: Varia
 	UIW.modal_head(b, I18n.t("Total rewards"), func() -> void: close_all.call(false))
 	if not ev.is_empty():
 		var tr := CenterContainer.new()
-		tr.add_child(MobileUI.trophies(int(ev.trophies), 3, 44))
+		tr.add_child(MobileUI.stars(int(ev.trophies), 3, 44))
 		b.add_child(tr)
 	for l: Array in lines:
 		var row := UIW.hbox(10)
@@ -485,17 +490,44 @@ static func race_rewards(app: App, prog: Dictionary, ev: Dictionary, gain: Varia
 		row.add_child(t)
 		row.add_child(UIKit.label(l[1], 19, UIKit.TEXT, true, 700))
 		b.add_child(UIW.row_line(row))
-	var acts := UIW.hbox(10)
-	acts.alignment = BoxContainer.ALIGNMENT_END
+	# the pass's bar (reference 033)
+	var pr := UIW.hbox(10)
+	pr.add_child(UIKit.label(I18n.t("Season pass · tier {n}", {"n": Progression.pass_tier()}).to_upper(), 15, UIKit.SOFT, true, 700))
+	var pb := MobileUI.bar(Progression.pass_into() / float(Progression.PASS_TIER_XP))
+	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pr.add_child(pb)
+	pr.add_child(UIKit.label("%d/%d" % [Progression.pass_into(), Progression.PASS_TIER_XP], 15, UIKit.TEXT, true, 700))
+	b.add_child(pr)
+	# ×2 (references 034, 086): the doubled number large, WATCH AD, or MISS OUT
 	if credits > 0:
-		var dbl := UIKit.button(I18n.t("Double credits · watch video"), func() -> void:
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", UIKit.box(Color("d81b72"), Color(1, 1, 1, 0.3), 1, 8, Vector2(18, 12)))
+		var crow := UIW.hbox(16)
+		var x2 := UIKit.label("×2", 64, Color.WHITE, true, 800)
+		x2.add_theme_font_override("font", UIKit.font(true, 800, true))
+		crow.add_child(x2)
+		var cc := UIW.vbox(2)
+		cc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cc.add_child(UIKit.label(I18n.t("Double your earnings!").to_upper(), 22, Color.WHITE, true, 800))
+		var amt := UIW.hbox(6)
+		amt.add_child(MobileUI.Icon.make("credit", 24, Color.WHITE))
+		amt.add_child(UIKit.label(StoreScreen.fmt(credits * 2), 30, Color.WHITE, true, 800))
+		cc.add_child(amt)
+		crow.add_child(cc)
+		var watch := MobileUI.buy_button(I18n.t("Watch ad"), "", "", func() -> void:
 			m.root.queue_free()
 			MobileAds.rewarded(app, I18n.t("{n} more credits", {"n": StoreScreen.fmt(credits)}), func(ok: bool) -> void:
 				if ok:
 					Progression.add_credits(credits)
 					MobileUI.reward_popup(app, I18n.t("Credits doubled"), [I18n.t("{n} credits", {"n": StoreScreen.fmt(credits)})])))
-		acts.add_child(dbl)
-	var ok := UIKit.button(I18n.t("Continue"), func() -> void: close_all.call(false), true)
+		watch.custom_minimum_size = Vector2(200, 54)
+		crow.add_child(watch)
+		card.add_child(crow)
+		b.add_child(card)
+	var acts := UIW.hbox(10)
+	acts.alignment = BoxContainer.ALIGNMENT_END
+	var ok := UIKit.button(I18n.t("Miss out") + "  »" if credits > 0 else I18n.t("Continue"), func() -> void: close_all.call(false), credits <= 0)
 	acts.add_child(ok)
 	b.add_child(acts)
 	ok.grab_focus.call_deferred()
