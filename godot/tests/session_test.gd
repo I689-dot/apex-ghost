@@ -154,7 +154,7 @@ func _run() -> void:
 		if OS.get_environment("SMOKE_AT") != "" and elapsed >= float(OS.get_environment("SMOKE_AT")) and session.tyre_smoke != null and Engine.get_process_frames() % 4 == 0:
 			for w: Wheel in session.vehicle.wheels:
 				if not w.front:
-					session.tyre_smoke.puff(w.cp + Vector3.UP * 0.2, session.vehicle.linear_velocity * 0.3, 1.0, false)
+					session.tyre_smoke.puff(w.cp + Vector3.UP * 0.2, session.vehicle.linear_velocity * 0.3, 1.0, TyreSmoke.SMOKE_C)
 		# PAD2 / PAD2_AT: a second input from then on (full throttle down the straight, then the handbrake)
 		for pk: String in ["PAD", "PAD2"]:
 			if OS.get_environment(pk) != "" and elapsed >= float(OS.get_environment(pk + "_AT")) and (pk == "PAD2" or OS.get_environment("PAD2") == "" or elapsed < float(OS.get_environment("PAD2_AT"))):

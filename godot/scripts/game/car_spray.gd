@@ -26,12 +26,22 @@ static func _soft_texture() -> Texture2D:
 		_tex = t
 	return _tex
 
-static func _material(alpha: float) -> StandardMaterial3D:
+## flipbook: the mist plays the pre-rendered smoke puff (TyreSmoke.PUFF_TEX; a flat radial blob before 2026-11-24),
+## brightened by the inverse of the sheet's mean shading (0.44: shaders/tyre_smoke.gdshaderinc); the splash's drops keep
+## the soft blob.
+static func _material(alpha: float, flipbook: bool) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	m.albedo_texture = _soft_texture()
-	m.albedo_color = Color(0.82, 0.85, 0.88, alpha)
+	if flipbook:
+		m.albedo_texture = load(TyreSmoke.PUFF_TEX)
+		m.particles_anim_h_frames = 8
+		m.particles_anim_v_frames = 8
+		m.particles_anim_loop = false
+		m.albedo_color = Color(0.82 / 0.44, 0.85 / 0.44, 0.88 / 0.44, alpha)
+	else:
+		m.albedo_texture = _soft_texture()
+		m.albedo_color = Color(0.82, 0.85, 0.88, alpha)
 	m.vertex_color_use_as_albedo = true
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
 	m.disable_receive_shadows = true
@@ -64,10 +74,14 @@ func _init(length: float, width: float) -> void:
 	var rt := GradientTexture1D.new()
 	rt.gradient = ramp
 	pm.color_ramp = rt
+	# the flipbook once over a particle's life, each starting a little into it
+	pm.anim_speed_min = 1.0
+	pm.anim_speed_max = 1.0
+	pm.anim_offset_max = 0.25
 	_mist.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(2.1, 2.1)
-	q.material = _material(1.0)
+	q.material = _material(1.0, true)
 	_mist.draw_pass_1 = q
 	_mist.amount = 80
 	_mist.lifetime = 1.1
@@ -90,7 +104,7 @@ func _init(length: float, width: float) -> void:
 	_splash.process_material = sp
 	var q2 := QuadMesh.new()
 	q2.size = Vector2(0.9, 0.9)
-	q2.material = _material(1.0)
+	q2.material = _material(1.0, false)
 	_splash.draw_pass_1 = q2
 	_splash.amount = 40
 	_splash.lifetime = 0.9

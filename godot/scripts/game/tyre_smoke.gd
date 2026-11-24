@@ -118,11 +118,11 @@ func emit_from(v: Vehicle, dt: float) -> void:
 		if _rng.randf() < count - whole:
 			whole += 1
 		for i in whole:
-			puff(w.cp + w.n * 0.2, carry, k, dust)
+			puff(w.cp + w.n * 0.2, carry, k, DUST_C if dust else SMOKE_C)
 
-## One puff at a point (a contact patch), carried along at `carry` (m/s), as thick as k (0..1); dust or smoke.
-func puff(at: Vector3, carry: Vector3, k: float, dust: bool) -> void:
-	var c := DUST_C if dust else SMOKE_C
+## One puff at a point (a contact patch, an engine bay), carried along at `carry` (m/s), as thick as k (0..1), of colour
+## c (SMOKE_C, DUST_C, CarVisual's engine smoke).
+func puff(at: Vector3, carry: Vector3, k: float, c: Color) -> void:
 	var i := _next
 	_next = (_next + 1) % _n
 	_pos[i] = at + Vector3(_rng.randf_range(-0.25, 0.25), 0.0, _rng.randf_range(-0.25, 0.25))

@@ -21,7 +21,6 @@ const VIS_OWN := 8
 static var _glass_re: RegEx
 static var _pool_tex: GradientTexture2D
 static var _blob_tex: GradientTexture2D
-static var _smoke_tex: GradientTexture2D
 
 class WheelRig:
 	extends RefCounted
@@ -67,8 +66,9 @@ var _steer_axis := Vector3(0, 0, 1)
 var _steer_ratio: float
 var _pool: MeshInstance3D = null
 var headlights: Array = [] # SpotLight3D
-var _smoke: Array = [] # Sprite3D
 var _smoke_t := 0.0
+## A damaged engine's smoke: dark, oily grey.
+const ENGINE_SMOKE_C := Color(0.3, 0.3, 0.32)
 var _opacity := 1.0
 var static_comp: Array = [0.0, 0.0, 0.0, 0.0]
 ## How far each wheel is off its hub (m, FL, FR, RL, RR): the pit crew's work.
@@ -729,57 +729,17 @@ func reset_damage() -> void:
 	apply_dents()
 	restore_parts()
 
-## Engine smoke at high damage. scene_root: where the sprites live (the world).
-func update_smoke(dt: float, engine_damage: float, scene_root: Node) -> void:
-	if engine_damage < 0.55:
-		for s: Sprite3D in _smoke:
-			s.visible = false
+## Engine smoke at high damage: dark puffs from the engine bay into the session's pool of smoke puffs (TyreSmoke, the
+## pre-rendered puff; flat gradient sprites before 2026-11-24). They stay where they are let go, as smoke in still air.
+func update_smoke(dt: float, engine_damage: float, smoke: TyreSmoke) -> void:
+	if engine_damage < 0.55 or smoke == null:
 		return
-	if _smoke.is_empty():
-		if _smoke_tex == null:
-			_smoke_tex = GradientTexture2D.new()
-			var g := Gradient.new()
-			g.colors = PackedColorArray([Color(1, 1, 1, 0.8), Color(1, 1, 1, 0.0)])
-			_smoke_tex.gradient = g
-			_smoke_tex.fill = GradientTexture2D.FILL_RADIAL
-			_smoke_tex.fill_from = Vector2(0.5, 0.5)
-			_smoke_tex.fill_to = Vector2(1.0, 0.5)
-			_smoke_tex.width = 64
-			_smoke_tex.height = 64
-		for i in 24:
-			var sp := Sprite3D.new()
-			sp.texture = _smoke_tex
-			sp.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-			sp.modulate = Color(0.33, 0.33, 0.33, 0.0)
-			sp.shaded = false
-			sp.visible = false
-			sp.pixel_size = 0.02
-			sp.set_meta("age", 99.0)
-			scene_root.add_child(sp)
-			_smoke.append(sp)
 	_smoke_t -= dt
 	if _smoke_t <= 0.0:
 		_smoke_t = 0.12 / engine_damage
-		for sp: Sprite3D in _smoke:
-			if sp.get_meta("age") > 2.2:
-				sp.set_meta("age", 0.0)
-				sp.global_position = global_transform * Vector3(0, 0.9, float(entry.dims.length) * 0.32)
-				sp.visible = true
-				break
-	for sp: Sprite3D in _smoke:
-		if not sp.visible:
-			continue
-		var age: float = sp.get_meta("age") + dt
-		sp.set_meta("age", age)
-		sp.global_position.y += dt * 1.2
-		sp.scale = Vector3.ONE * (0.6 + age * 1.6)
-		sp.modulate = Color(0.33, 0.33, 0.33, maxf(0.0, 0.45 * (1.0 - age / 2.2) * engine_damage))
-		if age > 2.2:
-			sp.visible = false
+		smoke.puff(global_transform * Vector3(0, 0.9, float(entry.dims.length) * 0.32), Vector3.ZERO, engine_damage, ENGINE_SMOKE_C)
 
 func dispose() -> void:
-	for sp: Sprite3D in _smoke:
-		sp.queue_free()
 	queue_free()
 
 ## The id of the model a car entry draws: its own, or the one it shares (the safety car is the Vantage GT3: "model").

@@ -779,7 +779,7 @@ func _process_inner(dt: float) -> void:
 	my_visual.set_pose(v.steer_angle, v.wheels[0].angle, v.wheels[2].angle, susp)
 	var braking: bool = v.pedals.brake > 0.1 and not v.is_reverse()
 	my_visual.set_lights(braking, headlights_on, env.night)
-	my_visual.update_smoke(dt, damage.zones[4], self)
+	my_visual.update_smoke(dt, damage.zones[4], tyre_smoke)
 
 	Prof.mark("p.my_visual")
 	# camera
@@ -989,7 +989,7 @@ func update_remote(r: Remote, server_now: float, dt: float, cam_pos: Vector3) ->
 		r.visual.position = Vector3(0, b.lift, 0)
 		r.visual.set_pose(v.steer_angle, v.wheels[0].angle, v.wheels[2].angle, susp)
 		r.visual.set_lights(v.pedals.brake > 0.1 and not v.is_reverse(), headlights_on, env.night)
-		r.visual.update_smoke(dt, 0.0, self)
+		r.visual.update_smoke(dt, 0.0, tyre_smoke)
 		var d := r.visual.global_position.distance_to(cam_pos)
 		r.visual.set_opacity(1.0 if cinematic != null or contact else near_fade(d))
 		return
@@ -1004,7 +1004,7 @@ func update_remote(r: Remote, server_now: float, dt: float, cam_pos: Vector3) ->
 	var susp2 := [s.susp[0] - 0.02, s.susp[1] - 0.02, s.susp[2] - 0.02, s.susp[3] - 0.02]
 	o.set_pose(s.steer, s.rot_f, s.rot_r, susp2)
 	o.set_lights((s.flags & CarState.FLAG_BRAKE) != 0, (s.flags & CarState.FLAG_HEADLIGHTS) != 0, env.night)
-	o.update_smoke(dt, maxf(0.6, r.damage.zones[4]) if (s.flags & CarState.FLAG_SMOKE) != 0 else 0.0, self)
+	o.update_smoke(dt, maxf(0.6, r.damage.zones[4]) if (s.flags & CarState.FLAG_SMOKE) != 0 else 0.0, tyre_smoke)
 	# ghost: fade out when very close to the camera so it never blocks the cockpit view
 	var dd := o.global_position.distance_to(cam_pos)
 	var fade := 1.0 if cinematic != null or contact or (spectator and r.id == spec_target) else near_fade(dd)
